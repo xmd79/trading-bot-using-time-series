@@ -591,19 +591,19 @@ def main():
                         print("EMA Fast:", ema_fast)
 
                         # Determine if a bullish or bearish signal has been generated
-                        if close_prices[-1] < ema_fast < ema_slow and percent_to_min_val < 0.3 and percent_to_max_val > 0.7:
+                        if percent_to_min_val < 25 and percent_to_max_val > 75:
                             print("Bullish signal generated!")
 
                             # Calculate RSI
-                            rsi = ta.RSI(close_prices, timeperiod=14)[-1]
+                            rsi = talib.RSI(close_prices, timeperiod=14)[-1]
                             print(f"RSI: {rsi}")
 
                             # Calculate MACD
-                            macd, signal, hist = ta.MACD(close_prices, fastperiod=12, slowperiod=26, signalperiod=9)
+                            macd, signal, hist = talib.MACD(close_prices, fastperiod=12, slowperiod=26, signalperiod=9)
                             print(f"MACD: {macd[-1]}, Signal: {signal[-1]}, Histogram: {hist[-1]}")
 
                             # Calculate Bollinger Bands
-                            upper, middle, lower = ta.BBANDS(close_prices, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+                            upper, middle, lower = talib.BBANDS(close_prices, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
                             print(f"Upper BB: {upper[-1]}, Middle BB: {middle[-1]}, Lower BB: {lower[-1]}")
 
                             # Calculate the electromagnetic field strength
@@ -620,19 +620,19 @@ def main():
                             weighted_score = rsi * 0.4 + hist[-1] * 0.3 + em_strength * 0.2 + (close_prices[-1] - lower[-1]) / (upper[-1] - lower[-1]) * 0.1
                             print(f"Weighted Score: {weighted_score}")
 
-                        elif close_prices[-1] > ema_fast > ema_slow and percent_to_min_val > 0.7 and percent_to_max_val < 0.3:
+                        elif percent_to_min_val > 75 and percent_to_max_val < 25:
                             print("Bearish signal generated!")
 
                             # Calculate RSI
-                            rsi = ta.RSI(close_prices, timeperiod=14)[-1]
+                            rsi = talib.RSI(close_prices, timeperiod=14)[-1]
                             print(f"RSI: {rsi}")
 
                             # Calculate MACD
-                            macd, signal, hist = ta.MACD(close_prices, fastperiod=12, slowperiod=26, signalperiod=9)
+                            macd, signal, hist = talib.MACD(close_prices, fastperiod=12, slowperiod=26, signalperiod=9)
                             print(f"MACD: {macd[-1]}, Signal: {signal[-1]}, Histogram: {hist[-1]}")
 
                             # Calculate Bollinger Bands
-                            upper, middle, lower = ta.BBANDS(close_prices, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+                            upper, middle, lower = talib.BBANDS(close_prices, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
                             print(f"Upper BB: {upper[-1]}, Middle BB: {middle[-1]}, Lower BB: {lower[-1]}")
 
                             # Calculate the electromagnetic field strength
