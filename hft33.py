@@ -634,7 +634,6 @@ def main():
 
                         print("EMA Slow:", ema_slow)
                         print("EMA Fast:", ema_fast)
-                        print("Last Close at:", close_prices[-1])
 
                         # Check if the EMA cross signal has been generated
                         if percent_to_min_val < 25 and percent_to_max_val > 75 and close_prices[-1] < ema_fast < ema_slow and momentum:
@@ -648,6 +647,10 @@ def main():
 
                         elif percent_to_max_val < 25 and percent_to_min_val > 75:
                             print("bearish momentum in trend") 
+
+                        else:
+                            print("No signal yet, scanning...")
+
 
             # Flush all data after each iteration
             account_balance = None
