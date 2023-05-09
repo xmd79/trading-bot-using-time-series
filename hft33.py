@@ -545,6 +545,49 @@ def main():
         print("Looping...")
         print()
         try:
+            # Check if balance is zero
+            #account_balance = float(get_account_balance())
+            #if account_balance == 0:
+                #print("Balance is zero. Exiting program.")
+                #break
+
+            # Define electromagnetic field variables
+            em_field = 0.1  # Tesla
+            em_amp = 10  # Amperes
+            em_phase = 0  # Radians
+
+            # Define sine wave variables
+            wave_len = 30 * 60  # 30 minutes in seconds
+            wave_freq = 1 / wave_len
+            time_period = 2 * math.pi / wave_freq
+            time_step = 1
+            num_cycles = 1
+            t = np.arange(0, num_cycles * time_period, time_step)
+            sine_wave = em_field * np.sin(2 * math.pi * wave_freq * t + em_phase)
+
+            # Print electromagnetic spectrum pulse with waves frequencies
+            print("Electromagnetic Spectrum Pulse:")
+            print()
+            print("Gamma waves (30-100 Hz):", np.linspace(30, 100, num=10))
+            print("Beta waves (12-30 Hz):", np.linspace(12, 30, num=10))
+            print("Alpha waves (8-12 Hz):", np.linspace(8, 12, num=10))
+            print("Theta waves (4-8 Hz):", np.linspace(4, 8, num=10))
+            print("Delta waves (0.1-4 Hz):", np.linspace(0.1, 4, num=10))
+            print()
+            print()
+
+            # Print sine wave variables and values
+            print("Sine Wave Variables:")
+            print()
+            print("Wave Length (seconds):", wave_len)
+            print("Wave Frequency (Hz):", wave_freq)
+            print("Time Period (seconds):", time_period)
+            print("Time Step (seconds):", time_step)
+            print("Number of Cycles:", num_cycles)
+            print("Sine Wave Values:", sine_wave)
+            print()
+            print()
+
             # Define start and end time for historical data
             start_time = int(time.time()) - (1800 * 4)  # 60-minute interval (4 candles)
             end_time = int(time.time())
@@ -557,7 +600,6 @@ def main():
             # Check if candles is empty
             if not candles:
                 print("Error: No historical candles found.")
-                continue
 
             # Get the MTF signal
             signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
@@ -580,88 +622,25 @@ def main():
                     print("MTF average:", mtf_average)
                     print("Percent to min:", percent_to_min_val)
                     print("Percent to max:", percent_to_max_val)
-                    print()
-
-                    # Calculate RSI
-                    rsi = talib.RSI(close_prices, timeperiod=14)[-1]
-                    print(f"RSI: {rsi}")
-
-                    # Calculate MACD
-                    macd, signal, hist = talib.MACD(close_prices, fastperiod=12, slowperiod=26, signalperiod=9)
-                    print(f"MACD: {macd[-1]}, Signal: {signal[-1]}, Histogram: {hist[-1]}")
-
-                    # Calculate Bollinger Bands
-                    upper, middle, lower = talib.BBANDS(close_prices, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
-                    print(f"Upper BB: {upper[-1]}, Middle BB: {middle[-1]}, Lower BB: {lower[-1]}")
-
-                    # Calculate the electromagnetic field strength
-                    em_field = 0.1  # Tesla
-                    em_amp = 10  # Amperes
-                    em_phase = 0  # Radians
-
-
-                    # Define sine wave variables
-                    wave_len = 30 * 60  # 30 minutes in seconds
-                    wave_freq = 1 / wave_len
-                    time_period = 2 * math.pi / wave_freq
-                    time_step = 1
-                    num_cycles = 1
-                    t = np.arange(0, num_cycles * time_period, time_step)
-                    sine_wave = em_field * np.sin(2 * math.pi * wave_freq * t + em_phase)
-
-                    # Print electromagnetic spectrum pulse with waves frequencies
-                    print("Electromagnetic Spectrum Pulse:")
-                    print()
-                    print("Gamma waves (30-100 Hz):", np.linspace(30, 100, num=10))
-                    print("Beta waves (12-30 Hz):", np.linspace(12, 30, num=10))
-                    print("Alpha waves (8-12 Hz):", np.linspace(8, 12, num=10))
-                    print("Theta waves (4-8 Hz):", np.linspace(4, 8, num=10))
-                    print("Delta waves (0.1-4 Hz):", np.linspace(0.1, 4, num=10))
-
-                    print()
-                    print()
-
-                    # Print sine wave variables and values
-                    print("Sine Wave Variables:")
-                    print()
-                    print("Wave Length (seconds):", wave_len)
-                    print("Wave Frequency (Hz):", wave_freq)
-                    print("Time Period (seconds):", time_period)
-                    print("Time Step (seconds):", time_step)
-                    print("Number of Cycles:", num_cycles)
-                    print("Sine Wave Values:", sine_wave)
-
-                    print()
-                    print()
-
-                    em_strength = em_field * em_amp * np.sin(2 * np.pi * wave_freq * (len(close_prices)/wave_len) + em_phase)
-                    print(f"EM Strength: {em_strength}")
-
-                    # Calculate the weighted sentimental score
-                    weighted_score = rsi * 0.4 + hist[-1] * 0.3 + em_strength * 0.2 + (close_prices[-1] - lower[-1]) / (upper[-1] - lower[-1]) * 0.1
-                    print(f"Weighted Score: {weighted_score}")
-
-                    print()
-                    print()
 
                     # Check if EMA periods have been set
                     if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
-                        # Calculate the EMA values
-                        ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]
-                        ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]
+                        #print("EMA Slow Period:", EMA_SLOW_PERIOD)
+                        #print("EMA Fast Period:", EMA_FAST_PERIOD)
+
+                        # Calculate the EMA signals
+                        ema_slow = talib.EMA(close_prices, EMA_SLOW_PERIOD)[-1]
+                        ema_fast = talib.EMA(close_prices, EMA_FAST_PERIOD)[-1]
 
                         print("EMA Slow:", ema_slow)
                         print("EMA Fast:", ema_fast)
 
-                        # Determine if a bullish or bearish signal has been generated
-                        if percent_to_min_val < 25 and percent_to_max_val > 75:
-                            print("Bullish signal generated!")
+                        # Check if the EMA cross signal has been generated
+                        if percent_to_min_val < 25 and percent_to_max_val > 75 and close_prices[-1] < ema_fast < ema_slow and TRADE_SYMBOL not in momentum:
+                            print("BUY signal")
 
-                        elif percent_to_min_val > 75 and percent_to_max_val < 25:
-                            print("Bearish signal generated!")
-
-                        else:
-                            print("No trade signal generated.")
+                        elif percent_to_min_val > 75 and percent_to_max_val < 25 and close_prices[-1] > ema_fast > ema_slow and TRADE_SYMBOL in momentum:
+                            print("SELL signal")
 
             # Flush all data after each iteration
             account_balance = None
