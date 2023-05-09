@@ -634,13 +634,20 @@ def main():
 
                         print("EMA Slow:", ema_slow)
                         print("EMA Fast:", ema_fast)
+                        print("Last Close at:", close_prices[-1])
 
                         # Check if the EMA cross signal has been generated
-                        if percent_to_min_val < 25 and percent_to_max_val > 75 and close_prices[-1] < ema_fast < ema_slow and TRADE_SYMBOL not in momentum:
-                            print("BUY signal")
+                        if percent_to_min_val < 25 and percent_to_max_val > 75 and close_prices[-1] < ema_fast < ema_slow and momentum:
+                            print("BUY signal at reversal")
 
                         elif percent_to_min_val > 75 and percent_to_max_val < 25 and close_prices[-1] > ema_fast > ema_slow and TRADE_SYMBOL in momentum:
-                            print("SELL signal")
+                            print("SELL signal at reversal")
+
+                        elif percent_to_min_val < 25 and percent_to_max_val > 75:
+                            print("bullish momentum in trend")  
+
+                        elif percent_to_max_val < 25 and percent_to_min_val > 75:
+                            print("bearish momentum in trend") 
 
             # Flush all data after each iteration
             account_balance = None
