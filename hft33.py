@@ -636,10 +636,10 @@ def main():
                         print("EMA Fast:", ema_fast)
 
                         # Check if the EMA cross signal has been generated
-                        if percent_to_min_val < 25 and percent_to_max_val > 75 and close_prices[-1] < ema_fast < ema_slow and momentum:
+                        if percent_to_min_val < 25 and percent_to_max_val > 75 and close_prices[-1] < ema_fast < ema_slow:
                             print("BUY signal at reversal")
 
-                        elif percent_to_min_val > 75 and percent_to_max_val < 25 and close_prices[-1] > ema_fast > ema_slow and TRADE_SYMBOL in momentum:
+                        elif percent_to_min_val > 75 and percent_to_max_val < 25 and close_prices[-1] > ema_fast > ema_slow:
                             print("SELL signal at reversal")
 
                         elif percent_to_min_val < 25 and percent_to_max_val > 75:
