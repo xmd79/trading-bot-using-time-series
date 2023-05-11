@@ -674,7 +674,6 @@ def main():
             print("Delta range:", freq_delta_range)
 
             # Flush all data after each iteration
-            account_balance = None
             em_field = None
             em_amp = None
             em_phase = None
