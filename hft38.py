@@ -562,6 +562,14 @@ def main():
     theta_freq = 5 * 60
     delta_freq = 1 * 60
 
+    # Define frequency ranges
+    freq_alpha_range = (8, 12)
+    freq_beta_range = (13, 30)
+    freq_gamma_range = (30, 100)
+    freq_theta_range = (4, 7)
+    freq_delta_range = (0.5, 4)
+
+
     # Calculate signals for other frequencies using Fourier transform
     time_domain = np.linspace(0, num_cycles * time_period, len(t))
     gamma_signal = np.fft.ifft(np.exp(1j * 2 * np.pi * gamma_freq * time_domain))
@@ -657,6 +665,14 @@ def main():
             print("Theta signal:", theta_signal[-1])
             print("Delta signal:", delta_signal[-1])
 
+            # Print frequency ranges
+            print("Frequency ranges:")
+            print("Alpha range:", freq_alpha_range)
+            print("Beta range:", freq_beta_range)
+            print("Gamma range:", freq_gamma_range)
+            print("Theta range:", freq_theta_range)
+            print("Delta range:", freq_delta_range)
+
             # Flush all data after each iteration
             account_balance = None
             em_field = None
@@ -688,7 +704,6 @@ def main():
             print(e)
 
         time.sleep(5)
-
 # Run the main function
 if __name__ == '__main__':
     main()
