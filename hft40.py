@@ -650,6 +650,8 @@ def main():
                     theta_perc = round(diff_theta / (freq_theta_range[1] - freq_theta_range[0]) * 100, 2)
                     delta_perc = round(diff_delta / (freq_delta_range[1] - freq_delta_range[0]) * 100, 2)
 
+                    print()
+
                     # Print frequency distribution table with proportion and percentage
                     print("Frequency Distribution Table with Proportion and Percentage")
                     print("--------------------------------------------------------------------")
@@ -659,6 +661,8 @@ def main():
                     print(f"Gamma ({freq_gamma_range[0]} - {freq_gamma_range[1]} Hz)   |   {diff_gamma}    |    {gamma_perc}%   |   {abs(close_position - gamma_signal[-1])}")
                     print(f"Theta ({freq_theta_range[0]} - {freq_theta_range[1]} Hz)   |   {diff_theta}    |    {theta_perc}%   |   {abs(close_position - theta_signal[-1])}")
                     print(f"Delta ({freq_delta_range[0]} - {freq_delta_range[1]} Hz)   |   {diff_delta}    |    {delta_perc}%   |   {abs(close_position - delta_signal[-1])}")
+
+                    print()
 
                     # Set prev_close_position to close_position
                     prev_close_position = close_position
