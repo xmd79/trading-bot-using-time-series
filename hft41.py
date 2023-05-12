@@ -627,7 +627,7 @@ def main():
 
             # Print frequency distribution table with proportion, percentage and difference
             print("Frequency Distribution Table with Proportion, Percentage and Difference")
-            print("--------------------------------------------------------------------")
+            print("-----------------------------------------------------------------------")
             print("Frequency Range   |   Proportion   |   Percentage  |  Difference")
             print(f"Alpha ({freq_alpha_range[0]} - {freq_alpha_range[1]} Hz)   |   {diff_alpha}    |    {alpha_perc}%   |   {abs(close_position - alpha_signal[-1])}")
             print(f"Beta ({freq_beta_range[0]} - {freq_beta_range[1]} Hz)   |   {diff_beta}    |    {beta_perc}%   |   {abs(close_position - beta_signal[-1])}")
