@@ -622,6 +622,21 @@ def main():
             theta_perc = round(diff_theta / (freq_theta_range[1] - freq_theta_range[0]) * 100, 2)
             delta_perc = round(diff_delta / (freq_delta_range[1] - freq_delta_range[0]) * 100, 2)
 
+
+            print()
+
+            # Print frequency distribution table with proportion, percentage and difference
+            print("Frequency Distribution Table with Proportion, Percentage and Difference")
+            print("--------------------------------------------------------------------")
+            print("Frequency Range   |   Proportion   |   Percentage  |  Difference")
+            print(f"Alpha ({freq_alpha_range[0]} - {freq_alpha_range[1]} Hz)   |   {diff_alpha}    |    {alpha_perc}%   |   {abs(close_position - alpha_signal[-1])}")
+            print(f"Beta ({freq_beta_range[0]} - {freq_beta_range[1]} Hz)   |   {diff_beta}    |    {beta_perc}%   |   {abs(close_position - beta_signal[-1])}")
+            print(f"Gamma ({freq_gamma_range[0]} - {freq_gamma_range[1]} Hz)   |   {diff_gamma}    |    {gamma_perc}%   |   {abs(close_position - gamma_signal[-1])}")
+            print(f"Theta ({freq_theta_range[0]} - {freq_theta_range[1]} Hz)   |   {diff_theta}    |    {theta_perc}%   |   {abs(close_position - theta_signal[-1])}")
+            print(f"Delta ({freq_delta_range[0]} - {freq_delta_range[1]} Hz)   |   {diff_delta}    |    {delta_perc}%   |   {abs(close_position - delta_signal[-1])}")
+
+            print()
+
             # Define the four quadrants of the unit circle
             quadrant1 = (0, 90)
             quadrant2 = (90, 180)
