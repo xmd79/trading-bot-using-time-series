@@ -605,28 +605,23 @@ def main():
                     percent_to_min_val = signals['1m']['ht_sine_percent_to_min']
                     percent_to_max_val = signals['1m']['ht_sine_percent_to_max']
                     mtf_average = signals['1m']['mtf_average']
-                    close_prices = np.array([candle['close'] for candle in candles['1m']])
+                    close_position = ((sine_wave[-1] - sine_wave.min()) / (sine_wave.max() - sine_wave.min())) * 100
 
                     # Calculate momentum using MTF signal
                     momentum = signals['1m']['momentum']
 
                     # Calculate EMAs
+                    close_prices = np.array([candle['close'] for candle in candles['1m']])
                     ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]
                     ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]
 
                     # Check for buy signal
                     if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
-                        print("Buy signal!")
-                        # Perform a short trigger if the MTF signal is below the min threshold
-                        if mtf_signal_values[-1] < mtf_average * (1 - signals['1m']['min_threshold']):
-                            print("Short trigger!")
+                        print("BUY signal!")
 
                     # Check for sell signal
                     elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
-                        print("Sell signal!")
-                        # Perform a long trigger if the MTF signal is above the max threshold
-                        if mtf_signal_values[-1] > mtf_average * (1 + signals['1m']['max_threshold']):
-                            print("Long trigger!")
+                        print("SELL signal!")
 
                     # Check for bullish momentum in trend
                     elif momentum > 0 and percent_to_min_val < 20:
@@ -640,21 +635,21 @@ def main():
                         print("No signal, seeking local or major reversal")
 
             # Print signals for other frequencies
-            close_to_alpha_range = abs(sine_wave[-1] - alpha_signal[-1])
-            close_to_beta_range = abs(sine_wave[-1] - beta_signal[-1])
-            close_to_gamma_range = abs(sine_wave[-1] - gamma_signal[-1])
-            close_to_theta_range = abs(sine_wave[-1] - theta_signal[-1])
-            close_to_delta_range = abs(sine_wave[-1] - delta_signal[-1])
+            close_to_alpha_range = abs(close_position - alpha_signal[-1]) / 100
+            close_to_beta_range = abs(close_position - beta_signal[-1]) / 100
+            close_to_gamma_range = abs(close_position - gamma_signal[-1]) / 100
+            close_to_theta_range = abs(close_position - theta_signal[-1]) / 100
+            close_to_delta_range = abs(close_position - delta_signal[-1]) / 100
 
-            alpha_prop = round(close_to_alpha_range / em_field, 3)
+            alpha_prop = round(close_to_alpha_range / (freq_alpha_range[1] - freq_alpha_range[0]), 3)
             alpha_perc = round(alpha_prop * 100, 2)
-            beta_prop = round(close_to_beta_range / em_field, 3)
+            beta_prop = round(close_to_beta_range / (freq_beta_range[1] - freq_beta_range[0]), 3)
             beta_perc = round(beta_prop * 100, 2)
-            gamma_prop = round(close_to_gamma_range / em_field, 3)
+            gamma_prop = round(close_to_gamma_range / (freq_gamma_range[1] - freq_gamma_range[0]), 3)
             gamma_perc = round(gamma_prop * 100, 2)
-            theta_prop = round(close_to_theta_range / em_field, 3)
+            theta_prop = round(close_to_theta_range / (freq_theta_range[1] - freq_theta_range[0]), 3)
             theta_perc = round(theta_prop * 100, 2)
-            delta_prop = round(close_to_delta_range / em_field, 3)
+            delta_prop = round(close_to_delta_range / (freq_delta_range[1] - freq_delta_range[0]), 3)
             delta_perc = round(delta_prop * 100, 2)
 
             print("Frequency Distribution Table with Proportion and Percentage")
@@ -665,12 +660,13 @@ def main():
             print(f"Gamma ({freq_gamma_range[0]} - {freq_gamma_range[1]} Hz)   |   {gamma_prop}    |    {gamma_perc}%")
             print(f"Theta ({freq_theta_range[0]} - {freq_theta_range[1]} Hz)   |   {theta_prop}    |    {theta_perc}%")
             print(f"Delta ({freq_delta_range[0]} - {freq_delta_range[1]} Hz)   |   {delta_prop}    |    {delta_perc}%")
+            print("--------------------------------------------------------------------")
 
-            # Wait for 5 seconds before repeating the loop
             time.sleep(5)
 
         except Exception as e:
-            print("Error:", e)
+            print(f"Error: {e}")
+            time.sleep(5)
         
 # Run the main function
 if __name__ == '__main__':
