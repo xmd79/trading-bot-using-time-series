@@ -675,21 +675,53 @@ def main():
             else:
                 print("Close position is in quadrant 4")
 
-            # Determine whether the close position is above or below the midline
-            if close_position >= midline:
-                print("Close position is above the midline")
-            else:
-                print("Close position is below the midline")
+            print()
 
-            # Determine whether the close position has crossed above or below the midline
-            if close_position > midline and prev_close_position <= midline:
-                print("Close position has crossed above the midline")
-            elif close_position < midline and prev_close_position >= midline:
-                print("Close position has crossed below the midline")
+            print(signals)
 
-            # Update previous close position and midline
-            prev_close_position = close_position
-            midline = (freq_alpha_range[0] + freq_alpha_range[1]) / 2
+            print()
+
+            # Check if the '1m' key exists in the signals dictionary
+            if '1m' in signals:
+                # Check if the percent to min/max signal keys exist in the '1m' dictionary
+                if 'ht_sine_percent_to_min' in signals['1m'] and 'ht_sine_percent_to_max' in signals['1m']:
+                    print("Reached the '1m' signals check.")
+
+                    percent_to_min_val = signals['1m']['ht_sine_percent_to_min']
+                    percent_to_max_val = signals['1m']['ht_sine_percent_to_max']
+                    mtf_average = signals['1m']['mtf_average']
+                    close_prices = np.array([candle['close'] for candle in candles['1m']])
+
+                    print("Close price:", close_prices[-1])
+                    print("MTF average:", mtf_average)
+                    print("Percent to min:", percent_to_min_val)
+                    print("Percent to max:", percent_to_max_val)
+
+                    # Check if EMA periods have been defined
+                    if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
+                        # Calculate the EMAs
+                        ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]
+                        ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]
+
+                        print("EMA slow:", ema_slow)
+                        print("EMA fast:", ema_fast)
+
+                        # Check if the current price is above the EMAs and the percent to min/max signals are above 80%
+                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
+                            print("Buy signal!")
+                            
+                        # Check if the current price is below the EMAs and the percent to min/max signals are below 20%
+                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
+                            print("Sell signal!")
+                   
+                        elif percent_to_min_val < 20:
+                            print("Bullish momentum in trend")
+
+                        elif percent_to_max_val < 20:
+                            print("Bearish momentum in trend")
+
+                        else:
+                            print("No signal, seeking local or major reversal")
 
             time.sleep(5)
 
