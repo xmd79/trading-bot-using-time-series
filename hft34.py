@@ -312,7 +312,7 @@ def forecast_price(candles, timeframes, mtf_signal):
         target_price = norm_sine[-1] + (target_percent/100) * (max_sine - min_sine)
     else:
         target_price = close
-    target_price += 1000  # add 1000 to the target price
+    #target_price += 1000  # add 1000 to the target price
     return round(target_price, 2)
 
 forecast = forecast_price(candles, timeframes, mtf_signal)
