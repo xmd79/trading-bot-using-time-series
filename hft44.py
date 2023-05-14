@@ -835,28 +835,6 @@ mtf = check_mtf_signal(candles, timeframes, mtf_signal)
 print(mtf[0])
 print()
 
-def forecast_price(candles, timeframes, mtf_signal):
-    signal, momentum_distance_min, momentum_distance_max, momentum_range, cycle_time_str, remaining_time, percent_to_min, percent_to_max = check_mtf_signal(candles, timeframes, mtf_signal)
-    close = candles['1m'][-1]['close']
-    if signal == "bearish":
-        target_percent = percent_to_min - 10
-        if target_percent < 0:
-            target_percent = 0
-        target_price = norm_sine[-1] - (target_percent/100) * (max_sine - min_sine)
-    elif signal == "bullish":
-        target_percent = percent_to_max + 10
-        if target_percent > 100:
-            target_percent = 100
-        target_price = norm_sine[-1] + (target_percent/100) * (max_sine - min_sine)
-    else:
-        target_price = close
-    #target_price += 1000  # add 1000 to the target price
-    return round(target_price, 2)
-
-forecast = forecast_price(candles, timeframes, mtf_signal)
-print(forecast)
-print()
-
 def get_mtf_signal_v2(candles, timeframes, percent_to_min=5, percent_to_max=5):
     signals = {}
     
@@ -1093,6 +1071,9 @@ def main():
 
     while True:
         try:
+            # Define current_quadrant variable
+            current_quadrant = 0
+
             # Define start and end time for historical data
             start_time = int(time.time()) - (1800 * 4)  # 60-minute interval (4 candles)
             end_time = int(time.time())
@@ -1134,6 +1115,13 @@ def main():
 
                     print("Minimum value of sine wave:", sine_wave_min)
                     print("Maximum value of sine wave:", sine_wave_max)
+
+                    # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
+                    dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+                    dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
+
+                    print("Distance from close to min:", dist_from_close_to_min)
+                    print("Distance from close to max:", dist_from_close_to_max)
 
                     # Calculate the range of values for each quadrant
                     range_q1 = (sine_wave_max - sine_wave_min) / 4
@@ -1267,7 +1255,6 @@ def main():
 
         except Exception as e:
             print("Exception:", e)
-            traceback.print_exc()
             continue
 
 # Run the main function
