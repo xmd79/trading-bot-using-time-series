@@ -606,8 +606,16 @@ def main():
                     # Calculate the sine wave using HT_SINE
                     sine_wave, _ = talib.HT_SINE(close_prices)
 
-                    # Print the sine wave
-                    print("Sine wave:", sine_wave[-1])
+                    #print(sine_wave)
+
+                    # Replace NaN values with 0 using nan_to_num
+                    sine_wave = np.nan_to_num(sine_wave)
+
+                    # Filter out values less than or equal to 0 using boolean indexing
+                    sine_wave = sine_wave[sine_wave > 0]
+
+                    print(sine_wave)
+                    print("Current close on Sine wave:", sine_wave[-1])
 
                     # Check if EMA periods have been defined
                     if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
