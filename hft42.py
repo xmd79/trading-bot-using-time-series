@@ -608,15 +608,10 @@ def main():
                     # Calculate the sine wave using HT_SINE
                     sine_wave, _ = talib.HT_SINE(close_prices)
 
-                    #print(sine_wave)
-
                     # Replace NaN values with 0 using nan_to_num
                     sine_wave = np.nan_to_num(sine_wave)
 
-                    # Filter out values less than or equal to 0 using boolean indexing
-                    #sine_wave = sine_wave[sine_wave > 0]
-
-                    print(sine_wave)
+                    sine_wave = -sine_wave
                     print("Current close on Sine wave:", sine_wave[-1])
 
                     # Calculate the minimum and maximum values of the sine wave
@@ -625,6 +620,13 @@ def main():
 
                     print("Minimum value of sine wave:", sine_wave_min)
                     print("Maximum value of sine wave:", sine_wave_max)
+
+                    # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
+                    dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+                    dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
+
+                    print("Distance from close to min:", dist_from_close_to_min)
+                    print("Distance from close to max:", dist_from_close_to_max)
 
                     # Check if EMA periods have been defined
                     if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
@@ -638,11 +640,11 @@ def main():
                         # Check if the current price is above the EMAs and the percent to min/max signals are above 80%
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
                             print("Buy signal!")
-                            
+
                         # Check if the current price is below the EMAs and the percent to min/max signals are below 20%
                         elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
                             print("Sell signal!")
-                   
+
                         elif percent_to_min_val < 20:
                             print("Bullish momentum in trend")
 
@@ -669,7 +671,7 @@ def main():
 
             # Sleep for 5sec
             time.sleep(5)
-                        
+
         except Exception as e:
             print(e)
 
