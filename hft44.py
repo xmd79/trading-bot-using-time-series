@@ -1215,6 +1215,7 @@ def main():
                             print("Sell signal!")
 
                         elif percent_to_min_val < 20:
+                            print("Bullish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
                                 print("Bullish momentum in Q1")
@@ -1229,6 +1230,7 @@ def main():
                                 print("Bullish momentum in Q4")
 
                         elif percent_to_max_val < 20:
+                            print("Bearish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
                                 print("Bearish momentum in Q1")
