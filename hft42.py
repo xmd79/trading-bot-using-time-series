@@ -612,7 +612,7 @@ def main():
                     sine_wave = np.nan_to_num(sine_wave)
 
                     # Filter out values less than or equal to 0 using boolean indexing
-                    sine_wave = sine_wave[sine_wave > 0]
+                    #sine_wave = sine_wave[sine_wave > 0]
 
                     print(sine_wave)
                     print("Current close on Sine wave:", sine_wave[-1])
