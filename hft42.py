@@ -612,6 +612,7 @@ def main():
                     sine_wave = np.nan_to_num(sine_wave)
 
                     sine_wave = -sine_wave
+
                     print("Current close on Sine wave:", sine_wave[-1])
 
                     # Calculate the minimum and maximum values of the sine wave
