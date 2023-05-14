@@ -1153,28 +1153,37 @@ def main():
 
                     # Calculate the current position of the price on the sine wave
                     current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
+                    current_quadrant = 0
 
                     # Determine which quadrant the current position is in
                     if current_position < 0.25:
                         # In quadrant 1
                         em_amp = em_amp_q1
                         em_phase = em_phase_q1
+                        current_quadrant = 1
                         print("Current position is in quadrant 1. Distance from 0% to 25% of range:", (current_position - 0.0) / 0.25 * 100, "%")
+                        print("Current quadrant is: ", current_quadrant)
                     elif current_position < 0.5:
                         # In quadrant 2
                         em_amp = em_amp_q2
                         em_phase = em_phase_q2
+                        current_quadrant = 2
                         print("Current position is in quadrant 2. Distance from 25% to 50% of range:", (current_position - 0.25) / 0.25 * 100, "%")
+                        print("Current quadrant is: ", current_quadrant)
                     elif current_position < 0.75:
                         # In quadrant 3
                         em_amp = em_amp_q3
                         em_phase = em_phase_q3
+                        current_quadrant = 3
                         print("Current position is in quadrant 3. Distance from 50% to 75% of range:", (current_position - 0.5) / 0.25 * 100, "%")
+                        print("Current quadrant is: ", current_quadrant)
                     else:
                         # In quadrant 4
                         em_amp = em_amp_q4
                         em_phase = em_phase_q4
+                        current_quadrant = 4
                         print("Current position is in quadrant 4. Distance from 75% to 100% of range:", (current_position - 0.75) / 0.25 * 100, "%")
+                        print("Current quadrant is: ", current_quadrant)
 
                     print("EM amplitude:", em_amp)
                     print("EM phase:", em_phase)
@@ -1246,6 +1255,8 @@ def main():
 
                         else:
                             print("No signal, seeking local or major reversal")
+
+                        print()
 
                     # Sleep for the specified sleep time
                     time.sleep(5)
