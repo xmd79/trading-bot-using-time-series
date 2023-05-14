@@ -579,7 +579,9 @@ def main():
                 if 'ht_sine_percent_to_min' in signals['1m'] and 'ht_sine_percent_to_max' in signals['1m']:
                     percent_to_min_val = signals['1m']['ht_sine_percent_to_min']
                     percent_to_max_val = signals['1m']['ht_sine_percent_to_max']
+
                     close_prices = np.array([candle['close'] for candle in candles['1m']])
+                    print("Close price:", close_prices[-1])
 
                     # Calculate the sine wave using HT_SINE
                     sine_wave, _ = talib.HT_SINE(close_prices)
@@ -609,6 +611,7 @@ def main():
                     em_field_q2 = 0
                     em_field_q3 = 0
                     em_field_q4 = 0
+
                     for i in range(len(sine_wave)):
                         if quadrant1_range[0] <= i < quadrant1_range[1]:
                             em_field_q1 += sine_wave[i]
@@ -646,6 +649,17 @@ def main():
                     em_phase_diff_q2_q3 = em_phase_q3 - em_phase_q2
                     em_phase_diff_q3_q4 = em_phase_q4 - em_phase_q3
                     em_phase_diff_q4_q1 = em_phase_q1 - em_phase_q4
+
+                    quadrants = ['Q1', 'Q2', 'Q3', 'Q4']
+
+                    for i, q in enumerate(quadrants):
+                        print(f"EM Amplitude {q}: {eval(f'em_amp_q{i+1}')}")
+                        print(f"EM Phase {q}: {eval(f'em_phase_q{i+1}')}")
+                        if i < 3:
+                            print(f"EM Phase Difference {q}-{quadrants[i+1]}: {eval(f'em_phase_diff_q{i+1}_q{i+2}')}")
+                        else:
+                            print(f"EM Phase Difference {q}-{quadrants[0]}: {eval(f'em_phase_diff_q{i+1}_q1')}")
+                    print()
 
                     # Adjust the EM phase differences to be between -pi and pi
                     if em_phase_diff_q1_q2 > math.pi:
