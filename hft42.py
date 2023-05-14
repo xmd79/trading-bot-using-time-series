@@ -536,6 +536,8 @@ print()
 print("Init main() loop: ")
 print()
 
+import numpy as np
+
 def main():
     global TRADE_SYMBOL
     global EMA_SLOW_PERIOD
@@ -616,6 +618,13 @@ def main():
 
                     print(sine_wave)
                     print("Current close on Sine wave:", sine_wave[-1])
+
+                    # Calculate the minimum and maximum values of the sine wave
+                    sine_wave_min = np.min(sine_wave)
+                    sine_wave_max = np.max(sine_wave)
+
+                    print("Minimum value of sine wave:", sine_wave_min)
+                    print("Maximum value of sine wave:", sine_wave_max)
 
                     # Check if EMA periods have been defined
                     if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
