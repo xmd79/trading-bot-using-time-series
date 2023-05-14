@@ -634,15 +634,15 @@ def main():
                     em_phase_q3 = math.atan2(em_field_q4, em_field_q3)
                     em_phase_q4 = math.atan2(em_field_q1, em_field_q4)
 
-                    print("EM Amplitude Q1:", em_amp_q1)
-                    print("EM Amplitude Q2:", em_amp_q2)
-                    print("EM Amplitude Q3:", em_amp_q3)
-                    print("EM Amplitude Q4:", em_amp_q4)
+                    #print("EM Amplitude Q1:", em_amp_q1)
+                    #print("EM Amplitude Q2:", em_amp_q2)
+                    #print("EM Amplitude Q3:", em_amp_q3)
+                    #print("EM Amplitude Q4:", em_amp_q4)
 
-                    print("EM Phase Q1:", em_phase_q1)
-                    print("EM Phase Q2:", em_phase_q2)
-                    print("EM Phase Q3:", em_phase_q3)
-                    print("EM Phase Q4:", em_phase_q4)
+                    #print("EM Phase Q1:", em_phase_q1)
+                    #print("EM Phase Q2:", em_phase_q2)
+                    #print("EM Phase Q3:", em_phase_q3)
+                    #print("EM Phase Q4:", em_phase_q4)
 
                     # Calculate the EM phase difference between adjacent quadrants
                     em_phase_diff_q1_q2 = em_phase_q2 - em_phase_q1
@@ -652,13 +652,13 @@ def main():
 
                     quadrants = ['Q1', 'Q2', 'Q3', 'Q4']
 
-                    for i, q in enumerate(quadrants):
-                        print(f"EM Amplitude {q}: {eval(f'em_amp_q{i+1}')}")
-                        print(f"EM Phase {q}: {eval(f'em_phase_q{i+1}')}")
-                        if i < 3:
-                            print(f"EM Phase Difference {q}-{quadrants[i+1]}: {eval(f'em_phase_diff_q{i+1}_q{i+2}')}")
-                        else:
-                            print(f"EM Phase Difference {q}-{quadrants[0]}: {eval(f'em_phase_diff_q{i+1}_q1')}")
+                    #for i, q in enumerate(quadrants):
+                        #print(f"EM Amplitude {q}: {eval(f'em_amp_q{i+1}')}")
+                        #print(f"EM Phase {q}: {eval(f'em_phase_q{i+1}')}")
+                        #if i < 3:
+                            #print(f"EM Phase Difference {q}-{quadrants[i+1]}: {eval(f'em_phase_diff_q{i+1}_q{i+2}')}")
+                        #else:
+                            #print(f"EM Phase Difference {q}-{quadrants[0]}: {eval(f'em_phase_diff_q{i+1}_q1')}")
                     print()
 
                     # Adjust the EM phase differences to be between -pi and pi
@@ -682,10 +682,10 @@ def main():
                     elif em_phase_diff_q4_q1 < -math.pi:
                         em_phase_diff_q4_q1 += 2*math.pi
 
-                    print("EM Phase Difference Q1-Q2:", em_phase_diff_q1_q2)
-                    print("EM Phase Difference Q2-Q3:", em_phase_diff_q2_q3)
-                    print("EM Phase Difference Q3-Q4:", em_phase_diff_q3_q4)
-                    print("EM Phase Difference Q4-Q1:", em_phase_diff_q4_q1)
+                    #print("EM Phase Difference Q1-Q2:", em_phase_diff_q1_q2)
+                    #print("EM Phase Difference Q2-Q3:", em_phase_diff_q2_q3)
+                    #print("EM Phase Difference Q3-Q4:", em_phase_diff_q3_q4)
+                    #print("EM Phase Difference Q4-Q1:", em_phase_diff_q4_q1)
 
                     # Determine the trend direction based on the EM phase differences
                     if em_phase_diff_q1_q2 > 0 and em_phase_diff_q2_q3 > 0 and em_phase_diff_q3_q4 > 0 and em_phase_diff_q4_q1 > 0:
@@ -694,6 +694,21 @@ def main():
                         print("Trend Direction: Downtrend")
                     else:
                         print("Trend Direction: Sideways")
+
+
+                    # Determine the current quadrant based on the phase of the EM field
+                    current_quadrant = 0
+                    if em_phase_q1 <= 0:
+                        current_quadrant = 1
+                    elif em_phase_q2 <= 0:
+                        current_quadrant = 2
+                    elif em_phase_q3 <= 0:
+                        current_quadrant = 3
+                    elif em_phase_q4 <= 0:
+                        current_quadrant = 4
+
+                    print("Current quadrant:", current_quadrant)
+
 
                     # Check if EMA periods have been defined
                     if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
