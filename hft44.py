@@ -661,13 +661,6 @@ def main():
                     em_phase_diff_q3_q4 = em_phase_q4 - em_phase_q3
                     em_phase_diff_q4_q1 = 2*math.pi - (em_phase_q4 - em_phase_q1)
 
-                    if em_phase_diff_q1_q2 > 0 and em_phase_diff_q2_q3 > 0 and em_phase_diff_q3_q4 > 0 and em_phase_diff_q4_q1 > 0:
-                        print("Trend Direction: Uptrend")
-                    elif em_phase_diff_q1_q2 < 0 and em_phase_diff_q2_q3 < 0 and em_phase_diff_q3_q4 < 0 and em_phase_diff_q4_q1 < 0:
-                        print("Trend Direction: Downtrend")
-                    else:
-                        print("Trend Direction: Sideways, reversal incoming")
-
                     # Check if EMA periods have been defined
                     if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
                         # Calculate the EMAs
