@@ -8,6 +8,7 @@ import datetime
 from datetime import timedelta
 from decimal import Decimal
 import decimal
+import random
 
 # binance module imports
 from binance.client import Client as BinanceClient
@@ -515,222 +516,140 @@ print("Init main() loop: ")
 print()
 
 def main():
-    # Define EM amplitude variables for each quadrant
-    em_amp_q1 = 0
-    em_amp_q2 = 0
-    em_amp_q3 = 0
-    em_amp_q4 = 0
+    # Define the sine wave parameters
+    amplitude = 100
+    period = 60
+    phi = math.pi / 2
+    cycle_length = period * 4
 
-    # Define EM phase variables for each quadrant
-    em_phase_q1 = 0
-    em_phase_q2 = math.pi/2
-    em_phase_q3 = math.pi
-    em_phase_q4 = 3*math.pi/2
+    # Define the price parameters
+    starting_price = 100
+    volatility = 0.1
+    drift = 0.01
 
-    # Define minimum and maximum values for the sine wave
-    sine_wave_min = -1
-    sine_wave_max = 1
+    # Define the time parameters
+    current_time = time.time()
+    forecast_time_5min = current_time + 5 * 60
+    forecast_time_15min = current_time + 15 * 60
+    forecast_time_30min = current_time + 30 * 60
+    current_time_mmss = time.strftime('%M:%S', time.localtime(current_time))
 
+    # Initialize the price and time variables
+    current_price = starting_price
+    time_step = 0
+
+    # Initialize the trend direction variables
+    trend_direction = "Sideways, reversal incoming"
+    season_trend_direction = "Sideways, reversal incoming"
+    micro_trend_direction = ""
+    macro_trend_direction = ""
+
+    # Initialize the reversal price variables
+    low_reversal_price = current_price
+    high_reversal_price = current_price
+
+    # Initialize the price forecast variables
+    price_forecast_5min = current_price
+    price_forecast_15min = current_price
+    price_forecast_30min = current_price
+
+    # Initialize the Elliott Wave Oscillator (EMO) variables
+    ema_short = 0
+    ema_long = 0
+    ema_diff = 0
+    ema_diff_prev = 0
+
+    # Start the time loop
     while True:
-        try:
-            # Define current_quadrant variable
-            current_quadrant = 0
+        # Calculate the sine wave value and the current quadrant
+        cycle_position = time_step % cycle_length
+        cycle_position_normalized = cycle_position / cycle_length
+        sine_value = amplitude * math.sin(2 * math.pi * cycle_position_normalized + phi)
+        current_quadrant = math.ceil(cycle_position_normalized * 4)
 
-            # Define start and end time for historical data
-            start_time = int(time.time()) - (1800 * 4)  # 60-minute interval (4 candles)
-            end_time = int(time.time())
+        # Calculate the distance from the current price to the minimum and maximum of the quadrant range
+        q_min = amplitude * math.sin(2 * math.pi * (current_quadrant - 1) / 4 + phi)
+        q_max = amplitude * math.sin(2 * math.pi * current_quadrant / 4 + phi)
+        dist_from_close_to_min = abs(current_price - q_min)
+        dist_from_close_to_max = abs(current_price - q_max)
 
-            # Define the candles and timeframes to use for the signals
-            candles = get_historical_candles(TRADE_SYMBOL, start_time, end_time, '1m')
-            timeframes = ['1m', '3m', '5m']
+        # Update the price with a random walk
+        current_price += drift + volatility * (2 * (0.5 - random.random()))
+        time_step += 1
 
-            # Check if candles is empty
-            if not candles:
-                print("Error: No historical candles found.")
-                continue
+        # Update the trend direction based on the cycle from the minimum of Q1 to the maximum of Q4 and the reverse cycle
+        if current_quadrant == 1 and dist_from_close_to_min < 25:
+            season_trend_direction = "Uptrend"
+            if micro_trend_direction != "Uptrend":
+                micro_trend_direction = "Uptrend"
+                print("MICRO Trend Direction: Uptrend")
+        elif current_quadrant == 2 and dist_from_close_to_max < 25:
+            season_trend_direction = "Uptrend"
+            if micro_trend_direction != "Uptrend":
+                micro_trend_direction = "Uptrend"
+                print("MICRO Trend Direction: Uptrend")
+        elif current_quadrant == 3 and dist_from_close_to_min < 25:
+            season_trend_direction = "Downtrend"
+            if micro_trend_direction != "Downtrend":
+                micro_trend_direction = "Downtrend"
+                print("MICRO Trend Direction: Downtrend")
+        elif current_quadrant == 4 and dist_from_close_to_max < 25:
+            season_trend_direction = "Downtrend"
+            if micro_trend_direction != "Downtrend":
+                micro_trend_direction = "Downtrend"
+                print("MICRO Trend Direction: Downtrend")
+        else:
+            season_trend_direction = "Sideways, reversal incoming"
+            micro_trend_direction = ""
+            if trend_direction != "Sideways, reversal incoming":
+                print("MICRO Trend Direction: Sideways, reversal incoming")
 
-            # Get the MTF signal
-            signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
+        # Update the macro trend direction based on complete cycles from Q1 to Q4 and Q4 to Q1 repetitions
+        if (cycle_position_normalized < 0.01 or cycle_position_normalized > 0.99) and season_trend_direction != "Sideways, reversal incoming":
+            if macro_trend_direction != season_trend_direction:
+                macro_trend_direction = season_trend_direction
+                print("MACRO Trend Direction:", macro_trend_direction)
 
-            # Check if the '1m' key exists in the signals dictionary
-            if '1m' in signals:
-                # Check if the percent to min/max signal keys exist in the '1m' dictionary
-                if 'ht_sine_percent_to_min' in signals['1m'] and 'ht_sine_percent_to_max' in signals['1m']:
-                    percent_to_min_val = signals['1m']['ht_sine_percent_to_min']
-                    percent_to_max_val = signals['1m']['ht_sine_percent_to_max']
+        # Update the low and high reversal prices
+        if season_trend_direction == "Uptrend":
+            if current_price < low_reversal_price:
+                low_reversal_price = current_price
+                print("New Low Reversal Price:", low_reversal_price)
+            if current_price > high_reversal_price:
+                high_reversal_price = current_price
+        elif season_trend_direction == "Downtrend":
+            if current_price > high_reversal_price:
+                high_reversal_price = current_price
+                print("New High Reversal Price:", high_reversal_price)
+            if current_price < low_reversal_price:
+                low_reversal_price = current_price
 
-                    close_prices = np.array([candle['close'] for candle in candles['1m']])
-                    print("Close price:", close_prices[-1])
+        # Update the price forecasts
+        if time.time() >= forecast_time_5min:
+            price_forecast_5min = current_price
+            forecast_time_5min += 5 * 60
+        if time.time() >= forecast_time_15min:
+            price_forecast_15min = current_price
+            forecast_time_15min += 15 * 60
+        if time.time() >= forecast_time_30min:
+            price_forecast_30min = current_price
+            forecast_time_30min += 30 * 60
 
-                    # Calculate the sine wave using HT_SINE
-                    sine_wave, _ = talib.HT_SINE(close_prices)
+        # Update the Elliott Wave Oscillator (EMO)
+        if time_step == 1:
+            ema_short = current_price
+            ema_long = current_price
+        else:
+            ema_short = 2 / (2 + 1) * (current_price - ema_short) + ema_short
+            ema_long = 2 / (14 + 1) * (current_price - ema_long) + ema_long
+            ema_diff_prev = ema_diff
+            ema_diff = ema_short - ema_long
 
-                    # Replace NaN values with 0 using nan_to_num
-                    sine_wave = np.nan_to_num(sine_wave)
-                    sine_wave = -sine_wave
+        # Print the current status
+        print("Time: {} - Price: {:.2f} - Trend Direction: {} - Season Trend Direction: {} - Micro Trend Direction: {} - Low Reversal Price: {:.2f} - High Reversal Price: {:.2f} - Price Forecast (5min): {:.2f} - Price Forecast (15min): {:.2f} - Price Forecast (30min): {:.2f} - EMO: {:.2f}".format(current_time_mmss, current_price, trend_direction, season_trend_direction, micro_trend_direction, low_reversal_price, high_reversal_price, price_forecast_5min, price_forecast_15min, price_forecast_30min, ema_diff))
 
-                    print("Current close on Sine wave:", sine_wave[-1])
-
-                    # Calculate the minimum and maximum values of the sine wave
-                    sine_wave_min = np.min(sine_wave)
-                    sine_wave_max = np.max(sine_wave)
-
-                    print("Minimum value of sine wave:", sine_wave_min)
-                    print("Maximum value of sine wave:", sine_wave_max)
-
-                    # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
-                    dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
-                    dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
-
-                    print("Distance from close to min:", dist_from_close_to_min)
-                    print("Distance from close to max:", dist_from_close_to_max)
-
-                    # Calculate the range of values for each quadrant
-                    range_q1 = (sine_wave_max - sine_wave_min) / 4
-                    range_q2 = (sine_wave_max - sine_wave_min) / 4
-                    range_q3 = (sine_wave_max - sine_wave_min) / 4
-                    range_q4 = (sine_wave_max - sine_wave_min) / 4
-
-                    # Set the EM amplitude for each quadrant based on the range of values
-                    em_amp_q1 = range_q1 / percent_to_max_val
-                    em_amp_q2 = range_q2 / percent_to_max_val
-                    em_amp_q3 = range_q3 / percent_to_max_val
-                    em_amp_q4 = range_q4 / percent_to_max_val
-
-                    print("EM amplitude for Q1:", em_amp_q1)
-                    print("EM amplitude for Q2:", em_amp_q2)
-                    print("EM amplitude for Q3:", em_amp_q3)
-                    print("EM amplitude for Q4:", em_amp_q4)
-
-                    # Calculate the EM phase for each quadrant
-                    em_phase_q1 = 0
-                    em_phase_q2 = math.pi/2
-                    em_phase_q3 = math.pi
-                    em_phase_q4 = 3*math.pi/2
-
-                    print("EM phase for Q1:", em_phase_q1)
-                    print("EM phase for Q2:", em_phase_q2)
-                    print("EM phase for Q3:", em_phase_q3)
-                    print("EM phase for Q4:", em_phase_q4)
-
-                    # Calculate the current position of the price on the sine wave
-                    current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
-                    current_quadrant = 0
-
-                    # Determine which quadrant the current position is in
-                    if current_position < 0.25:
-                        # In quadrant 1
-                        em_amp = em_amp_q1
-                        em_phase = em_phase_q1
-                        current_quadrant = 1
-                        print("Current position is in quadrant 1. Distance from 0% to 25% of range:", (current_position - 0.0) / 0.25 * 100, "%")
-                        print("Current quadrant is: ", current_quadrant)
-                    elif current_position < 0.5:
-                        # In quadrant 2
-                        em_amp = em_amp_q2
-                        em_phase = em_phase_q2
-                        current_quadrant = 2
-                        print("Current position is in quadrant 2. Distance from 25% to 50% of range:", (current_position - 0.25) / 0.25 * 100, "%")
-                        print("Current quadrant is: ", current_quadrant)
-                    elif current_position < 0.75:
-                        # In quadrant 3
-                        em_amp = em_amp_q3
-                        em_phase = em_phase_q3
-                        current_quadrant = 3
-                        print("Current position is in quadrant 3. Distance from 50% to 75% of range:", (current_position - 0.5) / 0.25 * 100, "%")
-                        print("Current quadrant is: ", current_quadrant)
-                    else:
-                        # In quadrant 4
-                        em_amp = em_amp_q4
-                        em_phase = em_phase_q4
-                        current_quadrant = 4
-                        print("Current position is in quadrant 4. Distance from 75% to 100% of range:", (current_position - 0.75) / 0.25 * 100, "%")
-                        print("Current quadrant is: ", current_quadrant)
-
-                    print("EM amplitude:", em_amp)
-                    print("EM phase:", em_phase)
-
-                    # Calculate the EM value
-                    em_value = em_amp * math.sin(em_phase)
-
-                    print("EM value:", em_value)
-
-                    # Determine the trend direction based on the EM phase differences
-                    em_phase_diff_q1_q2 = em_phase_q2 - em_phase_q1
-                    em_phase_diff_q2_q3 = em_phase_q3 - em_phase_q2
-                    em_phase_diff_q3_q4 = em_phase_q4 - em_phase_q3
-                    em_phase_diff_q4_q1 = 2*math.pi - (em_phase_q4 - em_phase_q1)
-
-                    if em_phase_diff_q1_q2 > 0 and em_phase_diff_q2_q3 > 0 and em_phase_diff_q3_q4 > 0 and em_phase_diff_q4_q1 > 0:
-                        print("Trend Direction: Uptrend")
-                    elif em_phase_diff_q1_q2 < 0 and em_phase_diff_q2_q3 < 0 and em_phase_diff_q3_q4 < 0 and em_phase_diff_q4_q1 < 0:
-                        print("Trend Direction: Downtrend")
-                    else:
-                        print("Trend Direction: Sideways, reversal incoming")
-
-                    # Check if EMA periods have been defined
-                    if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
-                        # Calculate the EMAs
-                        ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]
-                        ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]
-
-                        print("EMA slow:", ema_slow)
-                        print("EMA fast:", ema_fast)
-
-                        # Check if the current price is above the EMAs and the percent to min signals are below 20%
-                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
-                            print("Buy signal!")
-
-                        # Check if the current price is below the EMAs and the percent to max signals are below 20%
-                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
-                            print("Sell signal!")
-
-                        elif percent_to_min_val < 20:
-                            print("Bullish momentum in trend")
-                            if current_quadrant == 1:
-                                # In quadrant 1, distance from min to 25% of range
-                                print("Bullish momentum in Q1")
-                            elif current_quadrant == 2:
-                                # In quadrant 2, distance from 25% to 50% of range
-                                print("Bullish momentum in Q2")
-                            elif current_quadrant == 3:
-                                # In quadrant 3, distance from 50% to 75% of range
-                                print("Bullish momentum in Q3")
-                            elif current_quadrant == 4:
-                                # In quadrant 4, distance from 75% to max of range
-                                print("Bullish momentum in Q4")
-
-                        elif percent_to_max_val < 20:
-                            print("Bearish momentum in trend")
-                            if current_quadrant == 1:
-                                # In quadrant 1, distance from min to 25% of range
-                                print("Bearish momentum in Q1")
-                            elif current_quadrant == 2:
-                                # In quadrant 2, distance from 25% to 50% of range
-                                print("Bearish momentum in Q2")
-                            elif current_quadrant == 3:
-                                # In quadrant 3, distance from 50% to 75% of range
-                                print("Bearish momentum in Q3")
-                            elif current_quadrant == 4:
-                                # In quadrant 4, distance from 75% to max of range
-                                print("Bearish momentum in Q4")
-
-                        else:
-                            print("No signal, seeking local or major reversal")
-
-                        print()
-
-                    # Sleep for the specified sleep time
-                    time.sleep(5)
-
-                else:
-                    print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
-            else:
-                print("Error: '1m' key not found in signals dictionary.")
-
-        except Exception as e:
-            print("Exception:", e)
-            continue
+        # Sleep for 5 second
+        time.sleep(5)
 
 # Run the main function
 if __name__ == '__main__':
