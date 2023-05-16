@@ -537,6 +537,23 @@ def main():
     trade_open = False
     current_quadrant = None
     trade_entry_pnl = 0
+    trade_exit_pnl = 0
+    trade_side = None
+
+
+    # Define constants
+    trade_symbol = "BTCBUSD"
+    stop_loss = 0.0112        
+    take_profit = 0.0278       
+    fast_ema = 12       
+    slow_ema = 26         
+        
+    # Define trade variables    
+    position = None   
+    trade_open = False       
+    trade_side = None
+    entry_price = 0
+    entry_time = 0
 
     url = "https://api.binance.com/api/v3/time"
     while True:       
@@ -806,10 +823,10 @@ def main():
 
                         print()
 
-                        if trade_entry_pnl:
-                            print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-
-                        print()
+                    if trade_entry_pnl and trade_open or not trade_open:
+                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
+    
+                    print()
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
             else:
