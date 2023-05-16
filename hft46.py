@@ -765,12 +765,16 @@ def main():
                         if not trade_open:
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20 and current_quadrant == 1:
                                 entry_long(TRADE_SYMBOL)
+                                trade_open = True
                             elif close_prices[-1] < signals['1m']['mtf_average']:
                                 entry_long(TRADE_SYMBOL)
+                                trade_open = True
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 20 and current_quadrant == 4:
                                 entry_short(TRADE_SYMBOL)
+                                trade_open = True
                             elif close_prices[-1] > signals['1m']['mtf_average']:
                                 entry_short(TRADE_SYMBOL)
+                                trade_open = True
 
                         elif trade_open:
                             position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
@@ -779,16 +783,18 @@ def main():
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
+                                trade_open = False
                                 print("Entering new trade with changed side...")                 
                                 if trade_side == 'long':
-                                    entry_short(TRADE_SYMBOL)
+                                    entry_short(TRADE_SYMBOL, position_size='ALL')
+                                    trade_open = True
                                 elif trade_side == 'short':    
-                                    entry_long(TRADE_SYMBOL)
-                
+                                    entry_long(TRADE_SYMBO, position_size='ALL')
+                                    trade_open = True
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")             
                                 exit_trade()
-
+                                trade_open = False
                         else:
                             print("No signal, seeking local or major reversal")
 
