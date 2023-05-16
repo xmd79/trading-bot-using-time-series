@@ -748,11 +748,17 @@ def main():
                                 print("Bearish momentum in Q4")
             
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20 and current_quadrant == 1 and not trade_open:
-                            entry_long(TRADE_SYMBOL)  
-        
+                            entry_long(TRADE_SYMBOL)
+  
+                        elif close_prices[-1] < signals['1m']['MTF_signal'] and percent_to_min_val < 20 and current_quadrant == 1 and not trade_open:
+                            entry_long(TRADE_SYMBOL) 
+     
                         elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20 and current_quadrant == 4 and not trade_open:
-                            entry_short(TRADE_SYMBOL)  
-                
+                            entry_short(TRADE_SYMBOL)
+  
+                        elif close_prices[-1] > signals['1m']['MTF_signal'] and percent_to_max_val < 20 and current_quadrant == 4 and not trade_open:
+                            entry_short(TRADE_SYMBOL)
+              
                         elif percent_to_min_val < 20 and current_quadrant == 1 and not trade_open:
                             entry_long(TRADE_SYMBOL)
 
