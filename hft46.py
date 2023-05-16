@@ -566,6 +566,8 @@ def main():
             
             # Make your request with the adjusted timestamp
             response = requests.get(url, params={'timestamp': timestamp})
+            response = requests.get('https://api.binance.com/api/v3/time', auth=(api_key, api_secret))
+            print(response.json())
 
             # Define current_quadrant variable
             current_quadrant = 0
