@@ -747,33 +747,33 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
             
-                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20 and current_quadrant == 1:
+                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20 and current_quadrant == 1 and not trade_open:
                             entry_long(TRADE_SYMBOL)  
         
-                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20 and current_quadrant == 4:
+                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20 and current_quadrant == 4 and not trade_open:
                             entry_short(TRADE_SYMBOL)  
                 
-                        elif percent_to_min_val < 20 and current_quadrant == 1:
+                        elif percent_to_min_val < 20 and current_quadrant == 1 and not trade_open:
                             entry_long(TRADE_SYMBOL)
 
-                        elif percent_to_max_val < 20 and current_quadrant == 4:
+                        elif percent_to_max_val < 20 and current_quadrant == 4 and not trade_open:
                             entry_short(TRADE_SYMBOL)
 
                         else:
                             print("No signal, seeking local or major reversal")
 
                         if trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= STOP_LOSS_THRESHOLD:
-                            exit_trade(TRADE_SYMBOL, trade_side)                 
+                            print("STOPLOSS was hit! Closing position and exit trade...")
+                            exit_trade(TRADE_SYMBOL, trade_side)
+                            print("Entering new trade with changed side...")                 
                             if trade_side == 'long':
                                 entry_short(TRADE_SYMBOL)
                             else:    
                                 entry_long(TRADE_SYMBOL)
                 
-                        if trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= TAKE_PROFIT_THRESHOLD:             
+                        if trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= TAKE_PROFIT_THRESHOLD:
+                            print("TAKEPROFIT was hit! Closing position and exit trade...")             
                             exit_trade(TRADE_SYMBOL, trade_side)
-
-                        else:
-                            print("No signal, seeking local or major reversal")
 
                         print()
 
