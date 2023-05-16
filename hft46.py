@@ -43,7 +43,7 @@ TRADE_SYMBOL = 'BTCBUSD'
 TRADE_TYPE = ''
 TRADE_LVRG = 20
 STOP_LOSS_THRESHOLD = 0.0112 # define 1.12% for stoploss
-TAKE_PROFIT_THRESHOLD = 0.0336 # define 3.36% for stoploss
+TAKE_PROFIT_THRESHOLD = 0.0224 # define 2.24% for takeprofit
 BUY_THRESHOLD = -10
 SELL_THRESHOLD = 10
 EMA_SLOW_PERIOD = 56
@@ -534,8 +534,22 @@ def main():
     sine_wave_min = -1
     sine_wave_max = 1
 
-    while True:
-        try:
+    trade_open = False
+    current_quadrant = None
+    trade_entry_pnl = 0
+
+    url = "https://api.binance.com/api/v3/time"
+    while True:       
+        try:   
+            # Get the server time
+            server_time = requests.get('https://api.binance.com/api/v3/time').json()['serverTime']
+            
+            # Calculate the timestamp of your request       
+            timestamp = int(server_time - 500) # Subtract5 seconds
+            
+            # Make your request with the adjusted timestamp
+            response = requests.get(url, params={'timestamp': timestamp})
+
             # Define current_quadrant variable
             current_quadrant = 0
 
@@ -677,7 +691,7 @@ def main():
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
                             print("Buy signal!")
                             if not trade_open:
-                                enter_trade('long')
+                                entry_long(TRADE_SYMBOL)
                                 trade_open = True
                                 trade_side = 'long'
                                 trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
@@ -691,7 +705,7 @@ def main():
                         elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
                             print("Sell signal!")
                             if not trade_open:
-                                enter_trade('short')
+                                entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 trade_side = 'short'
                                 trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
@@ -707,7 +721,7 @@ def main():
                                 # In quadrant 1, distance from min to 25% of range
                                 print("Bullish momentum in Q1")
                                 if not trade_open:
-                                    enter_trade('long')
+                                    entry_long(TRADE_SYMBOL)
                                     trade_open = True
                                     trade_side = 'long'
                                     trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
@@ -741,7 +755,7 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
                                 if not trade_open:
-                                    enter_trade('short')
+                                    entry_short(TRADE_SYMBOL)
                                     trade_open = True
                                     trade_side = 'short'
                                     trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
@@ -791,20 +805,25 @@ def main():
                             print("No signal, seeking local or major reversal")
 
                         print()
-                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
+
+                        if trade_entry_pnl:
+                            print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
+
                         print()
-
-                    # Sleep for the specified sleep time
-                    time.sleep(5)
-
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
             else:
                 print("Error: '1m' key not found in signals dictionary.")
 
-        except Exception as e:
-            print("Exception:", e)
-            continue
+            time.sleep(5) # Sleep for 5 seconds      
+                
+        except BinanceAPIException as e:  
+            print(e)
+
+        except Exception as e:      
+            print(f"An error occurred: {e}")    
+            time.sleep(5) 
+
 
 # Run the main function
 if __name__ == '__main__':
