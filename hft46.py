@@ -745,10 +745,20 @@ def main():
                                 print("Bearish momentum in Q4")
             
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20 and current_quadrant == 1:
-                            entry_long(TRADE_SYMBOL)          
+                            entry_long(TRADE_SYMBOL)  
+        
                         elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20 and current_quadrant == 4:
                             entry_short(TRADE_SYMBOL)  
                 
+                        elif percent_to_min_val < 20 and current_quadrant == 1:
+                            entry_long(TRADE_SYMBOL)
+
+                        elif percent_to_max_val < 20 and current_quadrant == 4:
+                            entry_short(TRADE_SYMBOL)
+
+                        else:
+                            print("No signal, seeking local or major reversal")
+
                         if trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= STOP_LOSS_THRESHOLD:
                             exit_trade(TRADE_SYMBOL, trade_side)                 
                             if trade_side == 'long':
