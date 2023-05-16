@@ -43,7 +43,7 @@ TRADE_SYMBOL = 'BTCBUSD'
 TRADE_TYPE = ''
 TRADE_LVRG = 20
 STOP_LOSS_THRESHOLD = 0.0112 # define 1.12% for stoploss
-TAKE_PROFIT_THRESHOLD = 0.0224 # define 2.24% for takeprofit
+TAKE_PROFIT_THRESHOLD = 0.0336 # define 3.36% for stoploss
 BUY_THRESHOLD = -10
 SELL_THRESHOLD = 10
 EMA_SLOW_PERIOD = 56
@@ -421,12 +421,11 @@ def entry_long(symbol):
         # Calculate the maximum order quantity based on the current price
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
 
-        # Calculate the order quantity as the lesser of the entire available balance or the maximum order quantity
-        max_quantity = round((bUSD_balance / symbol_price) * TRADE_LVRG, 6)
-        min_quantity = float(get_min_order_quantity(symbol))
-        quantity = min(max_quantity, bUSD_balance, min_quantity)
+        # Calculate the order quantity as the entire available balance
+        quantity = round((bUSD_balance / symbol_price), 6)
 
         # Check that the resulting quantity meets the minimum order quantity for the asset
+        min_quantity = float(get_min_order_quantity(symbol))
         if quantity < min_quantity:
             print(f"Order quantity is less than the minimum quantity: {quantity} < {min_quantity}")
             return False
@@ -454,12 +453,11 @@ def entry_short(symbol):
         # Calculate the maximum order quantity based on the current price
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
 
-        # Calculate the order quantity as the lesser of the entire available balance or the maximum order quantity
-        max_quantity = round((bUSD_balance / symbol_price) * TRADE_LVRG, 6)
-        min_quantity = float(get_min_order_quantity(symbol))
-        quantity = min(max_quantity, bUSD_balance, min_quantity)
+        # Calculate the order quantity as the entire available balance
+        quantity = round((bUSD_balance / symbol_price), 6)
 
         # Check that the resulting quantity meets the minimum order quantity for the asset
+        min_quantity = float(get_min_order_quantity(symbol))
         if quantity < min_quantity:
             print(f"Order quantity is less than the minimum quantity: {quantity} < {min_quantity}")
             return False
@@ -534,39 +532,8 @@ def main():
     sine_wave_min = -1
     sine_wave_max = 1
 
-    trade_open = False
-    current_quadrant = None
-    trade_entry_pnl = 0
-    trade_exit_pnl = 0
-    trade_side = None
-
-
-    # Define constants
-    trade_symbol = "BTCBUSD"
-    stop_loss = 0.0112        
-    take_profit = 0.0278       
-    fast_ema = 12       
-    slow_ema = 26         
-        
-    # Define trade variables    
-    position = None   
-    trade_open = False       
-    trade_side = None
-    entry_price = 0
-    entry_time = 0
-
-    url = "https://api.binance.com/api/v3/time"
-    while True:       
-        try:   
-            # Get the server time
-            server_time = requests.get('https://api.binance.com/api/v3/time').json()['serverTime']
-            
-            # Calculate the timestamp of your request       
-            timestamp = int(server_time - 500) # Subtract5 seconds
-            
-            # Make your request with the adjusted timestamp
-            response = requests.get(url, params={'timestamp': timestamp})
-
+    while True:
+        try:
             # Define current_quadrant variable
             current_quadrant = 0
 
@@ -707,46 +674,16 @@ def main():
                         # Check if the current price is above the EMAs and the percent to min/max signals are above 80%
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
                             print("Buy signal!")
-                            if not trade_open:
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
-                                trade_side = 'long'
-                                trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                trade_exit_pnl = 0
-                                trade_entry_time = int(time.time())
-                                print(f"Entered long trade at {trade_entry_time}")
-                            else:
-                                print("LONG trade already open. Seeking exit potential position...")
 
                         # Check if the current price is below the EMAs and the percent to min/max signals are below 20%
                         elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
                             print("Sell signal!")
-                            if not trade_open:
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-                                trade_side = 'short'
-                                trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                trade_exit_pnl = 0
-                                trade_entry_time = int(time.time())
-                                print(f"Entered short trade at {trade_entry_time}")
-                            else:
-                                print("SHORT trade already open. Seeking exit potential position...")
 
                         elif percent_to_min_val < 20:
                             print("Bullish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
                                 print("Bullish momentum in Q1")
-                                if not trade_open:
-                                    entry_long(TRADE_SYMBOL)
-                                    trade_open = True
-                                    trade_side = 'long'
-                                    trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                    trade_exit_pnl = 0
-                                    trade_entry_time = int(time.time())
-                                    print(f"Entered long trade at {trade_entry_time}")
-                                else:
-                                    print("LONG trade already open. Seeking exit potential position...")
                             elif current_quadrant == 2:
                                 # In quadrant 2, distance from 25% to 50% of range
                                 print("Bullish momentum in Q2")
@@ -771,76 +708,23 @@ def main():
                             elif current_quadrant == 4:
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
-                                if not trade_open:
-                                    entry_short(TRADE_SYMBOL)
-                                    trade_open = True
-                                    trade_side = 'short'
-                                    trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                    trade_exit_pnl = 0
-                                    trade_entry_time = int(time.time())
-                                    print(f"Entered short trade at {trade_entry_time}")
-                                else:
-                                    print("SHORT trade already open. Seeking exit potential position...")
-
-                        # Check if the trade has exceeded the stop loss threshold
-                        elif trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= STOP_LOSS_THRESHOLD:
-                            # Exit the trade
-                            exit_trade(TRADE_SYMBOL, trade_side)
-                            trade_open = False
-                            trade_exit_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            print(f"Exited trade at stop loss threshold {int(time.time())}")
-
-                            # Enter a new trade with reversed side
-                            if trade_side == 'long':
-                                entry_short(TRADE_SYMBOL)
-                                trade_side = 'short'
-                            elif trade_side == 'short':
-                                entry_long(TRADE_SYMBOL)
-                                trade_side = 'long'
-
-                            # Reset trade variables
-                            trade_open = True
-                            trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            trade_exit_pnl = 0
-                            trade_entry_time = int(time.time())
-
-                        # Check if the trade has exceeded the take profit threshold
-                        elif trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= TAKE_PROFIT_THRESHOLD:
-                            # Exit the trade
-                            exit_trade(TRADE_SYMBOL, trade_side)
-                            trade_open = False
-                            trade_exit_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            print(f"Exited trade at take profit threshold {int(time.time())}")
-
-                            # Reset trade variables
-                            trade_open = True
-                            trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            trade_exit_pnl = 0
-                            trade_entry_time = int(time.time())
 
                         else:
                             print("No signal, seeking local or major reversal")
 
                         print()
 
-                    if trade_entry_pnl and trade_open or not trade_open:
-                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-    
-                    print()
+                    # Sleep for the specified sleep time
+                    time.sleep(5)
+
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
             else:
                 print("Error: '1m' key not found in signals dictionary.")
 
-            time.sleep(5) # Sleep for 5 seconds      
-                
-        except BinanceAPIException as e:  
-            print(e)
-
-        except Exception as e:      
-            print(f"An error occurred: {e}")    
-            time.sleep(5) 
-
+        except Exception as e:
+            print("Exception:", e)
+            continue
 
 # Run the main function
 if __name__ == '__main__':
