@@ -777,19 +777,16 @@ def main():
                                 trade_open = True
 
                         elif trade_open:
-                            position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
-                            trade_side = position['positionSide']
-
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
                                 trade_open = False
                                 print("Entering new trade with changed side...")                 
                                 if trade_side == 'long':
-                                    entry_short(TRADE_SYMBOL, position_size='ALL')
+                                    entry_short(TRADE_SYMBOL)
                                     trade_open = True
                                 elif trade_side == 'short':    
-                                    entry_long(TRADE_SYMBO, position_size='ALL')
+                                    entry_long(TRADE_SYMBOL)
                                     trade_open = True
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")             
