@@ -43,7 +43,7 @@ TRADE_SYMBOL = 'BTCBUSD'
 TRADE_TYPE = ''
 TRADE_LVRG = 20
 STOP_LOSS_THRESHOLD = 0.0112 # define 1.12% for stoploss
-TAKE_PROFIT_THRESHOLD = 0.0278 # define 2.78% for takeprofit
+TAKE_PROFIT_THRESHOLD = 0.0144 # define 1.44% for takeprofit
 BUY_THRESHOLD = -10
 SELL_THRESHOLD = 10
 EMA_SLOW_PERIOD = 56
@@ -478,30 +478,35 @@ def entry_short(symbol):
         print(f"Error creating short order: {e}")
         return False
 
-def exit_trade(symbol):
-    try:
-        total_quantity = 0
-        positions = client.futures_position_information(symbol=symbol)
-
-        for position in positions:
-            if float(position['positionAmt']) != 0:
-                side = 'SELL' if position['positionSide'] == 'LONG' else 'BUY'
-                quantity = abs(float(position['positionAmt']))
-                order = client.futures_create_order(
-                    symbol=symbol,
-                    side=side,
-                    type=client.ORDER_TYPE_MARKET,
-                    quantity=quantity)
-
-                total_quantity += quantity
-                print(f"Closed {quantity} {symbol} position with {side} order at market price.")
-
-        print(f"Total of {total_quantity} {symbol} positions closed.")
-        return True
-
-    except BinanceAPIException as e:
-        print(f"Error closing positions: {e}")
-        return False
+def exit_trade():
+    
+    # Get all open positions
+    positions = client.positions()
+    
+    # Loop through each position
+    for position in positions:
+        
+        symbol = position['symbol']
+        position_amount = float(position['positionAmt'])
+        
+        # Determine order side
+        if position['positionSide'] == 'LONG':
+            order_side = 'SELL'
+        else: 
+            order_side = 'BUY'  
+            
+        # Place order to exit position      
+        while position_amount > 0:
+            order = client.create_order(
+                symbol=symbol,
+                side=order_side,
+                type='MARKET',
+                quantity=position_amount)
+                
+            # Update remaining position amount
+            position_amount -= order['executedQty']
+                
+    print("All positions exited!")
 
 def calculate_ema(candles, period):
     prices = [float(candle['close']) for candle in candles]
@@ -518,6 +523,15 @@ print("Init main() loop: ")
 print()
 
 def main():
+    # Load credentials from file
+    with open("credentials.txt", "r") as f:
+        lines = f.readlines()
+        api_key = lines[0].strip()
+        api_secret = lines[1].strip()
+
+    # Instantiate Binance client
+    client = BinanceClient(api_key, api_secret)
+
     # Define EM amplitude variables for each quadrant
     em_amp_q1 = 0
     em_amp_q2 = 0
@@ -544,7 +558,7 @@ def main():
     # Define constants
     trade_symbol = "BTCBUSD"
     stop_loss = 0.0112        
-    take_profit = 0.0278       
+    take_profit = 0.0178       
     fast_ema = 12       
     slow_ema = 26         
         
@@ -590,6 +604,7 @@ def main():
 
             # Get the MTF signal
             signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
+            print(signals)
 
             # Check if the '1m' key exists in the signals dictionary
             if '1m' in signals:
@@ -746,47 +761,41 @@ def main():
                             elif current_quadrant == 4:
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
-            
-                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20 and current_quadrant == 1 and not trade_open:
-                            entry_long(TRADE_SYMBOL)
-  
-                        elif close_prices[-1] < signals['1m']['MTF_signal'] and percent_to_min_val < 20 and current_quadrant == 1 and not trade_open:
-                            entry_long(TRADE_SYMBOL) 
-     
-                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20 and current_quadrant == 4 and not trade_open:
-                            entry_short(TRADE_SYMBOL)
-  
-                        elif close_prices[-1] > signals['1m']['MTF_signal'] and percent_to_max_val < 20 and current_quadrant == 4 and not trade_open:
-                            entry_short(TRADE_SYMBOL)
-              
-                        elif percent_to_min_val < 20 and current_quadrant == 1 and not trade_open:
-                            entry_long(TRADE_SYMBOL)
 
-                        elif percent_to_max_val < 20 and current_quadrant == 4 and not trade_open:
-                            entry_short(TRADE_SYMBOL)
+                        if not trade_open:
+                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20 and current_quadrant == 1:
+                                entry_long(TRADE_SYMBOL)
+                            elif close_prices[-1] < signals['1m']['mtf_average']:
+                                entry_long(TRADE_SYMBOL)
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 20 and current_quadrant == 4:
+                                entry_short(TRADE_SYMBOL)
+                            elif close_prices[-1] > signals['1m']['mtf_average']:
+                                entry_short(TRADE_SYMBOL)
+
+                        elif trade_open: 
+                            if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
+                                print("STOPLOSS was hit! Closing position and exit trade...")
+                                exit_trade()
+                                print("Entering new trade with changed side...")                 
+                                if trade_side == 'long':
+                                    entry_short(TRADE_SYMBOL)
+                                else:    
+                                    entry_long(TRADE_SYMBOL)
+                
+                            elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
+                                print("TAKEPROFIT was hit! Closing position and exit trade...")             
+                                exit_trade()
 
                         else:
                             print("No signal, seeking local or major reversal")
-
-                        if trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= STOP_LOSS_THRESHOLD:
-                            print("STOPLOSS was hit! Closing position and exit trade...")
-                            exit_trade(TRADE_SYMBOL, trade_side)
-                            print("Entering new trade with changed side...")                 
-                            if trade_side == 'long':
-                                entry_short(TRADE_SYMBOL)
-                            else:    
-                                entry_long(TRADE_SYMBOL)
-                
-                        if trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= TAKE_PROFIT_THRESHOLD:
-                            print("TAKEPROFIT was hit! Closing position and exit trade...")             
-                            exit_trade(TRADE_SYMBOL, trade_side)
 
                         print()
 
                     if trade_entry_pnl and trade_open or not trade_open:
                         print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-    
+
                     print()
+
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
             else:
