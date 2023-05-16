@@ -418,18 +418,13 @@ def entry_long(symbol):
         bUSD_balance = float(get_account_balance())
         TRADE_LVRG = 20
 
-        # Calculate the maximum order quantity based on the current price
-        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
-
-        # Calculate the order quantity as the lesser of the entire available balance or the maximum order quantity
-        max_quantity = round((bUSD_balance / symbol_price) * TRADE_LVRG, 6)
+        # Calculate the maximum order quantity based on the available balance and the minimum order quantity
         min_quantity = float(get_min_order_quantity(symbol))
-        quantity = min(max_quantity, bUSD_balance, min_quantity)
+        max_quantity = round(min(bUSD_balance, (bUSD_balance / TRADE_LVRG) / symbol_price, 1000000000), 6)
+        quantity = max(min_quantity, min(max_quantity, bUSD_balance))
 
-        # Check that the resulting quantity meets the minimum order quantity for the asset
-        if quantity < min_quantity:
-            print(f"Order quantity is less than the minimum quantity: {quantity} < {min_quantity}")
-            return False
+        # Calculate the current price of the asset
+        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
 
         # Create the long order at market price
         order = client.futures_create_order(
@@ -451,18 +446,13 @@ def entry_short(symbol):
         bUSD_balance = float(get_account_balance())
         TRADE_LVRG = 20
 
-        # Calculate the maximum order quantity based on the current price
-        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
-
-        # Calculate the order quantity as the lesser of the entire available balance or the maximum order quantity
-        max_quantity = round((bUSD_balance / symbol_price) * TRADE_LVRG, 6)
+        # Calculate the maximum order quantity based on the available balance and the minimum order quantity
         min_quantity = float(get_min_order_quantity(symbol))
-        quantity = min(max_quantity, bUSD_balance, min_quantity)
+        max_quantity = round(min(bUSD_balance, (bUSD_balance / TRADE_LVRG) / symbol_price, 1000000000), 6)
+        quantity = max(min_quantity, min(max_quantity, bUSD_balance))
 
-        # Check that the resulting quantity meets the minimum order quantity for the asset
-        if quantity < min_quantity:
-            print(f"Order quantity is less than the minimum quantity: {quantity} < {min_quantity}")
-            return False
+        # Calculate the current price of the asset
+        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
 
         # Create the short order at market price
         order = client.futures_create_order(
