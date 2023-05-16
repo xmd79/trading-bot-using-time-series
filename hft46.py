@@ -43,7 +43,7 @@ TRADE_SYMBOL = 'BTCBUSD'
 TRADE_TYPE = ''
 TRADE_LVRG = 20
 STOP_LOSS_THRESHOLD = 0.0112 # define 1.12% for stoploss
-TAKE_PROFIT_THRESHOLD = 0.0224 # define 2.24% for takeprofit
+TAKE_PROFIT_THRESHOLD = 0.0278 # define 2.78% for takeprofit
 BUY_THRESHOLD = -10
 SELL_THRESHOLD = 10
 EMA_SLOW_PERIOD = 56
@@ -709,46 +709,16 @@ def main():
                         # Check if the current price is above the EMAs and the percent to min/max signals are above 80%
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
                             print("Buy signal!")
-                            if not trade_open:
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
-                                trade_side = 'long'
-                                trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                trade_exit_pnl = 0
-                                trade_entry_time = int(time.time())
-                                print(f"Entered long trade at {trade_entry_time}")
-                            else:
-                                print("LONG trade already open. Seeking exit potential position...")
 
                         # Check if the current price is below the EMAs and the percent to min/max signals are below 20%
                         elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
                             print("Sell signal!")
-                            if not trade_open:
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-                                trade_side = 'short'
-                                trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                trade_exit_pnl = 0
-                                trade_entry_time = int(time.time())
-                                print(f"Entered short trade at {trade_entry_time}")
-                            else:
-                                print("SHORT trade already open. Seeking exit potential position...")
 
                         elif percent_to_min_val < 20:
                             print("Bullish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
                                 print("Bullish momentum in Q1")
-                                if not trade_open:
-                                    entry_long(TRADE_SYMBOL)
-                                    trade_open = True
-                                    trade_side = 'long'
-                                    trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                    trade_exit_pnl = 0
-                                    trade_entry_time = int(time.time())
-                                    print(f"Entered long trade at {trade_entry_time}")
-                                else:
-                                    print("LONG trade already open. Seeking exit potential position...")
                             elif current_quadrant == 2:
                                 # In quadrant 2, distance from 25% to 50% of range
                                 print("Bullish momentum in Q2")
@@ -773,52 +743,21 @@ def main():
                             elif current_quadrant == 4:
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
-                                if not trade_open:
-                                    entry_short(TRADE_SYMBOL)
-                                    trade_open = True
-                                    trade_side = 'short'
-                                    trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                    trade_exit_pnl = 0
-                                    trade_entry_time = int(time.time())
-                                    print(f"Entered short trade at {trade_entry_time}")
-                                else:
-                                    print("SHORT trade already open. Seeking exit potential position...")
-
-                        # Check if the trade has exceeded the stop loss threshold
-                        elif trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= STOP_LOSS_THRESHOLD:
-                            # Exit the trade
-                            exit_trade(TRADE_SYMBOL, trade_side)
-                            trade_open = False
-                            trade_exit_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            print(f"Exited trade at stop loss threshold {int(time.time())}")
-
-                            # Enter a new trade with reversed side
+            
+                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20 and current_quadrant == 1:
+                            entry_long(TRADE_SYMBOL)          
+                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20 and current_quadrant == 4:
+                            entry_short(TRADE_SYMBOL)  
+                
+                        if trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= STOP_LOSS_THRESHOLD:
+                            exit_trade(TRADE_SYMBOL, trade_side)                 
                             if trade_side == 'long':
                                 entry_short(TRADE_SYMBOL)
-                                trade_side = 'short'
-                            elif trade_side == 'short':
+                            else:    
                                 entry_long(TRADE_SYMBOL)
-                                trade_side = 'long'
-
-                            # Reset trade variables
-                            trade_open = True
-                            trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            trade_exit_pnl = 0
-                            trade_entry_time = int(time.time())
-
-                        # Check if the trade has exceeded the take profit threshold
-                        elif trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= TAKE_PROFIT_THRESHOLD:
-                            # Exit the trade
+                
+                        if trade_open and abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= TAKE_PROFIT_THRESHOLD:             
                             exit_trade(TRADE_SYMBOL, trade_side)
-                            trade_open = False
-                            trade_exit_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            print(f"Exited trade at take profit threshold {int(time.time())}")
-
-                            # Reset trade variables
-                            trade_open = True
-                            trade_entry_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            trade_exit_pnl = 0
-                            trade_entry_time = int(time.time())
 
                         else:
                             print("No signal, seeking local or major reversal")
