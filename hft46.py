@@ -762,7 +762,7 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
-                        if not trade_open:
+                        if not trade_open and trade_side = None:
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20 and current_quadrant == 1:
                                 entry_long(TRADE_SYMBOL)
                             elif close_prices[-1] < signals['1m']['mtf_average']:
@@ -772,14 +772,18 @@ def main():
                             elif close_prices[-1] > signals['1m']['mtf_average']:
                                 entry_short(TRADE_SYMBOL)
 
-                        elif trade_open: 
+                        elif trade_open:
+
+                            position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
+                            trade_side = position['positionSide']
+                            
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
                                 print("Entering new trade with changed side...")                 
                                 if trade_side == 'long':
                                     entry_short(TRADE_SYMBOL)
-                                else:    
+                                elif trade_side == 'short':    
                                     entry_long(TRADE_SYMBOL)
                 
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
