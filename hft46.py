@@ -585,6 +585,9 @@ def main():
                 print("Error: No historical candles found.")
                 continue
 
+            bUSD_balance = float(get_account_balance())
+            print("Mu BUSD balance is at: ", bUSD_balance)
+
             # Get the MTF signal
             signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
 
