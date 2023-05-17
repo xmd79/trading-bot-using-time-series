@@ -782,10 +782,10 @@ def main():
 
                         # Trading function calls
                         if not trade_open:
-                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20 and current_quadrant == 1:
+                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 20 and current_quadrant == 4:
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
 
