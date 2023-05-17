@@ -432,8 +432,12 @@ def entry_long(symbol):
                 type=client.ORDER_TYPE_MARKET,
                 quantity=max_quantity)
 
-            print(f"Long order created for {max_quantity} {symbol} at market price.")
-            return True
+            if order is not None and 'orderId' in order:
+                print(f"Long order created for {max_quantity} {symbol} at market price.")
+                return True
+            else:
+                print(f"Error creating long order: {order}")
+                return False
         else:
             print("Insufficient balance to create the order.")
             return False
@@ -462,8 +466,12 @@ def entry_short(symbol):
                 type=client.ORDER_TYPE_MARKET,
                 quantity=max_quantity)
 
-            print(f"Short order created for {max_quantity} {symbol} at market price.")
-            return True
+            if order is not None and 'orderId' in order:
+                print(f"Short order created for {max_quantity} {symbol} at market price.")
+                return True
+            else:
+                print(f"Error creating short order: {order}")
+                return False
         else:
             print("Insufficient balance to create the order.")
             return False
@@ -599,6 +607,8 @@ def main():
             # Get the MTF signal
             signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
             print(signals)
+            
+            print()
 
             # Check if the '1m' key exists in the signals dictionary
             if '1m' in signals:
@@ -756,27 +766,35 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
-                        if not trade_open:
+                        if not trade_open and not position:
                             print("Not in any trade now...seeking potential entry for new trade")
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20 and current_quadrant == 1:
                                 print("Entering LONG now...placing BUY order")
                                 entry_long(TRADE_SYMBOL)
-                                trade_open = True
+                                # After placing order
+                                trade_open = True        
+                                position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
                                 print("BUY order was placed...on LONG now")
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 20 and current_quadrant == 4:
                                 print("Entering SHORT now...placing SELL order")
                                 entry_short(TRADE_SYMBOL)
-                                trade_open = True
+                                # After placing order
+                                trade_open = True        
+                                position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
                                 print("SELL order was placed...on SHORT now")
                         elif trade_open:
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
-                                trade_open = False
+                                # After placing order
+                                trade_open = False        
+                                position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")             
                                 exit_trade()
-                                trade_open = False
+                                # After placing order
+                                trade_open = False        
+                                position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
                         else:
                             print("No signal, seeking local or major reversal")
 
