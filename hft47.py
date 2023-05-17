@@ -42,7 +42,7 @@ TRADE_SIZE = bUSD_balance * 20
 TRADE_SYMBOL = 'BTCBUSD'
 TRADE_TYPE = ''
 TRADE_LVRG = 20
-STOP_LOSS_THRESHOLD = 0.0112 # define 1.12% for stoploss
+STOP_LOSS_THRESHOLD = 0.0144 # define 1.44% for stoploss
 TAKE_PROFIT_THRESHOLD = 0.0144 # define 1.44% for takeprofit
 BUY_THRESHOLD = -10
 SELL_THRESHOLD = 10
@@ -415,14 +415,14 @@ def get_min_order_quantity(symbol):
 def entry_long(symbol):
     try:
         # Get the available account balance and set the leverage to 20x
-        bUSD_balance = float(get_account_balance())
+        account_balance = float(get_account_balance())
         TRADE_LVRG = 20
 
-        # Calculate the current price of the asset
+        # Get the current price of the asset
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
 
         # Calculate the maximum order quantity based on the available balance and the leverage
-        max_quantity = round((bUSD_balance / TRADE_LVRG) / symbol_price, 6)
+        max_quantity = round((account_balance * TRADE_LVRG) / symbol_price, 6)
 
         if max_quantity > 0:
             # Create the long order at market price
@@ -449,14 +449,14 @@ def entry_long(symbol):
 def entry_short(symbol):
     try:
         # Get the available account balance and set the leverage to 20x
-        bUSD_balance = float(get_account_balance())
+        account_balance = float(get_account_balance())
         TRADE_LVRG = 20
 
-        # Calculate the current price of the asset
+        # Get the current price of the asset
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
 
         # Calculate the maximum order quantity based on the available balance and the leverage
-        max_quantity = round((bUSD_balance / TRADE_LVRG) / symbol_price, 6)
+        max_quantity = round((account_balance * TRADE_LVRG) / symbol_price, 6)
 
         if max_quantity > 0:
             # Create the short order at market price
