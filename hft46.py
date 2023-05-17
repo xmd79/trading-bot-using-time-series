@@ -421,8 +421,18 @@ def entry_long(symbol):
         # Get the current price of the asset
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
 
+        # Retrieve the minimum quantity step size for the BTCBUSD futures perpetual contract
+        symbol_info = client.futures_exchange_info()
+        symbol_filters = symbol_info['symbols']
+        for symbol in symbol_filters:
+            if symbol['symbol'] == 'BTCBUSD':
+                filters = symbol['filters']
+                for f in filters:
+                    if f['filterType'] == 'LOT_SIZE':
+                        min_qty = float(f['stepSize'])
+
         # Calculate the maximum order quantity based on the available balance and the leverage
-        max_quantity = round((account_balance * TRADE_LVRG) / symbol_price, 6)
+        max_quantity = round(((account_balance * TRADE_LVRG) / symbol_price) // min_qty * min_qty, 8)
 
         if max_quantity > 0:
             # Create the long order at market price
@@ -455,8 +465,18 @@ def entry_short(symbol):
         # Get the current price of the asset
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
 
+        # Retrieve the minimum quantity step size for the BTCBUSD futures perpetual contract
+        symbol_info = client.futures_exchange_info()
+        symbol_filters = symbol_info['symbols']
+        for symbol in symbol_filters:
+            if symbol['symbol'] == 'BTCBUSD':
+                filters = symbol['filters']
+                for f in filters:
+                    if f['filterType'] == 'LOT_SIZE':
+                        min_qty = float(f['stepSize'])
+
         # Calculate the maximum order quantity based on the available balance and the leverage
-        max_quantity = round((account_balance * TRADE_LVRG) / symbol_price, 6)
+        max_quantity = round(((account_balance * TRADE_LVRG) / symbol_price) // min_qty * min_qty, 8)
 
         if max_quantity > 0:
             # Create the short order at market price
