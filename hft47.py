@@ -598,8 +598,8 @@ def main():
             server_time = requests.get('https://api.binance.com/api/v3/time').json()['serverTime']
             
             # Calculate the timestamp of your request       
-            timestamp = int(server_time - 500) # Subtract5 seconds
-            
+            timestamp = int(server_time/1000) 
+
             # Make your request with the adjusted timestamp
             response = requests.get(url, params={'timestamp': timestamp})
             response = requests.get('https://api.binance.com/api/v3/time', auth=(api_key, api_secret))
