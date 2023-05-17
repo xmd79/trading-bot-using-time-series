@@ -418,22 +418,20 @@ def entry_long(symbol):
         bUSD_balance = float(get_account_balance())
         TRADE_LVRG = 20
 
-        # Calculate the maximum order quantity based on the available balance and the minimum order quantity
-        min_quantity = float(get_min_order_quantity(symbol))
-        max_quantity = round(min(bUSD_balance, (bUSD_balance / TRADE_LVRG) / symbol_price, 1000000000), 6)
-        quantity = max(min_quantity, min(max_quantity, bUSD_balance))
-
         # Calculate the current price of the asset
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
+
+        # Calculate the maximum order quantity based on the available balance and the leverage
+        max_quantity = round((bUSD_balance / TRADE_LVRG) / symbol_price, 6)
 
         # Create the long order at market price
         order = client.futures_create_order(
             symbol=symbol,
             side=client.SIDE_BUY,
             type=client.ORDER_TYPE_MARKET,
-            quantity=quantity)
+            quantity=max_quantity)
 
-        print(f"Long order created for {quantity} {symbol} at market price.")
+        print(f"Long order created for {max_quantity} {symbol} at market price.")
         return True
 
     except BinanceAPIException as e:
@@ -446,22 +444,20 @@ def entry_short(symbol):
         bUSD_balance = float(get_account_balance())
         TRADE_LVRG = 20
 
-        # Calculate the maximum order quantity based on the available balance and the minimum order quantity
-        min_quantity = float(get_min_order_quantity(symbol))
-        max_quantity = round(min(bUSD_balance, (bUSD_balance / TRADE_LVRG) / symbol_price, 1000000000), 6)
-        quantity = max(min_quantity, min(max_quantity, bUSD_balance))
-
         # Calculate the current price of the asset
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
+
+        # Calculate the maximum order quantity based on the available balance and the leverage
+        max_quantity = round((bUSD_balance / TRADE_LVRG) / symbol_price, 6)
 
         # Create the short order at market price
         order = client.futures_create_order(
             symbol=symbol,
             side=client.SIDE_SELL,
             type=client.ORDER_TYPE_MARKET,
-            quantity=quantity)
+            quantity=max_quantity)
 
-        print(f"Short order created for {quantity} {symbol} at market price.")
+        print(f"Short order created for {max_quantity} {symbol} at market price.")
         return True
 
     except BinanceAPIException as e:
@@ -469,13 +465,11 @@ def entry_short(symbol):
         return False
 
 def exit_trade():
-    
     # Get all open positions
-    positions = client.positions()
+    positions = client.futures_position_information()
     
     # Loop through each position
     for position in positions:
-        
         symbol = position['symbol']
         position_amount = float(position['positionAmt'])
         
@@ -486,15 +480,14 @@ def exit_trade():
             order_side = 'BUY'  
             
         # Place order to exit position      
-        while position_amount > 0:
-            order = client.create_order(
+        if position_amount != 0:
+            order = client.futures_create_order(
                 symbol=symbol,
                 side=order_side,
                 type='MARKET',
-                quantity=position_amount)
+                quantity=abs(position_amount))
                 
-            # Update remaining position amount
-            position_amount -= order['executedQty']
+            print(f"{order_side} order created to exit {abs(position_amount)} {symbol}.")
                 
     print("All positions exited!")
 
@@ -544,11 +537,10 @@ def main():
     trade_exit_pnl = 0
     trade_side = None
 
-
     # Define constants
     trade_symbol = "BTCBUSD"
-    stop_loss = 0.0112        
-    take_profit = 0.0178       
+    stop_loss = 0.0144        
+    take_profit = 0.0144      
     fast_ema = 12       
     slow_ema = 26         
         
@@ -756,13 +748,7 @@ def main():
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20 and current_quadrant == 1:
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
-                            elif close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20:
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 20 and current_quadrant == 4:
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 20:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
 
@@ -771,13 +757,13 @@ def main():
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
                                 trade_open = False
-                                print("Entering new trade with changed side...")                 
-                                if trade_side == 'long':
-                                    entry_short(TRADE_SYMBOL)
-                                    trade_open = True
-                                elif trade_side == 'short':    
-                                    entry_long(TRADE_SYMBOL)
-                                    trade_open = True
+                                #print("Entering new trade with changed side...")                 
+                                #if trade_side == 'long':
+                                    #entry_short(TRADE_SYMBOL)
+                                    #trade_open = True
+                                #elif trade_side == 'short':    
+                                    #entry_long(TRADE_SYMBOL)
+                                    #trade_open = True
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")             
                                 exit_trade()
@@ -805,7 +791,6 @@ def main():
         except Exception as e:      
             print(f"An error occurred: {e}")    
             time.sleep(5) 
-
 
 # Run the main function
 if __name__ == '__main__':
