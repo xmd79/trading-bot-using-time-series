@@ -414,34 +414,40 @@ def get_min_order_quantity(symbol):
         return None
 
 def entry_long(TRADE_SYMBOL):
-    symbol=TRADE_SYMBOL
+    symbol = TRADE_SYMBOL
     side = 'BUY'
     ticker = client.futures_symbol_ticker(symbol=symbol)
-    quantity = round(float(client.futures_account_balance()[3]['balance']) / float(ticker['price']), 2)
-    leverage = 20
+    balance = float(client.futures_account_balance()[3]['balance'])
+    price = float(ticker['price'])
+    leverage = 20  # Define leverage before using it
+    quantity = round(balance * leverage / price, 2)
     timestamp = int(time.time() * 1000)
     params = f'symbol={symbol}&side={side}&type=MARKET&quantity={quantity}&leverage={leverage}&timestamp={timestamp}'
-    #signature = hmac.new(api_secret.encode('utf-8'), params.encode('utf-8'), hashlib.sha256).hexdigest()
+
     try:
         order = client.futures_create_order(symbol=TRADE_SYMBOL, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
+        print(f"Entering LONG now...placing BUY order for {TRADE_SYMBOL}")
         return order
     except BinanceAPIException as e:
-        print(e)
+        print(f"An error occurred: {e}")
 
 def entry_short(TRADE_SYMBOL):
-    symbol=TRADE_SYMBOL
+    symbol = TRADE_SYMBOL
     side = 'SELL'
     ticker = client.futures_symbol_ticker(symbol=symbol)
-    quantity = round(float(client.futures_account_balance()[3]['balance']) / float(ticker['price']), 2)
-    leverage = 20
+    balance = float(client.futures_account_balance()[3]['balance'])
+    price = float(ticker['price'])
+    leverage = 20  # Define leverage before using it
+    quantity = round(balance * leverage / price, 2)
     timestamp = int(time.time() * 1000)
     params = f'symbol={symbol}&side={side}&type=MARKET&quantity={quantity}&leverage={leverage}&timestamp={timestamp}'
-    #signature = hmac.new(api_secret.encode('utf-8'), params.encode('utf-8'), hashlib.sha256).hexdigest()
+
     try:
         order = client.futures_create_order(symbol=TRADE_SYMBOL, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
+        print(f"Entering SHORT now...placing SELL order for {TRADE_SYMBOL}")
         return order
     except BinanceAPIException as e:
-        print(e)
+        print(f"An error occurred: {e}")
 
 def exit_trade():
     # Get all open positions
