@@ -9,6 +9,7 @@ from datetime import timedelta
 from decimal import Decimal
 import decimal
 import random
+import hmac
 
 # binance module imports
 from binance.client import Client as BinanceClient
@@ -412,93 +413,33 @@ def get_min_order_quantity(symbol):
         print(f"Error getting minimum order quantity for {symbol}: {e}")
         return None
 
-def entry_long(symbol):
+def entry_long():
+    symbol = 'BTCBUSD'
+    side = 'BUY'
+    quantity = round(float(client.futures_account_balance()[3]['balance']) / float(client.futures_symbol_ticker(symbol=symbol)['lastPrice']), 2)
+    leverage = 20
+    timestamp = int(time.time() * 1000)
+    params = f'symbol={symbol}&side={side}&type=MARKET&quantity={quantity}&leverage={leverage}&timestamp={timestamp}'
+    #signature = hmac.new(api_secret.encode('utf-8'), params.encode('utf-8'), hashlib.sha256).hexdigest()
     try:
-        # Get the available account balance and set the leverage to 20x
-        account_balance = float(get_account_balance())
-        TRADE_LVRG = 20
-
-        # Get the current price of the asset
-        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
-
-        # Retrieve the minimum quantity step size for the BTCBUSD futures perpetual contract
-        symbol_info = client.futures_exchange_info()
-        symbol_filters = symbol_info['symbols']
-        for symbol in symbol_filters:
-            if symbol['symbol'] == 'BTCBUSD':
-                filters = symbol['filters']
-                for f in filters:
-                    if f['filterType'] == 'LOT_SIZE':
-                        min_qty = float(f['stepSize'])
-
-        # Calculate the maximum order quantity based on the available balance and the leverage
-        max_quantity = round(((account_balance * TRADE_LVRG) / symbol_price) // min_qty * min_qty, 8)
-
-        if max_quantity > 0:
-            # Create the long order at market price
-            order = client.futures_create_order(
-                symbol=symbol,
-                side=client.SIDE_BUY,
-                type=client.ORDER_TYPE_MARKET,
-                quantity=max_quantity)
-
-            if order is not None and 'orderId' in order:
-                print(f"Long order created for {max_quantity} {symbol} at market price.")
-                return True
-            else:
-                print(f"Error creating long order: {order}")
-                return False
-        else:
-            print("Insufficient balance to create the order.")
-            return False
-
+        order = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
+        return order
     except BinanceAPIException as e:
-        print(f"Error creating long order: {e}")
-        return False
+        print(e)
 
-def entry_short(symbol):
+def entry_short():
+    symbol = 'BTCBUSD'
+    side = 'SELL'
+    quantity = round(float(client.futures_account_balance()[3]['balance']) / float(client.futures_symbol_ticker(symbol=symbol)['lastPrice']), 2)
+    leverage = 20
+    timestamp = int(time.time() * 1000)
+    params = f'symbol={symbol}&side={side}&type=MARKET&quantity={quantity}&leverage={leverage}&timestamp={timestamp}'
+    #signature = hmac.new(api_secret.encode('utf-8'), params.encode('utf-8'), hashlib.sha256).hexdigest()
     try:
-        # Get the available account balance and set the leverage to 20x
-        account_balance = float(get_account_balance())
-        TRADE_LVRG = 20
-
-        # Get the current price of the asset
-        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
-
-        # Retrieve the minimum quantity step size for the BTCBUSD futures perpetual contract
-        symbol_info = client.futures_exchange_info()
-        symbol_filters = symbol_info['symbols']
-        for symbol in symbol_filters:
-            if symbol['symbol'] == 'BTCBUSD':
-                filters = symbol['filters']
-                for f in filters:
-                    if f['filterType'] == 'LOT_SIZE':
-                        min_qty = float(f['stepSize'])
-
-        # Calculate the maximum order quantity based on the available balance and the leverage
-        max_quantity = round(((account_balance * TRADE_LVRG) / symbol_price) // min_qty * min_qty, 8)
-
-        if max_quantity > 0:
-            # Create the short order at market price
-            order = client.futures_create_order(
-                symbol=symbol,
-                side=client.SIDE_SELL,
-                type=client.ORDER_TYPE_MARKET,
-                quantity=max_quantity)
-
-            if order is not None and 'orderId' in order:
-                print(f"Short order created for {max_quantity} {symbol} at market price.")
-                return True
-            else:
-                print(f"Error creating short order: {order}")
-                return False
-        else:
-            print("Insufficient balance to create the order.")
-            return False
-
+        order = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
+        return order
     except BinanceAPIException as e:
-        print(f"Error creating short order: {e}")
-        return False
+        print(e)
 
 def exit_trade():
     # Get all open positions
