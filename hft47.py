@@ -791,14 +791,19 @@ def main():
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
-                                trade_open = False
+                                if not trade_open:
+                                    trade_open = False
+
                                 print("Closed position...exit trade done")
 
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
-                                print("TAKEPROFIT was hit! Closing position and exit trade...")             
+                                print("TAKEPROFIT was hit! Closing position and exit trade...")
                                 exit_trade()
-                                trade_open = False
+                                if not trade_open:
+                                    trade_open = False
+
                                 print("Closed position...exit trade done")
+
 
                         else:
                             print("No signal, seeking local or major reversal")
