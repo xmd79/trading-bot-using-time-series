@@ -414,7 +414,6 @@ def get_min_order_quantity(symbol):
         return None
 
 def entry_long():
-    symbol = 'BTCBUSD'
     side = 'BUY'
     quantity = round(float(client.futures_account_balance()[3]['balance']) / float(client.futures_symbol_ticker(symbol=symbol)['lastPrice']), 2)
     leverage = 20
@@ -422,13 +421,12 @@ def entry_long():
     params = f'symbol={symbol}&side={side}&type=MARKET&quantity={quantity}&leverage={leverage}&timestamp={timestamp}'
     #signature = hmac.new(api_secret.encode('utf-8'), params.encode('utf-8'), hashlib.sha256).hexdigest()
     try:
-        order = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
+        order = client.futures_create_order(symbol=TRADE_SYMBOL, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
         return order
     except BinanceAPIException as e:
         print(e)
 
 def entry_short():
-    symbol = 'BTCBUSD'
     side = 'SELL'
     quantity = round(float(client.futures_account_balance()[3]['balance']) / float(client.futures_symbol_ticker(symbol=symbol)['lastPrice']), 2)
     leverage = 20
@@ -436,7 +434,7 @@ def entry_short():
     params = f'symbol={symbol}&side={side}&type=MARKET&quantity={quantity}&leverage={leverage}&timestamp={timestamp}'
     #signature = hmac.new(api_secret.encode('utf-8'), params.encode('utf-8'), hashlib.sha256).hexdigest()
     try:
-        order = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
+        order = client.futures_create_order(symbol=TRADE_SYMBOL, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
         return order
     except BinanceAPIException as e:
         print(e)
@@ -733,15 +731,29 @@ def main():
 
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
                                 print("Entering LONG now...placing BUY order")
-                                entry_long(TRADE_SYMBOL)
+                                entry_long()
                                 trade_open = True
                                 print("BUY order was placed...on LONG now")
 
+                            elif dist_from_close_to_min < 20 and signals['1m']['momentum'] > 0:
+                                print("Entering LONG now...placing BUY order")
+                                entry_long()
+                                trade_open = True
+                                if trade_open:
+                                    print("BUY order was placed...on LONG now")
+
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
                                 print("Entering SHORT now...placing SELL order")
-                                entry_short(TRADE_SYMBOL)
+                                entry_short()
                                 trade_open = True
                                 print("SELL order was placed...on SHORT now")
+
+                            elif dist_from_close_to_max < 20 and signals['1m']['momentum'] < 0:
+                                print("Entering SHORT now...placing SELL order")
+                                entry_short()
+                                trade_open = True
+                                if trade_open:
+                                    print("SELL order was placed...on SJORT now")
 
                         elif trade_open:
                             print("In a trade now...seeking potential exit for this trade")
