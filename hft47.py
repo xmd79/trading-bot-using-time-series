@@ -413,7 +413,8 @@ def get_min_order_quantity(symbol):
         print(f"Error getting minimum order quantity for {symbol}: {e}")
         return None
 
-def entry_long():
+def entry_long(TRADE_SYMBOL):
+    symbol=TRADE_SYMBOL
     side = 'BUY'
     quantity = round(float(client.futures_account_balance()[3]['balance']) / float(client.futures_symbol_ticker(symbol=symbol)['lastPrice']), 2)
     leverage = 20
@@ -426,7 +427,8 @@ def entry_long():
     except BinanceAPIException as e:
         print(e)
 
-def entry_short():
+def entry_short(TRADE_SYMBOL):
+    symbol=TRADE_SYMBOL
     side = 'SELL'
     quantity = round(float(client.futures_account_balance()[3]['balance']) / float(client.futures_symbol_ticker(symbol=symbol)['lastPrice']), 2)
     leverage = 20
@@ -731,26 +733,26 @@ def main():
 
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
                                 print("Entering LONG now...placing BUY order")
-                                entry_long()
+                                entry_long(TRADE_SYMBOL)
                                 trade_open = True
                                 print("BUY order was placed...on LONG now")
 
                             elif dist_from_close_to_min < 20 and signals['1m']['momentum'] > 0:
                                 print("Entering LONG now...placing BUY order")
-                                entry_long()
+                                entry_long(TRADE_SYMBOL)
                                 trade_open = True
                                 if trade_open:
                                     print("BUY order was placed...on LONG now")
 
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
                                 print("Entering SHORT now...placing SELL order")
-                                entry_short()
+                                entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 print("SELL order was placed...on SHORT now")
 
                             elif dist_from_close_to_max < 20 and signals['1m']['momentum'] < 0:
                                 print("Entering SHORT now...placing SELL order")
-                                entry_short()
+                                entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 if trade_open:
                                     print("SELL order was placed...on SJORT now")
