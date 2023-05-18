@@ -417,12 +417,15 @@ def entry_long(TRADE_SYMBOL):
     symbol = TRADE_SYMBOL
     side = 'BUY'
     ticker = client.futures_symbol_ticker(symbol=symbol)
-    balance = float(client.futures_account_balance()[3]['balance'])
     price = float(ticker['price'])
-    leverage = 20  # Define leverage before using it
-    quantity = round(balance * leverage / price, 2)
+    leverage = 20  # Use 20x leverage
+    asset = 'BUSD'
+    balance_index = next((index for (index, d) in enumerate(client.futures_account_balance()) if d["asset"] == asset), None)
+    available_balance = float(client.futures_account_balance()[balance_index]['balance'])
+    max_position_size = round((available_balance * leverage) / price, 2)  # Calculate max position size based on available balance and leverage
+    quantity_percentage = 0.9  # Use 90% of the max position size
+    quantity = round(max_position_size * quantity_percentage, 2)  # Calculate order quantity
     timestamp = int(time.time() * 1000)
-    params = f'symbol={symbol}&side={side}&type=MARKET&quantity={quantity}&leverage={leverage}&timestamp={timestamp}'
 
     try:
         order = client.futures_create_order(symbol=TRADE_SYMBOL, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
@@ -435,12 +438,15 @@ def entry_short(TRADE_SYMBOL):
     symbol = TRADE_SYMBOL
     side = 'SELL'
     ticker = client.futures_symbol_ticker(symbol=symbol)
-    balance = float(client.futures_account_balance()[3]['balance'])
     price = float(ticker['price'])
-    leverage = 20  # Define leverage before using it
-    quantity = round(balance * leverage / price, 2)
+    leverage = 20  # Use 20x leverage
+    asset = 'BUSD'
+    balance_index = next((index for (index, d) in enumerate(client.futures_account_balance()) if d["asset"] == asset), None)
+    available_balance = float(client.futures_account_balance()[balance_index]['balance'])
+    max_position_size = round((available_balance * leverage) / price, 2)  # Calculate max position size based on available balance and leverage
+    quantity_percentage = 0.9  # Use 90% of the max position size
+    quantity = round(max_position_size * quantity_percentage, 2)  # Calculate order quantity
     timestamp = int(time.time() * 1000)
-    params = f'symbol={symbol}&side={side}&type=MARKET&quantity={quantity}&leverage={leverage}&timestamp={timestamp}'
 
     try:
         order = client.futures_create_order(symbol=TRADE_SYMBOL, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
