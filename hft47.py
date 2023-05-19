@@ -530,6 +530,9 @@ def main():
     fast_ema = 12       
     slow_ema = 26         
         
+    EMA_SLOW_PERIOD = slow_ema
+    EMA_FAST_PERIOD = fast_ema
+
     # Define trade variables    
     position = None   
     trade_open = False       
