@@ -790,12 +790,40 @@ def main():
                         if not trade_open:
 
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
+                                print("Entering LONG now...placing BUY order")
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
+                                print("BUY order was placed...on LONG now")
+
+                            elif dist_from_close_to_min < 20 and signals['1m']['momentum'] > 0:
+                                print("Entering LONG now...placing BUY order")
+                                entry_long(TRADE_SYMBOL)
+                                trade_open = True
+                                print("BUY order was placed...on LONG now")
+
+                            elif dist_from_close_to_min < dist_from_close_to_max and signals['1m']['momentum'] > 0:
+                                print("Entering LONG now...placing BUY order")
+                                entry_long(TRADE_SYMBOL)
+                                trade_open = True
+                                print("BUY order was placed...on LONG now")
 
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
+                                print("Entering SHORT now...placing SELL order")
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
+                                print("SELL order was placed...on SHORT now")
+
+                            elif dist_from_close_to_max < 20 and signals['1m']['momentum'] < 0:
+                                print("Entering SHORT now...placing SELL order")
+                                entry_short(TRADE_SYMBOL)
+                                trade_open = True
+                                print("SELL order was placed...on SHORT now")
+
+                            elif dist_from_close_to_max < dist_from_close_to_min and signals['1m']['momentum'] < 0:
+                                print("Entering SHORT now...placing SELL order")
+                                entry_short(TRADE_SYMBOL)
+                                trade_open = True
+                                print("SELL order was placed...on SHORT now")
 
                         elif trade_open:
 
