@@ -738,30 +738,6 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
-                        if not trade_open:
-                            print("Not in any trade now...seeking potential entry for new trade")
-                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20 and current_quadrant == 1:
-                                print("Entering LONG now...placing BUY order")
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
-                                print("BUY order was placed...on LONG now")
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 20 and current_quadrant == 4:
-                                print("Entering SHORT now...placing SELL order")
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-                                print("SELL order was placed...on SHORT now")
-                        elif trade_open:
-                            if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
-                                print("STOPLOSS was hit! Closing position and exit trade...")
-                                exit_trade()
-                                trade_open = False
-                            elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
-                                print("TAKEPROFIT was hit! Closing position and exit trade...")             
-                                exit_trade()
-                                trade_open = False
-                        else:
-                            print("No signal, seeking local or major reversal")
-
                         # Trading function calls
                         if not trade_open:
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
