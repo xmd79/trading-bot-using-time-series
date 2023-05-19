@@ -42,7 +42,7 @@ TRADE_SIZE = bUSD_balance * 20
 TRADE_SYMBOL = 'BTCBUSD'
 TRADE_TYPE = ''
 TRADE_LVRG = 20
-STOP_LOSS_THRESHOLD = 0.0112 # define 1.12% for stoploss
+STOP_LOSS_THRESHOLD = 0.0144 # define 1.44% for stoploss
 TAKE_PROFIT_THRESHOLD = 0.0144 # define 1.44% for takeprofit
 BUY_THRESHOLD = -10
 SELL_THRESHOLD = 10
@@ -413,91 +413,80 @@ def get_min_order_quantity(symbol):
         return None
 
 def entry_long(symbol):
-    try:
-        # Get the available account balance and set the leverage to 20x
-        account_balance = float(get_account_balance())
+    try:     
+        # Get available balance and leverage     
+        account_balance = float(get_account_balance())   
         TRADE_LVRG = 20
-
-        # Get the current price of the asset
+               
+        # Get symbol price    
         symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
-
-        # Retrieve the minimum quantity step size for the BTCBUSD futures perpetual contract
+        
+        # Retrieve minimum quantity step size
         symbol_info = client.futures_exchange_info()
         symbol_filters = symbol_info['symbols']
         for symbol in symbol_filters:
-            if symbol['symbol'] == 'BTCBUSD':
-                filters = symbol['filters']
-                for f in filters:
+            if symbol['symbol'] == 'BTCBUSD':   
+                filters = symbol['filters']       
+                for f in filters:        
                     if f['filterType'] == 'LOT_SIZE':
                         min_qty = float(f['stepSize'])
-
-        # Calculate the maximum order quantity based on the available balance and the leverage
-        max_quantity = round(((account_balance * TRADE_LVRG) / symbol_price) // min_qty * min_qty, 8)
-
-        if max_quantity > 0:
-            # Create the long order at market price
-            order = client.futures_create_order(
-                symbol=symbol,
-                side=client.SIDE_BUY,
-                type=client.ORDER_TYPE_MARKET,
-                quantity=max_quantity)
-
-            if order is not None and 'orderId' in order:
-                print(f"Long order created for {max_quantity} {symbol} at market price.")
+        
+        # Calculate maximum order quantity      
+        max_quantity = round(((account_balance * TRADE_LVRG)   / symbol_price) // min_qty * min_qty, 8)
+                
+       # Create the long order at market price
+        order = client.futures_create_order(
+            symbol=symbol,       
+            side=client.SIDE_BUY,          
+            type=client.ORDER_TYPE_MARKET,        
+            quantity=max_quantity)         
+        
+        if order:    
+            if 'orderId' in order:
                 return True
-            else:
-                print(f"Error creating long order: {order}")
-                return False
-        else:
-            print("Insufficient balance to create the order.")
+           
+        else:         
+            print("Error creating long order.")    
             return False
-
+            
     except BinanceAPIException as e:
         print(f"Error creating long order: {e}")
         return False
 
 def entry_short(symbol):
     try:
-        # Get the available account balance and set the leverage to 20x
-        account_balance = float(get_account_balance())
-        TRADE_LVRG = 20
-
-        # Get the current price of the asset
-        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
-
-        # Retrieve the minimum quantity step size for the BTCBUSD futures perpetual contract
-        symbol_info = client.futures_exchange_info()
-        symbol_filters = symbol_info['symbols']
-        for symbol in symbol_filters:
-            if symbol['symbol'] == 'BTCBUSD':
-                filters = symbol['filters']
-                for f in filters:
-                    if f['filterType'] == 'LOT_SIZE':
-                        min_qty = float(f['stepSize'])
-
-        # Calculate the maximum order quantity based on the available balance and the leverage
-        max_quantity = round(((account_balance * TRADE_LVRG) / symbol_price) // min_qty * min_qty, 8)
-
-        if max_quantity > 0:
-            # Create the short order at market price
-            order = client.futures_create_order(
-                symbol=symbol,
-                side=client.SIDE_SELL,
-                type=client.ORDER_TYPE_MARKET,
-                quantity=max_quantity)
-
-            if order is not None and 'orderId' in order:
-                print(f"Short order created for {max_quantity} {symbol} at market price.")
+        # Get available balance and leverage     
+        account_balance = float(get_account_balance())   
+        TRADE_LVRG = 20  
+            
+        # Get symbol price    
+        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price']) 
+        
+        # Retrieve minimum quantity step size       
+        symbol_info = client.futures_exchange_info() 
+        ...     
+        min_qty = ...
+        
+        # Calculate maximum order quantity      
+        max_quantity = ...
+                
+        # Create the short order at market price   
+        order = client.futures_create_order(      
+            symbol=symbol,       
+            side=client.SIDE_SELL,           
+            type=client.ORDER_TYPE_MARKET,       
+            quantity=max_quantity)
+        
+        if order:     
+            if 'orderId' in order:
                 return True
-            else:
-                print(f"Error creating short order: {order}")
-                return False
+        
         else:
-            print("Insufficient balance to create the order.")
+            print("Error creating short order.")    
             return False
-
+            
     except BinanceAPIException as e:
-        print(f"Error creating short order: {e}")
+        print(f"Error creating short order: {e}")   
         return False
 
 def exit_trade():
@@ -579,7 +568,7 @@ def main():
 
     # Define constants
     trade_symbol = "BTCBUSD"
-    stop_loss = 0.0378        
+    stop_loss = 0.0144        
     take_profit = 0.0144      
     fast_ema = 12       
     slow_ema = 26         
@@ -627,7 +616,7 @@ def main():
             # Get the MTF signal
             signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
             print(signals)
-
+            
             print()
 
             # Check if the '1m' key exists in the signals dictionary
@@ -786,59 +775,56 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
+                        if not trade_open and not position:
+                            print("Not in any trade now...seeking potential entry for new trade")
+                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 20 and current_quadrant == 1:
+                                print("Entering LONG now...placing BUY order")
+                                entry_long(TRADE_SYMBOL)
+                                # After placing order
+                                trade_open = True        
+                                position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
+                                print("BUY order was placed...on LONG now")
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 20 and current_quadrant == 4:
+                                print("Entering SHORT now...placing SELL order")
+                                entry_short(TRADE_SYMBOL)
+                                # After placing order
+                                trade_open = True        
+                                position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
+                                print("SELL order was placed...on SHORT now")
+                        elif trade_open:
+                            if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
+                                print("STOPLOSS was hit! Closing position and exit trade...")
+                                exit_trade()
+                                # After placing order
+                                trade_open = False        
+                                position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
+                            elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
+                                print("TAKEPROFIT was hit! Closing position and exit trade...")             
+                                exit_trade()
+                                # After placing order
+                                trade_open = False        
+                                position = client.futures_position_information(symbol=TRADE_SYMBOL)[0]
+                        else:
+                            print("No signal, seeking local or major reversal")
+
                         # Trading function calls
                         if not trade_open:
-
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
-                                print("Entering LONG now...placing BUY order")
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
-                                print("BUY order was placed...on LONG now")
-
-                            elif dist_from_close_to_min < 20 and signals['1m']['momentum'] > 0:
-                                print("Entering LONG now...placing BUY order")
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
-                                print("BUY order was placed...on LONG now")
-
-                            elif dist_from_close_to_min < dist_from_close_to_max and signals['1m']['momentum'] > 0:
-                                print("Entering LONG now...placing BUY order")
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
-                                print("BUY order was placed...on LONG now")
-
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
-                                print("Entering SHORT now...placing SELL order")
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
-                                print("SELL order was placed...on SHORT now")
-
-                            elif dist_from_close_to_max < 20 and signals['1m']['momentum'] < 0:
-                                print("Entering SHORT now...placing SELL order")
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-                                print("SELL order was placed...on SHORT now")
-
-                            elif dist_from_close_to_max < dist_from_close_to_min and signals['1m']['momentum'] < 0:
-                                print("Entering SHORT now...placing SELL order")
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-                                print("SELL order was placed...on SHORT now")
 
                         elif trade_open:
-
-                            if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= -stop_loss:
+                            if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
                                 trade_open = False
-
-
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")             
                                 exit_trade()
                                 trade_open = False
-
-
                         else:
                             print("No signal, seeking local or major reversal")
 
