@@ -753,6 +753,9 @@ def main():
 
                         # Trading function calls
                         if not trade_open:
+                            trade_entry_pnl = 0
+                            trade_exit_pnl = 0
+
                             print("Not in any trade now...seeking potential entry for new trade")
 
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
@@ -801,8 +804,8 @@ def main():
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
                                 print(f"STOPLOSS triggered! Current PNL is {stop_loss * 100}%")
                                 exit_trade()
-                                if not trade_open:
-                                    trade_open = False
+                                trade_exit_pnl = stop_loss
+                                trade_open = False
 
                                 # Close the open position
                                 position_info = client.futures_position_information()
@@ -832,8 +835,8 @@ def main():
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
                                 print(f"TAKEPROFIT triggered! Current PNL is {take_profit * 100}%")
                                 exit_trade()
-                                if not trade_open:
-                                    trade_open = False
+                                trade_exit_pnl = take_profit       
+                                trade_open = False
 
                                 # Close the open position
                                 position_info = client.futures_position_information()
