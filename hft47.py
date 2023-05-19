@@ -456,39 +456,20 @@ def entry_short(TRADE_SYMBOL):
         print(f"An error occurred: {e}")
 
 def exit_trade():
-    # Get all open positions
-    positions = client.futures_position_information()
-    
-    # Loop through each position
-    for position in positions:
-        symbol = position['symbol']
-        position_amount = float(position['positionAmt'])
-        
-        # Determine order side
-        if position_amount > 0:
-            order_side = 'SELL'
-            order_quantity = abs(position_amount)
-        elif position_amount < 0:
-            order_side = 'BUY'
-            order_quantity = abs(position_amount)
-        else:
-            continue # Skip this position if there is no position amount
-        
-        # Place order to exit position      
-        order = client.futures_create_order(
-            symbol=symbol,
-            side=order_side,
-            type='MARKET',
-            quantity=order_quantity)
-                
-        print(f"{order_side} order created to exit {order_quantity} {symbol}.")
-                
-    print("Allpositions exited!")
-    
-    # Flush the trade open
-    client.futures_account_balance()
-    
-    print("Trade open flushed!")
+    # Get the open position
+    position_info = client.futures_position_information()
+    position_id = None 
+    for position in position_info:
+        if position['symbol'] == TRADE_SYMBOL and position['positionAmt'] != '0':      
+             position_id  = position['positionAmt']
+            
+    # Close the position            
+    if position_id:   
+        response = client.futures_close_position(symbol=trade_symbol, positionSide='BOTH')
+        print(response)
+    else:
+        print("No open position to close.")
+
 
 def calculate_ema(candles, period):
     prices = [float(candle['close']) for candle in candles]
@@ -756,6 +737,14 @@ def main():
                             trade_entry_pnl = 0
                             trade_exit_pnl = 0
 
+                            # Get the open position
+                            position_info = client.futures_position_information()
+                            position_id = None 
+                            for position in position_info:
+                                if position['symbol'] == TRADE_SYMBOL and position['positionAmt'] != '0':      
+                                    position_id  = position['positionAmt']
+                                print("position is: ", position_id)
+
                             print("Not in any trade now...seeking potential entry for new trade")
 
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
@@ -768,15 +757,13 @@ def main():
                                 print("Entering LONG now...placing BUY order")
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
-                                if trade_open:
-                                    print("BUY order was placed...on LONG now")
+                                print("BUY order was placed...on LONG now")
 
                             elif dist_from_close_to_min < dist_from_close_to_max and signals['1m']['momentum'] > 0:
                                 print("Entering LONG now...placing BUY order")
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
-                                if trade_open:
-                                    print("BUY order was placed...on LONG now")
+                                print("BUY order was placed...on LONG now")
 
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
                                 print("Entering SHORT now...placing SELL order")
@@ -788,17 +775,24 @@ def main():
                                 print("Entering SHORT now...placing SELL order")
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
-                                if trade_open:
-                                    print("SELL order was placed...on SHORT now")
+                                print("SELL order was placed...on SHORT now")
 
                             elif dist_from_close_to_max < dist_from_close_to_min and signals['1m']['momentum'] < 0:
                                 print("Entering SHORT now...placing SELL order")
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
-                                if trade_open:
-                                    print("SELL order was placed...on SHORT now")
+                                print("SELL order was placed...on SHORT now")
 
                         elif trade_open:
+
+                            # Get the open position
+                            position_info = client.futures_position_information()
+                            position_id = None 
+                            for position in position_info:
+                                if position['symbol'] == TRADE_SYMBOL and position['positionAmt'] != '0':      
+                                    position_id  = position['positionAmt']
+                                print("position is: ", position_id)
+
                             print("In a trade now...seeking potential exit for this trade")
 
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
@@ -807,29 +801,6 @@ def main():
                                 trade_exit_pnl = stop_loss
                                 trade_open = False
 
-                                # Close the open position
-                                position_info = client.futures_position_information()
-                                position_id = None
-                                for position in position_info:
-                                    if position['symbol'] == 'BTCBUSD' and position['positionAmt'] != '0':
-                                        position_id = position['positionAmt']
-
-                                        if position_id:
-                                            response = client.futures_close_position(symbol='BTCUSDT', positionSide='BOTH')
-                                            print(response)
-                                        else:
-                                            print("No open position to close.")
-
-                                    # Call flush to ensure that the API response is up to date
-                                    client.sync('BTCBUSD')
-
-                                    # Check if the position is closed
-                                    open_positions = client.futures_position_information()
-                                    if not any(position['symbol'] == 'BTCBUSD' and position['positionAmt'] != '0' for position in open_positions):
-                                        print("Position has been closed successfully.")
-                                    else:
-                                        print("Position is still open.")
-
                                 print("Closed position...exit trade done")
 
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
@@ -837,29 +808,6 @@ def main():
                                 exit_trade()
                                 trade_exit_pnl = take_profit       
                                 trade_open = False
-
-                                # Close the open position
-                                position_info = client.futures_position_information()
-                                position_id = None
-                                for position in position_info:
-                                    if position['symbol'] == 'BTCBUSD' and position['positionAmt'] != '0':
-                                        position_id = position['positionAmt']
-
-                                        if position_id:
-                                            response = client.futures_close_position(symbol='BTCUSDT', positionSide='BOTH')
-                                            print(response)
-                                        else:
-                                            print("No open position to close.")
-
-                                    # Call flush to ensure that the API response is up to date
-                                    client.sync('BTCBUSD')
-
-                                    # Check if the position is closed
-                                    open_positions = client.futures_position_information()
-                                    if not any(position['symbol'] == 'BTCBUSD' and position['positionAmt'] != '0' for position in open_positions):
-                                        print("Position has been closed successfully.")
-                                    else:
-                                        print("Position is still open.")
 
                                 print("Closed position...exit trade done")
 
