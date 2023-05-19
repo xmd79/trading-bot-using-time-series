@@ -579,7 +579,7 @@ def main():
 
     # Define constants
     trade_symbol = "BTCBUSD"
-    stop_loss = 0.0144        
+    stop_loss = 0.0378        
     take_profit = 0.0144      
     fast_ema = 12       
     slow_ema = 26         
@@ -837,6 +837,8 @@ def main():
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")             
                                 exit_trade()
                                 trade_open = False
+
+
                         else:
                             print("No signal, seeking local or major reversal")
 
