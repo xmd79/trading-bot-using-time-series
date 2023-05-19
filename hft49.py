@@ -412,47 +412,93 @@ def get_min_order_quantity(symbol):
         print(f"Error getting minimum order quantity for {symbol}: {e}")
         return None
 
-def entry_long(TRADE_SYMBOL):
-    symbol = TRADE_SYMBOL
-    side = 'BUY'
-    ticker = client.futures_symbol_ticker(symbol=symbol)
-    price = float(ticker['price'])
-    leverage = 20  # Use 20x leverage
-    asset = 'BUSD'
-    balance_index = next((index for (index, d) in enumerate(client.futures_account_balance()) if d["asset"] == asset), None)
-    available_balance = float(client.futures_account_balance()[balance_index]['balance'])
-    max_position_size = round((available_balance * leverage) / price, 2)  # Calculate max position size based on available balance and leverage
-    quantity_percentage = 0.9  # Use 90% of the max position size
-    quantity = round(max_position_size * quantity_percentage, 2)  # Calculate order quantity
-    timestamp = int(time.time() * 1000)
-
+def entry_long(symbol):
     try:
-        order = client.futures_create_order(symbol=TRADE_SYMBOL, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
-        print(f"Entering LONG now...placing BUY order for {TRADE_SYMBOL}")
-        return order
+        # Get the available account balance and set the leverage to 20x
+        account_balance = float(get_account_balance())
+        TRADE_LVRG = 20
+
+        # Get the current price of the asset
+        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
+
+        # Retrieve the minimum quantity step size for the BTCBUSD futures perpetual contract
+        symbol_info = client.futures_exchange_info()
+        symbol_filters = symbol_info['symbols']
+        for symbol in symbol_filters:
+            if symbol['symbol'] == 'BTCBUSD':
+                filters = symbol['filters']
+                for f in filters:
+                    if f['filterType'] == 'LOT_SIZE':
+                        min_qty = float(f['stepSize'])
+
+        # Calculate the maximum order quantity based on the available balance and the leverage
+        max_quantity = round(((account_balance * TRADE_LVRG) / symbol_price) // min_qty * min_qty, 8)
+
+        if max_quantity > 0:
+            # Create the long order at market price
+            order = client.futures_create_order(
+                symbol=symbol,
+                side=client.SIDE_BUY,
+                type=client.ORDER_TYPE_MARKET,
+                quantity=max_quantity)
+
+            if order is not None and 'orderId' in order:
+                print(f"Long order created for {max_quantity} {symbol} at market price.")
+                return True
+            else:
+                print(f"Error creating long order: {order}")
+                return False
+        else:
+            print("Insufficient balance to create the order.")
+            return False
+
     except BinanceAPIException as e:
-        print(f"An error occurred: {e}")
+        print(f"Error creating long order: {e}")
+        return False
 
-def entry_short(TRADE_SYMBOL):
-    symbol = TRADE_SYMBOL
-    side = 'SELL'
-    ticker = client.futures_symbol_ticker(symbol=symbol)
-    price = float(ticker['price'])
-    leverage = 20  # Use 20x leverage
-    asset = 'BUSD'
-    balance_index = next((index for (index, d) in enumerate(client.futures_account_balance()) if d["asset"] == asset), None)
-    available_balance = float(client.futures_account_balance()[balance_index]['balance'])
-    max_position_size = round((available_balance * leverage) / price, 2)  # Calculate max position size based on available balance and leverage
-    quantity_percentage = 0.9  # Use 90% of the max position size
-    quantity = round(max_position_size * quantity_percentage, 2)  # Calculate order quantity
-    timestamp = int(time.time() * 1000)
-
+def entry_short(symbol):
     try:
-        order = client.futures_create_order(symbol=TRADE_SYMBOL, side=side, type='MARKET', quantity=quantity, leverage=leverage, timestamp=timestamp)
-        print(f"Entering SHORT now...placing SELL order for {TRADE_SYMBOL}")
-        return order
+        # Get the available account balance and set the leverage to 20x
+        account_balance = float(get_account_balance())
+        TRADE_LVRG = 20
+
+        # Get the current price of the asset
+        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
+
+        # Retrieve the minimum quantity step size for the BTCBUSD futures perpetual contract
+        symbol_info = client.futures_exchange_info()
+        symbol_filters = symbol_info['symbols']
+        for symbol in symbol_filters:
+            if symbol['symbol'] == 'BTCBUSD':
+                filters = symbol['filters']
+                for f in filters:
+                    if f['filterType'] == 'LOT_SIZE':
+                        min_qty = float(f['stepSize'])
+
+        # Calculate the maximum order quantity based on the available balance and the leverage
+        max_quantity = round(((account_balance * TRADE_LVRG) / symbol_price) // min_qty * min_qty, 8)
+
+        if max_quantity > 0:
+            # Create the short order at market price
+            order = client.futures_create_order(
+                symbol=symbol,
+                side=client.SIDE_SELL,
+                type=client.ORDER_TYPE_MARKET,
+                quantity=max_quantity)
+
+            if order is not None and 'orderId' in order:
+                print(f"Short order created for {max_quantity} {symbol} at market price.")
+                return True
+            else:
+                print(f"Error creating short order: {order}")
+                return False
+        else:
+            print("Insufficient balance to create the order.")
+            return False
+
     except BinanceAPIException as e:
-        print(f"An error occurred: {e}")
+        print(f"Error creating short order: {e}")
+        return False
 
 def exit_trade():
     # Get all open positions
@@ -581,6 +627,8 @@ def main():
             # Get the MTF signal
             signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
             print(signals)
+
+            print()
 
             # Check if the '1m' key exists in the signals dictionary
             if '1m' in signals:
@@ -740,18 +788,23 @@ def main():
 
                         # Trading function calls
                         if not trade_open:
+
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
+
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
 
                         elif trade_open:
+
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= -stop_loss:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
                                 trade_open = False
+
+
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")             
                                 exit_trade()
