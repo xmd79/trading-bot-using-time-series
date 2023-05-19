@@ -465,22 +465,30 @@ def exit_trade():
         position_amount = float(position['positionAmt'])
         
         # Determine order side
-        if position['positionSide'] == 'LONG':
+        if position_amount > 0:
             order_side = 'SELL'
-        else: 
-            order_side = 'BUY'  
-            
+            order_quantity = abs(position_amount)
+        elif position_amount < 0:
+            order_side = 'BUY'
+            order_quantity = abs(position_amount)
+        else:
+            continue # Skip this position if there is no position amount
+        
         # Place order to exit position      
-        if position_amount != 0:
-            order = client.futures_create_order(
-                symbol=symbol,
-                side=order_side,
-                type='MARKET',
-                quantity=abs(position_amount))
+        order = client.futures_create_order(
+            symbol=symbol,
+            side=order_side,
+            type='MARKET',
+            quantity=order_quantity)
                 
-            print(f"{order_side} order created to exit {abs(position_amount)} {symbol}.")
+        print(f"{order_side} order created to exit {order_quantity} {symbol}.")
                 
-    print("All positions exited!")
+    print("Allpositions exited!")
+    
+    # Flush the trade open
+    client.futures_account_balance()
+    
+    print("Trade open flushed!")
 
 def calculate_ema(candles, period):
     prices = [float(candle['close']) for candle in candles]
@@ -534,8 +542,8 @@ def main():
 
     # Define constants
     trade_symbol = "BTCBUSD"
-    stop_loss = 0.0144        
-    take_profit = 0.0144      
+    stop_loss = 0.0720        
+    take_profit = 0.0360      
     fast_ema = 12       
     slow_ema = 26         
         
@@ -794,6 +802,29 @@ def main():
                                 if not trade_open:
                                     trade_open = False
 
+                                # Close the open position
+                                position_info = client.futures_position_information()
+                                position_id = None
+                                for position in position_info:
+                                    if position['symbol'] == 'BTCBUSD' and position['positionAmt'] != '0':
+                                        position_id = position['positionAmt']
+
+                                        if position_id:
+                                            response = client.futures_close_position(symbol='BTCUSDT', positionSide='BOTH')
+                                            print(response)
+                                        else:
+                                            print("No open position to close.")
+
+                                    # Call flush to ensure that the API response is up to date
+                                    client.sync('BTCBUSD')
+
+                                    # Check if the position is closed
+                                    open_positions = client.futures_position_information()
+                                    if not any(position['symbol'] == 'BTCBUSD' and position['positionAmt'] != '0' for position in open_positions):
+                                        print("Position has been closed successfully.")
+                                    else:
+                                        print("Position is still open.")
+
                                 print("Closed position...exit trade done")
 
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
@@ -802,8 +833,30 @@ def main():
                                 if not trade_open:
                                     trade_open = False
 
-                                print("Closed position...exit trade done")
+                                # Close the open position
+                                position_info = client.futures_position_information()
+                                position_id = None
+                                for position in position_info:
+                                    if position['symbol'] == 'BTCBUSD' and position['positionAmt'] != '0':
+                                        position_id = position['positionAmt']
 
+                                        if position_id:
+                                            response = client.futures_close_position(symbol='BTCUSDT', positionSide='BOTH')
+                                            print(response)
+                                        else:
+                                            print("No open position to close.")
+
+                                    # Call flush to ensure that the API response is up to date
+                                    client.sync('BTCBUSD')
+
+                                    # Check if the position is closed
+                                    open_positions = client.futures_position_information()
+                                    if not any(position['symbol'] == 'BTCBUSD' and position['positionAmt'] != '0' for position in open_positions):
+                                        print("Position has been closed successfully.")
+                                    else:
+                                        print("Position is still open.")
+
+                                print("Closed position...exit trade done")
 
                         else:
                             print("No signal, seeking local or major reversal")
