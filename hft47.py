@@ -542,8 +542,10 @@ def main():
 
     # Define constants
     trade_symbol = "BTCBUSD"
-    stop_loss = 0.0720        
-    take_profit = 0.0360      
+
+    take_profit = 0.0144  # 1.44%
+    stop_loss = 0.0367 # 3.67%
+     
     fast_ema = 12       
     slow_ema = 26         
         
@@ -797,7 +799,7 @@ def main():
                             print("In a trade now...seeking potential exit for this trade")
 
                             if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
-                                print("STOPLOSS was hit! Closing position and exit trade...")
+                                print(f"STOPLOSS triggered! Current PNL is {stop_loss * 100}%")
                                 exit_trade()
                                 if not trade_open:
                                     trade_open = False
@@ -828,7 +830,7 @@ def main():
                                 print("Closed position...exit trade done")
 
                             elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
-                                print("TAKEPROFIT was hit! Closing position and exit trade...")
+                                print(f"TAKEPROFIT triggered! Current PNL is {take_profit * 100}%")
                                 exit_trade()
                                 if not trade_open:
                                     trade_open = False
