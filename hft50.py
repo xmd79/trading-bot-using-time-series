@@ -812,14 +812,14 @@ def main():
                         elif not trade_open:
 
                             # Check for entry signals and set stop loss and take profit levels
-                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and ema_sine[-1] < lower and close_prices[-1] < ema_fast and and close_prices[-1] < ema_slow and em_value > 0:
+                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and ema_sine[-1] < lower and close_prices[-1] < ema_fast and and close_prices[-1] < ema_slow and em_value > 0 and signals['1m']['momentum'] > 0:
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
                                 stop_loss = initial_pnl * 0.0288
                                 take_profit = initial_pnl * 0.0144
 
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and and close_prices[-1] > ema_slow and em_value < 0::
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and and close_prices[-1] > ema_slow and em_value < 0  and signals['1m']['momentum'] < 0:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
