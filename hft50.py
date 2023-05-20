@@ -819,6 +819,13 @@ def main():
                                 stop_loss = initial_pnl * 0.0288
                                 take_profit = initial_pnl * 0.0144
 
+                            elif percent_to_min_val < 10 and current_quadrant == 1 and signals['1m']['momentum'] > 0:
+                                entry_long(TRADE_SYMBOL)
+                                trade_open = True
+                                initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+                                stop_loss = initial_pnl * 0.0288
+                                take_profit = initial_pnl * 0.0144
+
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and close_prices[-1] > ema_slow and em_value < 0  and signals['1m']['momentum'] < 0:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
@@ -826,7 +833,17 @@ def main():
                                 stop_loss = initial_pnl * 0.0288
                                 take_profit = initial_pnl * 0.0144
 
-                    if trade_entry_pnl and trade_open or not trade_open:
+                            elif percent_to_max_val < 10 and current_quadrant == 4 and signals['1m']['momentum'] < 0:
+                                entry_short(TRADE_SYMBOL)
+                                trade_open = True
+                                initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+                                stop_loss = initial_pnl * 0.0288
+                                take_profit = initial_pnl * 0.0144
+
+                    if trade_entry_pnl and trade_open:
+                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
+
+                    elif trade_entry_pnl and not trade_open:
                         print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
                     print()
