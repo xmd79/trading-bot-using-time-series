@@ -561,8 +561,7 @@ def main():
 
     # Define constants
     trade_symbol = "BTCBUSD"
-    stop_loss = 0.0144        
-    take_profit = 0.0144      
+     
     fast_ema = 12       
     slow_ema = 26         
         
@@ -612,6 +611,10 @@ def main():
             
             print()
 
+            initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+            stop_loss = -0.0337 * initial_pnl
+            take_profit = 0.0144 * initial_pnl
+
             # Check if the '1m' key exists in the signals dictionary
             if '1m' in signals:
                 # Check if the percent to min/max signal keys exist in the '1m' dictionary
@@ -657,10 +660,10 @@ def main():
                     em_amp_q3 = range_q3 / percent_to_max_val
                     em_amp_q4 = range_q4 / percent_to_max_val
 
-                    print("EM amplitude for Q1:", em_amp_q1)
-                    print("EM amplitude for Q2:", em_amp_q2)
-                    print("EM amplitude for Q3:", em_amp_q3)
-                    print("EM amplitude for Q4:", em_amp_q4)
+                    #print("EM amplitude for Q1:", em_amp_q1)
+                    #print("EM amplitude for Q2:", em_amp_q2)
+                    #print("EM amplitude for Q3:", em_amp_q3)
+                    #print("EM amplitude for Q4:", em_amp_q4)
 
                     # Calculate the EM phase for each quadrant
                     em_phase_q1 = 0
@@ -668,10 +671,10 @@ def main():
                     em_phase_q3 = math.pi
                     em_phase_q4 = 3*math.pi/2
 
-                    print("EM phase for Q1:", em_phase_q1)
-                    print("EM phase for Q2:", em_phase_q2)
-                    print("EM phase for Q3:", em_phase_q3)
-                    print("EM phase for Q4:", em_phase_q4)
+                    #print("EM phase for Q1:", em_phase_q1)
+                    #print("EM phase for Q2:", em_phase_q2)
+                    #print("EM phase for Q3:", em_phase_q3)
+                    #print("EM phase for Q4:", em_phase_q4)
 
                     # Calculate the current position of the price on the sine wave
                     current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
@@ -769,23 +772,31 @@ def main():
                                 print("Bearish momentum in Q4")
 
                         # Trading function calls
-                        if not trade_open:
-                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-
-                        elif trade_open:
-                            if abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= stop_loss:
+                        if trade_open:
+                            print("Trade is already open, waiting for exit...")
+                            current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+                            if current_pnl <= stop_loss:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
                                 trade_open = False
-                            elif abs(float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])) >= take_profit:
+                            elif current_pnl >= take_profit:
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")             
                                 exit_trade()
                                 trade_open = False
+
+                        elif not trade_open:
+                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
+                                entry_long(TRADE_SYMBOL)
+                                trade_open = True
+                                initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+                                stop_loss = initial_pnl * 0.0344
+                                take_profit = initial_pnl * 0.0144
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4:
+                                entry_short(TRADE_SYMBOL)
+                                trade_open = True
+                                initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+                                stop_loss = initial_pnl * 0.0344
+                                take_profit = initial_pnl * 0.0144
                         else:
                             print("No signal, seeking local or major reversal")
 
