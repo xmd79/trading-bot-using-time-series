@@ -572,6 +572,8 @@ def main():
     entry_price = 0
     entry_time = 0
 
+    trade_exit_triggered = False
+
     url = "https://api.binance.com/api/v3/time"
     while True:       
         try:   
@@ -773,19 +775,26 @@ def main():
 
                         # Trading function calls
                         if trade_open:
+                            stop_loss = -0.0288
+                            take_profit = 0.0144
                             print("Trade is already open, waiting for exit...")
                             current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+
                             # Check if current PnL hits stop loss or take profit level
-                            if current_pnl <= stop_loss:
+                            if if current_pnl <= stop_loss and not trade_exit_triggered:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
                                 trade_open = False
-                            elif current_pnl >= take_profit:
+                                trade_exit_triggered = True
+
+                            elif current_pnl >= take_profit and not trade_exit_triggered:
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")
                                 exit_trade()
                                 trade_open = False
+                                trade_exit_triggered = True
 
                         elif not trade_open:
+
                             # Check for entry signals and set stop loss and take profit levels
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
                                 entry_long(TRADE_SYMBOL)
@@ -793,24 +802,13 @@ def main():
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
                                 stop_loss = initial_pnl * 0.0288
                                 take_profit = initial_pnl * 0.0144
+
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant ==4:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
                                 stop_loss = initial_pnl * 0.0288
                                 take_profit = initial_pnl * 0.0144
-
-                        # Check if current PnL hits stop loss or take profit level outside the trade_open block
-                        else:
-                            current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                            if current_pnl >= take_profit:
-                                print("TAKEPROFIT was hit! Closing position and exit trade...")
-                                exit_trade()
-                                trade_open = False
-                            elif current_pnl <= stop_loss:
-                                print("STOPLOSS was hit! Closing position and exit trade...")
-                                exit_trade()
-                                trade_open = False
 
                     if trade_entry_pnl and trade_open or not trade_open:
                         print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
