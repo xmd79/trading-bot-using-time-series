@@ -726,6 +726,22 @@ def main():
                     em_phase_diff_q3_q4 = em_phase_q4 - em_phase_q3
                     em_phase_diff_q4_q1 = 2*math.pi - (em_phase_q4 - em_phase_q1)
 
+                    # Get the daily open price using 1-minute data
+                    daily_open = candles['1m'][0]['open']
+                    daily_open_date = datetime.utcfromtimestamp(candles['1m'][0]['timestamp'] / 1000).strftime('%Y-%m-%d')
+
+                    # Find the daily close price from previous day's last candle
+                    previous_day_candles = client.futures_klines(symbol=TRADE_SYMBOL, interval=Client.KLINE_INTERVAL_1MINUTE, limit=1440, endTime=int(candles['1m'][0]['timestamp']))
+                    daily_close = previous_day_candles[-1][4]
+                    daily_close_date = datetime.utcfromtimestamp(previous_day_candles[-1][0] / 1000).strftime('%Y-%m-%d')
+
+                    # Calculate the daily percent change
+                    daily_percent_change = (float(daily_close) - float(daily_open)) / float(daily_open) * 100
+
+                    print(f"Daily open price on {daily_open_date}: {daily_open}")
+                    print(f"Daily close price on {daily_close_date}: {daily_close}")
+                    print(f"Daily percent change: {daily_percent_change:.2f}%")
+
                     # Check if EMA periods have been defined
                     if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
                         # Calculate the EMAs
@@ -812,14 +828,14 @@ def main():
                         elif not trade_open:
 
                             # Check for entry signals and set stop loss and take profit levels
-                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and ema_sine[-1] < lower and close_prices[-1] < ema_fast and and close_prices[-1] < ema_slow and em_value > 0 and signals['1m']['momentum'] > 0:
+                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and ema_sine[-1] < lower and close_prices[-1] < ema_fast and close_prices[-1] < ema_slow and em_value > 0 and signals['1m']['momentum'] > 0:
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
                                 stop_loss = initial_pnl * 0.0288
                                 take_profit = initial_pnl * 0.0144
 
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and and close_prices[-1] > ema_slow and em_value < 0  and signals['1m']['momentum'] < 0:
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and close_prices[-1] > ema_slow and em_value < 0  and signals['1m']['momentum'] < 0:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
