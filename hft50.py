@@ -735,11 +735,27 @@ def main():
                         print("EMA slow:", ema_slow)
                         print("EMA fast:", ema_fast)
 
-                        # Check if the current price is above the EMAs and the percent to min/max signals are above 80%
+                        close_prices = np.array([candle['close'] for candle in candles['1m']])
+
+                        # Calculate EMA of sine wave values    
+                        ema_sine = talib.EMA(sine_wave, period=20) 
+                      
+                        # Set midline threshold at median value       
+                        ema_sine_min = np.min(ema_sine)       
+                        ema_sine_max = np.max(ema_sine)
+                        midline = (ema_sine_min + ema_sine_max) / 2                   
+                        
+                        # Set upper threshold 1/3 from midline to max             
+                        upper = midline + (ema_sine_max - midline) / 3 
+                
+                        # Set lower threshold 1/3 from min to midline       
+                        lower = midline - (midline - ema_sine_min) / 3 
+
+                        # Check if the current price is above the EMAs and the percent to min signals are below 20%
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
                             print("Buy signal!")
 
-                        # Check if the current price is below the EMAs and the percent to min/max signals are below 20%
+                        # Check if the current price is below the EMAs and the percent to max signals are below 20%
                         elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
                             print("Sell signal!")
 
@@ -796,14 +812,14 @@ def main():
                         elif not trade_open:
 
                             # Check for entry signals and set stop loss and take profit levels
-                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1:
+                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and ema_sine[-1] < lower and close_prices[-1] < ema_fast and and close_prices[-1] < ema_slow:
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
                                 stop_loss = initial_pnl * 0.0288
                                 take_profit = initial_pnl * 0.0144
 
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant ==4:
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant ==4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and and close_prices[-1] > ema_slow:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
