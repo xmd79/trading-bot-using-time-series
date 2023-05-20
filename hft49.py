@@ -781,7 +781,7 @@ def main():
                             current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
                             # Check if current PnL hits stop loss or take profit level
-                            if if current_pnl <= stop_loss and not trade_exit_triggered:
+                            if current_pnl <= stop_loss and not trade_exit_triggered:
                                 print("STOPLOSS was hit! Closing position and exit trade...")
                                 exit_trade()
                                 trade_open = False
