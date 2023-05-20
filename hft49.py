@@ -795,7 +795,7 @@ def main():
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                stop_loss = initial_pnl * 0.0344
+                                stop_loss = initial_pnl * 0.0255
                                 take_profit = initial_pnl * 0.0144
                         else:
                             print("No signal, seeking local or major reversal")
