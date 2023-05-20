@@ -819,7 +819,7 @@ def main():
                                 stop_loss = initial_pnl * 0.0288
                                 take_profit = initial_pnl * 0.0144
 
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant ==4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and and close_prices[-1] > ema_slow:
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and and close_prices[-1] > ema_slow:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
