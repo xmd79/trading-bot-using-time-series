@@ -738,7 +738,7 @@ def main():
                         close_prices = np.array([candle['close'] for candle in candles['1m']])
 
                         # Calculate EMA of sine wave values    
-                        ema_sine = talib.EMA(sine_wave, period=5) 
+                        ema_sine = talib.EMA(sine_wave, timeperiod=5)
                       
                         # Set midline threshold at median value       
                         ema_sine_min = np.min(ema_sine)       
