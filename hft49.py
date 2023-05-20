@@ -414,39 +414,33 @@ def get_min_order_quantity(symbol):
 
 def entry_long(symbol):
     try:     
-        # Get available balance and leverage     
-        account_balance = float(get_account_balance())   
-        TRADE_LVRG = 20
-               
+        # Get balance and leverage     
+        account_balance = get_account_balance()   
+        trade_leverage = 20
+    
         # Get symbol price    
-        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
+        symbol_price = client.futures_symbol_ticker(symbol=symbol)['price']
         
-        # Retrieve minimum quantity step size
-        symbol_info = client.futures_exchange_info()
-        symbol_filters = symbol_info['symbols']
-        for symbol in symbol_filters:
-            if symbol['symbol'] == 'BTCBUSD':   
-                filters = symbol['filters']       
-                for f in filters:        
-                    if f['filterType'] == 'LOT_SIZE':
-                        min_qty = float(f['stepSize'])
-        
-        # Calculate maximum order quantity      
-        max_quantity = round(((account_balance * TRADE_LVRG)   / symbol_price) // min_qty * min_qty, 8)
-                
-       # Create the long order at market price
+        # Get step size from exchange info
+        info = client.futures_exchange_info()
+        filters = [f for f in info['symbols'] if f['symbol'] == symbol][0]['filters']
+        step_size = [f['stepSize'] for f in filters if f['filterType']=='LOT_SIZE'][0]
+                    
+        # Calculate max quantity based on balance, leverage, and price
+        max_qty = int(account_balance * trade_leverage / float(symbol_price) / float(step_size)) * float(step_size)  
+                    
+        # Create buy market order    
         order = client.futures_create_order(
-            symbol=symbol,       
-            side=client.SIDE_BUY,          
-            type=client.ORDER_TYPE_MARKET,        
-            quantity=max_quantity)         
-        
-        if order:    
-            if 'orderId' in order:
-                return True
-           
-        else:         
-            print("Error creating long order.")    
+            symbol=symbol,        
+            side='BUY',           
+            type='MARKET',         
+            quantity=max_qty)          
+                    
+        if 'orderId' in order:
+            return True
+          
+        else: 
+            print("Error creating long order.")  
             return False
             
     except BinanceAPIException as e:
@@ -454,39 +448,38 @@ def entry_long(symbol):
         return False
 
 def entry_short(symbol):
-    try:
-        # Get available balance and leverage     
-        account_balance = float(get_account_balance())   
-        TRADE_LVRG = 20  
-            
+    try:     
+        # Get balance and leverage     
+        account_balance = get_account_balance()   
+        trade_leverage = 20
+    
         # Get symbol price    
-        symbol_price = float(client.futures_symbol_ticker(symbol=symbol)['price']) 
+        symbol_price = client.futures_symbol_ticker(symbol=symbol)['price']
         
-        # Retrieve minimum quantity step size       
-        symbol_info = client.futures_exchange_info() 
-        ...     
-        min_qty = ...
-        
-        # Calculate maximum order quantity      
-        max_quantity = ...
-                
-        # Create the short order at market price   
-        order = client.futures_create_order(      
-            symbol=symbol,       
-            side=client.SIDE_SELL,           
-            type=client.ORDER_TYPE_MARKET,       
-            quantity=max_quantity)
-        
-        if order:     
-            if 'orderId' in order:
-                return True
-        
-        else:
-            print("Error creating short order.")    
+        # Get step size from exchange info
+        info = client.futures_exchange_info()
+        filters = [f for f in info['symbols'] if f['symbol'] == symbol][0]['filters']
+        step_size = [f['stepSize'] for f in filters if f['filterType']=='LOT_SIZE'][0]
+                    
+        # Calculate max quantity based on balance, leverage, and price
+        max_qty = int(account_balance * trade_leverage / float(symbol_price) / float(step_size)) * float(step_size)  
+                    
+        # Create sell market order    
+        order = client.futures_create_order(
+            symbol=symbol,        
+            side='SELL',           
+            type='MARKET',         
+            quantity=max_qty)          
+                    
+        if 'orderId' in order:
+            return True
+          
+        else: 
+            print("Error creating short order.")  
             return False
             
     except BinanceAPIException as e:
-        print(f"Error creating short order: {e}")   
+        print(f"Error creating short order: {e}")
         return False
 
 def exit_trade():
