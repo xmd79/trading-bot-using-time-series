@@ -1,3 +1,6 @@
+#region imports
+from AlgorithmImports import *
+#endregion
 import math
 import time
 import numpy as np
@@ -788,6 +791,55 @@ def main():
                             elif current_quadrant == 4:
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
+
+                        # Add time cycle variables
+                        pi_cycle = 0  
+                        phi_cycle = 0 
+                        golden_cycle = 0
+
+                        start_cycle = candles['1m'][0]['close_time']
+
+                        # In Q1 
+                        if current_quadrant == 1: 
+                            print("Calculating time cycles from Q1...")
+
+                            # Find next low point
+                            next_low = np.argmin(sine_wave[current_position:]) + current_position
+                            low_time = candles['1m'][next_low]['close_time']
+
+                            # Calculate cycles
+                            pi_cycle = (low_time - start_cycle) * 1.772
+                            phi_cycle = (low_time - start_cycle) * 1.618
+                            golden_cycle = (low_time - start_cycle) * 1.61803398875  
+        
+                            print(f"Pi time cycle: {pi_cycle}")
+                            print(f"Phi time cycle: {phi_cycle}")      
+                            print(f"Golden ratio time cycle: {golden_cycle}")          
+        
+                        # In Q4
+                        elif current_quadrant == 4:
+                            print("Calculating time cycles from Q4...")
+ 
+                            # Find next high point    
+                            next_high = np.argmax(sine_wave[current_position:]) + current_position  
+                            high_time = candles['1m'][next_high]['close_time']
+
+                            # Calculate cycles     
+                            pi_cycle = (high_time - start_cycle) * 1.772
+                            phi_cycle = (high_time - start_cycle) * 1.618
+                            golden_cycle =(high_time - start_cycle) * 1.61803398875
+
+                            print(f"Pi time cycle: {pi_cycle}")
+                            print(f"Phi time cycle: {phi_cycle}")
+                            print(f"Golden ratio time cycle: {golden_cycle}")
+            
+                        # Forecast based on cycles       
+                        if pi_cycle < phi_cycle < golden_cycle:
+                            print("Possible trend continuation.")     
+                        elif pi_cycle > phi_cycle > golden_cycle:
+                            print("Possible trend reversal.")
+                        else:
+                            print("Inconclusive trend forecast.")
 
                         # Trading function calls
                         if trade_open:
