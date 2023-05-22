@@ -1,6 +1,3 @@
-#region imports
-from AlgorithmImports import *
-#endregion
 import math
 import time
 import numpy as np
