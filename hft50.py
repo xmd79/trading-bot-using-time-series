@@ -416,7 +416,7 @@ def entry_long(symbol):
     try:     
         # Get balance and leverage     
         account_balance = get_account_balance()   
-        trade_leverage = 20
+        trade_leverage = 75
     
         # Get symbol price    
         symbol_price = client.futures_symbol_ticker(symbol=symbol)['price']
@@ -451,7 +451,7 @@ def entry_short(symbol):
     try:     
         # Get balance and leverage     
         account_balance = get_account_balance()   
-        trade_leverage = 20
+        trade_leverage = 75
     
         # Get symbol price    
         symbol_price = client.futures_symbol_ticker(symbol=symbol)['price']
@@ -614,8 +614,9 @@ def main():
             print()
 
             initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-            stop_loss = -0.0337 * initial_pnl
-            take_profit = 0.0144 * initial_pnl
+
+            stop_loss = -0.02 * initial_pnl
+            take_profit = 0.02 * initial_pnl
 
             # Check if the '1m' key exists in the signals dictionary
             if '1m' in signals:
@@ -791,20 +792,27 @@ def main():
 
                         # Trading function calls
                         if trade_open:
-                            stop_loss = -2.88
-                            take_profit = 1.44
+
+                            stop_loss = -2
+                            take_profit = 2
+
                             print("Trade is already open, waiting for exit...")
+
                             current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
                             # Check if current PnL hits stop loss or take profit level
                             if current_pnl <= stop_loss and not trade_exit_triggered:
+
                                 print("STOPLOSS was hit! Closing position and exit trade...")
+
                                 exit_trade()
                                 trade_open = False
                                 trade_exit_triggered = True
 
                             elif current_pnl >= take_profit and not trade_exit_triggered:
+
                                 print("TAKEPROFIT was hit! Closing position and exit trade...")
+
                                 exit_trade()
                                 trade_open = False
                                 trade_exit_triggered = True
@@ -816,29 +824,15 @@ def main():
                                 entry_long(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                stop_loss = initial_pnl * 0.0288
-                                take_profit = initial_pnl * 0.0144
-
-                            elif percent_to_min_val < 10 and current_quadrant == 1 and signals['1m']['momentum'] > 0:
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
-                                initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                stop_loss = initial_pnl * 0.0288
-                                take_profit = initial_pnl * 0.0144
+                                stop_loss = initial_pnl * 0.02
+                                take_profit = initial_pnl * 0.02
 
                             elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and ema_sine[-1] > upper and close_prices[-1] > ema_fast and close_prices[-1] > ema_slow and em_value < 0  and signals['1m']['momentum'] < 0:
                                 entry_short(TRADE_SYMBOL)
                                 trade_open = True
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                stop_loss = initial_pnl * 0.0288
-                                take_profit = initial_pnl * 0.0144
-
-                            elif percent_to_max_val < 10 and current_quadrant == 4 and signals['1m']['momentum'] < 0:
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-                                initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-                                stop_loss = initial_pnl * 0.0288
-                                take_profit = initial_pnl * 0.0144
+                                stop_loss = initial_pnl * 0.02
+                                take_profit = initial_pnl * 0.02
 
                     if trade_entry_pnl and trade_open:
                         print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
