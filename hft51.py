@@ -416,7 +416,7 @@ def entry_long(symbol):
     try:     
         # Get balance and leverage     
         account_balance = get_account_balance()   
-        trade_leverage = 75
+        trade_leverage = 25
     
         # Get symbol price    
         symbol_price = client.futures_symbol_ticker(symbol=symbol)['price']
@@ -451,7 +451,7 @@ def entry_short(symbol):
     try:     
         # Get balance and leverage     
         account_balance = get_account_balance()   
-        trade_leverage = 75
+        trade_leverage = 25
     
         # Get symbol price    
         symbol_price = client.futures_symbol_ticker(symbol=symbol)['price']
