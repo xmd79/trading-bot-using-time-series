@@ -796,7 +796,7 @@ def main():
                             stop_loss = -2
                             take_profit = 2
 
-                            print("Trade is already open, waiting for exit...")
+                            print("Trade is already open, seeking for exit condition...")
 
                             current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
@@ -840,7 +840,6 @@ def main():
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
                                 stop_loss = initial_pnl * 0.0144
                                 take_profit = initial_pnl * 0.0144
-
 
                             elif close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and signals['1m']['momentum'] > 0:
                                 entry_long(TRADE_SYMBOL)
