@@ -790,6 +790,30 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
+                        # Defie 3 6 9 pattern algo to forecast market mood
+                        def cyclic_sequence():
+                            num = 3
+                            while True:
+                                yield num
+                                num += 3
+                                if num % 10 == 0:
+                                    num //= 10
+                                num %= 10
+
+                        # Create a generator object for the cyclic sequence
+                        cyclic_gen = cyclic_sequence()
+
+                        # Generate the next number in the sequence
+                        market_mood = next(cyclic_gen)
+
+                        print("Market mood forecast value is: ", market_mood)
+
+                        if market_mood < 5 and current_quadrant == 1:
+                            print("Market mood forecast is BULLISH")
+
+                        elif market_mood > 5 and current_quadrant == 4:
+                            print("Market mood forecast is BEARISH")                     
+
                         # Trading function calls
                         if trade_open:
 
