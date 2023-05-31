@@ -790,7 +790,7 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
-                        # Defie 3 6 9 pattern algo to forecast market mood
+                        # Define 3 6 9 pattern algo to forecast market mood
                         def cyclic_sequence():
                             num = 3
                             while True:
