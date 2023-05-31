@@ -790,30 +790,6 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
-                        # Define 3 6 9 pattern algo to forecast market mood
-                        def cyclic_sequence():
-                            num = 3
-                            while True:
-                                yield num
-                                num += 3
-                                if num % 10 == 0:
-                                    num //= 10
-                                num %= 10
-
-                        # Create a generator object for the cyclic sequence
-                        cyclic_gen = cyclic_sequence()
-
-                        # Generate the next number in the sequence
-                        market_mood = next(cyclic_gen)
-
-                        print("Market mood forecast value is: ", market_mood)
-
-                        if market_mood < 5 and current_quadrant == 1:
-                            print("Market mood forecast is BULLISH")
-
-                        elif market_mood > 5 and current_quadrant == 4:
-                            print("Market mood forecast is BEARISH")                     
-
                         # Trading function calls
                         if trade_open:
 
@@ -900,15 +876,14 @@ def main():
                                 stop_loss = initial_pnl * 0.0144
                                 take_profit = initial_pnl * 0.0144
 
+                             
+                        if trade_entry_pnl and trade_open:
+                            print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
-                    if trade_entry_pnl and trade_open:
-                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
+                        elif trade_entry_pnl and not trade_open:
+                            print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
-                    elif trade_entry_pnl and not trade_open:
-                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-
-                    print()
-
+                        print()
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
             else:
