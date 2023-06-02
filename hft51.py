@@ -793,8 +793,8 @@ def main():
                         # Trading function calls
                         if trade_open:
 
-                            stop_loss = -2
-                            take_profit = 2
+                            stop_loss = -1.44
+                            take_profit = 1.44
 
                             print("Trade is already open, seeking for exit condition...")
 
