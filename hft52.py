@@ -790,8 +790,23 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
+                        # Get all open positions
+                        positions = client.futures_position_information()
+
+                        # Loop through each position
+                        for position in positions:
+                            symbol = position['symbol']
+                            position_amount = float(position['positionAmt'])
+
+                        # Print position if there is nor not     
+                        if position_amount != 0:
+                            print("Position open: ", position_amount)
+                       
+                        elif position_amount == 0:
+                            print("Position not open: ", position_amount)
+
                         # Trading function calls
-                        if trade_open:
+                        if trade_open and position_amount != 0:
 
                             stop_loss = -1.44
                             take_profit = 1.44
@@ -817,7 +832,7 @@ def main():
                                 trade_open = False
                                 trade_exit_triggered = True
 
-                        elif not trade_open:
+                        elif not trade_open and position_amount == 0:
 
                             # Check for entry signals and set stop loss and take profit levels
                             if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and ema_sine[-1] < lower and close_prices[-1] < ema_fast and close_prices[-1] < ema_slow and em_value > 0 and signals['1m']['momentum'] > 0:
@@ -875,12 +890,7 @@ def main():
                                 initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
                                 stop_loss = initial_pnl * 0.0144
                                 take_profit = initial_pnl * 0.0144
-
-                             
-                        if trade_entry_pnl and trade_open:
-                            print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-
-                        elif trade_entry_pnl and not trade_open:
+     
                             print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
                         print()
