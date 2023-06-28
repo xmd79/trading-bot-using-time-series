@@ -648,8 +648,8 @@ def main():
                     sine_wave_min = np.min(sine_wave)
                     sine_wave_max = np.max(sine_wave)
 
-                    print("Minimum value of sine wave:", sine_wave_min)
-                    print("Maximum value of sine wave:", sine_wave_max)
+                    #print("Minimum value of sine wave:", sine_wave_min)
+                    #print("Maximum value of sine wave:", sine_wave_max)
 
                     # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
                     dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
