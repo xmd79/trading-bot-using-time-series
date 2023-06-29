@@ -9,6 +9,7 @@ from datetime import timedelta
 from decimal import Decimal
 import decimal
 import random
+from math import pi, e
 
 # binance module imports
 from binance.client import Client as BinanceClient
@@ -564,11 +565,16 @@ def main():
      
     fast_ema = 12       
     slow_ema = 26         
- 
-    # Define PHI and PI constants    
-    PHI = 1.618 
-    PI = 3.1415926
- 
+    
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177  
+   
+    # Define PI constant with 15 decimals    
+    PI = 3.1415926535897932384626433832795028842
+   
+    # Define e constant with 15 decimals   
+    e =  2.718281828459045235360287471352662498  
+
     # Calculate sacred frequency
     sacred_freq = (432 * PHI ** 2) / 360
     
@@ -768,12 +774,12 @@ def main():
                         lower = midline - (midline - ema_sine_min) / 3 
 
                         # Check if the current price is above the EMAs and the percent to min signals are below 20%
-                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
-                            print("Buy signal!")
+                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20 and close_prices[-1] < lower:
+                            print("REVERSAL Buy signal!")
 
                         # Check if the current price is below the EMAs and the percent to max signals are below 20%
-                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
-                            print("Sell signal!")
+                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20 and close_prices[-1] > upper:
+                            print("REVERSAL Sell signal!")
 
                         elif percent_to_min_val < 20:
                             print("Bullish momentum in trend")
