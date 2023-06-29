@@ -571,7 +571,15 @@ def main():
  
     # Calculate sacred frequency
     sacred_freq = (432 * PHI ** 2) / 360
-      
+    
+    # Calculate Alpha and Omega ratios   
+    alpha_ratio = PHI / PI       
+    omega_ratio = PI / PHI
+          
+    # Calculate Alpha and Omega spiral angle rates     
+    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+  
     # Define trade variables    
     position = None   
     trade_open = False       
@@ -801,12 +809,16 @@ def main():
                         if current_quadrant == 1:  
                             # Up cycle from Q1 to Q4   
                             quadrature_phase = em_phase_q1
+                            em_phase = alpha_spiral
                         elif current_quadrant == 2:
-                            quadrature_phase = em_phase_q2          
+                            quadrature_phase = em_phase_q2
+                            em_phase = omega_spiral          
                         elif current_quadrant  == 3:      
-                            quadrature_phase = em_phase_q3      
+                            quadrature_phase = em_phase_q3
+                            em_phase = omega_spiral      
                         else:          
-                            quadrature_phase = em_phase_q4 
+                            quadrature_phase = em_phase_q4
+                            em_phase = alpha_spiral 
 
                         # Get next quadrant
                         next_quadrant = current_quadrant + 1
@@ -822,6 +834,9 @@ def main():
                             next_quadrature_phase = em_phase_q3
                         else:           
                             next_quadrature_phase = em_phase_q4
+
+                        # Calculate EM value
+                        em_value = em_amp * math.sin(em_phase)  
 
                         # Calculate quadrature phase shift from current to next quadrant      
                         quadrature = next_quadrature_phase - quadrature_phase
