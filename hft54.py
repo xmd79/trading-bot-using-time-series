@@ -773,13 +773,19 @@ def main():
                         # Set lower threshold 1/3 from min to midline       
                         lower = midline - (midline - ema_sine_min) / 3 
 
+                        if close_prices[-1] < lower:
+                            print("Reversal at DIP")
+
+                        elif close_prices[-1] > upper:
+                            print("Reversal at TOP") 
+
                         # Check if the current price is above the EMAs and the percent to min signals are below 20%
-                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20 and close_prices[-1] < lower:
-                            print("REVERSAL Buy signal!")
+                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
+                            print("Buy signal!")
 
                         # Check if the current price is below the EMAs and the percent to max signals are below 20%
-                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20 and close_prices[-1] > upper:
-                            print("REVERSAL Sell signal!")
+                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
+                            print("Sell signal!")
 
                         elif percent_to_min_val < 20:
                             print("Bullish momentum in trend")
