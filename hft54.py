@@ -1038,9 +1038,9 @@ def main():
                         print(f"Lowest 3 frequencies: {lowest_3_mood}")
 
                         if highest_3_mood > 0:
-                            print(f"Cycle mood is positive")
+                            print(f"Cycle mood is negative")
                         elif highest_3_mood < 0:      
-                            print(f"Cycle mood is negative") 
+                            print(f"Cycle mood is positive") 
                         else:
                             print("Cycle mood is neutral")
 
