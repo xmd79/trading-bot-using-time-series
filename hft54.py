@@ -9,7 +9,7 @@ from datetime import timedelta
 from decimal import Decimal
 import decimal
 import random
-from math import pi, e
+import statistics
 
 # binance module imports
 from binance.client import Client as BinanceClient
@@ -588,7 +588,8 @@ def main():
 
     # Calculate frequencies spectrum index
     frequencies = []    
-   
+    frequencies_next = [] 
+
     for i in range(1,26):
         frequency = i * sacred_freq
         
@@ -603,7 +604,20 @@ def main():
             'e': e, 
             'mood': 'neutral'      
         }) 
-  
+      
+        frequencies_next.append({
+            'number': i,       
+            'frequency': frequency,        
+            'em_amp': 0,
+            'em_phase': 0,          
+            'em_value': 0,
+            'phi': PHI,    
+            'pi': PI,
+            'e': e,           
+            'mood': 'neutral'       
+        })
+
+
     # Define trade variables    
     position = None   
     trade_open = False       
@@ -919,6 +933,69 @@ def main():
                             total_mood = 'neutral'
         
                         print(f"Market mood forecast: {total_mood}") 
+
+                        print()
+
+                        # Update the frequencies for the next quadrant     
+                        if next_quadrant == 1:       
+                            # Update frequencies for next quadrant (Q1)               
+                            for freq in frequencies_next:       
+                                freq['em_amp'] = em_amp_q1       
+                                freq['em_phase'] = em_phase_q1
+             
+                        elif next_quadrant == 2:
+                            # Update frequencies for Q2        
+                            for freq in frequencies_next:                 
+                                freq['em_amp'] = em_amp_q2   
+                                freq['em_phase'] = em_phase_q2 
+
+                        elif next_quadrant == 3:
+                            # Update frequencies for Q3        
+                            for freq in frequencies_next:                 
+                                freq['em_amp'] = em_amp_q3   
+                                freq['em_phase'] = em_phase_q3
+
+                        elif next_quadrant == 4:
+                            # Update frequencies for Q4        
+                            for freq in frequencies_next:                 
+                                freq['em_amp'] = em_amp_q4   
+                                freq['em_phase'] = em_phase_q4
+
+                        highest_3 = frequencies[:3]
+                        lowest_3 = frequencies[-3:]
+
+                        mood_map = {
+                            'moderate positive': 1,  
+                            'somewhat positive': 2,   
+                            'positive': 3,       
+                            'extremely positive': 4,  
+                            'neutral': 0 
+                        }
+
+                        highest_3_mood_values = []
+                        for freq in highest_3:   
+                            if freq['mood'] == 'neutral':
+                                highest_3_mood_values.append(0)   
+                            else:
+                                highest_3_mood_values.append(mood_map[freq['mood']])
+
+                        lowest_3_mood_values = []        
+                        for freq in lowest_3:   
+                            if freq['mood'] == 'neutral':
+                                lowest_3_mood_values.append(0)        
+                            else:
+                                lowest_3_mood_values.append(mood_map[freq['mood']])      
+
+                        highest_3_mood_values = [mood_map[freq['mood']] for freq in highest_3]
+                        highest_3_mood = statistics.mean(highest_3_mood_values)
+
+                        lowest_3_mood_values = [mood_map[freq['mood']] for freq in lowest_3]
+                        lowest_3_mood = statistics.mean(lowest_3_mood_values)
+
+                        print(f"Current quadrant: {current_quadrant}")
+                        print(f"Next quadrant: {next_quadrant}")
+                        print(f"Highest 3 frequencies: {highest_3_mood}")        
+                        print(f"Lowest 3 frequencies: {lowest_3_mood}")
 
                         print()
 
