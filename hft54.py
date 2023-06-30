@@ -883,32 +883,54 @@ def main():
                                     # Most negative frequencies
                                     freq['em_amp'] = em_amp_q1
                                     freq['em_phase'] = em_phase_q1                 
-                                    freq['mood'] = 'moderate positive'  
-                
+                                    freq['mood'] = 'extremely negative'  
+
+                                elif freq['number'] >= 20:              
+                                     freq['em_amp'] = em_amp_q1
+                                     freq['em_phase'] = em_phase_q1  
+                                     freq['mood'] = 'extremely positive'
+
                             elif current_quadrant == 2:
                             # Quadrant 2
                 
                                 if freq['number'] > 10 and freq['number'] <= 15:                 
                                     freq['em_amp'] = em_amp_q2
                                     freq['em_phase'] = em_phase_q2
-                                    freq['mood'] = 'somewhat positive'
+                                    freq['mood'] = 'strongly negative'
                         
+                                elif freq['number'] > 15 and freq['number'] <= 20:                 
+                                    freq['em_amp'] = em_amp_q2
+                                    freq['em_phase'] = em_phase_q2
+                                    freq['mood'] = 'strongly positive'
+
                             elif current_quadrant == 3: 
                             # Quadrant 3
             
                                 if freq['number'] > 15 and freq['number'] < 20:            
                                     freq['em_amp'] = em_amp_q3                  
                                     freq['em_phase'] = em_phase_q3
-                                    freq['mood'] = 'positive'              
-            
+                                    freq['mood'] = 'negative'              
+           
+
+                                elif freq['number'] > 10 and freq['number'] < 15:            
+                                    freq['em_amp'] = em_amp_q3                  
+                                    freq['em_phase'] = em_phase_q3
+                                    freq['mood'] = 'positive'
+ 
                             else:      
                             # Quadrant 4 
             
                                 if freq['number'] >= 20:                    
                                     freq['em_amp'] = em_amp_q4
                                     freq['em_phase'] = em_phase_q4  
-                                    freq['mood'] = 'extremely positive'       
-                
+                                    freq['mood'] = 'partial negative'       
+
+
+                                elif freq['number'] <= 10:                    
+                                    freq['em_amp'] = em_amp_q4
+                                    freq['em_phase'] = em_phase_q4  
+                                    freq['mood'] = 'partial positive'
+
                             freq['em_value'] = freq['em_amp'] * math.sin(freq['em_phase'])
         
                         # Sort frequencies from most negative to most positive       
