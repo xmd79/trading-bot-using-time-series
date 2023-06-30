@@ -961,6 +961,15 @@ def main():
                                 freq['em_amp'] = em_amp_q4   
                                 freq['em_phase'] = em_phase_q4
 
+                        # Get next quadrant phi 
+                        next_phi = PHI ** freq['number']  
+      
+                        # Map moods based on inverse phi power         
+                        if next_phi < 1.2:
+                            freq['mood'] = 'extremely positive' 
+                        elif next_phi < 1.4:
+                            freq['mood'] = 'positive'
+
                         highest_3 = frequencies[:3]
                         lowest_3 = frequencies[-3:]
 
