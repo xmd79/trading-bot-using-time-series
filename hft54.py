@@ -1027,14 +1027,14 @@ def main():
                             if mood_map[frequencies[0]['mood']] < 0:
                                 total_mood = f"{frequencies[0]['mood']} and  {frequencies[-1]['mood']}"
                                 print(f"Frequency spectrum index range: {total_mood} ")
-                                print(f"Freq. Trend is negative")
+                                print(f"Freq. range is negative")
                             else:    
                                 total_mood = f"{frequencies[0]['mood']} and {frequencies[-1]['mood']}"
                                 print(f"Frequency spectrum index range: {total_mood}") 
-                                print(f"Freq. Trend is positive")   
+                                print(f"Freq. range is positive")   
                         else:
                             print(f"Frequency spectrum index range: neutral")
-                            print(f"Freq. Trend is neutral") 
+                            print(f"Freq. range is neutral") 
 
                         print()
 
