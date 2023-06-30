@@ -919,7 +919,7 @@ def main():
                         for freq in frequencies:               
                             print(freq['number'], freq['em_value'], freq['mood'])    
         
-                        # Calculate market mood forecast based on most negative and positive frequencies
+                        # Calculate frequency spectrum index range based on most negative and positive frequencies
                         mood_map = {
                             'moderate positive': 1,
                             'somewhat positive': 2,  
@@ -932,7 +932,7 @@ def main():
                         else:
                             total_mood = 'neutral'
         
-                        print(f"Market mood forecast: {total_mood}") 
+                        print(f"Frequency spectrum index range: {total_mood}") 
 
                         print()
 
