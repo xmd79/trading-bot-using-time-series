@@ -958,8 +958,6 @@ def main():
                             total_mood = frequencies[0]['mood'] + " and " +  frequencies[-1]['mood']
                         else:
                             total_mood = 'neutral'
-        
-                        print(f"Frequency spectrum index range: {total_mood}") 
 
                         print()
 
