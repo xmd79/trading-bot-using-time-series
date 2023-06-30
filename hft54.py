@@ -921,10 +921,15 @@ def main():
         
                         # Calculate frequency spectrum index range based on most negative and positive frequencies
                         mood_map = {
-                            'moderate positive': 1,
-                            'somewhat positive': 2,  
-                            'positive': 3,    
-                            'extremely positive': 4  
+                            'extremely negative': -4,  
+                            'strongly negative': -3,  
+                            'negative': -2,        
+                            'partial negative': -1,           
+                            'neutral': 0,
+                            'partial positive': 1, 
+                            'positive': 2,       
+                            'strongly positive': 3,    
+                            'extremely positive': 4   
                         }
 
                         if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':   
@@ -974,11 +979,15 @@ def main():
                         lowest_3 = frequencies[-3:]
 
                         mood_map = {
-                            'moderate positive': 1,  
-                            'somewhat positive': 2,   
-                            'positive': 3,       
-                            'extremely positive': 4,  
-                            'neutral': 0 
+                            'extremely negative': -4,  
+                            'strongly negative': -3,  
+                            'negative': -2,        
+                            'partial negative': -1,           
+                            'neutral': 0,
+                            'partial positive': 1, 
+                            'positive': 2,       
+                            'strongly positive': 3,    
+                            'extremely positive': 4   
                         }
 
                         highest_3_mood_values = []
@@ -1005,6 +1014,27 @@ def main():
                         print(f"Next quadrant: {next_quadrant}")
                         print(f"Highest 3 frequencies: {highest_3_mood}")        
                         print(f"Lowest 3 frequencies: {lowest_3_mood}")
+
+                        if highest_3_mood > 0:
+                            print(f"Cycle mood is negative")
+                        elif highest_3_mood < 0:      
+                            print(f"Cycle mood is positive") 
+                        else:
+                            print("Cycle mood is neutral")
+
+
+                        if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':        
+                            if mood_map[frequencies[0]['mood']] < 0:
+                                total_mood = f"{frequencies[0]['mood']} and  {frequencies[-1]['mood']}"
+                                print(f"Frequency spectrum index range: {total_mood} ")
+                                print(f"Freq. Trend is negative")
+                            else:    
+                                total_mood = f"{frequencies[0]['mood']} and {frequencies[-1]['mood']}"
+                                print(f"Frequency spectrum index range: {total_mood}") 
+                                print(f"Freq. Trend is positive")   
+                        else:
+                            print(f"Frequency spectrum index range: neutral")
+                            print(f"Freq. Trend is neutral") 
 
                         print()
 
