@@ -598,6 +598,9 @@ def main():
             'em_amp': 0,
             'em_phase': 0,         
             'em_value': 0,
+            'phi': PHI,    
+            'pi': PI,
+            'e': e, 
             'mood': 'neutral'      
         }) 
   
