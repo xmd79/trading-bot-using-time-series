@@ -585,6 +585,21 @@ def main():
     # Calculate Alpha and Omega spiral angle rates     
     alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
     omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
+    # Calculate frequencies spectrum index
+    frequencies = []    
+   
+    for i in range(1,26):
+        frequency = i * sacred_freq
+        
+        frequencies.append({
+            'number': i,
+            'frequency': frequency,  
+            'em_amp': 0,
+            'em_phase': 0,         
+            'em_value': 0,
+            'mood': 'neutral'      
+        }) 
   
     # Define trade variables    
     position = None   
@@ -839,6 +854,70 @@ def main():
                         else:  
                             # Down cycle from Q4 to Q1 
                             print("Down cycle")
+
+                        print()
+
+                        for freq in frequencies:
+      
+                            if current_quadrant == 1:
+                                # Quadrant 1
+                
+                                if freq['number'] <= 10:
+                                    # Most negative frequencies
+                                    freq['em_amp'] = em_amp_q1
+                                    freq['em_phase'] = em_phase_q1                 
+                                    freq['mood'] = 'moderate positive'  
+                
+                            elif current_quadrant == 2:
+                            # Quadrant 2
+                
+                                if freq['number'] > 10 and freq['number'] <= 15:                 
+                                    freq['em_amp'] = em_amp_q2
+                                    freq['em_phase'] = em_phase_q2
+                                    freq['mood'] = 'somewhat positive'
+                        
+                            elif current_quadrant == 3: 
+                            # Quadrant 3
+            
+                                if freq['number'] > 15 and freq['number'] < 20:            
+                                    freq['em_amp'] = em_amp_q3                  
+                                    freq['em_phase'] = em_phase_q3
+                                    freq['mood'] = 'positive'              
+            
+                            else:      
+                            # Quadrant 4 
+            
+                                if freq['number'] >= 20:                    
+                                    freq['em_amp'] = em_amp_q4
+                                    freq['em_phase'] = em_phase_q4  
+                                    freq['mood'] = 'extremely positive'       
+                
+                            freq['em_value'] = freq['em_amp'] * math.sin(freq['em_phase'])
+        
+                        # Sort frequencies from most negative to most positive       
+                        frequencies.sort(key=lambda x: x['em_value'])   
+        
+                        print("Frequencies spectrum index:")  
+                
+                        for freq in frequencies:               
+                            print(freq['number'], freq['em_value'], freq['mood'])    
+        
+                        # Calculate market mood forecast based on most negative and positive frequencies
+                        mood_map = {
+                            'moderate positive': 1,
+                            'somewhat positive': 2,  
+                            'positive': 3,    
+                            'extremely positive': 4  
+                        }
+
+                        if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':   
+                            total_mood = frequencies[0]['mood'] + " and " +  frequencies[-1]['mood']
+                        else:
+                            total_mood = 'neutral'
+        
+                        print(f"Market mood forecast: {total_mood}") 
+
+                        print()
 
                         # Get all open positions
                         positions = client.futures_position_information()
