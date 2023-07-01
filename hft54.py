@@ -791,6 +791,54 @@ def main():
 
                         close_prices = np.array([candle['close'] for candle in candles['1m']])
 
+                        #Calculate X:Y ratio from golden ratio     
+                        ratio = 2 * (PHI - 1)  
+
+                        # Assign EM amplitudes based on X:Y ratio
+                        em_amp_q1 = (sine_wave_max - sine_wave_min) * ratio / 4
+                        em_amp_q2 = (sine_wave_max - sine_wave_min) * ratio / 4 
+                        em_amp_q3 = (sine_wave_max - sine_wave_min) * ratio / 4 
+                        em_amp_q4 = (sine_wave_max - sine_wave_min) * ratio / 4  
+
+                        # Calculate EM phases based on dividing whole range by X:Y ratio  
+                        em_phase_q1 = 0  
+                        em_phase_q2 = PI * ratio / 2 
+                        em_phase_q3 = PI * ratio           
+                        em_phase_q4 = PI * ratio * 1.5  
+
+                        #Calculate midpoints of each quadrant
+                        mid_q1 = sine_wave_min + em_amp_q1 / 2
+                        mid_q2 = mid_q1 + em_amp_q1
+                        mid_q3 = mid_q2 + em_amp_q2
+                        mid_q4 = max(sine_wave)
+
+                        #Compare current sine wave value to determine quadrant
+                        if sine_wave.any() <= mid_q1:
+                            current_quadrant = 1
+                            current_em_amp = em_amp_q1
+                            current_em_phase = em_phase_q1
+                        elif sine_wave.any() <= mid_q2:
+                            current_quadrant = 2
+                            current_em_amp = em_amp_q2
+                            current_em_phase = em_phase_q2
+                        elif sine_wave.any() <= mid_q3:
+                            current_quadrant = 3
+                            current_em_amp = em_amp_q3
+                            current_em_phase = em_phase_q3
+                        elif sine_wave.any() <= mid_q4:
+                            current_quadrant = 4
+                            current_em_amp = em_amp_q4
+                            current_em_phase = em_phase_q4
+                        else:
+                            # Assign a default value
+                            current_em_amp = 0 
+                            current_em_phase = 0
+
+                        #Assign current EM amplitude and phase
+                        em_amp = current_em_amp
+                        em_phase = current_em_phase
+
+
                         # Check if the current price is above the EMAs and the percent to min signals are below 20%
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
                             print("Buy signal!")
