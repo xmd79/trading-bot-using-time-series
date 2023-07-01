@@ -534,9 +534,6 @@ def main():
     # Instantiate Binance client
     client = BinanceClient(api_key, api_secret)
 
-    # Define symbol to trade        
-    symbol = "BTCBUSD"
-
     # Define EM amplitude variables for each quadrant
     em_amp_q1 = 0
     em_amp_q2 = 0
@@ -592,8 +589,6 @@ def main():
     # Calculate frequencies spectrum index
     frequencies = []    
     frequencies_next = [] 
-    compounded_freqs = []
-    forecasts = []
 
     for i in range(1,26):
         frequency = i * sacred_freq
@@ -653,10 +648,8 @@ def main():
             start_time = int(time.time()) - (1800 * 4)  # 60-minute interval (4 candles)
             end_time = int(time.time())
 
-            # Get 4 hour of historical candles 
-            candles = get_historical_candles(symbol, int(time.time()) - 4*60*60, int(time.time()), '1m')
-
-            # Define the timeframes to use for the signals
+            # Define the candles and timeframes to use for the signals
+            candles = get_historical_candles(TRADE_SYMBOL, start_time, end_time, '1m')
             timeframes = ['1m', '3m', '5m']
 
             # Check if candles is empty
@@ -922,15 +915,41 @@ def main():
 
                         if quadrature > 0:
                             # Up cycle from Q1 to Q4  
-                            print("Up cycle")  
+                            print("now Up cycle")  
                         else:  
                             # Down cycle from Q4 to Q1 
-                            print("Down cycle")
+                            print("now Down cycle")
 
                         print()
 
+                        next_1h_forecast = []
+
                         for freq in frequencies:
-      
+
+                            # Get PHI raised to the frequency number         
+                            phi_power = PHI ** freq['number'] 
+
+                            if phi_power < 1.05:
+                                freq['mood_next_1h'] = 'extremely positive'
+                            elif phi_power < 1.2:       
+                                freq['mood_next_1h'] = 'strongly positive'
+                            elif phi_power < 1.35:       
+                                freq['mood_next_1h'] = 'positive'    
+                            elif phi_power < 1.5:       
+                                freq['mood_next_1h'] = 'slightly positive'
+                            elif phi_power < 2:          
+                                freq['mood_next_1h'] = 'neutral'              
+                            elif phi_power < 2.5:     
+                                freq['mood_next_1h'] = 'slightly negative'      
+                            elif phi_power < 3.5:     
+                                freq['mood_next_1h'] = 'negative'
+                            elif phi_power < 4.5:     
+                                freq['mood_next_1h'] = 'strongly negative'   
+                            else:                     
+                                freq['mood_next_1h'] = 'extremely negative'
+
+                            next_1h_forecast.append(freq)
+
                             if current_quadrant == 1:
                                 # Quadrant 1
                 
@@ -1112,49 +1131,33 @@ def main():
 
                         print()
 
-                        # Compound frequency cycles 
-                        compounded_freqs = []
+                        # Sort forecast from most negative to most positive       
+                        next_1h_forecast.sort(key=lambda f: mood_map[f['mood_next_1h']])  
+    
+                        # Get average mood of highest/lowest 3 frequencies 
+                        highest_3 = next_1h_forecast[:3]
+                        highest_3_mood = 0
+   
+                        for freq in highest_3:
+                            mood_val  = mood_map[freq['mood_next_1h']] 
+                            highest_3_mood += mood_val
+                            highest_3_mood = highest_3_mood / len(highest_3)
 
-                        # Compound frequency cycles 
-                        # Start with the initial 3 highest and lowest frequencies
-                        compounded_freqs = highest_3 + lowest_3
+                        lowest_3 = next_1h_forecast[-3:]
+                        lowest_3_mood = 0
 
-                        # Compound 5 cycles
-                        for i in range(20):          
-                            compounded_freqs += frequencies[:3] * (20-i)  
-                            compounded_freqs += frequencies[-3:] * (20-i)
-        
-                        # Calculate overall market mood from compounded frequencies      
-                        total_mood_values = []
-                        for freq in compounded_freqs:
-                            total_mood_values.append(mood_map[freq['mood']])     
-                            overall_mood = statistics.mean(total_mood_values) 
-         
-                        if overall_mood < 0:
-                            print(f"Market mood forecast: Bullish")
-                        elif overall_mood > 0:  
-                            print(f"Market mood forecast: Bearish")
-                        else:
-                            print("Market mood forecast: Neutral")
+                        for freq in lowest_3:
+                            mood_val  = mood_map[freq['mood_next_1h']]
+                            lowest_3_mood += mood_val  
+                            lowest_3_mood = lowest_3_mood / len(lowest_3)
 
-                        # Calculate forecast     
-                        if statistics.mean([f['em_value'] for f in compounded_freqs]) > 0:         
-                            forecast = "bullish"  
-                        else:
-                            forecast = "bearish"
-
-                        forecasts.append(forecast)
-
-                        # Determine average forecast         
-                        bullish_forecasts = [f for f in forecasts if f == "bullish"]
-                        bearish_forecasts = [f for f in forecasts if f == "bearish"]
-
-                        if len(bullish_forecasts) > len(bearish_forecasts):  
-                            average_forecast = "bullish" 
-                        else: 
-                            average_forecast = "bearish"
-
-                        print(average_forecast)
+                        # Determine overall 1h market mood based on highest/lowest 3    
+                        if highest_3_mood < lowest_3_mood:  # Negative > positive    
+                            overall_mood = highest_3_mood 
+                            print(f"1h forecast: overall {overall_mood} mood. Bullish.")
+                        else:  # Positive > negative    
+                            overall_mood = lowest_3_mood       
+                            print(f"1h forecast: overall {overall_mood} mood. Bearish.")
 
                         # Get all open positions
                         positions = client.futures_position_information()
