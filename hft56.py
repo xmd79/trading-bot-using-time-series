@@ -534,6 +534,9 @@ def main():
     # Instantiate Binance client
     client = BinanceClient(api_key, api_secret)
 
+    # Define symbol to trade        
+    symbol = "BTCBUSD"
+
     # Define EM amplitude variables for each quadrant
     em_amp_q1 = 0
     em_amp_q2 = 0
@@ -589,6 +592,8 @@ def main():
     # Calculate frequencies spectrum index
     frequencies = []    
     frequencies_next = [] 
+    compounded_freqs = []
+    forecasts = []
 
     for i in range(1,26):
         frequency = i * sacred_freq
@@ -648,8 +653,10 @@ def main():
             start_time = int(time.time()) - (1800 * 4)  # 60-minute interval (4 candles)
             end_time = int(time.time())
 
-            # Define the candles and timeframes to use for the signals
-            candles = get_historical_candles(TRADE_SYMBOL, start_time, end_time, '1m')
+            # Get 4 hour of historical candles 
+            candles = get_historical_candles(symbol, int(time.time()) - 4*60*60, int(time.time()), '1m')
+
+            # Define the timeframes to use for the signals
             timeframes = ['1m', '3m', '5m']
 
             # Check if candles is empty
@@ -1106,13 +1113,16 @@ def main():
                         print()
 
                         # Compound frequency cycles 
+                        compounded_freqs = []
+
+                        # Compound frequency cycles 
                         # Start with the initial 3 highest and lowest frequencies
                         compounded_freqs = highest_3 + lowest_3
 
                         # Compound 5 cycles
-                        for i in range(5):          
-                            compounded_freqs += frequencies[:3]  
-                            compounded_freqs += frequencies[-3:]
+                        for i in range(20):          
+                            compounded_freqs += frequencies[:3] * (20-i)  
+                            compounded_freqs += frequencies[-3:] * (20-i)
         
                         # Calculate overall market mood from compounded frequencies      
                         total_mood_values = []
@@ -1126,6 +1136,25 @@ def main():
                             print(f"Market mood forecast: Bearish")
                         else:
                             print("Market mood forecast: Neutral")
+
+                        # Calculate forecast     
+                        if statistics.mean([f['em_value'] for f in compounded_freqs]) > 0:         
+                            forecast = "bullish"  
+                        else:
+                            forecast = "bearish"
+
+                        forecasts.append(forecast)
+
+                        # Determine average forecast         
+                        bullish_forecasts = [f for f in forecasts if f == "bullish"]
+                        bearish_forecasts = [f for f in forecasts if f == "bearish"]
+
+                        if len(bullish_forecasts) > len(bearish_forecasts):  
+                            average_forecast = "bullish" 
+                        else: 
+                            average_forecast = "bearish"
+
+                        print(average_forecast)
 
                         # Get all open positions
                         positions = client.futures_position_information()
