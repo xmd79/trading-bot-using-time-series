@@ -915,10 +915,10 @@ def main():
 
                         if quadrature > 0:
                             # Up cycle from Q1 to Q4  
-                            print("now Up cycle")  
+                            print("UP cycle now")  
                         else:  
                             # Down cycle from Q4 to Q1 
-                            print("now Down cycle")
+                            print("DOWN cycle now")
 
                         print()
 
