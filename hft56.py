@@ -920,8 +920,6 @@ def main():
                             # Down cycle from Q4 to Q1 
                             print("DOWN cycle now")
 
-                        print()
-
                         next_1h_forecast = []
 
                         for freq in frequencies:
@@ -1010,10 +1008,10 @@ def main():
                         # Sort frequencies from most negative to most positive       
                         frequencies.sort(key=lambda x: x['em_value'])   
         
-                        print("Frequencies spectrum index:")  
+                        #print("Frequencies spectrum index:")  
                 
-                        for freq in frequencies:               
-                            print(freq['number'], freq['em_value'], freq['mood'])    
+                        #for freq in frequencies:               
+                            #print(freq['number'], freq['em_value'], freq['mood'])    
         
                         # Calculate frequency spectrum index range based on most negative and positive frequencies
                         mood_map = {
@@ -1119,15 +1117,15 @@ def main():
                         if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':        
                             if mood_map[frequencies[0]['mood']] < 0:
                                 total_mood = f"{frequencies[0]['mood']} and  {frequencies[-1]['mood']}"
-                                print(f"Frequency spectrum index range: {total_mood} ")
-                                print(f"Freq. range is negative")
+                                #print(f"Frequency spectrum index range: {total_mood} ")
+                                #print(f"Freq. range is negative")
                             else:    
                                 total_mood = f"{frequencies[0]['mood']} and {frequencies[-1]['mood']}"
-                                print(f"Frequency spectrum index range: {total_mood}") 
-                                print(f"Freq. range is positive")   
-                        else:
-                            print(f"Frequency spectrum index range: neutral")
-                            print(f"Freq. range is neutral") 
+                                #print(f"Frequency spectrum index range: {total_mood}") 
+                                #print(f"Freq. range is positive")   
+                        #else:
+                            #print(f"Frequency spectrum index range: neutral")
+                            #print(f"Freq. range is neutral") 
 
                         print()
 
