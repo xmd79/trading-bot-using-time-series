@@ -9,7 +9,6 @@ from datetime import timedelta
 from decimal import Decimal
 import decimal
 import random
-import statistics
 
 # binance module imports
 from binance.client import Client as BinanceClient
@@ -565,62 +564,7 @@ def main():
      
     fast_ema = 12       
     slow_ema = 26         
-    
-    # Define PHI constant with 15 decimals
-    PHI = 1.6180339887498948482045868343656381177  
-   
-    # Define PI constant with 15 decimals    
-    PI = 3.1415926535897932384626433832795028842
-   
-    # Define e constant with 15 decimals   
-    e =  2.718281828459045235360287471352662498  
-
-    # Calculate sacred frequency
-    sacred_freq = (432 * PHI ** 2) / 360
-    
-    # Calculate Alpha and Omega ratios   
-    alpha_ratio = PHI / PI       
-    omega_ratio = PI / PHI
-          
-    # Calculate Alpha and Omega spiral angle rates     
-    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
-    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
-
-    # Calculate frequencies spectrum index
-    frequencies = []    
-    frequencies_next = [] 
-
-    for i in range(1,26):
-        frequency = i * sacred_freq
         
-        frequencies.append({
-            'number': i,
-            'frequency': frequency,  
-            'em_amp': 0,
-            'em_phase': 0,         
-            'em_value': 0,
-            'phi': PHI,    
-            'pi': PI,
-            'e': e, 
-            'mood': 'neutral'      
-        }) 
-      
-        frequencies_next.append({
-            'number': i,       
-            'frequency': frequency,        
-            'em_amp': 0,
-            'em_phase': 0,          
-            'em_value': 0,
-            'phi': PHI,    
-            'pi': PI,
-            'e': e,           
-            'mood': 'neutral'       
-        })
-
-
-    mood_score = 0 
-    mood_scores = [] 
-
     # Define trade variables    
     position = None   
     trade_open = False       
@@ -697,8 +641,8 @@ def main():
                     sine_wave_min = np.min(sine_wave)
                     sine_wave_max = np.max(sine_wave)
 
-                    #print("Minimum value of sine wave:", sine_wave_min)
-                    #print("Maximum value of sine wave:", sine_wave_max)
+                    print("Minimum value of sine wave:", sine_wave_min)
+                    print("Maximum value of sine wave:", sine_wave_max)
 
                     # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
                     dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
@@ -794,53 +738,19 @@ def main():
 
                         close_prices = np.array([candle['close'] for candle in candles['1m']])
 
-                        #Calculate X:Y ratio from golden ratio     
-                        ratio = 2 * (PHI - 1)  
-
-                        # Assign EM amplitudes based on X:Y ratio
-                        em_amp_q1 = (sine_wave_max - sine_wave_min) * ratio / 4
-                        em_amp_q2 = (sine_wave_max - sine_wave_min) * ratio / 4 
-                        em_amp_q3 = (sine_wave_max - sine_wave_min) * ratio / 4 
-                        em_amp_q4 = (sine_wave_max - sine_wave_min) * ratio / 4  
-
-                        # Calculate EM phases based on dividing whole range by X:Y ratio  
-                        em_phase_q1 = 0  
-                        em_phase_q2 = PI * ratio / 2 
-                        em_phase_q3 = PI * ratio           
-                        em_phase_q4 = PI * ratio * 1.5  
-
-                        #Calculate midpoints of each quadrant
-                        mid_q1 = sine_wave_min + em_amp_q1 / 2
-                        mid_q2 = mid_q1 + em_amp_q1
-                        mid_q3 = mid_q2 + em_amp_q2
-                        mid_q4 = max(sine_wave)
-
-                        #Compare current sine wave value to determine quadrant
-                        if sine_wave.any() <= mid_q1:
-                            current_quadrant = 1
-                            current_em_amp = em_amp_q1
-                            current_em_phase = em_phase_q1
-                        elif sine_wave.any() <= mid_q2:
-                            current_quadrant = 2
-                            current_em_amp = em_amp_q2
-                            current_em_phase = em_phase_q2
-                        elif sine_wave.any() <= mid_q3:
-                            current_quadrant = 3
-                            current_em_amp = em_amp_q3
-                            current_em_phase = em_phase_q3
-                        elif sine_wave.any() <= mid_q4:
-                            current_quadrant = 4
-                            current_em_amp = em_amp_q4
-                            current_em_phase = em_phase_q4
-                        else:
-                            # Assign a default value
-                            current_em_amp = 0 
-                            current_em_phase = 0
-
-                        #Assign current EM amplitude and phase
-                        em_amp = current_em_amp
-                        em_phase = current_em_phase
-
+                        # Calculate EMA of sine wave values    
+                        ema_sine = talib.EMA(sine_wave, timeperiod=5)
+                      
+                        # Set midline threshold at median value       
+                        ema_sine_min = np.min(ema_sine)       
+                        ema_sine_max = np.max(ema_sine)
+                        midline = (ema_sine_min + ema_sine_max) / 2                   
+                        
+                        # Set upper threshold 1/3 from midline to max             
+                        upper = midline + (ema_sine_max - midline) / 3 
+                
+                        # Set lower threshold 1/3 from min to midline       
+                        lower = midline - (midline - ema_sine_min) / 3 
 
                         # Check if the current price is above the EMAs and the percent to min signals are below 20%
                         if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
@@ -880,334 +790,6 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bearish momentum in Q4")
 
-                        # Calculate quadrature phase shift based on current quadrant  
-                        if current_quadrant == 1:  
-                            # Up cycle from Q1 to Q4   
-                            quadrature_phase = em_phase_q1
-                            em_phase = alpha_spiral
-                        elif current_quadrant == 2:
-                            quadrature_phase = em_phase_q2
-                            em_phase = omega_spiral          
-                        elif current_quadrant  == 3:      
-                            quadrature_phase = em_phase_q3
-                            em_phase = omega_spiral      
-                        else:          
-                            quadrature_phase = em_phase_q4
-                            em_phase = alpha_spiral 
-
-                        # Get next quadrant
-                        next_quadrant = current_quadrant + 1
-                        if next_quadrant > 4:
-                            next_quadrant = 1
-
-                        # Calculate quadrature for next quadrant
-                        if next_quadrant == 1:       
-                            next_quadrature_phase = em_phase_q1            
-                        elif next_quadrant == 2:       
-                            next_quadrature_phase = em_phase_q2        
-                        elif next_quadrant == 3:                
-                            next_quadrature_phase = em_phase_q3
-                        else:           
-                            next_quadrature_phase = em_phase_q4
-
-                        # Calculate EM value
-                        em_value = em_amp * math.sin(em_phase)  
-
-                        # Calculate quadrature phase shift from current to next quadrant      
-                        quadrature = next_quadrature_phase - quadrature_phase
-
-                        if quadrature > 0:
-                            # Up cycle from Q1 to Q4  
-                            print("UP cycle now")  
-                        else:  
-                            # Down cycle from Q4 to Q1 
-                            print("DOWN cycle now")
-
-                        next_1h_forecast = []
-
-                        for freq in frequencies:
-
-                            # Get PHI raised to the frequency number         
-                            phi_power = PHI ** freq['number'] 
-
-                            if phi_power < 1.05:
-                                freq['mood_next_1h'] = 'extremely positive'
-                            elif phi_power < 1.2:       
-                                freq['mood_next_1h'] = 'strongly positive'
-                            elif phi_power < 1.35:       
-                                freq['mood_next_1h'] = 'positive'    
-                            elif phi_power < 1.5:       
-                                freq['mood_next_1h'] = 'slightly positive'
-                            elif phi_power < 2:          
-                                freq['mood_next_1h'] = 'neutral'              
-                            elif phi_power < 2.5:     
-                                freq['mood_next_1h'] = 'slightly negative'      
-                            elif phi_power < 3.5:     
-                                freq['mood_next_1h'] = 'negative'
-                            elif phi_power < 4.5:     
-                                freq['mood_next_1h'] = 'strongly negative'   
-                            else:                     
-                                freq['mood_next_1h'] = 'extremely negative'
-
-                            next_1h_forecast.append(freq)
-
-                            if current_quadrant == 1:
-                                # Quadrant 1
-                
-                                if freq['number'] <= 10:
-                                    # Most negative frequencies
-                                    freq['em_amp'] = em_amp_q1
-                                    freq['em_phase'] = em_phase_q1                 
-                                    freq['mood'] = 'extremely negative'  
-
-                                elif freq['number'] >= 20:              
-                                     freq['em_amp'] = em_amp_q1
-                                     freq['em_phase'] = em_phase_q1  
-                                     freq['mood'] = 'extremely positive'
-
-                            elif current_quadrant == 2:
-                            # Quadrant 2
-                
-                                if freq['number'] > 10 and freq['number'] <= 15:                 
-                                    freq['em_amp'] = em_amp_q2
-                                    freq['em_phase'] = em_phase_q2
-                                    freq['mood'] = 'strongly negative'
-                        
-                                elif freq['number'] > 15 and freq['number'] <= 20:                 
-                                    freq['em_amp'] = em_amp_q2
-                                    freq['em_phase'] = em_phase_q2
-                                    freq['mood'] = 'strongly positive'
-
-                            elif current_quadrant == 3: 
-                            # Quadrant 3
-            
-                                if freq['number'] > 15 and freq['number'] < 20:            
-                                    freq['em_amp'] = em_amp_q3                  
-                                    freq['em_phase'] = em_phase_q3
-                                    freq['mood'] = 'negative'              
-           
-
-                                elif freq['number'] > 10 and freq['number'] < 15:            
-                                    freq['em_amp'] = em_amp_q3                  
-                                    freq['em_phase'] = em_phase_q3
-                                    freq['mood'] = 'positive'
- 
-                            else:      
-                            # Quadrant 4 
-            
-                                if freq['number'] >= 20:                    
-                                    freq['em_amp'] = em_amp_q4
-                                    freq['em_phase'] = em_phase_q4  
-                                    freq['mood'] = 'partial negative'       
-
-
-                                elif freq['number'] <= 10:                    
-                                    freq['em_amp'] = em_amp_q4
-                                    freq['em_phase'] = em_phase_q4  
-                                    freq['mood'] = 'partial positive'
-
-                            freq['em_value'] = freq['em_amp'] * math.sin(freq['em_phase'])
-        
-                        # Sort frequencies from most negative to most positive       
-                        frequencies.sort(key=lambda x: x['em_value'])   
-        
-                        #print("Frequencies spectrum index:")  
-                
-                        #for freq in frequencies:               
-                            #print(freq['number'], freq['em_value'], freq['mood'])    
-        
-                        # Calculate frequency spectrum index range based on most negative and positive frequencies
-                        mood_map = {
-                            'extremely negative': -4,  
-                            'strongly negative': -3,  
-                            'negative': -2,        
-                            'partial negative': -1,           
-                            'neutral': 0,
-                            'partial positive': 1, 
-                            'positive': 2,       
-                            'strongly positive': 3,    
-                            'extremely positive': 4   
-                        }
-
-                        if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':   
-                            total_mood = frequencies[0]['mood'] + " and " +  frequencies[-1]['mood']
-                        else:
-                            total_mood = 'neutral'
-
-                        print()
-
-                        # Update the frequencies for the next quadrant     
-                        if next_quadrant == 1:       
-                            # Update frequencies for next quadrant (Q1)               
-                            for freq in frequencies_next:       
-                                freq['em_amp'] = em_amp_q1       
-                                freq['em_phase'] = em_phase_q1
-             
-                        elif next_quadrant == 2:
-                            # Update frequencies for Q2        
-                            for freq in frequencies_next:                 
-                                freq['em_amp'] = em_amp_q2   
-                                freq['em_phase'] = em_phase_q2 
-
-                        elif next_quadrant == 3:
-                            # Update frequencies for Q3        
-                            for freq in frequencies_next:                 
-                                freq['em_amp'] = em_amp_q3   
-                                freq['em_phase'] = em_phase_q3
-
-                        elif next_quadrant == 4:
-                            # Update frequencies for Q4        
-                            for freq in frequencies_next:                 
-                                freq['em_amp'] = em_amp_q4   
-                                freq['em_phase'] = em_phase_q4
-
-                        # Get next quadrant phi 
-                        next_phi = PHI ** freq['number']  
-      
-                        # Map moods based on inverse phi power         
-                        if next_phi < 1.2:
-                            freq['mood'] = 'extremely positive' 
-                        elif next_phi < 1.4:
-                            freq['mood'] = 'positive'
-
-                        highest_3 = frequencies[:3]
-                        lowest_3 = frequencies[-3:]
-
-                        mood_map = {
-                            'extremely negative': -4,  
-                            'strongly negative': -3,  
-                            'negative': -2,        
-                            'partial negative': -1,           
-                            'neutral': 0,
-                            'partial positive': 1, 
-                            'positive': 2,       
-                            'strongly positive': 3,    
-                            'extremely positive': 4   
-                        }
-
-                        highest_3_mood_values = []
-                        for freq in highest_3:   
-                            if freq['mood'] == 'neutral':
-                                highest_3_mood_values.append(0)   
-                            else:
-                                highest_3_mood_values.append(mood_map[freq['mood']])
-
-                        lowest_3_mood_values = []        
-                        for freq in lowest_3:   
-                            if freq['mood'] == 'neutral':
-                                lowest_3_mood_values.append(0)        
-                            else:
-                                lowest_3_mood_values.append(mood_map[freq['mood']])      
-
-                        highest_3_mood_values = [mood_map[freq['mood']] for freq in highest_3]
-                        highest_3_mood = statistics.mean(highest_3_mood_values)
-
-                        lowest_3_mood_values = [mood_map[freq['mood']] for freq in lowest_3]
-                        lowest_3_mood = statistics.mean(lowest_3_mood_values)
-
-                        print(f"Current quadrant: {current_quadrant}")
-                        print(f"Next quadrant: {next_quadrant}")
-                        print(f"Highest 3 frequencies: {highest_3_mood}")        
-                        print(f"Lowest 3 frequencies: {lowest_3_mood}")
-
-                        if highest_3_mood > 0:
-                            print(f"Cycle mood is negative")
-                        elif highest_3_mood < 0:      
-                            print(f"Cycle mood is positive") 
-                        else:
-                            print("Cycle mood is neutral")
-
-                        if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':        
-                            if mood_map[frequencies[0]['mood']] < 0:
-                                total_mood = f"{frequencies[0]['mood']} and  {frequencies[-1]['mood']}"
-                                #print(f"Frequency spectrum index range: {total_mood} ")
-                                #print(f"Freq. range is negative")
-                            else:    
-                                total_mood = f"{frequencies[0]['mood']} and {frequencies[-1]['mood']}"
-                                #print(f"Frequency spectrum index range: {total_mood}") 
-                                #print(f"Freq. range is positive")   
-                        #else:
-                            #print(f"Frequency spectrum index range: neutral")
-                            #print(f"Freq. range is neutral") 
-
-                        print()
-
-                        # Sort forecast from most negative to most positive       
-                        next_1h_forecast.sort(key=lambda f: mood_map[f['mood_next_1h']])  
-    
-                        # Get average mood of highest/lowest 3 frequencies 
-                        highest_3 = next_1h_forecast[:3]
-                        highest_3_mood = 0
-   
-                        for freq in highest_3:
-                            mood_val  = mood_map[freq['mood_next_1h']] 
-                            highest_3_mood += mood_val
-                            highest_3_mood = highest_3_mood / len(highest_3)
-
-                        lowest_3 = next_1h_forecast[-3:]
-                        lowest_3_mood = 0
-
-                        for freq in lowest_3:
-                            mood_val  = mood_map[freq['mood_next_1h']]
-                            lowest_3_mood += mood_val  
-                            lowest_3_mood = lowest_3_mood / len(lowest_3)
-
-                        # Determine overall 1h market mood based on highest/lowest 3    
-                        if highest_3_mood < lowest_3_mood:  # Negative > positive    
-                            overall_mood = highest_3_mood 
-                            print(f"1h forecast: overall {overall_mood} mood. Bullish.")
-                        else:  # Positive > negative    
-                            overall_mood = lowest_3_mood       
-                            print(f"1h forecast: overall {overall_mood} mood. Bearish.")
-
-                        for quadrant in range(1, 5):                   
-                            for freq in frequencies:          
-                                # Calculate wavelength from frequency  
-                                wavelength = 300000 / freq["number"]               
-           
-                                # Assign mood score           
-                                if wavelength < 10:       
-                                    mood = -2
-                                elif wavelength < 15:      
-                                    mood = -1 
-                                elif wavelength < 25:        
-                                    mood = 0                     
-                                elif wavelength < 35:               
-                                    mood = 1                
-                                else:                                  
-                                    mood = 2
-               
-                                mood_score += mood
-
-                                # Check for extreme frequencies       
-                                if freq["number"] in [1, 2, 26]:        
-                                    mood = -5 
-                                    mood_score += mood
-
-                        mood_scores.append(mood_score)     
-        
-                        # Calculate average score           
-                        average_mood = sum(mood_scores) / len(mood_scores)
-
-                        if average_mood >= 4:
-                            print("Extreme greed")        
-                        elif average_mood >= 3:       
-                            print("Very high greed")     
-                        elif average_mood >= 2:               
-                            print("High greed")            
-                        elif average_mood >= 1: 
-                            print("Moderate greed") 
-                        elif average_mood >= 0:
-                            print("Neutral")        
-                        elif average_mood >= -1:               
-                            print("Moderate fear")        
-                        elif average_mood >= -2:
-                            print("High fear") 
-                        elif average_mood >= -3:          
-                            print("Very high fear")   
-                        else:                           
-                            print("Extreme fear")
-
                         # Get all open positions
                         positions = client.futures_position_information()
 
@@ -1222,6 +804,43 @@ def main():
                        
                         elif position_amount == 0:
                             print("Position not open: ", position_amount)
+
+                        # Trading function calls
+                        if trade_open and position_amount != 0:
+
+                            stop_loss = -1.44
+                            take_profit = 1.44
+
+                            print("Trade is already open, seeking for exit condition...")
+
+                            current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+
+                            # Check if current PnL hits stop loss or take profit level
+                            if current_pnl <= stop_loss and not trade_exit_triggered:
+
+                                print("STOPLOSS was hit! Closing position and exit trade...")
+
+                                exit_trade()
+                                trade_open = False
+                                trade_exit_triggered = True
+
+                            elif current_pnl >= take_profit and not trade_exit_triggered:
+
+                                print("TAKEPROFIT was hit! Closing position and exit trade...")
+
+                                exit_trade()
+                                trade_open = False
+                                trade_exit_triggered = True
+
+                        elif not trade_open and position_amount == 0:
+
+                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and signals['1m']['momentum'] > 0:
+                                entry_long(TRADE_SYMBOL)
+                                trade_open = True
+
+                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and signals['1m']['momentum'] < 0:
+                                entry_short(TRADE_SYMBOL)
+                                trade_open = True
 
                         print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
