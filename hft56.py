@@ -509,16 +509,6 @@ def exit_trade():
                 
     print("All positions exited!")
 
-def calculate_ema(candles, period):
-    prices = [float(candle['close']) for candle in candles]
-    ema = []
-    sma = sum(prices[:period]) / period
-    multiplier = 2 / (period + 1)
-    ema.append(sma)
-    for price in prices[period:]:
-        ema.append((price - ema[-1]) * multiplier + ema[-1])
-    return ema
-
 print()
 print("Init main() loop: ")
 print()
@@ -561,9 +551,6 @@ def main():
 
     # Define constants
     trade_symbol = "BTCBUSD"
-     
-    fast_ema = 12       
-    slow_ema = 26         
         
     # Define trade variables    
     position = None   
@@ -615,8 +602,8 @@ def main():
 
             initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
-            stop_loss = -0.02 * initial_pnl
-            take_profit = 0.02 * initial_pnl
+            stop_loss = -0.0233 * initial_pnl
+            take_profit = 0.0233 * initial_pnl
 
             # Check if the '1m' key exists in the signals dictionary
             if '1m' in signals:
@@ -641,9 +628,6 @@ def main():
                     sine_wave_min = np.min(sine_wave)
                     sine_wave_max = np.max(sine_wave)
 
-                    print("Minimum value of sine wave:", sine_wave_min)
-                    print("Maximum value of sine wave:", sine_wave_max)
-
                     # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
                     dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
                     dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
@@ -663,21 +647,11 @@ def main():
                     em_amp_q3 = range_q3 / percent_to_max_val
                     em_amp_q4 = range_q4 / percent_to_max_val
 
-                    #print("EM amplitude for Q1:", em_amp_q1)
-                    #print("EM amplitude for Q2:", em_amp_q2)
-                    #print("EM amplitude for Q3:", em_amp_q3)
-                    #print("EM amplitude for Q4:", em_amp_q4)
-
                     # Calculate the EM phase for each quadrant
                     em_phase_q1 = 0
                     em_phase_q2 = math.pi/2
                     em_phase_q3 = math.pi
                     em_phase_q4 = 3*math.pi/2
-
-                    #print("EM phase for Q1:", em_phase_q1)
-                    #print("EM phase for Q2:", em_phase_q2)
-                    #print("EM phase for Q3:", em_phase_q3)
-                    #print("EM phase for Q4:", em_phase_q4)
 
                     # Calculate the current position of the price on the sine wave
                     current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
@@ -713,13 +687,13 @@ def main():
                         print("Current position is in quadrant 4. Distance from 75% to 100% of range:", (current_position - 0.75) / 0.25 * 100, "%")
                         print("Current quadrant is: ", current_quadrant)
 
-                    print("EM amplitude:", em_amp)
-                    print("EM phase:", em_phase)
+                    #print("EM amplitude:", em_amp)
+                    #print("EM phase:", em_phase)
 
                     # Calculate the EM value
                     em_value = em_amp * math.sin(em_phase)
 
-                    print("EM value:", em_value)
+                    #print("EM value:", em_value)
 
                     # Determine the trend direction based on the EM phase differences
                     em_phase_diff_q1_q2 = em_phase_q2 - em_phase_q1
@@ -727,124 +701,90 @@ def main():
                     em_phase_diff_q3_q4 = em_phase_q4 - em_phase_q3
                     em_phase_diff_q4_q1 = 2*math.pi - (em_phase_q4 - em_phase_q1)
 
-                    # Check if EMA periods have been defined
-                    if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
-                        # Calculate the EMAs
-                        ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]
-                        ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]
 
-                        print("EMA slow:", ema_slow)
-                        print("EMA fast:", ema_fast)
+                    close_prices = np.array([candle['close'] for candle in candles['1m']])
 
-                        close_prices = np.array([candle['close'] for candle in candles['1m']])
+                    if percent_to_min_val < 20:
+                        print("Bullish momentum in trend")
 
-                        # Calculate EMA of sine wave values    
-                        ema_sine = talib.EMA(sine_wave, timeperiod=5)
-                      
-                        # Set midline threshold at median value       
-                        ema_sine_min = np.min(ema_sine)       
-                        ema_sine_max = np.max(ema_sine)
-                        midline = (ema_sine_min + ema_sine_max) / 2                   
-                        
-                        # Set upper threshold 1/3 from midline to max             
-                        upper = midline + (ema_sine_max - midline) / 3 
-                
-                        # Set lower threshold 1/3 from min to midline       
-                        lower = midline - (midline - ema_sine_min) / 3 
+                        if current_quadrant == 1:
+                            # In quadrant 1, distance from min to 25% of range
+                            print("Bullish momentum in Q1")
+                        elif current_quadrant == 2:
+                            # In quadrant 2, distance from 25% to 50% of range
+                            print("Bullish momentum in Q2")
+                        elif current_quadrant == 3:
+                            # In quadrant 3, distance from 50% to 75% of range
+                            print("Bullish momentum in Q3")
+                        elif current_quadrant == 4:
+                            # In quadrant 4, distance from 75% to max of range
+                            print("Bullish momentum in Q4")
 
-                        # Check if the current price is above the EMAs and the percent to min signals are below 20%
-                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
-                            print("Buy signal!")
+                    elif percent_to_max_val < 20:
+                        print("Bearish momentum in trend")
 
-                        # Check if the current price is below the EMAs and the percent to max signals are below 20%
-                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
-                            print("Sell signal!")
+                        if current_quadrant == 1:
+                            # In quadrant 1, distance from min to 25% of range
+                            print("Bearish momentum in Q1")
+                        elif current_quadrant == 2:
+                            # In quadrant 2, distance from 25% to 50% of range
+                            print("Bearish momentum in Q2")
+                        elif current_quadrant == 3:
+                            # In quadrant 3, distance from 50% to 75% of range
+                            print("Bearish momentum in Q3")
+                        elif current_quadrant == 4:
+                            # In quadrant 4, distance from 75% to max of range
+                            print("Bearish momentum in Q4")
 
-                        elif percent_to_min_val < 20:
-                            print("Bullish momentum in trend")
-                            if current_quadrant == 1:
-                                # In quadrant 1, distance from min to 25% of range
-                                print("Bullish momentum in Q1")
-                            elif current_quadrant == 2:
-                                # In quadrant 2, distance from 25% to 50% of range
-                                print("Bullish momentum in Q2")
-                            elif current_quadrant == 3:
-                                # In quadrant 3, distance from 50% to 75% of range
-                                print("Bullish momentum in Q3")
-                            elif current_quadrant == 4:
-                                # In quadrant 4, distance from 75% to max of range
-                                print("Bullish momentum in Q4")
+                    # Get all open positions
+                    positions = client.futures_position_information()
 
-                        elif percent_to_max_val < 20:
-                            print("Bearish momentum in trend")
-                            if current_quadrant == 1:
-                                # In quadrant 1, distance from min to 25% of range
-                                print("Bearish momentum in Q1")
-                            elif current_quadrant == 2:
-                                # In quadrant 2, distance from 25% to 50% of range
-                                print("Bearish momentum in Q2")
-                            elif current_quadrant == 3:
-                                # In quadrant 3, distance from 50% to 75% of range
-                                print("Bearish momentum in Q3")
-                            elif current_quadrant == 4:
-                                # In quadrant 4, distance from 75% to max of range
-                                print("Bearish momentum in Q4")
+                    # Loop through each position
+                    for position in positions:
+                        symbol = position['symbol']
+                        position_amount = float(position['positionAmt'])
 
-                        # Get all open positions
-                        positions = client.futures_position_information()
-
-                        # Loop through each position
-                        for position in positions:
-                            symbol = position['symbol']
-                            position_amount = float(position['positionAmt'])
-
-                        # Print position if there is nor not     
-                        if position_amount != 0:
-                            print("Position open: ", position_amount)
+                    # Print position if there is nor not     
+                    if position_amount != 0:
+                        print("Position open: ", position_amount)
                        
-                        elif position_amount == 0:
-                            print("Position not open: ", position_amount)
+                    elif position_amount == 0:
+                        print("Position not open: ", position_amount)
 
-                        # Trading function calls
-                        if trade_open and position_amount != 0:
+                    # Trading function calls
+                    if trade_open and position_amount != 0:
 
-                            stop_loss = -1.44
-                            take_profit = 1.44
+                        print("Trade is already open, seeking for exit condition...")
+                        current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
-                            print("Trade is already open, seeking for exit condition...")
+                        # Check if current PnL hits stop loss or take profit level
+                        if current_pnl <= stop_loss and not trade_exit_triggered:
 
-                            current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+                            print("STOPLOSS was hit! Closing position and exit trade...")
+                            exit_trade()
+                            trade_open = False
+                            trade_exit_triggered = True
 
-                            # Check if current PnL hits stop loss or take profit level
-                            if current_pnl <= stop_loss and not trade_exit_triggered:
+                        elif current_pnl >= take_profit and not trade_exit_triggered:
 
-                                print("STOPLOSS was hit! Closing position and exit trade...")
+                            print("TAKEPROFIT was hit! Closing position and exit trade...")
+                            exit_trade()
+                            trade_open = False
+                            trade_exit_triggered = True
 
-                                exit_trade()
-                                trade_open = False
-                                trade_exit_triggered = True
+                    elif not trade_open and position_amount == 0:
 
-                            elif current_pnl >= take_profit and not trade_exit_triggered:
+                        if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and signals['1m']['momentum'] > 0:
+                            entry_long(TRADE_SYMBOL)
+                            trade_open = True
 
-                                print("TAKEPROFIT was hit! Closing position and exit trade...")
+                        elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and signals['1m']['momentum'] < 0:
+                            entry_short(TRADE_SYMBOL)
+                            trade_open = True
 
-                                exit_trade()
-                                trade_open = False
-                                trade_exit_triggered = True
+                    print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
+                    print()
 
-                        elif not trade_open and position_amount == 0:
-
-                            if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and signals['1m']['momentum'] > 0:
-                                entry_long(TRADE_SYMBOL)
-                                trade_open = True
-
-                            elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and signals['1m']['momentum'] < 0:
-                                entry_short(TRADE_SYMBOL)
-                                trade_open = True
-
-                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-
-                        print()
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
             else:
