@@ -618,6 +618,9 @@ def main():
         })
 
 
+    mood_score = 0 
+    mood_scores = [] 
+
     # Define trade variables    
     position = None   
     trade_open = False       
@@ -1156,6 +1159,54 @@ def main():
                         else:  # Positive > negative    
                             overall_mood = lowest_3_mood       
                             print(f"1h forecast: overall {overall_mood} mood. Bearish.")
+
+                        for quadrant in range(1, 5):                   
+                            for freq in frequencies:          
+                                # Calculate wavelength from frequency  
+                                wavelength = 300000 / freq["number"]               
+           
+                                # Assign mood score           
+                                if wavelength < 10:       
+                                    mood = -2
+                                elif wavelength < 15:      
+                                    mood = -1 
+                                elif wavelength < 25:        
+                                    mood = 0                     
+                                elif wavelength < 35:               
+                                    mood = 1                
+                                else:                                  
+                                    mood = 2
+               
+                                mood_score += mood
+
+                                # Check for extreme frequencies       
+                                if freq["number"] in [1, 2, 26]:        
+                                    mood = -5 
+                                    mood_score += mood
+
+                        mood_scores.append(mood_score)     
+        
+                        # Calculate average score           
+                        average_mood = sum(mood_scores) / len(mood_scores)
+
+                        if average_mood >= 4:
+                            print("Extreme greed")        
+                        elif average_mood >= 3:       
+                            print("Very high greed")     
+                        elif average_mood >= 2:               
+                            print("High greed")            
+                        elif average_mood >= 1: 
+                            print("Moderate greed") 
+                        elif average_mood >= 0:
+                            print("Neutral")        
+                        elif average_mood >= -1:               
+                            print("Moderate fear")        
+                        elif average_mood >= -2:
+                            print("High fear") 
+                        elif average_mood >= -3:          
+                            print("Very high fear")   
+                        else:                           
+                            print("Extreme fear")
 
                         # Get all open positions
                         positions = client.futures_position_information()
