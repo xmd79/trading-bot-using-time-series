@@ -9,6 +9,7 @@ from datetime import timedelta
 from decimal import Decimal
 import decimal
 import random
+import statistics
 
 # binance module imports
 from binance.client import Client as BinanceClient
@@ -509,6 +510,16 @@ def exit_trade():
                 
     print("All positions exited!")
 
+def calculate_ema(candles, period):
+    prices = [float(candle['close']) for candle in candles]
+    ema = []
+    sma = sum(prices[:period]) / period
+    multiplier = 2 / (period + 1)
+    ema.append(sma)
+    for price in prices[period:]:
+        ema.append((price - ema[-1]) * multiplier + ema[-1])
+    return ema
+
 print()
 print("Init main() loop: ")
 print()
@@ -551,7 +562,62 @@ def main():
 
     # Define constants
     trade_symbol = "BTCBUSD"
+     
+    fast_ema = 12       
+    slow_ema = 26         
+    
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177  
+   
+    # Define PI constant with 15 decimals    
+    PI = 3.1415926535897932384626433832795028842
+   
+    # Define e constant with 15 decimals   
+    e =  2.718281828459045235360287471352662498  
+
+    # Calculate sacred frequency
+    sacred_freq = (432 * PHI ** 2) / 360
+    
+    # Calculate Alpha and Omega ratios   
+    alpha_ratio = PHI / PI       
+    omega_ratio = PI / PHI
+          
+    # Calculate Alpha and Omega spiral angle rates     
+    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
+    # Calculate frequencies spectrum index
+    frequencies = []    
+    frequencies_next = [] 
+
+    for i in range(1,26):
+        frequency = i * sacred_freq
         
+        frequencies.append({
+            'number': i,
+            'frequency': frequency,  
+            'em_amp': 0,
+            'em_phase': 0,         
+            'em_value': 0,
+            'phi': PHI,    
+            'pi': PI,
+            'e': e, 
+            'mood': 'neutral'      
+        }) 
+      
+        frequencies_next.append({
+            'number': i,       
+            'frequency': frequency,        
+            'em_amp': 0,
+            'em_phase': 0,          
+            'em_value': 0,
+            'phi': PHI,    
+            'pi': PI,
+            'e': e,           
+            'mood': 'neutral'       
+        })
+
+
     # Define trade variables    
     position = None   
     trade_open = False       
@@ -602,8 +668,8 @@ def main():
 
             initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
-            stop_loss = -0.0233 * initial_pnl
-            take_profit = 0.0233 * initial_pnl
+            stop_loss = -0.02 * initial_pnl
+            take_profit = 0.02 * initial_pnl
 
             # Check if the '1m' key exists in the signals dictionary
             if '1m' in signals:
@@ -628,6 +694,9 @@ def main():
                     sine_wave_min = np.min(sine_wave)
                     sine_wave_max = np.max(sine_wave)
 
+                    #print("Minimum value of sine wave:", sine_wave_min)
+                    #print("Maximum value of sine wave:", sine_wave_max)
+
                     # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
                     dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
                     dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
@@ -647,11 +716,21 @@ def main():
                     em_amp_q3 = range_q3 / percent_to_max_val
                     em_amp_q4 = range_q4 / percent_to_max_val
 
+                    #print("EM amplitude for Q1:", em_amp_q1)
+                    #print("EM amplitude for Q2:", em_amp_q2)
+                    #print("EM amplitude for Q3:", em_amp_q3)
+                    #print("EM amplitude for Q4:", em_amp_q4)
+
                     # Calculate the EM phase for each quadrant
                     em_phase_q1 = 0
                     em_phase_q2 = math.pi/2
                     em_phase_q3 = math.pi
                     em_phase_q4 = 3*math.pi/2
+
+                    #print("EM phase for Q1:", em_phase_q1)
+                    #print("EM phase for Q2:", em_phase_q2)
+                    #print("EM phase for Q3:", em_phase_q3)
+                    #print("EM phase for Q4:", em_phase_q4)
 
                     # Calculate the current position of the price on the sine wave
                     current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
@@ -687,13 +766,13 @@ def main():
                         print("Current position is in quadrant 4. Distance from 75% to 100% of range:", (current_position - 0.75) / 0.25 * 100, "%")
                         print("Current quadrant is: ", current_quadrant)
 
-                    #print("EM amplitude:", em_amp)
-                    #print("EM phase:", em_phase)
+                    print("EM amplitude:", em_amp)
+                    print("EM phase:", em_phase)
 
                     # Calculate the EM value
                     em_value = em_amp * math.sin(em_phase)
 
-                    #print("EM value:", em_value)
+                    print("EM value:", em_value)
 
                     # Determine the trend direction based on the EM phase differences
                     em_phase_diff_q1_q2 = em_phase_q2 - em_phase_q1
@@ -701,90 +780,403 @@ def main():
                     em_phase_diff_q3_q4 = em_phase_q4 - em_phase_q3
                     em_phase_diff_q4_q1 = 2*math.pi - (em_phase_q4 - em_phase_q1)
 
+                    # Check if EMA periods have been defined
+                    if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
+                        # Calculate the EMAs
+                        ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]
+                        ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]
 
-                    close_prices = np.array([candle['close'] for candle in candles['1m']])
+                        print("EMA slow:", ema_slow)
+                        print("EMA fast:", ema_fast)
 
-                    if percent_to_min_val < 20:
-                        print("Bullish momentum in trend")
+                        close_prices = np.array([candle['close'] for candle in candles['1m']])
 
-                        if current_quadrant == 1:
-                            # In quadrant 1, distance from min to 25% of range
-                            print("Bullish momentum in Q1")
+                        #Calculate X:Y ratio from golden ratio     
+                        ratio = 2 * (PHI - 1)  
+
+                        # Assign EM amplitudes based on X:Y ratio
+                        em_amp_q1 = (sine_wave_max - sine_wave_min) * ratio / 4
+                        em_amp_q2 = (sine_wave_max - sine_wave_min) * ratio / 4 
+                        em_amp_q3 = (sine_wave_max - sine_wave_min) * ratio / 4 
+                        em_amp_q4 = (sine_wave_max - sine_wave_min) * ratio / 4  
+
+                        # Calculate EM phases based on dividing whole range by X:Y ratio  
+                        em_phase_q1 = 0  
+                        em_phase_q2 = PI * ratio / 2 
+                        em_phase_q3 = PI * ratio           
+                        em_phase_q4 = PI * ratio * 1.5  
+
+                        #Calculate midpoints of each quadrant
+                        mid_q1 = sine_wave_min + em_amp_q1 / 2
+                        mid_q2 = mid_q1 + em_amp_q1
+                        mid_q3 = mid_q2 + em_amp_q2
+                        mid_q4 = max(sine_wave)
+
+                        #Compare current sine wave value to determine quadrant
+                        if sine_wave.any() <= mid_q1:
+                            current_quadrant = 1
+                            current_em_amp = em_amp_q1
+                            current_em_phase = em_phase_q1
+                        elif sine_wave.any() <= mid_q2:
+                            current_quadrant = 2
+                            current_em_amp = em_amp_q2
+                            current_em_phase = em_phase_q2
+                        elif sine_wave.any() <= mid_q3:
+                            current_quadrant = 3
+                            current_em_amp = em_amp_q3
+                            current_em_phase = em_phase_q3
+                        elif sine_wave.any() <= mid_q4:
+                            current_quadrant = 4
+                            current_em_amp = em_amp_q4
+                            current_em_phase = em_phase_q4
+                        else:
+                            # Assign a default value
+                            current_em_amp = 0 
+                            current_em_phase = 0
+
+                        #Assign current EM amplitude and phase
+                        em_amp = current_em_amp
+                        em_phase = current_em_phase
+
+
+                        # Check if the current price is above the EMAs and the percent to min signals are below 20%
+                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
+                            print("Buy signal!")
+
+                        # Check if the current price is below the EMAs and the percent to max signals are below 20%
+                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
+                            print("Sell signal!")
+
+                        elif percent_to_min_val < 20:
+                            print("Bullish momentum in trend")
+                            if current_quadrant == 1:
+                                # In quadrant 1, distance from min to 25% of range
+                                print("Bullish momentum in Q1")
+                            elif current_quadrant == 2:
+                                # In quadrant 2, distance from 25% to 50% of range
+                                print("Bullish momentum in Q2")
+                            elif current_quadrant == 3:
+                                # In quadrant 3, distance from 50% to 75% of range
+                                print("Bullish momentum in Q3")
+                            elif current_quadrant == 4:
+                                # In quadrant 4, distance from 75% to max of range
+                                print("Bullish momentum in Q4")
+
+                        elif percent_to_max_val < 20:
+                            print("Bearish momentum in trend")
+                            if current_quadrant == 1:
+                                # In quadrant 1, distance from min to 25% of range
+                                print("Bearish momentum in Q1")
+                            elif current_quadrant == 2:
+                                # In quadrant 2, distance from 25% to 50% of range
+                                print("Bearish momentum in Q2")
+                            elif current_quadrant == 3:
+                                # In quadrant 3, distance from 50% to 75% of range
+                                print("Bearish momentum in Q3")
+                            elif current_quadrant == 4:
+                                # In quadrant 4, distance from 75% to max of range
+                                print("Bearish momentum in Q4")
+
+                        # Calculate quadrature phase shift based on current quadrant  
+                        if current_quadrant == 1:  
+                            # Up cycle from Q1 to Q4   
+                            quadrature_phase = em_phase_q1
+                            em_phase = alpha_spiral
                         elif current_quadrant == 2:
-                            # In quadrant 2, distance from 25% to 50% of range
-                            print("Bullish momentum in Q2")
-                        elif current_quadrant == 3:
-                            # In quadrant 3, distance from 50% to 75% of range
-                            print("Bullish momentum in Q3")
-                        elif current_quadrant == 4:
-                            # In quadrant 4, distance from 75% to max of range
-                            print("Bullish momentum in Q4")
+                            quadrature_phase = em_phase_q2
+                            em_phase = omega_spiral          
+                        elif current_quadrant  == 3:      
+                            quadrature_phase = em_phase_q3
+                            em_phase = omega_spiral      
+                        else:          
+                            quadrature_phase = em_phase_q4
+                            em_phase = alpha_spiral 
 
-                    elif percent_to_max_val < 20:
-                        print("Bearish momentum in trend")
+                        # Get next quadrant
+                        next_quadrant = current_quadrant + 1
+                        if next_quadrant > 4:
+                            next_quadrant = 1
 
-                        if current_quadrant == 1:
-                            # In quadrant 1, distance from min to 25% of range
-                            print("Bearish momentum in Q1")
-                        elif current_quadrant == 2:
-                            # In quadrant 2, distance from 25% to 50% of range
-                            print("Bearish momentum in Q2")
-                        elif current_quadrant == 3:
-                            # In quadrant 3, distance from 50% to 75% of range
-                            print("Bearish momentum in Q3")
-                        elif current_quadrant == 4:
-                            # In quadrant 4, distance from 75% to max of range
-                            print("Bearish momentum in Q4")
+                        # Calculate quadrature for next quadrant
+                        if next_quadrant == 1:       
+                            next_quadrature_phase = em_phase_q1            
+                        elif next_quadrant == 2:       
+                            next_quadrature_phase = em_phase_q2        
+                        elif next_quadrant == 3:                
+                            next_quadrature_phase = em_phase_q3
+                        else:           
+                            next_quadrature_phase = em_phase_q4
 
-                    # Get all open positions
-                    positions = client.futures_position_information()
+                        # Calculate EM value
+                        em_value = em_amp * math.sin(em_phase)  
 
-                    # Loop through each position
-                    for position in positions:
-                        symbol = position['symbol']
-                        position_amount = float(position['positionAmt'])
+                        # Calculate quadrature phase shift from current to next quadrant      
+                        quadrature = next_quadrature_phase - quadrature_phase
 
-                    # Print position if there is nor not     
-                    if position_amount != 0:
-                        print("Position open: ", position_amount)
+                        if quadrature > 0:
+                            # Up cycle from Q1 to Q4  
+                            print("now Up cycle")  
+                        else:  
+                            # Down cycle from Q4 to Q1 
+                            print("now Down cycle")
+
+                        print()
+
+                        next_1h_forecast = []
+
+                        for freq in frequencies:
+
+                            # Get PHI raised to the frequency number         
+                            phi_power = PHI ** freq['number'] 
+
+                            if phi_power < 1.05:
+                                freq['mood_next_1h'] = 'extremely positive'
+                            elif phi_power < 1.2:       
+                                freq['mood_next_1h'] = 'strongly positive'
+                            elif phi_power < 1.35:       
+                                freq['mood_next_1h'] = 'positive'    
+                            elif phi_power < 1.5:       
+                                freq['mood_next_1h'] = 'slightly positive'
+                            elif phi_power < 2:          
+                                freq['mood_next_1h'] = 'neutral'              
+                            elif phi_power < 2.5:     
+                                freq['mood_next_1h'] = 'slightly negative'      
+                            elif phi_power < 3.5:     
+                                freq['mood_next_1h'] = 'negative'
+                            elif phi_power < 4.5:     
+                                freq['mood_next_1h'] = 'strongly negative'   
+                            else:                     
+                                freq['mood_next_1h'] = 'extremely negative'
+
+                            next_1h_forecast.append(freq)
+
+                            if current_quadrant == 1:
+                                # Quadrant 1
+                
+                                if freq['number'] <= 10:
+                                    # Most negative frequencies
+                                    freq['em_amp'] = em_amp_q1
+                                    freq['em_phase'] = em_phase_q1                 
+                                    freq['mood'] = 'extremely negative'  
+
+                                elif freq['number'] >= 20:              
+                                     freq['em_amp'] = em_amp_q1
+                                     freq['em_phase'] = em_phase_q1  
+                                     freq['mood'] = 'extremely positive'
+
+                            elif current_quadrant == 2:
+                            # Quadrant 2
+                
+                                if freq['number'] > 10 and freq['number'] <= 15:                 
+                                    freq['em_amp'] = em_amp_q2
+                                    freq['em_phase'] = em_phase_q2
+                                    freq['mood'] = 'strongly negative'
+                        
+                                elif freq['number'] > 15 and freq['number'] <= 20:                 
+                                    freq['em_amp'] = em_amp_q2
+                                    freq['em_phase'] = em_phase_q2
+                                    freq['mood'] = 'strongly positive'
+
+                            elif current_quadrant == 3: 
+                            # Quadrant 3
+            
+                                if freq['number'] > 15 and freq['number'] < 20:            
+                                    freq['em_amp'] = em_amp_q3                  
+                                    freq['em_phase'] = em_phase_q3
+                                    freq['mood'] = 'negative'              
+           
+
+                                elif freq['number'] > 10 and freq['number'] < 15:            
+                                    freq['em_amp'] = em_amp_q3                  
+                                    freq['em_phase'] = em_phase_q3
+                                    freq['mood'] = 'positive'
+ 
+                            else:      
+                            # Quadrant 4 
+            
+                                if freq['number'] >= 20:                    
+                                    freq['em_amp'] = em_amp_q4
+                                    freq['em_phase'] = em_phase_q4  
+                                    freq['mood'] = 'partial negative'       
+
+
+                                elif freq['number'] <= 10:                    
+                                    freq['em_amp'] = em_amp_q4
+                                    freq['em_phase'] = em_phase_q4  
+                                    freq['mood'] = 'partial positive'
+
+                            freq['em_value'] = freq['em_amp'] * math.sin(freq['em_phase'])
+        
+                        # Sort frequencies from most negative to most positive       
+                        frequencies.sort(key=lambda x: x['em_value'])   
+        
+                        print("Frequencies spectrum index:")  
+                
+                        for freq in frequencies:               
+                            print(freq['number'], freq['em_value'], freq['mood'])    
+        
+                        # Calculate frequency spectrum index range based on most negative and positive frequencies
+                        mood_map = {
+                            'extremely negative': -4,  
+                            'strongly negative': -3,  
+                            'negative': -2,        
+                            'partial negative': -1,           
+                            'neutral': 0,
+                            'partial positive': 1, 
+                            'positive': 2,       
+                            'strongly positive': 3,    
+                            'extremely positive': 4   
+                        }
+
+                        if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':   
+                            total_mood = frequencies[0]['mood'] + " and " +  frequencies[-1]['mood']
+                        else:
+                            total_mood = 'neutral'
+
+                        print()
+
+                        # Update the frequencies for the next quadrant     
+                        if next_quadrant == 1:       
+                            # Update frequencies for next quadrant (Q1)               
+                            for freq in frequencies_next:       
+                                freq['em_amp'] = em_amp_q1       
+                                freq['em_phase'] = em_phase_q1
+             
+                        elif next_quadrant == 2:
+                            # Update frequencies for Q2        
+                            for freq in frequencies_next:                 
+                                freq['em_amp'] = em_amp_q2   
+                                freq['em_phase'] = em_phase_q2 
+
+                        elif next_quadrant == 3:
+                            # Update frequencies for Q3        
+                            for freq in frequencies_next:                 
+                                freq['em_amp'] = em_amp_q3   
+                                freq['em_phase'] = em_phase_q3
+
+                        elif next_quadrant == 4:
+                            # Update frequencies for Q4        
+                            for freq in frequencies_next:                 
+                                freq['em_amp'] = em_amp_q4   
+                                freq['em_phase'] = em_phase_q4
+
+                        # Get next quadrant phi 
+                        next_phi = PHI ** freq['number']  
+      
+                        # Map moods based on inverse phi power         
+                        if next_phi < 1.2:
+                            freq['mood'] = 'extremely positive' 
+                        elif next_phi < 1.4:
+                            freq['mood'] = 'positive'
+
+                        highest_3 = frequencies[:3]
+                        lowest_3 = frequencies[-3:]
+
+                        mood_map = {
+                            'extremely negative': -4,  
+                            'strongly negative': -3,  
+                            'negative': -2,        
+                            'partial negative': -1,           
+                            'neutral': 0,
+                            'partial positive': 1, 
+                            'positive': 2,       
+                            'strongly positive': 3,    
+                            'extremely positive': 4   
+                        }
+
+                        highest_3_mood_values = []
+                        for freq in highest_3:   
+                            if freq['mood'] == 'neutral':
+                                highest_3_mood_values.append(0)   
+                            else:
+                                highest_3_mood_values.append(mood_map[freq['mood']])
+
+                        lowest_3_mood_values = []        
+                        for freq in lowest_3:   
+                            if freq['mood'] == 'neutral':
+                                lowest_3_mood_values.append(0)        
+                            else:
+                                lowest_3_mood_values.append(mood_map[freq['mood']])      
+
+                        highest_3_mood_values = [mood_map[freq['mood']] for freq in highest_3]
+                        highest_3_mood = statistics.mean(highest_3_mood_values)
+
+                        lowest_3_mood_values = [mood_map[freq['mood']] for freq in lowest_3]
+                        lowest_3_mood = statistics.mean(lowest_3_mood_values)
+
+                        print(f"Current quadrant: {current_quadrant}")
+                        print(f"Next quadrant: {next_quadrant}")
+                        print(f"Highest 3 frequencies: {highest_3_mood}")        
+                        print(f"Lowest 3 frequencies: {lowest_3_mood}")
+
+                        if highest_3_mood > 0:
+                            print(f"Cycle mood is negative")
+                        elif highest_3_mood < 0:      
+                            print(f"Cycle mood is positive") 
+                        else:
+                            print("Cycle mood is neutral")
+
+                        if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':        
+                            if mood_map[frequencies[0]['mood']] < 0:
+                                total_mood = f"{frequencies[0]['mood']} and  {frequencies[-1]['mood']}"
+                                print(f"Frequency spectrum index range: {total_mood} ")
+                                print(f"Freq. range is negative")
+                            else:    
+                                total_mood = f"{frequencies[0]['mood']} and {frequencies[-1]['mood']}"
+                                print(f"Frequency spectrum index range: {total_mood}") 
+                                print(f"Freq. range is positive")   
+                        else:
+                            print(f"Frequency spectrum index range: neutral")
+                            print(f"Freq. range is neutral") 
+
+                        print()
+
+                        # Sort forecast from most negative to most positive       
+                        next_1h_forecast.sort(key=lambda f: mood_map[f['mood_next_1h']])  
+    
+                        # Get average mood of highest/lowest 3 frequencies 
+                        highest_3 = next_1h_forecast[:3]
+                        highest_3_mood = 0
+   
+                        for freq in highest_3:
+                            mood_val  = mood_map[freq['mood_next_1h']] 
+                            highest_3_mood += mood_val
+                            highest_3_mood = highest_3_mood / len(highest_3)
+
+                        lowest_3 = next_1h_forecast[-3:]
+                        lowest_3_mood = 0
+
+                        for freq in lowest_3:
+                            mood_val  = mood_map[freq['mood_next_1h']]
+                            lowest_3_mood += mood_val  
+                            lowest_3_mood = lowest_3_mood / len(lowest_3)
+
+                        # Determine overall 1h market mood based on highest/lowest 3    
+                        if highest_3_mood < lowest_3_mood:  # Negative > positive    
+                            overall_mood = highest_3_mood 
+                            print(f"1h forecast: overall {overall_mood} mood. Bullish.")
+                        else:  # Positive > negative    
+                            overall_mood = lowest_3_mood       
+                            print(f"1h forecast: overall {overall_mood} mood. Bearish.")
+
+                        # Get all open positions
+                        positions = client.futures_position_information()
+
+                        # Loop through each position
+                        for position in positions:
+                            symbol = position['symbol']
+                            position_amount = float(position['positionAmt'])
+
+                        # Print position if there is nor not     
+                        if position_amount != 0:
+                            print("Position open: ", position_amount)
                        
-                    elif position_amount == 0:
-                        print("Position not open: ", position_amount)
+                        elif position_amount == 0:
+                            print("Position not open: ", position_amount)
 
-                    # Trading function calls
-                    if trade_open and position_amount != 0:
+                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
-                        print("Trade is already open, seeking for exit condition...")
-                        current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-
-                        # Check if current PnL hits stop loss or take profit level
-                        if current_pnl <= stop_loss and not trade_exit_triggered:
-
-                            print("STOPLOSS was hit! Closing position and exit trade...")
-                            exit_trade()
-                            trade_open = False
-                            trade_exit_triggered = True
-
-                        elif current_pnl >= take_profit and not trade_exit_triggered:
-
-                            print("TAKEPROFIT was hit! Closing position and exit trade...")
-                            exit_trade()
-                            trade_open = False
-                            trade_exit_triggered = True
-
-                    elif not trade_open and position_amount == 0:
-
-                        if close_prices[-1] < signals['1m']['mtf_average'] and percent_to_min_val < 10 and current_quadrant == 1 and signals['1m']['momentum'] > 0:
-                            entry_long(TRADE_SYMBOL)
-                            trade_open = True
-
-                        elif close_prices[-1] > signals['1m']['mtf_average'] and percent_to_max_val < 10 and current_quadrant == 4 and signals['1m']['momentum'] < 0:
-                            entry_short(TRADE_SYMBOL)
-                            trade_open = True
-
-                    print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-                    print()
-
+                        print()
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
             else:
