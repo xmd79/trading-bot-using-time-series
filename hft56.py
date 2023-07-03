@@ -892,26 +892,22 @@ def main():
                             quadrature_phase = em_phase_q4
                             em_phase = alpha_spiral 
 
+                        # Up cycle (1 to 4)
+                        if current_quadrant == 1:
+                            next_quadrant = 2  
+                        elif current_quadrant == 2:
+                            next_quadrant = 3     
+                        elif current_quadrant == 3:        
+                            next_quadrant = 4
 
-                        # Get next quadrant
-                        if current_quadrant == 4:
+                        # Down cycle (4 to 1)       
+                        elif current_quadrant == 4:        
                             next_quadrant = 3
                         elif current_quadrant == 3:        
-                            next_quadrant = 2    
-                        elif current_quadrant == 2:
-                            next_quadrant = 1      
-                        elif current_quadrant == 1:
                             next_quadrant = 2       
-                        else:        
-                            next_quadrant = current_quadrant + 1      
-                        if next_quadrant > 4:
+                        elif current_quadrant == 2:
                             next_quadrant = 1
-                        
-                        while next_quadrant == current_quadrant:
-                            next_quadrant += 1
-                            if next_quadrant > 4:
-                                next_quadrant = 1      
-           
+
                         # Calculate quadrature phase                       
                         if next_quadrant == 1:     
                             next_quadrature_phase = em_phase_q1            
