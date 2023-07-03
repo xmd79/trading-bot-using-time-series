@@ -1023,8 +1023,8 @@ def main():
         
                         print("Frequencies spectrum index:")  
                 
-                        for freq in frequencies:               
-                            print(freq['number'], freq['em_value'], freq['mood'])    
+                        #for freq in frequencies:               
+                            #print(freq['number'], freq['em_value'], freq['mood'])    
         
                         # Calculate frequency spectrum index range based on most negative and positive frequencies
                         mood_map = {
@@ -1071,9 +1071,53 @@ def main():
                                 freq['em_amp'] = em_amp_q4   
                                 freq['em_phase'] = em_phase_q4
 
+                        quadrant_1_amplitude = 0.5
+                        quadrant_1_phase = 0.2
+
+                        quadrant_2_amplitude = 1.0  
+                        quadrant_2_phase = 0.5
+
+                        quadrant_3_amplitude = 0.8        
+                        quadrant_3_phase = 0.7
+
+                        quadrant_4_amplitude = 1.2
+                        quadrant_4_phase = 0.9
+
+                        lowest_frequency = float('inf')
+                        highest_frequency = 0
+
+                        min_quadrant = None  
+                        max_quadrant = None
+
+                        if current_quadrant == 1:
+                            frequency_amplitude = quadrant_1_amplitude  
+                            frequency_phase = quadrant_1_phase  
+                            current_frequency = frequency_amplitude * frequency_phase
+
+                        elif current_quadrant == 2:        
+                            frequency_amplitude = quadrant_2_amplitude   
+                            frequency_phase = quadrant_2_phase 
+                            current_frequency = frequency_amplitude * frequency_phase
+
+                        elif current_quadrant == 3:        
+                            frequency_amplitude = quadrant_3_amplitude
+                            frequency_phase = quadrant_3_phase
+                            current_frequency = frequency_amplitude * frequency_phase
+  
+                        elif current_quadrant == 4:        
+                            frequency_amplitude = quadrant_4_amplitude       
+                            frequency_phase = quadrant_4_phase
+                            current_frequency = frequency_amplitude * frequency_phase
+
+                        if current_frequency == lowest_frequency:
+                            min_node = {'frequency': current_frequency, 'quadrant': current_quadrant}
+
+                        if current_frequency == highest_frequency:      
+                            max_node = {'frequency': current_frequency, 'quadrant': current_quadrant}
+
                         # Get next quadrant phi 
-                        next_phi = PHI ** freq['number']  
-      
+                        next_phi = PHI ** freq['number'] 
+
                         # Map moods based on inverse phi power         
                         if next_phi < 1.2:
                             freq['mood'] = 'extremely positive' 
@@ -1222,6 +1266,93 @@ def main():
                             print("Strongly Bullish")            
                         else:
                             print("Extremely bullish")
+
+                        # Define stationary circuit variables
+                        stationary_circuit = []
+
+                        # Map quadrants to triangle points of Metatron's Cube
+                        quadrant_map = {
+                            1: 'Apex',
+                            2: 'Left',  
+                            3: 'Base',
+                            4: 'Right' 
+                        }
+
+                        # Add triangle points to circuit
+                        stationary_circuit.append('Apex')
+                        stationary_circuit.append('Left')     
+                        stationary_circuit.append('Base')
+                        stationary_circuit.append('Right')
+
+                        # Loop through each quadrant cycle        
+                        for quadrant in [1,2,3,4]:
+    
+                            print(f"Quadrant {quadrant}")
+            
+                            # Get triangle point from quadrant map               
+                            point = quadrant_map[quadrant]    
+    
+                            print(f"Current point: {point}")
+    
+                            # Get next point based on circuit        
+                            if point == 'Apex':
+                                next_point = 'Left'
+                            elif point == 'Left':
+                                next_point = 'Base'         
+                            elif point == 'Base':
+                                next_point = 'Right'
+                            elif point == 'Right':
+                                next_point = 'Apex'
+        
+                            print(f"Next point: {next_point}")       
+    
+                            # Get frequency and mood forecast
+                            frequency = frequencies[quadrant]['frequency']
+                            mood = frequencies[quadrant]['mood']
+    
+                            print(f"Frequency: {frequency} Hz - Mood: {mood}")
+    
+                        print()
+
+                        if current_frequency < lowest_frequency:
+                            lowest_frequency = current_frequency    
+                        if current_frequency > highest_frequency:     
+                            highest_frequency = current_frequency
+
+                        # Define min and max nodal points based on frequencies
+                        min_node = { 
+                            'frequency': lowest_frequency,  
+                            'quadrant': min_quadrant   
+                        }
+
+                        max_node = {
+                            'frequency': highest_frequency,
+                            'quadrant': max_quadrant         
+                        }
+
+                        if current_frequency < lowest_frequency:
+                            lowest_frequency = current_frequency    
+                            quadrant = current_quadrant   
+
+                        min_node = {'frequency': lowest_frequency, 'quadrant': quadrant}  
+
+                        if current_frequency > highest_frequency:      
+                            highest_frequency = current_frequency   
+                            max_quadrant = current_quadrant   
+
+                        max_node = {'frequency': highest_frequency, 'quadrant': max_quadrant}
+
+                        # Loop through each quadrant cycle        
+                        for quadrant in [1,2,3,4]:
+    
+                            # Check if current quadrant is a min or max node
+                            if quadrant == min_node['quadrant']:
+                                print(f"Min node reached at frequency {min_node['frequency']} Hz")
+        
+                            elif quadrant == max_node['quadrant']:
+                               print(f"Max node reached at frequency {max_node['frequency']} Hz")
+
+                        print()
 
                         # Get all open positions
                         positions = client.futures_position_information()
