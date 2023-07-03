@@ -1356,6 +1356,48 @@ def main():
 
                         print()
 
+                        # Calculate forecast mood based on frequencies and nodal points
+                        forecast = {
+                            'mood' : None,
+                            'min_reversal' : {
+                                'time': None,
+                                'quadrant': None
+                            },  
+                            'max_reversal' : {
+                                'time': None,     
+                                'quadrant': None      
+                            }       
+                        }
+
+                        if lowest_3_mood < 0:
+                            forecast['mood'] = 'bullish'
+                        elif highest_3_mood > 0:      
+                            forecast['mood'] = 'bearish'
+                        else:
+                            forecast['mood'] = 'neutral'
+
+                        # Calculate time to min nodal point reversal
+                        freq = min_node['frequency']  
+                        period = 1/freq   
+                        min_time = period/4    
+                        forecast['min_reversal']['time'] = min_time
+                        forecast['min_reversal']['quadrant'] = min_node['quadrant']
+
+                        # Calculate time to max nodal point reversal    
+                        freq = max_node['frequency']         
+                        period = 1/freq   
+                        max_time = period/4  
+                        forecast['max_reversal']['time'] = max_time
+                        forecast['max_reversal']['quadrant'] = max_node['quadrant']
+
+                        # Print forecast   
+                        print(forecast)
+
+                        # Print overall mood  
+                        print(f"Overall market mood: {forecast['mood']}")
+
+                        print()
+
                         # Get all open positions
                         positions = client.futures_position_information()
 
