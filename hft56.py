@@ -1166,6 +1166,9 @@ def main():
                                 total += magnitude * mood
                                 total_weight += magnitude
         
+                            if total_weight == 0:
+                                return 0
+
                             return total / total_weight
 
                         # Calculate weighted averages  
@@ -1180,17 +1183,17 @@ def main():
                         overall_mood = top_n_weighted_avg - bottom_n_weighted_avg
 
                         if overall_mood > 2:
-                            print("Strongly bearish mood")
+                            print("Strongly bullish mood")
                         elif overall_mood > 1:       
-                            print("Bearish mood")
+                            print("Bullish mood")
                         elif overall_mood > 0:
-                            print("Mildly  bearish mood")     
+                            print("Mildly bullish mood")     
                         elif overall_mood == 0:
                             print("Neutral mood")          
                         elif overall_mood > -1:        
-                            print("Mildly  bullish mood")      
+                            print("Mildly Bearish mood")      
                         elif overall_mood > -2:       
-                            print("Bullish mood")  
+                            print("Bearish mood")  
                         else:
                             print("Strongly bearish mood")
 
@@ -1205,7 +1208,7 @@ def main():
                         elif overall_mood > 1:        
                             print("Bullish")      
                         elif overall_mood > 2:        
-                            print("Strongly bullish")            
+                            print("Strongly Bullish")            
                         else:
                             print("Extremely bullish")
 
