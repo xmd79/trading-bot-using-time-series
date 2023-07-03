@@ -1267,6 +1267,8 @@ def main():
                         else:
                             print("Extremely bullish")
 
+                        print()
+
                         # Define stationary circuit variables
                         stationary_circuit = []
 
