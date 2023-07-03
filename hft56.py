@@ -1159,6 +1159,30 @@ def main():
                             overall_mood = lowest_3_mood       
                             print(f"1h forecast: overall {overall_mood} mood. Bearish.")
 
+                        # Define the signal spectrum
+                        spectrum = frequencies
+
+                        # Calculate the magnitude and phase of each frequency component using Fourier Transform
+                        magnitude = np.abs(np.array([val['em_value'] for val in spectrum]))
+                        phase = np.angle(np.array([val['em_phase'] for val in spectrum]))
+
+                        # Extrapolate the frequency components into the future by assuming that the same frequency components will continue to dominate the signal
+                        forecast_magnitude = 2 * magnitude  # multiply the magnitude of each frequency component by 2 to simulate an increase in signal power
+                        forecast_phase = phase  # assume that the phase of each frequency component remains constant
+
+                        # Combine the extrapolated frequency components to create a new signal, which represents the forecast
+                        forecast_spectrum = forecast_magnitude * np.exp(1j * forecast_phase)
+                        forecast = np.real(np.fft.ifft(forecast_spectrum))  # compute the inverse Fourier Transform to obtain the forecasted signal
+
+                        # Print details about the forecast
+                        print('Original spectrum:', spectrum)
+                        print('Magnitude:', magnitude)
+                        print('Phase:', phase)
+                        print('Forecasted magnitude:', forecast_magnitude)
+                        print('Forecasted phase:', forecast_phase)
+                        print('Forecasted spectrum:', forecast_spectrum)
+                        print('Forecasted signal:', forecast)
+
                         # Get all open positions
                         positions = client.futures_position_information()
 
