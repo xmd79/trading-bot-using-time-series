@@ -1151,13 +1151,63 @@ def main():
                             lowest_3_mood += mood_val  
                             lowest_3_mood = lowest_3_mood / len(lowest_3)
 
-                        # Determine overall 1h market mood based on highest/lowest 3    
-                        if highest_3_mood < lowest_3_mood:  # Negative > positive    
-                            overall_mood = highest_3_mood 
-                            print(f"1h forecast: overall {overall_mood} mood. Bullish.")
-                        else:  # Positive > negative    
-                            overall_mood = lowest_3_mood       
-                            print(f"1h forecast: overall {overall_mood} mood. Bearish.")
+                        for freq in next_1h_forecast:
+                            freq['magnitude'] = np.abs(freq['em_value'])
+
+                        n = 10
+
+                        def calculate_weighted_avg(weights, values):
+                            total = 0 
+                            total_weight = 0
+    
+                            for w, v in zip(weights, values):
+                                magnitude = w 
+                                mood = v
+                                total += magnitude * mood
+                                total_weight += magnitude
+        
+                            return total / total_weight
+
+                        # Calculate weighted averages  
+                        top_n_weights = [freq['magnitude'] for freq in next_1h_forecast[:n]]
+                        top_n_moods = [mood_map[freq['mood_next_1h']] for freq in next_1h_forecast[:n]]
+                        top_n_weighted_avg = calculate_weighted_avg(top_n_weights, top_n_moods)
+
+                        bottom_n_weights = [freq['magnitude'] for freq in next_1h_forecast[-n:]]  
+                        bottom_n_moods = [mood_map[freq['mood_next_1h']] for freq in next_1h_forecast[-n:]]
+                        bottom_n_weighted_avg = calculate_weighted_avg(bottom_n_weights, bottom_n_moods)
+
+                        overall_mood = top_n_weighted_avg - bottom_n_weighted_avg
+
+                        if overall_mood > 2:
+                            print("Strongly bullish mood")
+                        elif overall_mood > 1:       
+                            print("Bullish mood")
+                        elif overall_mood > 0:
+                            print("Mildly bullish mood")     
+                        elif overall_mood == 0:
+                            print("Neutral mood")          
+                        elif overall_mood > -1:        
+                            print("Mildly bearish mood")      
+                        elif overall_mood > -2:       
+                            print("Bearish mood")  
+                        else:
+                            print("Strongly bearish mood")
+
+                        if overall_mood < -3:
+                            print("Extremely bearish")  
+                        elif overall_mood < -2:           
+                            print("Strongly bearish")
+                        elif overall_mood < -1:       
+                            print("Bearish")           
+                        elif overall_mood == 0:
+                            print("Neutral")
+                        elif overall_mood > 1:        
+                            print("Bullish")      
+                        elif overall_mood > 2:        
+                            print("Strongly bullish")            
+                        else:
+                            print("Extremely bullish")
 
                         # Get all open positions
                         positions = client.futures_position_information()
