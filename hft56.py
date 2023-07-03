@@ -1180,17 +1180,17 @@ def main():
                         overall_mood = top_n_weighted_avg - bottom_n_weighted_avg
 
                         if overall_mood > 2:
-                            print("Strongly bullish mood")
+                            print("Strongly bearish mood")
                         elif overall_mood > 1:       
-                            print("Bullish mood")
+                            print("Bearish mood")
                         elif overall_mood > 0:
-                            print("Mildly bullish mood")     
+                            print("Mildly  bearish mood")     
                         elif overall_mood == 0:
                             print("Neutral mood")          
                         elif overall_mood > -1:        
-                            print("Mildly bearish mood")      
+                            print("Mildly  bullish mood")      
                         elif overall_mood > -2:       
-                            print("Bearish mood")  
+                            print("Bullish mood")  
                         else:
                             print("Strongly bearish mood")
 
