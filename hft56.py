@@ -1316,9 +1316,9 @@ def main():
     
                         print()
 
-                        if current_frequency < lowest_frequency:
+                        if current_frequency > lowest_frequency:
                             lowest_frequency = current_frequency    
-                        if current_frequency > highest_frequency:     
+                        if current_frequency < highest_frequency:     
                             highest_frequency = current_frequency
 
                         # Define min and max nodal points based on frequencies
