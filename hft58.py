@@ -1457,6 +1457,35 @@ def main():
                         print("Current point is at: ", forecast[f'min_reversal']['point'] if forecast[f'min_reversal']['point'] == point else forecast[f'max_reversal']['point']) 
                         print()
 
+                        quadrant_to_point = {
+                            1: 'apex', 
+                            2: 'left',   
+                            3: 'base',
+                            4: 'right'      
+                        }
+      
+                        for i in range(4):
+                            current = quadrant_to_point[(i % 4) + 1]                
+       
+                            frequency = frequencies[i + 1]['frequency']                    
+                            mood =  frequencies[i + 1]['mood']                    
+        
+                            forecast = {              
+                                'min_reversal': {
+                                'time': 1 / (2 * frequency),
+                                'point': current              
+                                }  
+                            }  
+         
+                            print(f'Current point: {current}')
+                            print(forecast)
+
+                        next = quadrant_to_point[(i + 1) % 4 + 1]                 
+   
+                        print(f'Next point: {next}')     
+
+                        print()
+
                         # Get all open positions
                         positions = client.futures_position_information()
 
