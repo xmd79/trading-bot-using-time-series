@@ -694,9 +694,6 @@ def main():
                     sine_wave_min = np.min(sine_wave)
                     sine_wave_max = np.max(sine_wave)
 
-                    #print("Minimum value of sine wave:", sine_wave_min)
-                    #print("Maximum value of sine wave:", sine_wave_max)
-
                     # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
                     dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
                     dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
@@ -716,21 +713,11 @@ def main():
                     em_amp_q3 = range_q3 / percent_to_max_val
                     em_amp_q4 = range_q4 / percent_to_max_val
 
-                    #print("EM amplitude for Q1:", em_amp_q1)
-                    #print("EM amplitude for Q2:", em_amp_q2)
-                    #print("EM amplitude for Q3:", em_amp_q3)
-                    #print("EM amplitude for Q4:", em_amp_q4)
-
                     # Calculate the EM phase for each quadrant
                     em_phase_q1 = 0
                     em_phase_q2 = math.pi/2
                     em_phase_q3 = math.pi
                     em_phase_q4 = 3*math.pi/2
-
-                    #print("EM phase for Q1:", em_phase_q1)
-                    #print("EM phase for Q2:", em_phase_q2)
-                    #print("EM phase for Q3:", em_phase_q3)
-                    #print("EM phase for Q4:", em_phase_q4)
 
                     # Calculate the current position of the price on the sine wave
                     current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
