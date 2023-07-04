@@ -1370,9 +1370,9 @@ def main():
                         }
 
                         if lowest_3_mood < 0:
-                            forecast['mood'] = 'negative'
-                        elif highest_3_mood > 0:      
                             forecast['mood'] = 'positive'
+                        elif highest_3_mood > 0:      
+                            forecast['mood'] = 'negative'
                         else:
                             forecast['mood'] = 'neutral'
 
@@ -1445,10 +1445,6 @@ def main():
                         forecast['max_reversal']['time'] = period/4               
                         forecast['max_reversal']['point'] = max_point['point']
 
-                        print(forecast)  
- 
-                        print()
-
                         # Prints                    
                         print(f"Apex: {octahedron[0]['frequency']}")    
                         print(f"Left: {octahedron[1]['frequency']}")      
@@ -1458,7 +1454,7 @@ def main():
                         print(f"Pi: {octahedron[5]['frequency']}")
                         print(f"e: {octahedron[6]['frequency']}")
                         print(f"Origin: {octahedron[7]['frequency']}")
-
+                        print("Current point is at: ", forecast[f'min_reversal']['point'] if forecast[f'min_reversal']['point'] == point else forecast[f'max_reversal']['point']) 
                         print()
 
                         # Get all open positions
