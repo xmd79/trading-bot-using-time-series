@@ -879,29 +879,29 @@ def main():
                             quadrature_phase = em_phase_q4
                             em_phase = alpha_spiral 
 
-                        cycle_direction = ""
+                        cycle_direction = "UP"
                         next_quadrant = 1
 
                         if current_quadrant == 1:
                             next_quadrant = 2  
-                            cycle_direction = "up"
+                            cycle_direction = "UP"
 
                         elif current_quadrant == 2:
-                            if cycle_direction == "up":
+                            if cycle_direction == "UP":
                                 next_quadrant = 3
-                            elif cycle_direction == "down":
+                            elif cycle_direction == "DOWN":
                                 next_quadrant = 1
         
                         elif current_quadrant == 3:        
-                            if cycle_direction == "up":
+                            if cycle_direction == "UP":
                                 next_quadrant = 4        
-                            elif cycle_direction == "down": 
+                            elif cycle_direction == "DOWN": 
                                 next_quadrant = 2
        
                         elif current_quadrant == 4:        
-                            if cycle_direction == "up":
-                                cycle_direction = "down"
+                            if cycle_direction == "UP":
                                 next_quadrant = 3
+                                cycle_direction = "DOWN"
 
                         # Calculate quadrature phase                       
                         if next_quadrant == 1:     
@@ -921,10 +921,10 @@ def main():
 
                         if quadrature > 0:
                             # Up cycle from Q1 to Q4  
-                            print("current in Up cycle")  
+                            print("Up cycle now")  
                         else:  
                             # Down cycle from Q4 to Q1 
-                            print("current in Down cycle")
+                            print("Down cycle now")
 
                         print()
 
@@ -1016,7 +1016,7 @@ def main():
                         # Sort frequencies from most negative to most positive       
                         frequencies.sort(key=lambda x: x['em_value'])   
         
-                        print("Frequencies spectrum index:")  
+                        print("Quadrant is in: " + cycle_direction + " cycle")  
                 
                         #for freq in frequencies:               
                             #print(freq['number'], freq['em_value'], freq['mood'])    
