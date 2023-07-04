@@ -668,8 +668,8 @@ def main():
 
             initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
-            stop_loss = -0.02 * initial_pnl
-            take_profit = 0.02 * initial_pnl
+            stop_loss = -0.0144 * initial_pnl
+            take_profit = 0.0144 * initial_pnl
 
             # Check if the '1m' key exists in the signals dictionary
             if '1m' in signals:
@@ -1451,6 +1451,7 @@ def main():
                         print(f"Origin: {octahedron[7]['frequency']}")
                         print("Current point is at: ", forecast[f'min_reversal']['point'] if forecast[f'min_reversal']['point'] == point else forecast[f'max_reversal']['point']) 
                         print()
+
 
                         # Get all open positions
                         positions = client.futures_position_information()
