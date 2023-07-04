@@ -1365,9 +1365,9 @@ def main():
                         }
 
                         if lowest_3_mood < 0:
-                            forecast['mood'] = 'negative'
-                        elif highest_3_mood > 0:      
                             forecast['mood'] = 'positive'
+                        elif highest_3_mood > 0:      
+                            forecast['mood'] = 'negative'
                         else:
                             forecast['mood'] = 'neutral'
 
