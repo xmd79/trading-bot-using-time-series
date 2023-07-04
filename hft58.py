@@ -921,10 +921,10 @@ def main():
 
                         if quadrature > 0:
                             # Up cycle from Q1 to Q4  
-                            print("now Up cycle")  
+                            print("current in Up cycle")  
                         else:  
                             # Down cycle from Q4 to Q1 
-                            print("now Down cycle")
+                            print("current in Down cycle")
 
                         print()
 
@@ -1307,7 +1307,7 @@ def main():
                             frequency = frequencies[quadrant]['frequency']
                             mood = frequencies[quadrant]['mood']
     
-                            print(f"Frequency: {frequency} Hz - Mood: {mood}")
+                            #print(f"Frequency: {frequency} Hz - Mood: {mood}")
     
                         print()
 
@@ -1344,10 +1344,10 @@ def main():
     
                             # Check if current quadrant is a min or max node
                             if quadrant == min_node['quadrant']:
-                                print(f"Min node reached at frequency {min_node['frequency']} Hz")
+                                print(f"Node reached at frequency {min_node['frequency']} Hz")
         
                             elif quadrant == max_node['quadrant']:
-                               print(f"Max node reached at frequency {max_node['frequency']} Hz")
+                               print(f"Node reached at frequency {max_node['frequency']} Hz")
 
                         print()
 
