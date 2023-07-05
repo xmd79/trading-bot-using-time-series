@@ -706,7 +706,7 @@ def calculate_sine_wave(data):
     em_amp = current_em_amp
     em_phase = current_em_phase
 
-    if percent_to_min_val < 15:
+    if dist_from_close_to_min < 15:
         print("Bullish momentum in trend")
 
         if current_quadrant == 1:
@@ -722,7 +722,7 @@ def calculate_sine_wave(data):
             # In quadrant 4, distance from 75% to max of range
             print("Bullish momentum in Q4")
 
-    elif percent_to_max_val < 15:
+    elif dist_from_close_to_max < 15:
         print("Bearish momentum in trend")
 
         if current_quadrant == 1:
