@@ -800,7 +800,56 @@ def calculate_sine_wave(data):
         # Down cycle from Q4 to Q1 
         print("Down cycle now")
 
-    return sine_wave[-1]
+    for timeframe in timeframes:
+
+        if isinstance(data, dict):
+            prices = [candle['close'] for candle in data] 
+            data = np.array(prices)
+
+        # Calculate EMA on close prices    
+        ema = talib.EMA(data, timeperiod=14)
+
+        # Get the OHLCV data for the given timeframe
+        ohlc_data = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles[timeframe]], dtype=np.double)
+        
+        # Calculate the momentum signal for the given timeframe
+        close_prices = ohlc_data[:, 3]
+
+        momentum = talib.MOM(close_prices, timeperiod=14)
+        
+        # Calculate the minimum and maximum values for the momentum signal
+        min_momentum = np.nanmin(momentum)
+        max_momentum = np.nanmax(momentum)
+        
+        # Calculate the percentage distance from the current momentum to the minimum and maximum values of the momentum signal
+        current_momentum = momentum[-1]
+        percent_to_min_momentum = (max_momentum - current_momentum) / (max_momentum - min_momentum) * 100
+        percent_to_max_momentum = (current_momentum - min_momentum) / (max_momentum - min_momentum) * 100
+        
+        # Calculate the new momentum signal based on percentages from the MTF signal and the initial momentum signal
+        percent_to_min_combined = (percent_to_min_val + percent_to_min_momentum) / 2
+        percent_to_max_combined = (percent_to_max_val + percent_to_max_momentum) / 2
+        momentum_signal = percent_to_max_combined - percent_to_min_combined
+        
+        # Calculate the new average for the MTF signal based on the percentage distance from the current close to the minimum and maximu values of the normalized HT Sine Wave indicator, and the given percentage thresholds
+        min_mtf = np.nanmin(ohlc_data[:, 3])
+        max_mtf = np.nanmax(ohlc_data[:, 3])
+        percent_to_min_custom = percent_to_min_val / 100
+        percent_to_max_custom = percent_to_max_val / 100
+
+    # Store the signals for the given timeframe
+    signals[timeframe] = {'momentum': momentum_signal}
+
+    # Print the results
+    print(f"Momentum Percent to Min: {percent_to_min_momentum:.2f}%")
+    print(f"Momentum Percent to Max: {percent_to_max_momentum:.2f}%")
+    print(f"Combined Percent to Min: {percent_to_min_combined:.2f}%")
+    print(f"Combined Percent to Max: {percent_to_max_combined:.2f}%")
+    print(f"New Momentum Signal: {momentum_signal:.2f}")
+
+    print()
+
+    return signals
 
 print()
 print("Init main() loop: ")
