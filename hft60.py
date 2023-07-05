@@ -534,6 +534,9 @@ def calculate_sine_wave(data):
     # Replace NaN values with 0 using nan_to_num
     sine_wave = np.nan_to_num(sine_wave, nan=0)
 
+    # Filter out zeros  
+    sine_wave = sine_wave[sine_wave != 0]
+
     return sine_wave
 
 print()
