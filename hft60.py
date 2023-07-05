@@ -520,7 +520,26 @@ def calculate_ema(candles, period):
         ema.append((price - ema[-1]) * multiplier + ema[-1])
     return ema
 
+ 
 def calculate_sine_wave(data):
+
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177
+
+    # Define PI constant with 15 decimals    
+    PI = 3.1415926535897932384626433832795028842
+
+    # Calculate sacred frequency
+    sacred_freq = (432 * PHI ** 2) / 360
+
+    # Calculate Alpha and Omega ratios   
+    alpha_ratio = PHI / PI       
+    omega_ratio = PI / PHI
+
+    # Calculate Alpha and Omega spiral angle rates     
+    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
     # Calculate the sine wave using HT_SINE
     if len(data) == 0:
         # All NaN candles
@@ -537,7 +556,250 @@ def calculate_sine_wave(data):
     # Filter out zeros  
     sine_wave = sine_wave[sine_wave != 0]
 
-    return sine_wave
+    sine_wave = -sine_wave
+
+    print("Current close on 5min Sinewave:", sine_wave[-1])
+
+    # Calculate the minimum and maximum values of the sine wave
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
+    dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+    dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
+
+    print("Distance from close to min:", dist_from_close_to_min)
+    print("Distance from close to max:", dist_from_close_to_max)
+
+    # Define EM amplitude variables for each quadrant
+    em_amp_q1 = 0
+    em_amp_q2 = 0
+    em_amp_q3 = 0
+    em_amp_q4 = 0
+
+    # Define EM phase variables for each quadrant
+    em_phase_q1 = 0
+    em_phase_q2 = math.pi/2
+    em_phase_q3 = math.pi
+    em_phase_q4 = 3*math.pi/2
+
+    # Define minimum and maximum values for the sine wave
+    sine_wave_min = -1
+    sine_wave_max = 1
+
+    # Define min and max values for percentages from close to min and max of talib HT_SINE
+    percent_to_min_val = 10
+    percent_to_max_val = 10
+    current_quadrant = None
+
+    # Calculate the range of values for each quadrant
+    range_q1 = (sine_wave_max - sine_wave_min) / 4
+    range_q2 = (sine_wave_max - sine_wave_min) / 4
+    range_q3 = (sine_wave_max - sine_wave_min) / 4
+    range_q4 = (sine_wave_max - sine_wave_min) / 4
+
+    # Set the EM amplitude for each quadrant based on the range of values
+    em_amp_q1 = range_q1 / percent_to_max_val
+    em_amp_q2 = range_q2 / percent_to_max_val
+    em_amp_q3 = range_q3 / percent_to_max_val
+    em_amp_q4 = range_q4 / percent_to_max_val
+
+    # Calculate the EM phase for each quadrant
+    em_phase_q1 = 0
+    em_phase_q2 = math.pi/2
+    em_phase_q3 = math.pi
+    em_phase_q4 = 3*math.pi/2
+
+    # Calculate the current position of the price on the sine wave
+    current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
+    current_quadrant = 0
+
+    # Determine which quadrant the current position is in
+    if current_position < 0.25:
+        # In quadrant 1
+        em_amp = em_amp_q1
+        em_phase = em_phase_q1
+        current_quadrant = 1
+        print("Current position is in quadrant 1. Distance from 0% to 25% of range:", (current_position - 0.0) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    elif current_position < 0.5:
+        # In quadrant 2
+        em_amp = em_amp_q2
+        em_phase = em_phase_q2
+        current_quadrant = 2
+        print("Current position is in quadrant 2. Distance from 25% to 50% of range:", (current_position - 0.25) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    elif current_position < 0.75:
+        # In quadrant 3
+        em_amp = em_amp_q3
+        em_phase = em_phase_q3
+        current_quadrant = 3
+        print("Current position is in quadrant 3. Distance from 50% to 75% of range:", (current_position - 0.5) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    else:
+        # In quadrant 4
+        em_amp = em_amp_q4
+        em_phase = em_phase_q4
+        current_quadrant = 4
+        print("Current position is in quadrant 4. Distance from 75% to 100% of range:", (current_position - 0.75) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+
+    print("EM amplitude:", em_amp)
+    print("EM phase:", em_phase)
+
+    # Calculate the EM value
+    em_value = em_amp * math.sin(em_phase)
+
+    print("EM value:", em_value)
+
+    # Determine the trend direction based on the EM phase differences
+    em_phase_diff_q1_q2 = em_phase_q2 - em_phase_q1
+    em_phase_diff_q2_q3 = em_phase_q3 - em_phase_q2
+    em_phase_diff_q3_q4 = em_phase_q4 - em_phase_q3
+    em_phase_diff_q4_q1 = 2*math.pi - (em_phase_q4 - em_phase_q1)
+
+    #Calculate X:Y ratio from golden ratio     
+    ratio = 2 * (PHI - 1)  
+
+    # Assign EM amplitudes based on X:Y ratio
+    em_amp_q1 = (sine_wave_max - sine_wave_min) * ratio / 4
+    em_amp_q2 = (sine_wave_max - sine_wave_min) * ratio / 4 
+    em_amp_q3 = (sine_wave_max - sine_wave_min) * ratio / 4 
+    em_amp_q4 = (sine_wave_max - sine_wave_min) * ratio / 4  
+
+    # Calculate EM phases based on dividing whole range by X:Y ratio  
+    em_phase_q1 = 0  
+    em_phase_q2 = PI * ratio / 2 
+    em_phase_q3 = PI * ratio           
+    em_phase_q4 = PI * ratio * 1.5  
+
+    #Calculate midpoints of each quadrant
+    mid_q1 = sine_wave_min + em_amp_q1 / 2
+    mid_q2 = mid_q1 + em_amp_q1
+    mid_q3 = mid_q2 + em_amp_q2
+    mid_q4 = max(sine_wave)
+
+    #Compare current sine wave value to determine quadrant
+    if sine_wave.any() <= mid_q1:
+        current_quadrant = 1
+        current_em_amp = em_amp_q1
+        current_em_phase = em_phase_q1
+    elif sine_wave.any() <= mid_q2:
+        current_quadrant = 2
+        current_em_amp = em_amp_q2
+        current_em_phase = em_phase_q2
+    elif sine_wave.any() <= mid_q3:
+        current_quadrant = 3
+        current_em_amp = em_amp_q3
+        current_em_phase = em_phase_q3
+    elif sine_wave.any() <= mid_q4:
+        current_quadrant = 4
+        current_em_amp = em_amp_q4
+        current_em_phase = em_phase_q4
+    else:
+        # Assign a default value
+        current_em_amp = 0 
+        current_em_phase = 0
+
+    #Assign current EM amplitude and phase
+    em_amp = current_em_amp
+    em_phase = current_em_phase
+
+    if percent_to_min_val < 10:
+        print("Bullish momentum in trend")
+
+        if current_quadrant == 1:
+            # In quadrant 1, distance from min to 25% of range
+            print("Bullish momentum in Q1")
+        elif current_quadrant == 2:
+            # In quadrant 2, distance from 25% to 50% of range
+            print("Bullish momentum in Q2")
+        elif current_quadrant == 3:
+            # In quadrant 3, distance from 50% to 75% of range
+            print("Bullish momentum in Q3")
+        elif current_quadrant == 4:
+            # In quadrant 4, distance from 75% to max of range
+            print("Bullish momentum in Q4")
+
+    elif percent_to_max_val < 10:
+        print("Bearish momentum in trend")
+
+        if current_quadrant == 1:
+            # In quadrant 1, distance from min to 25% of range
+            print("Bearish momentum in Q1")
+        elif current_quadrant == 2:
+            # In quadrant 2, distance from 25% to 50% of range
+            print("Bearish momentum in Q2")
+        elif current_quadrant == 3:
+            # In quadrant 3, distance from 50% to 75% of range
+            print("Bearish momentum in Q3")
+        elif current_quadrant == 4:
+            # In quadrant 4, distance from 75% to max of range
+            print("Bearish momentum in Q4")
+
+    # Calculate quadrature phase shift based on current quadrant  
+    if current_quadrant == 1:  
+        # Up cycle from Q1 to Q4   
+        quadrature_phase = em_phase_q1
+        em_phase = alpha_spiral
+    elif current_quadrant == 2:
+        quadrature_phase = em_phase_q2
+        em_phase = omega_spiral          
+    elif current_quadrant  == 3:      
+        quadrature_phase = em_phase_q3
+        em_phase = omega_spiral      
+    else:          
+        quadrature_phase = em_phase_q4
+        em_phase = alpha_spiral 
+
+    cycle_direction = "UP"
+    next_quadrant = 1
+
+    if current_quadrant == 1:
+        next_quadrant = 2  
+        cycle_direction = "UP"
+
+    elif current_quadrant == 2:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+        elif cycle_direction == "DOWN":
+            next_quadrant = 1
+        
+    elif current_quadrant == 3:        
+        if cycle_direction == "UP":
+            next_quadrant = 4        
+        elif cycle_direction == "DOWN": 
+            next_quadrant = 2
+       
+    elif current_quadrant == 4:        
+        if cycle_direction == "UP":
+            next_quadrant = 3
+            cycle_direction = "DOWN"
+
+    # Calculate quadrature phase                       
+    if next_quadrant == 1:     
+        next_quadrature_phase = em_phase_q1            
+    elif next_quadrant == 2:        
+        next_quadrature_phase = em_phase_q2          
+    elif next_quadrant == 3:                 
+        next_quadrature_phase = em_phase_q3             
+    else:              
+        next_quadrature_phase = em_phase_q4
+
+    # Calculate EM value
+    em_value = em_amp * math.sin(em_phase)  
+
+    # Calculate quadrature phase shift from current to next quadrant      
+    quadrature = next_quadrature_phase - quadrature_phase
+
+    if quadrature > 0:
+        # Up cycle from Q1 to Q4  
+        print("Up cycle now")  
+    else:  
+        # Down cycle from Q4 to Q1 
+        print("Down cycle now")
+
+    return sine_wave[-1]
 
 print()
 print("Init main() loop: ")
@@ -1509,6 +1771,8 @@ def main():
 
                         sine5min = calculate_sine_wave(data)
                         print(sine5min)
+
+                        print()
 
                         # Get all open positions
                         positions = client.futures_position_information()
