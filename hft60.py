@@ -556,7 +556,7 @@ def calculate_sine_wave(data):
     # Filter out zeros  
     sine_wave = sine_wave[sine_wave != 0]
 
-    sine_wave = -sine_wave
+    #sine_wave = -sine_wave
 
     print("Current close on 5min Sinewave:", sine_wave[-1])
 
@@ -1868,6 +1868,21 @@ def main():
 
                         sine5min = calculate_sine_wave(data)
                         print(sine5min)
+                        
+                        # Call the function to get the EM field data
+                        em_field = calculate_em_field()
+
+                        # Get the frequency range for a specific band
+                        alpha_freqs = em_field["alpha"]  # [8, 12]
+
+                        # Get the minimum frequency for a band    
+                        alpha_min = em_field["alpha"][0]
+                        alpha_max = em_field["alpha"][1]
+
+                        print(em_field)                      
+                        print(alpha_freqs)                       
+                        print(alpha_min)
+                        print(alpha_max)
 
                         print()
 
@@ -1882,7 +1897,7 @@ def main():
                         # Print position if there is nor not     
                         if position_amount != 0:
                             print("Position open: ", position_amount)
-                       
+                        
                         elif position_amount == 0:
                             print("Position not open: ", position_amount)
 
