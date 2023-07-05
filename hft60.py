@@ -590,6 +590,7 @@ def calculate_sine_wave(data):
     # Define min and max values for percentages from close to min and max of talib HT_SINE
     percent_to_min_val = 10
     percent_to_max_val = 10
+
     current_quadrant = None
 
     # Calculate the range of values for each quadrant
@@ -705,7 +706,7 @@ def calculate_sine_wave(data):
     em_amp = current_em_amp
     em_phase = current_em_phase
 
-    if percent_to_min_val < 10:
+    if percent_to_min_val < 15:
         print("Bullish momentum in trend")
 
         if current_quadrant == 1:
@@ -721,7 +722,7 @@ def calculate_sine_wave(data):
             # In quadrant 4, distance from 75% to max of range
             print("Bullish momentum in Q4")
 
-    elif percent_to_max_val < 10:
+    elif percent_to_max_val < 15:
         print("Bearish momentum in trend")
 
         if current_quadrant == 1:
