@@ -520,13 +520,13 @@ def calculate_ema(candles, period):
         ema.append((price - ema[-1]) * multiplier + ema[-1])
     return ema
 
-def calculate_sine_wave(close_prices):
+def calculate_sine_wave(data):
     # Calculate the sine wave using HT_SINE
-    if len(close_prices) == 0:
+    if len(data) == 0:
         # All NaN candles
         sine_wave = np.array([0])
     else:
-        sine_wave, _ = talib.HT_SINE(close_prices)
+        sine_wave, _ = talib.HT_SINE(data)
         if sine_wave is None:
             # Handle None case
             sine_wave = np.array([0])
@@ -1496,8 +1496,16 @@ def main():
 
                         print()
 
-                        sine_wave = calculate_sine_wave(close_prices)
-                        print(sine_wave)
+                        timeframes = ['1m', '3m', '5m']
+
+                        interval = '5m'
+
+                        # Get the OHLCV data for the 1-minute timeframe
+                        data = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles['5m']], dtype=np.double)
+                        data = data.reshape(-1)
+
+                        sine5min = calculate_sine_wave(data)
+                        print(sine5min)
 
                         # Get all open positions
                         positions = client.futures_position_information()
