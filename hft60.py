@@ -1963,47 +1963,75 @@ def main():
                         theta_max_forecast = get_forecast(max_point, "theta")
 
                         #adding prints
-                        print(alpha_min_forecast)
-                        print(alpha_max_forecast)
-                        print(beta_min_forecast)
-                        print(beta_max_forecast)
-                        print(gamma_min_forecast)
-                        print(gamma_max_forecast)
-                        print(delta_min_forecast)
-                        print(delta_max_forecast)
-                        print(theta_min_forecast)
-                        print(theta_max_forecast)
+                        #print(alpha_min_forecast)
+                        #print(alpha_max_forecast)
+                        #print(beta_min_forecast)
+                        #print(beta_max_forecast)
+                        #print(gamma_min_forecast)
+                        #print(gamma_max_forecast)
+                        #print(delta_min_forecast)
+                        #print(delta_max_forecast)
+                        #print(theta_min_forecast)
+                        #print(theta_max_forecast)
 
                         print()
 
                         # Initialize totals to 0 
-                        total_energy = 0
-                        total_momentum = 0
-                        total_charge = 0
-                        total_intensity = 0
+                        total_energy = 0.0
+                        total_momentum = 0.0
+                        total_charge = 0.0
+                        total_intensity = 0.0
+                        potential_energy = 0.0
+                        kinetic_energy = 0.0
+
+                        # Initialize totals for each band
+                        total_energy = {"alpha": 0.0, "beta": 0.0, "gamma": 0.0, "delta": 0.0, "theta": 0.0}   
+                        total_momentum = {"alpha": 0.0, "beta": 0.0, "gamma": 0.0, "delta": 0.0, "theta": 0.0}       
+                        total_charge = {"alpha": 0.0, "beta": 0.0, "gamma": 0.0, "delta": 0.0, "theta": 0.0} 
+                        total_intensity = {"alpha": 0.0, "beta": 0.0, "gamma": 0.0, "delta": 0.0, "theta": 0.0}         
+                        potential_energy  = {"alpha": 0.0, "beta": 0.0, "gamma": 0.0, "delta": 0.0, "theta": 0.0}  
+                        kinetic_energy = {"alpha": 0.0, "beta": 0.0, "gamma": 0.0, "delta": 0.0, "theta": 0.0}
 
                         # Loop through each frequency in the forecast
                         for freq in next_1h_forecast:    
   
                             #print(freq)
+                            band = ""
 
-                            # Calculate energy       
-                            energy = max(freq["magnitude"] * freq["number"], 1) * freq["frequency"] 
-    
-                            # Calculate momentum                
-                            momentum = max(freq["magnitude"] * freq["number"]*2, 1) * freq["frequency"]  
-                     
-                            # Calculate charge           
-                            charge = max(freq["magnitude"] * freq["number"]**2 ,1) * freq["frequency"]**2       
-        
-                            # Calculate intensity           
-                            intensity = max(freq["frequency"] * freq["number"], 1) ** 2 * max(freq["magnitude"],1)  
-         
-                            # Add to total energy, momentum, charge and intensity
-                            total_energy += energy
-                            total_momentum += momentum  
-                            total_charge += charge
-                            total_intensity += intensity
+                            if alpha_freqs[0] <= freq["frequency"] <= alpha_freqs[1]:
+                                band = "alpha"                 
+                            elif beta_freqs[0] <= freq["frequency"] <= beta_freqs[1]:               
+                                band = "beta"               
+                            elif gamma_freqs[0] <= freq["frequency"] <= gamma_freqs[1]:               
+                                band = "gamma"      
+                            elif delta_freqs[0] <= freq["frequency"] <= delta_freqs[1]:       
+                                band = "delta"       
+                            elif theta_freqs[0] <= freq["frequency"] <= theta_freqs[1]:        
+                                band = "theta"
+
+                            # Calculate values                 
+                            energy = max(freq["magnitude"] * freq["number"], 1) * freq["frequency"]
+                            momentum = max(freq["magnitude"] * freq["number"]*2, 1) * freq["frequency"]      
+                            charge = max(freq["magnitude"] * freq["number"]**2 ,1) * freq["frequency"]**2 
+                            intensity = max(freq["frequency"] * freq["number"], 1) ** 2 * max(freq["magnitude"],1)
+
+                            # Add values to total energy, momentum, charge and intensity for the correct band
+                            if band == "alpha":
+                                total_energy["alpha"] += energy  
+                                total_momentum["alpha"]  += momentum 
+                            elif band == "beta":       
+                                total_energy["beta"] += energy
+                                total_momentum["beta"] += momentum 
+                            elif band == "gamma":       
+                                total_energy["gamma"] += energy
+                                total_momentum["gamma"] += momentum 
+                            elif band == "delta":       
+                                total_energy["delta"] += energy
+                                total_momentum["delta"] += momentum 
+                            elif band == "theta":       
+                                total_energy["theta"] += energy
+                                total_momentum["theta"] += momentum 
+
 
                         # Print results
                         print(f"Total energy: {total_energy}")    
@@ -2012,8 +2040,8 @@ def main():
                         print(f"Total intensity: {total_intensity}")
 
                         # Calculate potential energy     
-                        potential_energy = total_energy * total_intensity
-                        print(f"Potential energy: {potential_energy}")
+                        potential_energy = total_energy[band] * total_intensity[band]
+                        print(f"{band} potential energy: {potential_energy}")
 
                         print()
 
