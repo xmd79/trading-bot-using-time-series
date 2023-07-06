@@ -898,6 +898,31 @@ def calculate_em_field():
       
     return em_field
 
+def get_freq_range(band):  
+   if band == "alpha":
+      return [alpha_freq_low, alpha_freq_high]    
+   elif band == "beta": 
+      return [beta_freq_low, beta_freq_high]
+   elif band == "gamma":           
+      return [gamma_freq_low, gamma_freq_high]
+   elif band == "delta":               
+      return [delta_freq_low, delta_freq_high]
+   elif band == "theta":            
+      return [theta_freq_low, theta_freq_high]
+
+def get_forecast(point, band):    
+   freq_range = get_freq_range(band)    
+   if point["type"] == "min":         
+      freq = freq_range[0]       
+   elif point["type"] == "max":         
+      freq = freq_range[1]
+        
+   period = 1/freq                 
+   forecast = {}            
+   forecast["time"] = period / 4      
+   forecast["point"] = point["point"]
+   return forecast
+
 print()
 print("Init main() loop: ")
 print()
@@ -1869,6 +1894,9 @@ def main():
                         sine5min = calculate_sine_wave(data)
                         print(sine5min)
                         
+                        min_value = min_point
+                        max_value = max_point
+
                         # Call the function to get the EM field data
                         em_field = calculate_em_field()
 
@@ -1878,27 +1906,59 @@ def main():
                         gamma_freqs = em_field["gamma"]
                         delta_freqs = em_field["delta"] 
                         theta_freqs = em_field["theta"] 
-
-                        # Alpha band  
-                        alpha_freqs = em_field["alpha"]  
-                        alpha_min = em_field["alpha"][0]  
-                        alpha_max = em_field["alpha"][1]
-
+  
+                        # Alpha band 
+                        alpha_min = np.float32(em_field["alpha"][0])   
+                        alpha_max = np.float32(em_field["alpha"][1])
+ 
                         # Beta band   
-                         beta_min = em_field["beta"][0]     
-                         beta_max = em_field["beta"][1]
+                        beta_min = np.float32(em_field["beta"][0])        
+                        beta_max = np.float32(em_field["beta"][1])
 
                         # Gamma band     
-                        gamma_min = em_field["gamma"][0]
-                        gamma_max = em_field["gamma"][1]
+                        gamma_min = np.float32(em_field["gamma"][0])
+                        gamma_max = np.float32(em_field["gamma"][1])
 
                         # Delta band        
-                        delta_min = em_field["delta"][0]
-                        delta_max = em_field["delta"][1]
+                        delta_min = np.float32(em_field["delta"][0])  
+                        delta_max =  np.float32(em_field["delta"][1])
 
                         # Theta band             
-                        theta_min = em_field["theta"][0]
-                        theta_max = em_field["theta"][1]
+                        theta_min = np.float32(em_field["theta"][0])
+                        theta_max = np.float32(em_field["theta"][1]) 
+ 
+                        min_point = {"type": "min", "point": min_value}
+                        max_point = {"type": "max", "point": max_value}
+
+                        # Alpha band - min point     
+                        alpha_min_forecast = get_forecast(min_point, "alpha")  
+
+                        # Alpha band - max point
+                        alpha_max_forecast = get_forecast(max_point, "alpha")
+
+                        # Beta band - min point
+                        beta_min_forecast = get_forecast(min_point, "beta")
+
+                        # Beta band - max point    
+                        beta_max_forecast = get_forecast(max_point, "beta")
+
+                        # Gamma band - min point      
+                        gamma_min_forecast = get_forecast(min_point, "gamma") 
+
+                        # Gamma band - max point       
+                        gamma_max_forecast = get_forecast(max_point, "gamma")
+
+                        # Delta band - min point        
+                        delta_min_forecast= get_forecast(min_point, "delta")
+
+                        # Delta band - max point              
+                        delta_max_forecast = get_forecast(max_point, "delta")  
+
+                        # Theta band - min point               
+                        theta_min_forecast= get_forecast(min_point, "theta")        
+
+                        # Theta band - max point         
+                        theta_max_forecast = get_forecast(max_point, "theta")
 
                         print()
 
