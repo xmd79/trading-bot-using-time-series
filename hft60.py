@@ -1987,17 +1987,17 @@ def main():
   
                             #print(freq)
 
-                            # Calculate energy      
-                            energy = max(freq["magnitude"], 1) * freq["frequency"]  
-  
-                            # Calculate momentum               
-                            momentum = max(freq["magnitude"], 1) * freq["frequency"]
-                   
-                            # Calculate charge                
-                            charge = max(freq["magnitude"], 1) * freq["frequency"] ** 2      
-         
-                            # Calculate intensity               
-                            intensity = max(freq["frequency"], 1) ** 2 * max(freq["magnitude"],1)  
+                            # Calculate energy       
+                            energy = max(freq["magnitude"] * freq["number"], 1) * freq["frequency"] 
+    
+                            # Calculate momentum                
+                            momentum = max(freq["magnitude"] * freq["number"]*2, 1) * freq["frequency"]  
+                     
+                            # Calculate charge           
+                            charge = max(freq["magnitude"] * freq["number"]**2 ,1) * freq["frequency"]**2       
+        
+                            # Calculate intensity           
+                            intensity = max(freq["frequency"] * freq["number"], 1) ** 2 * max(freq["magnitude"],1)  
          
                             # Add to total energy, momentum, charge and intensity
                             total_energy += energy
