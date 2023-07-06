@@ -851,49 +851,49 @@ def calculate_sine_wave(data):
 
     return signals
 
-# Define wave frequencies
-alpha_freq_low = 8   
-alpha_freq_high = 12
+# Define wave frequencies as floats   
+alpha_freq_low = 8.0   
+alpha_freq_high = 12.0
 
-beta_freq_low = 13  
-beta_freq_high = 30
+beta_freq_low = 13.0  
+beta_freq_high = 30.0
 
-gamma_freq_low = 32  
-gamma_freq_high = 80
+gamma_freq_low = 32.0  
+gamma_freq_high = 80.0
 
 delta_freq_low = 0.1      
-delta_freq_high = 4       
+delta_freq_high = 4.0       
 
-theta_freq_low = 4              
-theta_freq_high = 8
+theta_freq_low = 4.0              
+theta_freq_high = 8.0
 
 def calculate_em_field():
     # Alpha waves (8 - 12 Hz)
-    alpha_freq_low = 8  
-    alpha_freq_high = 12
+    alpha_freq_low = 8.0  
+    alpha_freq_high = 12.0
      
     # Beta waves (13 - 30 Hz)
-    beta_freq_low = 13  
-    beta_freq_high = 30
+    beta_freq_low = 13.0  
+    beta_freq_high = 30.0
      
     # Gamma waves (32 - 80 Hz) 
-    gamma_freq_low = 32
-    gamma_freq_high = 80
-     
-    # Delta waves (0.1 - 4 Hz)   
+    gamma_freq_low = 32.0
+    gamma_freq_high = 80.0
+      
+    # Delta waves (0.1 - 4 Hz)          
     delta_freq_low = 0.1    
-    delta_freq_high = 4      
-     
-    # Theta waves (4 - 8 Hz)   
-    theta_freq_low = 4
-    theta_freq_high = 8
+    delta_freq_high = 4.0       
+      
+    # Theta waves (4 - 8 Hz)           
+    theta_freq_low = 4.0            
+    theta_freq_high = 8.0
       
     em_field = {
         "alpha": [alpha_freq_low, alpha_freq_high], 
-        "beta": [beta_freq_low, beta_freq_high],
+        "beta": [beta_freq_low, beta_freq_high],      
         "gamma": [gamma_freq_low, gamma_freq_high], 
-        "delta": [delta_freq_low, delta_freq_high],
-        "theta": [theta_freq_low, theta_freq_high]
+        "delta": [delta_freq_low, delta_freq_high],   
+        "theta": [theta_freq_low, theta_freq_high]    
     }
       
     return em_field
