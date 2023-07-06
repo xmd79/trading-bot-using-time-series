@@ -1976,6 +1976,47 @@ def main():
 
                         print()
 
+                        # Initialize totals to 0 
+                        total_energy = 0
+                        total_momentum = 0
+                        total_charge = 0
+                        total_intensity = 0
+
+                        # Loop through each frequency in the forecast
+                        for freq in next_1h_forecast:    
+  
+                            #print(freq)
+
+                            # Calculate energy      
+                            energy = max(freq["magnitude"], 1) * freq["frequency"]  
+  
+                            # Calculate momentum               
+                            momentum = max(freq["magnitude"], 1) * freq["frequency"]
+                   
+                            # Calculate charge                
+                            charge = max(freq["magnitude"], 1) * freq["frequency"] ** 2      
+         
+                            # Calculate intensity               
+                            intensity = max(freq["frequency"], 1) ** 2 * max(freq["magnitude"],1)  
+         
+                            # Add to total energy, momentum, charge and intensity
+                            total_energy += energy
+                            total_momentum += momentum  
+                            total_charge += charge
+                            total_intensity += intensity
+
+                        # Print results
+                        print(f"Total energy: {total_energy}")    
+                        print(f"Total momentum: {total_momentum}")
+                        print(f"Total charge: {total_charge}")          
+                        print(f"Total intensity: {total_intensity}")
+
+                        # Calculate potential energy     
+                        potential_energy = total_energy * total_intensity
+                        print(f"Potential energy: {potential_energy}")
+
+                        print()
+
                         # Get all open positions
                         positions = client.futures_position_information()
 
