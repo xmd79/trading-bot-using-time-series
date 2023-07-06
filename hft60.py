@@ -1893,7 +1893,9 @@ def main():
 
                         sine5min = calculate_sine_wave(data)
                         print(sine5min)
-                        
+
+                        print()
+
                         min_value = min_point
                         max_value = max_point
 
@@ -1959,6 +1961,18 @@ def main():
 
                         # Theta band - max point         
                         theta_max_forecast = get_forecast(max_point, "theta")
+
+                        #adding prints
+                        print(alpha_min_forecast)
+                        print(alpha_max_forecast)
+                        print(beta_min_forecast)
+                        print(beta_max_forecast)
+                        print(gamma_min_forecast)
+                        print(gamma_max_forecast)
+                        print(delta_min_forecast)
+                        print(delta_max_forecast)
+                        print(theta_min_forecast)
+                        print(theta_max_forecast)
 
                         print()
 
