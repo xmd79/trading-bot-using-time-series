@@ -1873,16 +1873,32 @@ def main():
                         em_field = calculate_em_field()
 
                         # Get the frequency range for a specific band
-                        alpha_freqs = em_field["alpha"]  # [8, 12]
+                        alpha_freqs = em_field["alpha"] 
+                        beta_freqs = em_field["beta"]
+                        gamma_freqs = em_field["gamma"]
+                        delta_freqs = em_field["delta"] 
+                        theta_freqs = em_field["theta"] 
 
-                        # Get the minimum frequency for a band    
-                        alpha_min = em_field["alpha"][0]
+                        # Alpha band  
+                        alpha_freqs = em_field["alpha"]  
+                        alpha_min = em_field["alpha"][0]  
                         alpha_max = em_field["alpha"][1]
 
-                        print(em_field)                      
-                        print(alpha_freqs)                       
-                        print(alpha_min)
-                        print(alpha_max)
+                        # Beta band   
+                         beta_min = em_field["beta"][0]     
+                         beta_max = em_field["beta"][1]
+
+                        # Gamma band     
+                        gamma_min = em_field["gamma"][0]
+                        gamma_max = em_field["gamma"][1]
+
+                        # Delta band        
+                        delta_min = em_field["delta"][0]
+                        delta_max = em_field["delta"][1]
+
+                        # Theta band             
+                        theta_min = em_field["theta"][0]
+                        theta_max = em_field["theta"][1]
 
                         print()
 
