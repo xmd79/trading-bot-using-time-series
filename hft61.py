@@ -1500,15 +1500,15 @@ def main():
 
                         # Forecast mood 
                         if current_momentum < -2:
-                            forecast_mood = 'bullish'
+                            forecast_mood = 'bearish'
                         elif current_momentum < 0:
-                            forecast_mood = 'slightly bullish'    
+                            forecast_mood = 'slightly bearish'    
                         elif current_momentum == 0:        
                             forecast_mood = 'neutral'
                         elif current_momentum > 0:        
-                            forecast_mood = 'slightly bearish'
+                            forecast_mood = 'slightly bullish'
                         elif current_momentum > 2:
-                            forecast_mood = 'bearish'
+                            forecast_mood = 'bullish'
 
                         print(f"Current momentum: {current_momentum}")     
                         print(f"Trend forecast: {forecast_mood}")    
@@ -1520,11 +1520,13 @@ def main():
  
                         sma50 = talib.SMA(np.array(close_prices), timeperiod=50)
                         sma50 = sma50[-1]  
+                        print(sma50)
 
-                        sma200 = talib.SMA(np.array(close_prices), timeperiod=200)
-                        sma200 = sma200[-1]
- 
-                        phi_ratio = sma200 / sma50
+                        sma100 = talib.SMA(np.array(close_prices), timeperiod=100)
+                        sma100 = sma100[-1]
+                        print(sma100)
+
+                        phi_ratio = sma100 / sma50
 
                         deviation = close_prices[-1] - sma50  
                         threshold = 0.03
@@ -1557,12 +1559,12 @@ def main():
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:
           
-                                    range = sma50 - sma200
+                                    range = sma50 - sma100
                                     forecast = f"Reversal of up to {range*phi_ratio} points possible in medium term"
                                     print(forecast)
                                 else:
           
-                                    forecast = f"Reversal of {sma200*phi_ratio} points or more possible in long term" 
+                                    forecast = f"Reversal of {sma100*phi_ratio} points or more possible in long term" 
                                     print(forecast)
                         elif deviation < threshold:  # No reversal signal
                          
@@ -1572,11 +1574,11 @@ def main():
                                     forecast = "Uptrend likely to continue in near term"   
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:               
-                                    range = sma50 - sma200
+                                    range = sma50 - sma100
                                     forecast = f"Uptrend likely to continue {range * phi_ratio} points in medium term"
                                     print(forecast)
                                 else:               
-                                    forecast = f"Uptrend likely to continue {sma200 * phi_ratio} points or more in long term"
+                                    forecast = f"Uptrend likely to continue {sma100 * phi_ratio} points or more in long term"
                                     print(forecast)
                             elif close_prices[-1] > sma50: # Downtrend       
               
@@ -1584,12 +1586,14 @@ def main():
                                     forecast = "Downtrend likely to continue in near term" 
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:              
-                                    range = sma200 - sma50       
+                                    range = sma100 - sma50       
                                     forecast ="Downtrend likely to continue {range * phi_ratio} points in medium term"
                                     print(forecast)
                                 else:                 
-                                    forecast = f"Downtrend likely to continue {sma200 * phi_ratio} points or more in long term"
+                                    forecast = f"Downtrend likely to continue {sma100 * phi_ratio} points or more in long term"
                                     print(forecast)
+
+                        print()
 
                         # Get all open positions
                         positions = client.futures_position_information()
