@@ -1587,6 +1587,7 @@ def main():
                                 else:                 
                                     forecast = f"Downtrend likely to continue {sma200 * phi_ratio} points or more in long term"
                                     print(forecast)
+
                         # Get all open positions
                         positions = client.futures_position_information()
 
