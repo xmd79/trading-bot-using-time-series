@@ -1522,11 +1522,11 @@ def main():
 
                         sma50 = talib.SMA(np.array(close_prices), timeperiod=50)
                         sma50 = sma50[-1]  
-                        print("SMA50 is now at: ", sma50)
+                        #print("SMA50 is now at: ", sma50)
 
                         sma100 = talib.SMA(np.array(close_prices), timeperiod=100)
                         sma100 = sma100[-1]
-                        print("SMA100 is now at: ", sma100)
+                        #print("SMA100 is now at: ", sma100)
 
                         phi_ratio = sma100 / sma50
 
@@ -1618,11 +1618,11 @@ def main():
 
                             print("Position not open: ", position_amount)
 
-                            if current_quadrant == 1 and percent_to_min_val <= 10 and quadrature > 0 and current_momentum > 0 and signals['1m']['momentum_signal'] > 0 and point == 'Apex' and forecast['mood'] == 'positive':
+                            if current_quadrant == 1 and percent_to_min_val <= 10 and quadrature > 0 and current_momentum > 0 and signals['1m']['momentum_signal'] > 0 and point == 'Apex':
                                 print("Entry long triggered")
                                 f.write(f"{timestamp} LONG\n")
 
-                            elif current_quadrant == 4 and percent_to_max_val <= 10 and quadrature < 0 and current_momentum < 0 and signals['1m']['momentum_signal'] < 0 and point == 'Right' and forecast['mood'] == 'negative':
+                            elif current_quadrant == 4 and percent_to_max_val <= 10 and quadrature < 0 and current_momentum < 0 and signals['1m']['momentum_signal'] < 0 and point == 'Right':
                                 print("Entry short triggered")
                                 f.write(f"{timestamp} SHORT\n")
 
