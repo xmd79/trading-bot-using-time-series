@@ -1448,6 +1448,68 @@ def main():
                         print("Current point is at: ", forecast[f'min_reversal']['point'] if forecast[f'min_reversal']['point'] == point else forecast[f'max_reversal']['point']) 
                         print()
 
+                        mood_to_corr = {
+                            'extremely negative': -0.9,   
+                            'strongly negative': -0.7,
+                            'negative': -0.5,       
+                            'partial negative': -0.3,           
+                            'neutral': 0,
+                            'partial positive': 0.3,  
+                            'positive': 0.5,       
+                            'strongly positive': 0.7,    
+                            'extremely positive': 0.9   
+                        }
+
+                        momentum_map = {      
+                            'extremely negative': -5,   
+                            'strongly negative': -4,     
+                            'negative': -3,       
+                            'partial negative': -2,           
+                            'neutral': 0,
+                            'partial positive': 2,   
+                            'positive': 3,       
+                            'strongly positive': 4,    
+                            'extremely positive': 5  
+                        }
+
+                        current_momentum = 0
+
+                        for freq in frequencies:
+
+                            corr = mood_to_corr[freq['mood']]
+                            z = np.arctanh(corr) 
+                            freq['z'] = z
+                            freq['pos'] = 0 if corr == 0 else z
+
+                            # Get momentum score       
+                            momentum = momentum_map[freq['mood']]
+      
+                            # Calculate weighted momentum score      
+                            weighted_momentum = momentum * freq['magnitude']         
+  
+                            current_momentum += weighted_momentum
+                        
+                        frequencies.sort(key=lambda f: f['z'])
+                        # Calculate average momentum      
+                        current_momentum /= len(frequencies)
+
+                        # Forecast mood 
+                        if current_momentum < -2:
+                            forecast_mood = 'bearish'
+                        elif current_momentum < 0:
+                            forecast_mood = 'slightly bearish'    
+                        elif current_momentum == 0:        
+                            forecast_mood = 'neutral'
+                        elif current_momentum > 0:        
+                            forecast_mood = 'slightly bullish'
+                        elif current_momentum > 2:
+                            forecast_mood = 'bullish'
+
+                        print(f"Current momentum: {current_momentum}")     
+                        print(f"Trend forecast: {forecast_mood}")    
+
+                        print()
+
                         # Get all open positions
                         positions = client.futures_position_information()
 
