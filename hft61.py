@@ -1262,8 +1262,6 @@ def main():
                         else:
                             print("Extremely bullish")
 
-                        print()
-
                         # Define stationary circuit variables
                         stationary_circuit = []
 
@@ -1309,8 +1307,6 @@ def main():
     
                             #print(f"Frequency: {frequency} Hz - Mood: {mood}")
     
-                        print()
-
                         if current_frequency > lowest_frequency:
                             lowest_frequency = current_frequency    
                         if current_frequency < highest_frequency:     
