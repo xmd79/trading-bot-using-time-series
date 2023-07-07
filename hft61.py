@@ -1595,43 +1595,45 @@ def main():
                                     forecast = f"Downtrend likely to continue {sma100 * phi_ratio} points or more in long term"
                                     print(forecast)
 
-                        print()
-
-                        current_time = datetime.datetime.utcnow() + timedelta(hours=3)
-
-                        with open("signals.txt", "a") as f:  
-                            timestamp = current_time.strftime("%d %H %M %S")
-
-                        # Get all open positions
-                        positions = client.futures_position_information()
-
-                        # Loop through each position
-                        for position in positions:
-                            symbol = position['symbol']
-                            position_amount = float(position['positionAmt'])
-
-                        # Print position if there is nor not     
-                        if position_amount != 0:
-                            print("Position open: ", position_amount)
-                       
-                        elif position_amount == 0:
-
-                            print("Position not open: ", position_amount)
-
-                            if current_quadrant == 1 and dist_from_close_to_min <= 10.00 and quadrature > 0 and signals['1m']['momentum'] > 0.00 and point == 'Apex':
-                                print("Entry long triggered")
-                                f.write(f"{timestamp} LONG\n")
-
-                            elif current_quadrant == 4 and dist_from_close_to_max <= 10.00 and quadrature < 0 and signals['1m']['momentum'] < 0.00 and point == 'Right':
-                                print("Entry short triggered")
-                                f.write(f"{timestamp} SHORT\n")
-                        print()
-
-                        #print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
+
             else:
                 print("Error: '1m' key not found in signals dictionary.")
+
+            print()
+
+            current_time = datetime.datetime.utcnow() + timedelta(hours=3)
+
+            with open("signals.txt", "a") as f:  
+                timestamp = current_time.strftime("%d %H %M %S")
+
+            # Get all open positions
+            positions = client.futures_position_information()
+
+            # Loop through each position
+            for position in positions:
+                symbol = position['symbol']
+                position_amount = float(position['positionAmt'])
+
+            # Print position if there is nor not     
+            if position_amount != 0:
+                print("Position open: ", position_amount)
+                       
+            elif position_amount == 0:
+
+                print("Position not open: ", position_amount)
+
+                if current_quadrant == 1 and dist_from_close_to_min <= 10.00 and quadrature > 0 and signals['1m']['momentum'] > 0.00 and point == 'Apex':
+                    print("Entry long triggered")
+                    f.write(f"{timestamp} LONG\n")
+
+                elif current_quadrant == 4 and dist_from_close_to_max <= 10.00 and quadrature < 0 and signals['1m']['momentum'] < 0.00 and point == 'Right':
+                    print("Entry short triggered")
+                    f.write(f"{timestamp} SHORT\n")
+
+            print()
+            #print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
             time.sleep(5) # Sleep for 5 seconds      
                 
