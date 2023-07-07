@@ -299,31 +299,26 @@ mtf = check_mtf_signal(candles, timeframes, mtf_signal)
 print(mtf[0])
 print()
 
-timeframe = ['1m', '3m', '5m']
-
-def get_mtf_signal_v2(candles, timeframes, timeframe, percent_to_min=5, percent_to_max=5):
-    
+def get_mtf_signal_v2(candles, timeframes, percent_to_min=5, percent_to_max=5):
     signals = {}
     
-    for tf in timeframe:
-        # Get the OHLCV data for the given timeframe
-        data_tf = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles[tf]], dtype=np.double)  
-          
-        # Get the HT sine wave indicator   
-        if np.any(np.isfinite(data_tf)):
-            sine, leadsine = talib.HT_SINE(data_tf[:,3])
-        
-        # Normalize the HT sine wave indicator 
-        min_price = np.nanmin(data_tf[:, 3])
-        max_price = np.nanmax(data_tf[:, 3])     
-        norm_sine = (sine - min_price) / (max_price - min_price) 
+    # Get the OHLCV data for the 1-minute timeframe
+    data_1m = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles['1m']], dtype=np.double)
+    
+    # Get the HT sine wave indicator for the 1-minute timeframe
+    sine, leadsine = talib.HT_SINE(data_1m[:, 3])
+    
+    # Normalize the HT sine wave indicator to the minimum and maximum prices in the market data
+    min_price = np.nanmin(data_1m[:, 3])
+    max_price = np.nanmax(data_1m[:, 3])
+    norm_sine = (sine - min_price) / (max_price - min_price)
     
     # Get the minimum and maximum values of the normalized HT Sine Wave indicator
     min_sine = np.nanmin(norm_sine)
     max_sine = np.nanmax(norm_sine)
     
     # Calculate the percentage distance from the current close on sine to the minimum and maximum values of the normalized HT Sine Wave indicator
-    close = data_tf[-1][-2]
+    close = data_1m[-1][-2]
     percent_to_min_val = (max_sine - norm_sine[-1]) / (max_sine - min_sine) * 100
     percent_to_max_val = (norm_sine[-1] - min_sine) / (max_sine - min_sine) * 100
     
@@ -381,7 +376,7 @@ def get_mtf_signal_v2(candles, timeframes, timeframe, percent_to_min=5, percent_
 
     return signals
 
-get_mtf_signal_v2(candles, timeframes, timeframe, percent_to_min=5, percent_to_max=5)
+get_mtf_signal_v2(candles, timeframes, percent_to_min=5, percent_to_max=5)
 
 def get_historical_candles(symbol, start_time, end_time, timeframe):
     candles = client.futures_klines(symbol=symbol, interval=timeframe, startTime=start_time * 1000, endTime=end_time * 1000)
@@ -666,7 +661,7 @@ def main():
             print("My BUSD balance from futures wallet is at: ", bUSD_balance)
 
             # Get the MTF signal
-            signals = get_mtf_signal_v2(candles, timeframes, timeframe, percent_to_min=1, percent_to_max=1)
+            signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
             print(signals)
             
             print()
@@ -1456,33 +1451,48 @@ def main():
                         print(f"Origin: {octahedron[7]['frequency']}")
                         print("Current point is at: ", forecast[f'min_reversal']['point'] if forecast[f'min_reversal']['point'] == point else forecast[f'max_reversal']['point']) 
                         print()
-  
-                        # Assign default value of None to quadrant key for all points
-                        for point in octahedron:
-                            point['quadrant'] = None
 
                         quadrants = [
-                            {'name': 'NE', 'points': ['Apex', 'Left', 'Base'], 'quadrant': '1'},
-                            {'name': 'SE', 'points': ['Base', 'Left', 'Apex'], 'quadrant': '2'}, 
-                            {'name': 'SW', 'points': ['Apex', 'Right','Base'], 'quadrant': '3'},    
-                            {'name': 'NW','points': ['Base', 'Right', 'Left'], 'quadrant': '4'}     
+                            {'name': 'NE', 'points': ['Apex', 'Left', 'Base', 'Right']},
+                            {'name': 'SE', 'points': ['Base', 'Left', 'Apex','Right']}, 
+                            {'name': 'SW', 'points': ['Apex', 'Right','Base', 'Left']},    
+                            {'name': 'NW','points': ['Base', 'Right', 'Left','Apex']}     
                         ]
 
-                        for point in octahedron:
-                            for quadrant in quadrants:
-                                if point['point'] in quadrant['points']:
-                                    point['quadrant'] = quadrant['name']
-                                    break
+                        # Update octahedron point for current quadrant 
+                        quadrant_index = 0
 
-                        # Set quadrant to 1 for Apex point and 4 for Right point
-                        if point['point'] == 'Apex':
-                            point['quadrant'] = 'NE'
-                        elif point['point'] == 'Right':
-                            point['quadrant'] = 'SW'
+                        if len(quadrants[current_quadrant]['points']) > quadrant_index: 
+                            for point in octahedron:
+                                if point['point'] == quadrants[current_quadrant]['points'][quadrant_index]:
+                                    point['frequency'] = current_frequency     
+                                    point['mood'] = frequencies[current_quadrant]['mood']
+                                    quadrant_index += 1    # Increment index
+                                    if quadrant_index >= len(quadrants[current_quadrant]['points']):
+                                       break
 
-                        for point in octahedron:
-                            print(f"Point: {point['point']}, Frequency: {point['frequency']}, Mood: {point['mood']}, Quadrant: {point['quadrant']}")
+                        frequency_range = max_point['frequency'] - min_point['frequency']
 
+                        for i in range(1,26):
+                            if i == 1: 
+                                if frequency_range < 10:
+                                    print("Frequency range is small, indicating:")         
+                                    print("- Little volatility")
+                                    print("- Subdued market mood")       
+                                    print("- Limited opportunities")            
+                                elif frequency_range < 20:    
+                                    print("Frequency range is moderate, indicating:")       
+                                    print("- Some volatility")         
+                                    print("- Cautious market mood with room for growth")
+                                    print("- Moderate opportunities")       
+                                else:    
+                                    print("Broad frequency range, indicating:")    
+                                    print("- Heightened volatility")    
+                                    print("- Bullish market mood with strong momentum")       
+                                    print("- Abundant opportunities")
+
+                        print(quadrants)
+                        print(frequency_range)
                         print()
 
                         # Get all open positions
