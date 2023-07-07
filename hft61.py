@@ -569,6 +569,9 @@ def main():
     # Define PHI constant with 15 decimals
     PHI = 1.6180339887498948482045868343656381177  
    
+    # Calculate the Brun constant from the phi ratio and sqrt(5)
+    brun_constant = math.sqrt(PHI * math.sqrt(5))
+
     # Define PI constant with 15 decimals    
     PI = 3.1415926535897932384626433832795028842
    
@@ -590,7 +593,9 @@ def main():
     frequencies = []    
     frequencies_next = [] 
 
-    for i in range(1,26):
+    range = 26
+
+    for i in __builtins__.range(1,26):
         frequency = i * sacred_freq
         
         frequencies.append({
@@ -1495,21 +1500,93 @@ def main():
 
                         # Forecast mood 
                         if current_momentum < -2:
-                            forecast_mood = 'bearish'
+                            forecast_mood = 'bullish'
                         elif current_momentum < 0:
-                            forecast_mood = 'slightly bearish'    
+                            forecast_mood = 'slightly bullish'    
                         elif current_momentum == 0:        
                             forecast_mood = 'neutral'
                         elif current_momentum > 0:        
-                            forecast_mood = 'slightly bullish'
+                            forecast_mood = 'slightly bearish'
                         elif current_momentum > 2:
-                            forecast_mood = 'bullish'
+                            forecast_mood = 'bearish'
 
                         print(f"Current momentum: {current_momentum}")     
                         print(f"Trend forecast: {forecast_mood}")    
 
                         print()
 
+                        brun_low  = close_prices[-1] * brun_constant  
+                        brun_high = close_prices[-1] / brun_constant 
+ 
+                        sma50 = talib.SMA(np.array(close_prices), timeperiod=50)
+                        sma50 = sma50[-1]  
+                        sma200 = talib.SMA(np.array(close_prices), timeperiod=200)
+                        sma200 = sma200[-1] 
+                      
+                        deviation = close_prices[-1] - sma50  
+                        threshold = 0.03
+
+                        if deviation > threshold: # Reversal signal  
+      
+                            if close_prices[-1] > brun_high: # Above Brun level 
+                                if phi_ratio < 1.2:  
+        
+                                    # Near term       
+                                    forecast = f"Continuation likely for {15*phi_ratio} periods"      
+                                    print(forecast)
+                                elif 1.2 <= phi_ratio < 1.5:       
+        
+                                    # Medium term        
+                                    range = (brun_high - brun_low) * 0.5
+                                    forecast = f"Continuation likely {range*phi_ratio} points in the medium term"  
+                                    print(forecast)
+                                else:  
+        
+                                    # Long term     
+                                    range = brun_high - brun_low
+                                    forecast = f"Strong continuation likely {range*phi_ratio} points or more"
+                                    print(forecast)
+                            elif close_prices[-1] < brun_low: # Below Brun level  # Downtrend reversal signal    
+        
+                                if phi_ratio < 1.2:  
+          
+                                    forecast = f"Reversal likely in {15*phi_ratio} periods"
+                                    print(forecast)
+                                elif 1.2 <= phi_ratio < 1.5:
+          
+                                    range = sma50 - sma200
+                                    forecast = f"Reversal of up to {range*phi_ratio} points possible in medium term"
+                                    print(forecast)
+                                else:
+          
+                                    forecast = f"Reversal of {sma200*phi_ratio} points or more possible in long term" 
+                                    print(forecast)
+                        elif deviation < threshold:  # No reversal signal
+                         
+                            if close_prices[-1] > sma50: # Uptrend
+                   
+                                if phi_ratio < 1.2:   
+                                    forecast = "Uptrend likely to continue in near term"   
+                                    print(forecast)
+                                elif 1.2 <= phi_ratio < 1.5:               
+                                    range = sma50 - sma200
+                                    forecast = f"Uptrend likely to continue {range * phi_ratio} points in medium term"
+                                    print(forecast)
+                                else:               
+                                    forecast = f"Uptrend likely to continue {sma200 * phi_ratio} points or more in long term"
+                                    print(forecast)
+                            elif close_prices[-1] > sma50: # Downtrend       
+              
+                                if phi_ratio < 1.2:  
+                                    forecast = "Downtrend likely to continue in near term" 
+                                    print(forecast)
+                                elif 1.2 <= phi_ratio < 1.5:              
+                                    range = sma200 - sma50       
+                                    forecast ="Downtrend likely to continue {range * phi_ratio} points in medium term"
+                                    print(forecast)
+                                else:                 
+                                    forecast = f"Downtrend likely to continue {sma200 * phi_ratio} points or more in long term"
+                                    print(forecast)
                         # Get all open positions
                         positions = client.futures_position_information()
 
