@@ -1597,8 +1597,10 @@ def main():
 
                         print()
 
+                        current_time = datetime.datetime.utcnow() + timedelta(hours=3)
+
                         with open("signals.txt", "a") as f:  
-                            timestamp = datetime.now().strftime("%d %H %M %S")
+                            timestamp = current_time.strftime("%d %H %M %S")
 
                         # Get all open positions
                         positions = client.futures_position_information()
