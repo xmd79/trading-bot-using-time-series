@@ -1618,17 +1618,16 @@ def main():
 
                             print("Position not open: ", position_amount)
 
-                            if current_quadrant == 1 and percent_to_min_val <= 10 and quadrature > 0 and current_momentum > 0 and signals['1m']['momentum_signal'] > 0 and point == 'Apex':
+                            if current_quadrant == 1 and dist_from_close_to_min <= 10 and quadrature > 0 and current_momentum > 0 and signals['1m']['momentum_signal'] > 0 and point == 'Apex':
                                 print("Entry long triggered")
                                 f.write(f"{timestamp} LONG\n")
 
-                            elif current_quadrant == 4 and percent_to_max_val <= 10 and quadrature < 0 and current_momentum < 0 and signals['1m']['momentum_signal'] < 0 and point == 'Right':
+                            elif current_quadrant == 4 and dist_from_close_to_max <= 10 and quadrature < 0 and current_momentum < 0 and signals['1m']['momentum_signal'] < 0 and point == 'Right':
                                 print("Entry short triggered")
                                 f.write(f"{timestamp} SHORT\n")
-
-                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-
                         print()
+
+                        #print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
             else:
