@@ -1618,11 +1618,11 @@ def main():
 
                             print("Position not open: ", position_amount)
 
-                            if current_quadrant == 1 and dist_from_close_to_min <= 10 and quadrature > 0 and current_momentum > 0 and signals['1m']['momentum_signal'] > 0 and point == 'Apex':
+                            if current_quadrant == 1 and dist_from_close_to_min <= 10.00 and quadrature > 0 and signals['1m']['momentum'] > 0.00 and point == 'Apex':
                                 print("Entry long triggered")
                                 f.write(f"{timestamp} LONG\n")
 
-                            elif current_quadrant == 4 and dist_from_close_to_max <= 10 and quadrature < 0 and current_momentum < 0 and signals['1m']['momentum_signal'] < 0 and point == 'Right':
+                            elif current_quadrant == 4 and dist_from_close_to_max <= 10.00 and quadrature < 0 and signals['1m']['momentum'] < 0.00 and point == 'Right':
                                 print("Entry short triggered")
                                 f.write(f"{timestamp} SHORT\n")
                         print()
