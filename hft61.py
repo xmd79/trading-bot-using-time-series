@@ -1517,14 +1517,16 @@ def main():
 
                         brun_low  = close_prices[-1] * brun_constant  
                         brun_high = close_prices[-1] / brun_constant 
- 
+                        #print(brun_low)
+                        #print(brun_high)
+
                         sma50 = talib.SMA(np.array(close_prices), timeperiod=50)
                         sma50 = sma50[-1]  
-                        print(sma50)
+                        print("SMA50 is now at: ", sma50)
 
                         sma100 = talib.SMA(np.array(close_prices), timeperiod=100)
                         sma100 = sma100[-1]
-                        print(sma100)
+                        print("SMA100 is now at: ", sma100)
 
                         phi_ratio = sma100 / sma50
 
