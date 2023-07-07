@@ -1284,12 +1284,12 @@ def main():
                         # Loop through each quadrant cycle        
                         for quadrant in [1,2,3,4]:
     
-                            print(f"Quadrant {quadrant}")
+                            #print(f"Quadrant {quadrant}")
             
                             # Get triangle point from quadrant map               
                             point = quadrant_map[quadrant]    
     
-                            print(f"Current point: {point}")
+                            #print(f"Current point: {point}")
     
                             # Get next point based on circuit        
                             if point == 'Apex':
@@ -1301,7 +1301,7 @@ def main():
                             elif point == 'Right':
                                 next_point = 'Apex'
         
-                            print(f"Next point: {next_point}")       
+                            #print(f"Next point: {next_point}")       
     
                             # Get frequency and mood forecast
                             frequency = frequencies[quadrant]['frequency']
@@ -1491,8 +1491,8 @@ def main():
                                     print("- Bullish market mood with strong momentum")       
                                     print("- Abundant opportunities")
 
-                        print(quadrants)
-                        print(frequency_range)
+                        #print(quadrants)
+                        #print(frequency_range)
                         print()
 
                         # Get all open positions
