@@ -1520,9 +1520,12 @@ def main():
  
                         sma50 = talib.SMA(np.array(close_prices), timeperiod=50)
                         sma50 = sma50[-1]  
+
                         sma200 = talib.SMA(np.array(close_prices), timeperiod=200)
-                        sma200 = sma200[-1] 
-                      
+                        sma200 = sma200[-1]
+ 
+                        phi_ratio = sma200 / sma50
+
                         deviation = close_prices[-1] - sma50  
                         threshold = 0.03
 
