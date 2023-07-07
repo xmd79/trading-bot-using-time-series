@@ -1452,49 +1452,6 @@ def main():
                         print("Current point is at: ", forecast[f'min_reversal']['point'] if forecast[f'min_reversal']['point'] == point else forecast[f'max_reversal']['point']) 
                         print()
 
-                        quadrants = [
-                            {'name': 'NE', 'points': ['Apex', 'Left', 'Base', 'Right']},
-                            {'name': 'SE', 'points': ['Base', 'Left', 'Apex','Right']}, 
-                            {'name': 'SW', 'points': ['Apex', 'Right','Base', 'Left']},    
-                            {'name': 'NW','points': ['Base', 'Right', 'Left','Apex']}     
-                        ]
-
-                        # Update octahedron point for current quadrant 
-                        quadrant_index = 0
-
-                        if len(quadrants[current_quadrant]['points']) > quadrant_index: 
-                            for point in octahedron:
-                                if point['point'] == quadrants[current_quadrant]['points'][quadrant_index]:
-                                    point['frequency'] = current_frequency     
-                                    point['mood'] = frequencies[current_quadrant]['mood']
-                                    quadrant_index += 1    # Increment index
-                                    if quadrant_index >= len(quadrants[current_quadrant]['points']):
-                                       break
-
-                        frequency_range = max_point['frequency'] - min_point['frequency']
-
-                        for i in range(1,26):
-                            if i == 1: 
-                                if frequency_range < 10:
-                                    print("Frequency range is small, indicating:")         
-                                    print("- Little volatility")
-                                    print("- Subdued market mood")       
-                                    print("- Limited opportunities")            
-                                elif frequency_range < 20:    
-                                    print("Frequency range is moderate, indicating:")       
-                                    print("- Some volatility")         
-                                    print("- Cautious market mood with room for growth")
-                                    print("- Moderate opportunities")       
-                                else:    
-                                    print("Broad frequency range, indicating:")    
-                                    print("- Heightened volatility")    
-                                    print("- Bullish market mood with strong momentum")       
-                                    print("- Abundant opportunities")
-
-                        #print(quadrants)
-                        #print(frequency_range)
-                        print()
-
                         # Get all open positions
                         positions = client.futures_position_information()
 
