@@ -1611,9 +1611,9 @@ def main():
                        
                         elif position_amount == 0:
                             print("Position not open: ", position_amount)
-                            if current_quadrant == 1 and percent_to_min_val <= 10 and quadrature > 0 and current_momentum > 0 and signals['1m']['momentum_signal'] > 0 and point == 'Apex' and forecast['mood'] = 'positive':
+                            if current_quadrant == 1 and percent_to_min_val <= 10 and quadrature > 0 and current_momentum > 0 and signals['1m']['momentum_signal'] > 0 and point == 'Apex' and forecast['mood'] == 'positive':
                                 print("Entry long triggered")
-                            elif current_quadrant == 4 and percent_to_max_val <= 10 and quadrature < 0 and current_momentum < 0 and signals['1m']['momentum_signal'] < 0 and point == 'Right' and forecast['mood'] = 'negative':
+                            elif current_quadrant == 4 and percent_to_max_val <= 10 and quadrature < 0 and current_momentum < 0 and signals['1m']['momentum_signal'] < 0 and point == 'Right' and forecast['mood'] == 'negative':
                                 print("Entry short triggered")
 
                         print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
