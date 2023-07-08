@@ -683,7 +683,6 @@ def main():
             close_prices = np.array([candle['close'] for candle in candles])
             print("Close price:", close_prices[-1])
 
-
             bUSD_balance = float(get_account_balance())
             print("My BUSD balance from futures wallet is at: ", bUSD_balance)
 
@@ -853,7 +852,7 @@ def main():
                         em_amp = current_em_amp
                         em_phase = current_em_phase
 
-                        if percent_to_min_val < 20:
+                        if percent_to_min_val <= 10:
                             print("Bullish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
@@ -868,7 +867,7 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bullish momentum in Q4")
 
-                        elif percent_to_max_val < 20:
+                        elif percent_to_max_val <= 10:
                             print("Bearish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
