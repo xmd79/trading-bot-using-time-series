@@ -134,6 +134,9 @@ def get_30m_candles(symbol):
 def get_1h_candles(symbol):   
     return get_candles(symbol, client.KLINE_INTERVAL_1HOUR)
 
+def get_4h_candles(symbol):   
+    return get_candles(symbol, client.KLINE_INTERVAL_4HOUR)
+
 candles = get_5m_candles("BTCBUSD")
 #print(candles)
 
@@ -592,7 +595,16 @@ candle_timeframe = '30min'
 candles_1h = get_candles(symbol, client.KLINE_INTERVAL_1HOUR)
 candle_timeframe = '1h'
 
+# Get 4 hour candles   
+candles_4h = get_candles(symbol, client.KLINE_INTERVAL_4HOUR)
+candle_timeframe = '4h'
+
+timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '4h']
+
 def get_reversal_signals(candles, candle_timeframe):   
+   
+    # Calculate supergolden ratio value
+    supergolden = (1 + 5 ** 0.5) / 2
    
     # Calculate HT_SINE    
     close_prices = np.array([candle['close'] for candle in candles])    
@@ -601,16 +613,16 @@ def get_reversal_signals(candles, candle_timeframe):
     # Normalize sine wave     
     sine = (sine - min(sine)) / (max(sine) - min(sine))      
         
-    if sine[-1] <= 0.1:               
+    if sine[-1] <= 1/supergolden:               
         signal, forecast = "buy", "dip"         
          
-    elif sine[-1] >= 0.94:               
+    elif sine[-1] >= 1 - 1/supergolden:               
         signal, forecast = "sell", "top"       
-   
+         
     else:   
         signal, forecast = "hold", "none"
       
-    forecast_range = calculate_cycle_time(sine, candle_timeframe)    
+    forecast_range = calculate_cycle_time(sine, candle_timeframe)
       
     return signal, forecast, forecast_range
 
@@ -1684,8 +1696,34 @@ def main():
                                     print(forecast)
                         print()
 
-                        reversal_signals = get_reversal_signals(close_prices, candle_timeframe)
-                        print(reversal_signals) 
+                        #reversal_signals = get_reversal_signals(close_prices, candle_timeframe)
+                        #print(reversal_signals) 
+
+                        timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '4h']
+
+                        for timeframe in timeframes:
+                            if timeframe == '1min':
+                                candles = candles_1m
+                            elif timeframe == '3min': 
+                                candles = candles_3m
+                            if timeframe == '5min':
+                                candles = candles_5m
+                            elif timeframe == '15min': 
+                                candles = candles_15m
+                            if timeframe == '30min':
+                                candles = candles_30m
+                            elif timeframe == '1h': 
+                                candles = candles_1h
+                            if timeframe == '4h':
+                                candles = candles_4h
+
+                            # Call function    
+                            signal, forecast, forecast_range = get_reversal_signals(candles, timeframe)
+    
+                            # Print results
+                            print(f"{timeframe} Signal: {signal}")
+                            print(f"Forecast: {forecast}")
+                            print(f"Forecast range: {forecast_range} minutes")
 
                         print()
 
