@@ -533,6 +533,38 @@ def calculate_ema(candles, period):
         ema.append((price - ema[-1]) * multiplier + ema[-1])
     return ema
 
+def calculate_pendulum_force(momentum, damping, restoring_force):
+    """Returns the net pendulum force based on momentum, damping and restoring force"""    
+    return momentum - damping + restoring_force
+
+def get_phi_ratio(close_prices):
+    """Calculates the phi ratio between EMA50 and EMA200"""    
+    ema50 = talib.EMA(close_prices, 50)
+    ema200 = talib.EMA(close_prices, 200)    
+    return ema200[-1] / ema50[-1]
+
+def inverse_fisher_transform(correlation):    
+    """Calculates the z-score from the correlation using the Inverse Fisher transform"""
+    z = 0.5 * np.log((1 + correlation) / (1 - correlation))
+    return z
+
+def calculate_momentum(close_prices):    
+    """Calculates momentum  as the change in close prices"""
+    momentum = close_prices[-1] - close_prices[-2]
+    return momentum
+    
+def calculate_damping(close_prices):    
+    """Calculates damping ratio based on ATR relative to close prices"""    
+    atr = talib.ATR(high, low, close)
+    damping = atr[-1] / close_prices[-1]    
+    return damping
+
+def calculate_restoring_force(close_prices):
+    """Calculates restoring force based on volatility relative to close prices"""     
+    volatility = np.std(close_prices)    
+    restoring_force = volatility / close_prices[-1]
+    return restoring_force
+
 print()
 print("Init main() loop: ")
 print()
