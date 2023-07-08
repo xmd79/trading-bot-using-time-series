@@ -565,78 +565,74 @@ def calculate_restoring_force(close_prices):
     restoring_force = volatility / close_prices[-1]
     return restoring_force
 
-def get_reversal_signals(close_prices):
-    # Check type first   
-    if isinstance(candles, list):
-        close_prices = np.array([candle['close'] for candle in candles])  
-    else:
-        close_prices = np.array([price for price in candles.values()])
+# Settings symbol and candle request for all timeframes
+symbol = "BTCUSDT"
 
-    # Calculate HT_SINE 
-    sine, _ = talib.HT_SINE(close_prices)
+# Get 1 minute candles
+candles_1m = get_candles(symbol, client.KLINE_INTERVAL_1MINUTE)
+candle_timeframe = '1min'
+
+# Get 3 minute candles 
+candles_3m = get_candles(symbol, client.KLINE_INTERVAL_3MINUTE)  
+candle_timeframe = '3min'
+
+# Get 5 minute candles
+candles_5m = get_candles(symbol, client.KLINE_INTERVAL_5MINUTE)
+candle_timeframe = '5min'
+
+# Get 15 minute candles
+candles_15m = get_candles(symbol, client.KLINE_INTERVAL_15MINUTE)
+candle_timeframe = '15min' 
+
+# Get 30 minute candles
+candles_30m = get_candles(symbol, client.KLINE_INTERVAL_30MINUTE)
+candle_timeframe = '30min'
+
+# Get 1 hour candles   
+candles_1h = get_candles(symbol, client.KLINE_INTERVAL_1HOUR)
+candle_timeframe = '1h'
+
+def get_reversal_signals(candles, candle_timeframe):   
+   
+    # Calculate HT_SINE    
+    close_prices = np.array([candle['close'] for candle in candles])    
+    sine, _ = talib.HT_SINE(close_prices)  
+          
+    # Normalize sine wave     
+    sine = (sine - min(sine)) / (max(sine) - min(sine))      
         
-    # Normalize sine wave  
-    sine = (sine - min(sine)) / (max(sine) - min(sine))   
-    
-    # Number of sides    
-    n = 100
-
-    # Polygon radius in units
-    r = 10  
-
-    # Define PI constant with 15 decimals    
-    PI = 3.1415926535897932384626433832795028842
-
-    # Calculate geometric parameters        
-    apothem = r / math.tan(math.pi / n)
-    perimeter  = n * r / math.tan(math.pi / n)   
-    area = (n * r**2) / (2 * math.tan(math.pi / n))
-
-    apothem_inf = r     
-    perimeter_inf = PI * r       
-    area_inf = PI * r ** 2
-        
-    # Calculate arctanh
-    arctanh_0 = math.atanh(0) 
-    arctanh_1 = np.nan
-
-    try:   
-       arctanh_neg1 = math.atanh(-1)  
-    except ValueError:      
-       arctanh_neg1 = np.nan
-
     if sine[-1] <= 0.1:               
-        forecast_range = calculate_forecast_range(range)
         signal, forecast = "buy", "dip"         
-        
-    elif sine[-1] >= 0.94:                
-        forecast_range= calculate_forecast_range(range)   
-        signal, forecast = "sell", "top"
-        
+         
+    elif sine[-1] >= 0.94:               
+        signal, forecast = "sell", "top"       
+   
     else:   
         signal, forecast = "hold", "none"
-        forecast_range = 0
-           
-    # Define adjustment factor
-    adjust_factor = {
-        "dip": 0.9,  
-        "top": 1.1,     
-        "none": 1   
-    } 
-        
-    print(f"Potential {signal} reversal. Next {forecast} likely {forecast_range} {forecast}.")  
       
-    return signal, range, forecast, forecast_range * adjust_factor[forecast]
+    forecast_range = calculate_cycle_time(sine, candle_timeframe)    
+      
+    return signal, forecast, forecast_range
 
-def calculate_forecast_range(current_range):
-    if current_range < 50:
-       forecast_range = current_range * 0.9
-    elif current_range < 100:
-       forecast_range = current_range * 0.95       
-    else:    
-       forecast_range = current_range * 0.98
-         
-    return forecast_range
+def calculate_cycle_time(sine, candle_timeframe):
+      
+    # Check for NaN values    
+    if np.isnan(sine).any():      
+        return None        
+    
+    # Calculate cycle time based on previous peaks/troughs      
+    cycle_time = int(abs(np.nanargmax(sine)-np.nanargmin(sine))*0.25)   
+        
+    # Determine multiplier based on timeframe        
+    if candle_timeframe == '1min':
+       multiplier = 1  
+    elif candle_timeframe =='3min':
+       multiplier = 3
+    elif candle_timeframe == '5min':
+       multiplier = 5            
+      
+    # Return actual cycle time    
+    return cycle_time * multiplier
 
 print()
 print("Init main() loop: ")
@@ -1688,7 +1684,7 @@ def main():
                                     print(forecast)
                         print()
 
-                        reversal_signals = get_reversal_signals(close_prices)
+                        reversal_signals = get_reversal_signals(close_prices, candle_timeframe)
                         print(reversal_signals) 
 
                         print()
