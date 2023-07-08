@@ -648,6 +648,10 @@ def main():
                 print("Error: No historical candles found.")
                 continue
 
+            close_prices = np.array([candle['close'] for candle in candles])
+            print("Close price:", close_prices[-1])
+
+
             bUSD_balance = float(get_account_balance())
             print("My BUSD balance from futures wallet is at: ", bUSD_balance)
 
@@ -666,12 +670,11 @@ def main():
 
             # Check if the '1m' key exists in the signals dictionary
             if '5m' in signals:
-                # Check if the percent to min/max signal keys exist in the '1m' dictionary
+                # Check if the percent to min/max signal keys exist in the '5m' dictionary
                 if 'ht_sine_percent_to_min' in signals['5m'] and 'ht_sine_percent_to_max' in signals['5m']:
-                    percent_to_min_val = signals['1m']['ht_sine_percent_to_min']
-                    percent_to_max_val = signals['1m']['ht_sine_percent_to_max']
+                    percent_to_min_val = signals['5m']['ht_sine_percent_to_min']
+                    percent_to_max_val = signals['5m']['ht_sine_percent_to_max']
 
-                    close_prices = np.array([candle['close'] for candle in candles_5min])
                     print("Close price:", close_prices[-1])
 
                     # Calculate the sine wave using HT_SINE
