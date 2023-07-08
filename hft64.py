@@ -538,14 +538,8 @@ print("Init main() loop: ")
 print()
 
 def main():
-    # Load credentials from file
-    with open("credentials.txt", "r") as f:
-        lines = f.readlines()
-        api_key = lines[0].strip()
-        api_secret = lines[1].strip()
-
-    # Instantiate Binance client
-    client = BinanceClient(api_key, api_secret)
+    # Instantiate Binance client and load credentials from file
+    client = get_binance_client()  
 
     # Define EM amplitude variables for each quadrant
     em_amp_q1 = 0
@@ -576,9 +570,6 @@ def main():
     # Define constants
     trade_symbol = "BTCBUSD"
      
-    fast_ema = 12       
-    slow_ema = 26         
-    
     # Define PHI constant with 15 decimals
     PHI = 1.6180339887498948482045868343656381177  
    
@@ -648,26 +639,8 @@ def main():
     url = "https://api.binance.com/api/v3/time"
     while True:       
         try:   
-            # Get the server time
-            server_time = requests.get('https://api.binance.com/api/v3/time').json()['serverTime']
-            
-            # Calculate the timestamp of your request       
-            timestamp = int(server_time - 500) # Subtract5 seconds
-            
-            # Make your request with the adjusted timestamp
-            response = requests.get(url, params={'timestamp': timestamp})
-            response = requests.get('https://api.binance.com/api/v3/time', auth=(api_key, api_secret))
-            print(response.json())
-
-            # Define current_quadrant variable
-            current_quadrant = 0
-
-            # Define start and end time for historical data
-            start_time = int(time.time()) - (1800 * 4)  # 60-minute interval (4 candles)
-            end_time = int(time.time())
-
             # Define the candles and timeframes to use for the signals
-            candles = get_historical_candles(TRADE_SYMBOL, start_time, end_time, '1m')
+            candles = get_5m_candles("BTCBUSD")
             timeframes = ['1m', '3m', '5m']
 
             # Check if candles is empty
@@ -684,19 +657,21 @@ def main():
             
             print()
 
+            close = get_current_price(trade_symbol)
+
             initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
             stop_loss = -0.0144 * initial_pnl
             take_profit = 0.0144 * initial_pnl
 
             # Check if the '1m' key exists in the signals dictionary
-            if '1m' in signals:
+            if '5m' in signals:
                 # Check if the percent to min/max signal keys exist in the '1m' dictionary
-                if 'ht_sine_percent_to_min' in signals['1m'] and 'ht_sine_percent_to_max' in signals['1m']:
+                if 'ht_sine_percent_to_min' in signals['5m'] and 'ht_sine_percent_to_max' in signals['5m']:
                     percent_to_min_val = signals['1m']['ht_sine_percent_to_min']
                     percent_to_max_val = signals['1m']['ht_sine_percent_to_max']
 
-                    close_prices = np.array([candle['close'] for candle in candles['1m']])
+                    close_prices = np.array([candle['close'] for candle in candles_5min])
                     print("Close price:", close_prices[-1])
 
                     # Calculate the sine wave using HT_SINE
@@ -794,7 +769,7 @@ def main():
                         print("EMA slow:", ema_slow)
                         print("EMA fast:", ema_fast)
 
-                        close_prices = np.array([candle['close'] for candle in candles['1m']])
+                        close_prices = candles
 
                         #Calculate X:Y ratio from golden ratio     
                         ratio = 2 * (PHI - 1)  
@@ -843,16 +818,7 @@ def main():
                         em_amp = current_em_amp
                         em_phase = current_em_phase
 
-
-                        # Check if the current price is above the EMAs and the percent to min signals are below 20%
-                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
-                            print("Buy signal!")
-
-                        # Check if the current price is below the EMAs and the percent to max signals are below 20%
-                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
-                            print("Sell signal!")
-
-                        elif percent_to_min_val < 20:
+                        if percent_to_min_val < 20:
                             print("Bullish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
@@ -1404,7 +1370,7 @@ def main():
 
                         # Print overall mood  
                         print(f"Overall market mood: {forecast['mood']}")
-
+                        
                         print()
 
                         # Define octahedron points mapped to Metatron's Cube
@@ -1527,28 +1493,33 @@ def main():
                         print(f"Trend forecast: {forecast_mood}")    
 
                         print()
+                        print(close)
 
-                        brun_low  = close_prices[-1] * brun_constant  
-                        brun_high = close_prices[-1] / brun_constant 
-                        #print(brun_low)
-                        #print(brun_high)
+                        brun_low  = close * brun_constant  
+                        brun_high = close / brun_constant 
+                        print(brun_low)
+                        print(brun_high)
 
-                        sma50 = talib.SMA(np.array(close_prices), timeperiod=50)
-                        sma50 = sma50[-1]  
-                        #print("SMA50 is now at: ", sma50)
+                        # ema is now a list
+                        ema = calculate_ema(candles, 50)
 
-                        sma100 = talib.SMA(np.array(close_prices), timeperiod=100)
-                        sma100 = sma100[-1]
-                        #print("SMA100 is now at: ", sma100)
+                        # ema is now a float
+                        last_ema50 = ema[-1]
 
-                        phi_ratio = sma100 / sma50
+                        # ema is now a float
+                        ema = calculate_ema(candles, 200)
 
-                        deviation = close_prices[-1] - sma50  
+                        # ema is now a float
+                        last_ema200 = ema[-1]
+
+                        phi_ratio = last_ema200 / last_ema50
+
+                        deviation = close - last_ema50  
                         threshold = 0.03
 
                         if deviation > threshold: # Reversal signal  
       
-                            if close_prices[-1] > brun_high: # Above Brun level 
+                            if close > brun_high: # Above Brun level 
                                 if phi_ratio < 1.2:  
         
                                     # Near term       
@@ -1566,7 +1537,7 @@ def main():
                                     range = brun_high - brun_low
                                     forecast = f"Strong continuation likely {range*phi_ratio} points or more"
                                     print(forecast)
-                            elif close_prices[-1] < brun_low: # Below Brun level  # Downtrend reversal signal    
+                            elif close < brun_low: # Below Brun level  # Downtrend reversal signal    
         
                                 if phi_ratio < 1.2:  
           
@@ -1574,38 +1545,38 @@ def main():
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:
           
-                                    range = sma50 - sma100
+                                    range = last_ema50 - last_ema200
                                     forecast = f"Reversal of up to {range*phi_ratio} points possible in medium term"
                                     print(forecast)
                                 else:
           
-                                    forecast = f"Reversal of {sma100*phi_ratio} points or more possible in long term" 
+                                    forecast = f"Reversal of {last_ema200*phi_ratio} points or more possible in long term" 
                                     print(forecast)
                         elif deviation < threshold:  # No reversal signal
                          
-                            if close_prices[-1] > sma50: # Uptrend
+                            if close > last_ema50: # Uptrend
                    
                                 if phi_ratio < 1.2:   
                                     forecast = "Uptrend likely to continue in near term"   
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:               
-                                    range = sma50 - sma100
+                                    range = last_ema50 - last_ema200
                                     forecast = f"Uptrend likely to continue {range * phi_ratio} points in medium term"
                                     print(forecast)
                                 else:               
-                                    forecast = f"Uptrend likely to continue {sma100 * phi_ratio} points or more in long term"
+                                    forecast = f"Uptrend likely to continue {last_ema200 * phi_ratio} points or more in long term"
                                     print(forecast)
-                            elif close_prices[-1] > sma50: # Downtrend       
+                            elif close > last_ema50: # Downtrend       
               
                                 if phi_ratio < 1.2:  
                                     forecast = "Downtrend likely to continue in near term" 
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:              
-                                    range = sma100 - sma50       
+                                    range = last_ema200 - last_ema50       
                                     forecast ="Downtrend likely to continue {range * phi_ratio} points in medium term"
                                     print(forecast)
                                 else:                 
-                                    forecast = f"Downtrend likely to continue {sma100 * phi_ratio} points or more in long term"
+                                    forecast = f"Downtrend likely to continue {last_ema200 * phi_ratio} points or more in long term"
                                     print(forecast)
 
                 else:
@@ -1637,11 +1608,11 @@ def main():
 
                 print("Position not open: ", position_amount)
 
-                if current_quadrant == 1 and dist_from_close_to_min <= 10.00 and quadrature > 0 and signals['1m']['momentum'] > 0.00 and point == 'Apex':
+                if current_quadrant == 1 and dist_from_close_to_min <= 10.00 and quadrature > 0 and signals['1m']['momentum'] > 0 and point == 'Apex':
                     print("Entry long triggered")
                     f.write(f"{timestamp} LONG\n")
 
-                elif current_quadrant == 4 and dist_from_close_to_max <= 10.00 and quadrature < 0 and signals['1m']['momentum'] < 0.00 and point == 'Right':
+                elif current_quadrant == 4 and dist_from_close_to_max <= 10.00 and quadrature < 0 and signals['1m']['momentum'] < 0 and point == 'Right':
                     print("Entry short triggered")
                     f.write(f"{timestamp} SHORT\n")
 
