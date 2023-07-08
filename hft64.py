@@ -713,7 +713,7 @@ def main():
 
                     # Replace NaN values with 0 using nan_to_num
                     sine_wave = np.nan_to_num(sine_wave)
-                    sine_wave = -sine_wave
+                    #sine_wave = -sine_wave
 
                     print("Current close on Sine wave:", sine_wave[-1])
 
@@ -900,7 +900,7 @@ def main():
                         cycle_direction = "UP"
                         next_quadrant = 1
 
-                        if current_quadrant == 1:
+                        if current_quadrant == 1 <= 15:
                             next_quadrant = 2  
                             cycle_direction = "UP"
 
@@ -916,7 +916,7 @@ def main():
                             elif cycle_direction == "DOWN": 
                                 next_quadrant = 2
        
-                        elif current_quadrant == 4:        
+                        elif current_quadrant == 4 <= 15:        
                             if cycle_direction == "UP":
                                 next_quadrant = 3
                                 cycle_direction = "DOWN"
