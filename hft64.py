@@ -713,7 +713,7 @@ def main():
 
                     # Replace NaN values with 0 using nan_to_num
                     sine_wave = np.nan_to_num(sine_wave)
-                    #sine_wave = -sine_wave
+                    sine_wave = -sine_wave
 
                     print("Current close on Sine wave:", sine_wave[-1])
 
