@@ -620,7 +620,7 @@ def get_reversal_signals(candles, candle_timeframe):
         signal, forecast = "sell", "top"       
          
     else:   
-        signal, forecast = "hold", "none"
+        signal, forecast = "hold", "No trade opportunity"
       
     forecast_range = calculate_cycle_time(sine, candle_timeframe)
       
@@ -641,10 +641,18 @@ def calculate_cycle_time(sine, candle_timeframe):
     elif candle_timeframe =='3min':
        multiplier = 3
     elif candle_timeframe == '5min':
-       multiplier = 5            
-      
+       multiplier = 5
+    elif candle_timeframe == '15min':
+       multiplier = 15 
+    elif candle_timeframe == '1h':
+       multiplier = 60
+    elif candle_timeframe == '4h':
+       multiplier = 240
+          
+    multiplier = cycle_time * multiplier  
+
     # Return actual cycle time    
-    return cycle_time * multiplier
+    return multiplier
 
 print()
 print("Init main() loop: ")
@@ -1701,29 +1709,35 @@ def main():
 
                         timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '4h']
 
-                        for timeframe in timeframes:
-                            if timeframe == '1min':
-                                candles = candles_1m
-                            elif timeframe == '3min': 
-                                candles = candles_3m
-                            if timeframe == '5min':
-                                candles = candles_5m
-                            elif timeframe == '15min': 
-                                candles = candles_15m
-                            if timeframe == '30min':
-                                candles = candles_30m
-                            elif timeframe == '1h': 
-                                candles = candles_1h
-                            if timeframe == '4h':
-                                candles = candles_4h
+                        candle_map = {
+                            '1min': candles_1m,  
+                            '3min': candles_3m,
+                            '5min': candles_5m,  
+                            '15min': candles_15m, 
+                            '30min': candles_30m,
+                            '1h': candles_1h,
+                            '4h': candles_4h,
+                        }
 
-                            # Call function    
-                            signal, forecast, forecast_range = get_reversal_signals(candles, timeframe)
-    
-                            # Print results
-                            print(f"{timeframe} Signal: {signal}")
-                            print(f"Forecast: {forecast}")
-                            print(f"Forecast range: {forecast_range} minutes")
+                        for timeframe in timeframes:
+
+                            candles = candle_map[timeframe]
+
+                            # Call functions    
+                            signal1 = get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5)
+                            print(signal1)
+
+                            reversal_time = (len(candles) * (60/multiplier)) + timeframe 
+                            reversal_min = candles[-1]['close'] * 0.98
+                            reversal_max = candles[-1]['close'] * 1.02
+
+                            multiplier = calculate_cycle_time(sine, candle_timeframe)
+                            reversal_time = (len(candles) * (60/multiplier)) + timeframe
+
+                            print(f"Reversal at: {reversal_time} minutes")      
+                            print(f"Estimated next minimum: {reversal_min:.2f}")      
+                            print(f"Estimated next maximum: {reversal_max:.2f}")      
+                            print(f"Current market mood: {forecast}")
 
                         print()
 
