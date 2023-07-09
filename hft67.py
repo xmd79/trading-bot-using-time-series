@@ -486,6 +486,79 @@ forecast_low, forecast_high = forecast_low_high()
 print(f"Forecast low: {forecast_low}")
 print(f"Forecast high: {forecast_high}")
 
+print()
+
+##################################################
+##################################################
+
+def get_market_mood():
+    candles = candles_1h # Use 1 hour candles
+    
+    high = max([c["high"] for c in candles[-20:]]) # Get highest high in last 20 candles
+    low = min([c["low"] for c in candles[-20:]]) # Get lowest low in last 20 candles  
+    
+    small_band = (high - low) * 0.1
+    medium_band = (high - low) * 0.25  
+    large_band = (high - low) * 0.5
+    
+    close = get_close(candles)
+    
+    if close > high - small_band:
+        mood = "Bullish"
+    elif close < low + small_band:
+        mood = "Bearish"        
+    elif close > high - medium_band:
+        if high - close < close - low:
+            mood = "Tending bullish"
+        else:
+            mood = "Somewhat bullish"
+    elif close < low + medium_band: 
+        if close - low < high - close:      
+            mood = "Tending bearish" 
+        else:      
+            mood = "Somewhat bearish"       
+    elif close > high - large_band:
+        mood = "Mildly bullish"        
+    elif close < low + large_band:
+        mood = "Mildly bearish"       
+    else:
+        mood = "Neutral"      
+
+    return mood
+
+candles = candles_1h # Use 1 hour candles
+
+high = max([c["high"] for c in candles[-20:]])  
+low = min([c["low"] for c in candles[-20:]])
+
+print(f"Highest high in last 20 candles: {high}")
+print(f"Lowest low in last 20 candles: {low}")
+
+small_band = (high - low) * 0.1
+medium_band = (high - low) * 0.25  
+large_band = (high - low) * 0.5
+
+print(f"Small band: {small_band}") 
+print(f"Medium band: {medium_band}")
+print(f"Large band: {large_band}")   
+
+close = get_close(candles)
+
+print(f"Current close: {close}")
+
+distance_to_high = high - close        
+distance_to_low = close - low
+
+print(f"Distance to high: {distance_to_high}")      
+print(f"Distance to low: {distance_to_low}")  
+
+mood = get_market_mood()
+
+print(f"Market mood: {mood}")  
+
+print()
+
+
 ##################################################
 ##################################################
 
