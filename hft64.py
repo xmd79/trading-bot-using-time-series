@@ -626,33 +626,36 @@ def get_reversal_signals(candles, candle_timeframe):
       
     return signal, forecast, forecast_range
 
-def calculate_cycle_time(sine, candle_timeframe):
-      
-    # Check for NaN values    
-    if np.isnan(sine).any():      
-        return None        
+def calculate_cycle_time(close_prices, candle_timeframe):
     
-    # Calculate cycle time based on previous peaks/troughs      
-    cycle_time = int(abs(np.nanargmax(sine)-np.nanargmin(sine))*0.25)   
-        
-    # Determine multiplier based on timeframe        
+    multipliers = {
+       "1min": 1,
+       "3min": 3,
+       "5min": 5,
+       "15min": 15,
+       "1h": 60, 
+       "4h": 240
+    }
+    
+    # Check for 1 min candles      
     if candle_timeframe == '1min':
-       multiplier = 1  
-    elif candle_timeframe =='3min':
-       multiplier = 3
-    elif candle_timeframe == '5min':
-       multiplier = 5
-    elif candle_timeframe == '15min':
-       multiplier = 15 
-    elif candle_timeframe == '1h':
-       multiplier = 60
-    elif candle_timeframe == '4h':
-       multiplier = 240
-          
-    multiplier = cycle_time * multiplier  
+       if np.isnan(close_prices).any():          
+           print("1 min candles contain NaN, using default cycle time")
+           return 1    
+             
+    # Check for other candles 
+    if np.isnan(close_prices).any():           
+       return 0
+         
+    cycle_time = abs(np.nanargmax(close_prices) - np.nanargmin(close_prices))*0.25 
 
-    # Return actual cycle time    
-    return multiplier
+    multiplier = cycle_time * multipliers[candle_timeframe]
+            
+    if multiplier == 0:
+       multiplier = 1
+       print("Warning: Zero cycle time returned! Setting to 1 minute...")
+            
+    return int(multiplier)
 
 print()
 print("Init main() loop: ")
@@ -1725,10 +1728,11 @@ def main():
                             # Call functions    
                             signals, mtf_signal = get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5)
 
-                            if signal in signals[timeframe]:
+                            if signal == signals[timeframe]:
                                 forecast = mtf_signal
 
                             multiplier = calculate_cycle_time(sine, timeframe)
+                            print(f"Timeframe: {timeframe}, Multiplier: {multiplier}")
 
                             if multiplier is None:
                                 reversal_time = 0
