@@ -1725,7 +1725,7 @@ def main():
                             # Call functions    
                             signals, mtf_signal = get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5)
 
-                            if signal in signal1[timeframe]:
+                            if signal in signals[timeframe]:
                                 forecast = mtf_signal
 
                             multiplier = calculate_cycle_time(sine, timeframe)
