@@ -458,4 +458,35 @@ print()
 ##################################################
 ##################################################
 
+def forecast_low_high():
+    
+    lows = []
+    highs = []
+    
+    for timeframe, candles in candle_map.items():
+        
+        # Get last 100 candles
+        recent_candles = candles[-100:]
+        
+        # Find lowest low and highest high
+        lowest_low = min([c["low"] for c in recent_candles])
+        highest_high = max([c["high"] for c in recent_candles])
+        
+        lows.append(lowest_low)
+        highs.append(highest_high)
+        
+    # Take average of lows and highs  
+    forecast_low = np.mean(lows)
+    forecast_high = np.mean(highs)
+        
+    return forecast_low, forecast_high
+
+forecast_low, forecast_high = forecast_low_high()
+
+print(f"Forecast low: {forecast_low}")
+print(f"Forecast high: {forecast_high}")
+
+##################################################
+##################################################
+
 
