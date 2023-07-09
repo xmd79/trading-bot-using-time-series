@@ -271,7 +271,7 @@ candle_map = {
 ##################################################
 ##################################################
 
-# Define ema moving averages crosses and getting percentage dist. from close to them:
+# Define ema moving averages crosses and getting percentage dist. from close to each of them:
 
 def get_emacross_mtf_signal(): 
 
