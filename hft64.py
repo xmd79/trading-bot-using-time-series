@@ -601,62 +601,6 @@ candle_timeframe = '4h'
 
 timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '4h']
 
-def get_reversal_signals(candles, candle_timeframe):   
-   
-    # Calculate supergolden ratio value
-    supergolden = (1 + 5 ** 0.5) / 2
-   
-    # Calculate HT_SINE    
-    close_prices = np.array([candle['close'] for candle in candles])    
-    sine, _ = talib.HT_SINE(close_prices)  
-          
-    # Normalize sine wave     
-    sine = (sine - min(sine)) / (max(sine) - min(sine))      
-        
-    if sine[-1] <= 1/supergolden:               
-        signal, forecast = "buy", "dip"         
-         
-    elif sine[-1] >= 1 - 1/supergolden:               
-        signal, forecast = "sell", "top"       
-         
-    else:   
-        signal, forecast = "hold", "No trade opportunity"
-      
-    forecast_range = calculate_cycle_time(sine, candle_timeframe)
-      
-    return signal, forecast, forecast_range
-
-def calculate_cycle_time(close_prices, candle_timeframe):
-    
-    multipliers = {
-       "1min": 1,
-       "3min": 3,
-       "5min": 5,
-       "15min": 15,
-       "1h": 60, 
-       "4h": 240
-    }
-    
-    # Check for 1 min candles      
-    if candle_timeframe == '1min':
-       if np.isnan(close_prices).any():          
-           print("1 min candles contain NaN, using default cycle time")
-           return 1    
-             
-    # Check for other candles 
-    if np.isnan(close_prices).any():           
-       return 0
-         
-    cycle_time = abs(np.nanargmax(close_prices) - np.nanargmin(close_prices))*0.25 
-
-    multiplier = cycle_time * multipliers[candle_timeframe]
-            
-    if multiplier == 0:
-       multiplier = 1
-       print("Warning: Zero cycle time returned! Setting to 1 minute...")
-            
-    return int(multiplier)
-
 print()
 print("Init main() loop: ")
 print()
@@ -1708,7 +1652,7 @@ def main():
                         print()
 
                         timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '4h']
-                        forecast = "bullish"
+
                         candle_map = {
                             '1min': candles_1m,  
                             '3min': candles_3m,
@@ -1728,25 +1672,6 @@ def main():
                             # Call functions    
                             signals, mtf_signal = get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5)
 
-                            if signal == signals[timeframe]:
-                                forecast = mtf_signal
-
-                            multiplier = calculate_cycle_time(sine, timeframe)
-                            print(f"Timeframe: {timeframe}, Multiplier: {multiplier}")
-
-                            if multiplier is None:
-                                reversal_time = 0
-                            else:          
-                                reversal_time = int(len(candles) * (60/multiplier)) + int(timeframe[:-3])
-
-                            reversal_time = int(len(candles) * (60/multiplier)) + int(timeframe[:-3])
-                            reversal_min = candles[-1]['close'] * 0.98
-                            reversal_max = candles[-1]['close'] * 1.02
-
-                            print(f"Reversal at: {reversal_time} minutes")      
-                            print(f"Estimated next minimum: {reversal_min:.2f}")      
-                            print(f"Estimated next maximum: {reversal_max:.2f}")      
-                            print(f"Current market mood: {forecast}")
 
                         print()
 
