@@ -1704,11 +1704,8 @@ def main():
                                     print(forecast)
                         print()
 
-                        #reversal_signals = get_reversal_signals(close_prices, candle_timeframe)
-                        #print(reversal_signals) 
-
                         timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '4h']
-
+                        forecast = "bullish"
                         candle_map = {
                             '1min': candles_1m,  
                             '3min': candles_3m,
@@ -1722,17 +1719,25 @@ def main():
                         for timeframe in timeframes:
 
                             candles = candle_map[timeframe]
+                            close_prices = np.array([candle['close'] for candle in candles])
+                            sine, leadsine = talib.HT_SINE(close_prices)
 
                             # Call functions    
-                            signal1 = get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5)
-                            print(signal1)
+                            signals, mtf_signal = get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5)
 
-                            reversal_time = (len(candles) * (60/multiplier)) + timeframe 
+                            if signal in signal1[timeframe]:
+                                forecast = mtf_signal
+
+                            multiplier = calculate_cycle_time(sine, timeframe)
+
+                            if multiplier is None:
+                                reversal_time = 0
+                            else:          
+                                reversal_time = int(len(candles) * (60/multiplier)) + int(timeframe[:-3])
+
+                            reversal_time = int(len(candles) * (60/multiplier)) + int(timeframe[:-3])
                             reversal_min = candles[-1]['close'] * 0.98
                             reversal_max = candles[-1]['close'] * 1.02
-
-                            multiplier = calculate_cycle_time(sine, candle_timeframe)
-                            reversal_time = (len(candles) * (60/multiplier)) + timeframe
 
                             print(f"Reversal at: {reversal_time} minutes")      
                             print(f"Estimated next minimum: {reversal_min:.2f}")      
