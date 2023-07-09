@@ -206,6 +206,8 @@ def get_3d_candles(symbol):
 ##################################################
 ##################################################
 
+# getting KLINE data from binance servers for asset symbol:
+
 # Get 1 minute candles
 candles_1m = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_1MINUTE) 
 
@@ -248,6 +250,8 @@ candles_3D = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_3DAY)
 ##################################################
 ##################################################
 
+# moving KLINE data received from binance server within candle_map{} dict. :
+
 candle_map = {
     '1min': candles_1m,  
     '3min' : candles_3m,  
@@ -266,6 +270,8 @@ candle_map = {
 
 ##################################################
 ##################################################
+
+# Define ema moving averages crosses and getting percentage dist. from close to them:
 
 def get_emacross_mtf_signal(): 
 
@@ -330,8 +336,8 @@ def get_emacross_mtf_signal():
         print(f"{timeframe} - Fast EMA: {ema_fast}")   
         print(f"{timeframe} - Slow EMA: {ema_slow}") 
 
-        print(f"{timeframe} - Close price value to Slow 200EMA value diff: {slow_diff:.2f}%")
-        print(f"{timeframe} - Close price value to Fast 50EMA value diff: {fast_diff:.2f}%") 
+        print(f"{timeframe} - Close price value to Slow EMA value diff: {slow_diff:.2f}%")
+        print(f"{timeframe} - Close price value to Fast EMA value diff: {fast_diff:.2f}%") 
 
         print()
 
@@ -372,5 +378,4 @@ print()
 
 ##################################################
 ##################################################
-
 
