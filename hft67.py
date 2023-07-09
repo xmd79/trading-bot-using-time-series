@@ -1,3 +1,5 @@
+# Start code:
+
 print()
 
 ##################################################
@@ -12,9 +14,10 @@ print()
 print("Test")
 print()
 
+##################################################
+##################################################
 
-##################################################
-##################################################
+# Import modules:
 
 import math
 import time
@@ -28,6 +31,8 @@ from decimal import Decimal
 import decimal
 import random
 import statistics
+
+from typing import Tuple
 
 ##################################################
 ##################################################
@@ -53,6 +58,7 @@ client = BinanceClient(api_key, api_secret)
 ##################################################
 
 # Define a function to get the account balance in BUSD
+
 def get_account_balance():
     accounts = client.futures_account_balance()
     for account in accounts:
@@ -70,6 +76,8 @@ print()
 ##################################################
 ##################################################
 
+# Define vars and constants for data calculations:
+
 # Calculate the trade size based on the USDT balance with 20x leverage
 TRADE_SIZE = bUSD_balance * 20
 
@@ -79,17 +87,25 @@ TRADE_SYMBOL = 'BTCBUSD'
 TRADE_TYPE = ''
 TRADE_LVRG = 20
 
-STOP_LOSS_THRESHOLD = 0.0144 # define 1.44% for stoploss
-TAKE_PROFIT_THRESHOLD = 0.0144 # define 1.44% for takeprofit
+# define % for stoploss
+STOP_LOSS_THRESHOLD = 0.0234 
 
+# define % for takeprofit
+TAKE_PROFIT_THRESHOLD = 0.0234 
+
+# Define EMA-s:
 EMA_SLOW_PERIOD = 200
 EMA_FAST_PERIOD = 50
 
-BUY_THRESHOLD = 3
+BUY_THRESHOLD = 5
 SELL_THRESHOLD = 3
 
-EMA_THRESHOLD_LONG = 5 # Close must be within 5% of slow EMA for long entry
-EMA_THRESHOLD_SHORT = 20 # Close must be within 20% of fast EMA for short entry
+EMA_THRESHOLD_LONG = 12 # Close must be within 5% of slow EMA for long entry
+EMA_THRESHOLD_SHORT = 5 # Close must be within 5% of fast EMA for short entry
+
+LONG_SIGNAL = 1
+SHORT_SIGNAL = -1
+NO_SIGNAL = 0 
 
 closed_positions = []
 
@@ -98,7 +114,8 @@ OPPOSITE_SIDE = {'long': 'SELL', 'short': 'BUY'}
 ##################################################
 ##################################################
 
-# Initialize variables for tracking trade state
+# Initialize variables for tracking trade state:
+
 trade_open = False
 trade_side = None
 
@@ -113,11 +130,14 @@ trade_percentage = 0
 ##################################################
 ##################################################
 
-# Define timeframes
+# Define timeframes:
+
 timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '2h', '4h',  '6h', '8h', '12h', '1D',  '3D']
 
 ##################################################
 ##################################################
+
+# Define binance client reading api key and secret from local file:
 
 def get_binance_client():
     # Read credentials from file    
@@ -136,6 +156,8 @@ client = get_binance_client()
 
 ##################################################
 ##################################################
+
+# Extrct kline data for candels via api from binance eserver:
 
 def get_candles(symbol, timeframe):
     """Get all candles for a symbol and timeframe"""
@@ -206,8 +228,6 @@ def get_3d_candles(symbol):
 ##################################################
 ##################################################
 
-# getting KLINE data from binance servers for asset symbol:
-
 # Get 1 minute candles
 candles_1m = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_1MINUTE) 
 
@@ -250,7 +270,7 @@ candles_3D = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_3DAY)
 ##################################################
 ##################################################
 
-# moving KLINE data received from binance server within candle_map{} dict. :
+# move KLINE data received from binance server within candle_map{} dict. :
 
 candle_map = {
     '1min': candles_1m,  
@@ -270,6 +290,29 @@ candle_map = {
 
 ##################################################
 ##################################################
+
+# Get close price as array
+def get_close(candles):
+  "Get last close price from candles"
+  return candles[-1]["close"]
+
+##################################################
+##################################################
+
+# Function to get EMAs with np arrays
+def get_emas(close_prices: np.ndarray) -> Tuple[float,float]:
+    ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]   
+    ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]   
+    return ema_slow, ema_fast
+
+##################################################
+##################################################
+
+#Checking EMA crosees:
+
+def check_cross(ema_slow: float, ema_fast: float) -> bool:  
+  "Check if EMAs have crossed"
+  return ema_slow < ema_fast  
 
 # Define ema moving averages crosses and getting percentage dist. from close to each of them:
 
@@ -378,4 +421,41 @@ print()
 
 ##################################################
 ##################################################
+
+# Function to check where close is relative to EMAs   
+def get_signal() -> Tuple[int, str]:
+      
+    for timeframe, candles in candle_map.items():
+        
+        candle_array = np.array([candle["close"] for candle in candles])   
+        ema_slow, ema_fast = get_emas(candle_array)  
+          
+        if candle_array[-1] < ema_slow:
+            print(f"{timeframe} - Close below slow EMA, potential reversal point.")
+            
+        if candle_array[-1] < ema_fast:        
+            print(f"{timeframe} - Close below fast EMA, potential support.")
+            
+        if candle_array[-1] < ema_slow and candle_array[-1] < ema_fast:
+            print(f"{timeframe} - Close below both EMAs, strong reversal signal.")
+                
+        if candle_array[-1] > ema_slow:
+            print(f"{timeframe} - Close above slow EMA, potential resistance.")
+                    
+        if candle_array[-1] > ema_fast:
+            print(f"{timeframe} - Close above fast EMA, potential resistance.")
+                    
+        if candle_array[-1] > ema_slow and candle_array[-1] > ema_fast:
+           print(f"{timeframe} - Close above both EMAs, strong bullish signal.")
+            
+    return NO_SIGNAL, None
+            
+# Call function       
+signal, timeframe = get_signal() 
+
+print()
+
+##################################################
+##################################################
+
 
