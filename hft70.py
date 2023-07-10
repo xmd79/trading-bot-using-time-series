@@ -528,6 +528,19 @@ def calculate_ema(candles, period):
         ema.append((price - ema[-1]) * multiplier + ema[-1])
     return ema
 
+def is_prime(n):
+    if n <= 1:
+        return False
+    elif n == 2:
+        return True
+    elif n % 2 == 0:
+        return False
+    else:
+        for i in range(3, int(n**0.5) + 1, 2):
+            if n % i == 0:
+                return False
+        return True
+
 print()
 print("Init main() loop: ")
 print()
@@ -1524,7 +1537,10 @@ def main():
                         print()
                         
                         print("Close price:", close_prices[-1])
-   
+
+                        ema_fast = 50
+                        ema_slow = 200
+
                         # Calculate EMAs 
                         ema_fast = talib.EMA(close_prices, timeperiod=fast_ema)[-1]    
                         ema_slow = talib.EMA(close_prices, timeperiod=slow_ema)[-1]
@@ -1533,6 +1549,54 @@ def main():
                         print(ema_fast)
                         print(ema_slow)
 
+                        # Calculate phi ratio        
+                        phi_ema_ratio = ema_slow / ema_fast
+                        print(f"Phi EMA Ratio: {phi_ema_ratio}")
+
+                        # Define interval as min/max of last N candles    
+                        N = 20  
+
+                        interval = [min(close_prices[-N:]), max(close_prices[-N:])]  
+
+                        # Calculate logarithmic integral at upper bound      
+                        li_y = np.log(interval[1]) * interval[1] 
+                        print(f"Logarithmic Integral: {li_y}")
+
+                        # Calculate Brun's constant times phi      
+                        brun_factor = 2 * phi_ema_ratio
+                        print(f"Brun Factor: {brun_factor}")
+
+                        # Calculate lower and upper Brun bounds
+                        brun_low = brun_factor * li_y / np.log(interval[1] - interval[0] + 1)   
+                        brun_high = brun_low * np.log(interval[1] - interval[0] + 1)
+
+                        print(f"Lower Brun Bound: {brun_low}")
+                        print(f"Upper Brun Bound: {brun_high}")
+
+                        # Count actual primes in interval    
+                        prime_count = 0
+
+                        lower = interval[0]  
+                        upper = interval[1] + 1
+                        print(f"Lower Bound: {lower}")
+                        print(f"Upper Bound: {upper}")
+ 
+                        # Define step size
+                        step = 1
+
+                        for i in np.arange(lower, upper, step):
+                            if is_prime(n):
+                                prime_count += 1
+        
+                        # Compare to Brun bounds       
+                        print(f"Actual prime count: {prime_count}") 
+
+                        # Calculate Fibonacci ratios
+                        fibo_ratio_low = (interval[1] - interval[0]) / interval[1]
+                        fibo_ratio_high = (interval[1] - interval[0]) / interval[0]
+
+                        print(f"Fibonacci Ratio Low: {fibo_ratio_low}")
+                        print(f"Fibonacci Ratio High: {fibo_ratio_high}")
 
                         print()
 
