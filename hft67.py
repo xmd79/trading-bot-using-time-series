@@ -608,3 +608,37 @@ print()
 ##################################################
 ##################################################
 
+def ratio_on_sine():
+    # Distance from close to min/max in degrees
+    distance_min = 30  
+    distance_max = 150
+    
+    # Calculate sine values 
+    sin_close = math.sin(math.radians(90)) 
+    sin_min = math.sin(math.radians(90 - distance_min))
+    sin_max = math.sin(math.radians(90 + distance_max))
+    
+    # Calculate ratios 
+    sin_close_min_ratio = sin_close / sin_min
+    sin_close_max_ratio = sin_close / sin_max
+    
+    # Convert to percentages 
+    min_diff = (1 - sin_close_min_ratio) * 100
+    max_diff = (1 - sin_close_max_ratio) * 100
+    
+    print(f"Close is {distance_min} degrees from sine min")  
+    print(f"Close is {distance_max} degrees from sine max")
+    print(f"Close to min ratio: {sin_close_min_ratio:.2f}")
+    print(f"Close to max ratio: {sin_close_max_ratio:.2f}")    
+    print(f"Potential min reversal: {min_diff:.2f}%")   
+    print(f"Potential max reversal: {max_diff:.2f}%")
+
+# Call with different distances
+ratio_on_sine()   
+distance_min = 20     
+distance_max = 120
+
+print()
+
+##################################################
+##################################################
