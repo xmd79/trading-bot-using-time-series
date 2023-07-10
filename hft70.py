@@ -151,7 +151,6 @@ def get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5):
 
     # Calculate HT SINE                 
     sine, leadsine = talib.HT_SINE(data[:, 3]) 
-    sine = -sine
 
     # Normalize the HT sine wave indicator to the minimum and maximum prices in the market data
     min_price = np.nanmin(data[:, 3])
