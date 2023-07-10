@@ -730,19 +730,131 @@ print(market_mood)
 
 print()  
  
-print("Support and resistance levels:")   
-print(f"Support 1: {support1}")    
-print(f"Support 2: {support2}")        
-print(f"Support 3: {support3}")
-
-print()
-print(f"Resistance 1: {resistance1}")
-print(f"Resistance 2: {resistance2}")        
-print(f"Resistance 3: {resistance3}")
-
-print()
-
 
 ##################################################
 ##################################################
 
+
+def get_angle(ratio):
+    if ratio <= 0.1:
+        angle = 90 - ratio*180  
+        return angle
+            
+    if ratio <= 0.2:  
+        angle = 90   
+        return angle  
+             
+    if ratio <= 0.3: 
+        angle = 60
+        return angle   
+            
+    if ratio <= 0.4:   
+        angle = 120   
+        return angle
+        
+    if ratio <= 0.5:   
+        angle = 180
+        return angle 
+        
+    if ratio <= 0.6:    
+        angle = 240   
+        return angle 
+            
+    if ratio <= 0.7:   
+        angle = 300
+        return angle
+      
+    if ratio <= 0.8: 
+        angle = 0 
+        return angle
+            
+    if ratio <= 0.9: 
+        angle = 30
+        return angle
+        
+    if ratio <= 1.0:
+        angle = 330
+        return angle
+
+def get_sincos(angle):    
+     angle_rad = math.radians(angle)
+     return math.sin(angle_rad),  math.cos(angle_rad)
+     
+def get_quadrant(angle):
+     
+    if angle >= 0 and angle < 90:
+        return 1
+         
+    if angle >= 90 and angle < 180:  
+        return 2
+         
+    if angle >= 180 and angle < 270:
+        return 3
+         
+    if angle >= 270 and angle < 360:
+        return 4 
+
+def unit_circle_ratios(candles):
+
+    # Get close price
+    close = get_close(candles)
+
+    # Calculate close ratio
+    close_ratio = close / high  
+    
+    # Calculate close angle    
+    close_angle = get_angle(close_ratio) 
+
+    # Now call get_sincos() after defining close_angle    
+    sin_close, cos_close = get_sincos(close_angle)
+    
+    print(f"Close angle: {close_angle}")  
+
+    # Calculate sin and cos for potential support 
+    support_angle = get_angle(support_ratio)        
+    sin_support, cos_support = get_sincos(support_angle) 
+    
+    print(f"Support angle: {support_angle}")
+    
+    # Calculate ratio for potential support    
+    ratio_support = sin_close / sin_support  
+    
+    print(f"Ratio for potential support: {ratio_support}")
+    
+    # Calculate sin and cos for potential resistance     
+    resistance_angle = get_angle(resistance_ratio)    
+    sin_resistance, cos_resistance = get_sincos(resistance_angle)  
+
+    print(f"Resistance angle: {resistance_angle}")
+    
+    # Calculate ratio for potential resistance    
+    ratio_resistance = sin_close / sin_resistance
+    
+    print(f"Ratio for potential resistance: {ratio_resistance}")
+        
+    # Get quadrants for close, support and resistance
+    close_quadrant =  get_quadrant(close_angle)    
+    support_quadrant = get_quadrant(support_angle)    
+    resistance_quadrant = get_quadrant(resistance_angle)
+        
+    print(f"Close quadrant: {close_quadrant}")
+    print(f"Support quadrant: {support_quadrant}")
+    print(f"Resistance quadrant: {resistance_quadrant}")
+        
+    return (
+        ratio_support, 
+        support_quadrant,
+        ratio_resistance,
+        resistance_quadrant,
+        close_quadrant
+    )
+
+support_ratio = resistance_ratio = 0.5
+
+# Get 5m candles 
+candles = get_5m_candles(TRADE_SYMBOL)
+
+# Call function with candle data
+ratio_support, support_quadrant, ratio_resistance, resistance_quadrant, close_quadrant = unit_circle_ratios(candles)  
+
+print(ratio_support)
