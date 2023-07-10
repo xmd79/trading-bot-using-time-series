@@ -550,6 +550,8 @@ def main():
     sine_wave_min = -1
     sine_wave_max = 1
 
+    quadrant = 1
+
     # Define min and max values for percentages from close to min and max of talib HT_SINE
     percent_to_min_val = 10
     percent_to_max_val = 10
@@ -887,26 +889,34 @@ def main():
                         cycle_direction = "UP"
                         next_quadrant = 1
 
+                        # Up cycle         
                         if current_quadrant == 1:
-                            next_quadrant = 2  
+                            next_quadrant = 2
                             cycle_direction = "UP"
-
-                        elif current_quadrant == 2:
-                            if cycle_direction == "UP":
-                                next_quadrant = 3
-                            elif cycle_direction == "DOWN":
-                                next_quadrant = 1
         
-                        elif current_quadrant == 3:        
-                            if cycle_direction == "UP":
-                                next_quadrant = 4        
-                            elif cycle_direction == "DOWN": 
-                                next_quadrant = 2
-       
-                        elif current_quadrant == 4:        
-                            if cycle_direction == "UP":
-                                next_quadrant = 3
-                                cycle_direction = "DOWN"
+                        elif current_quadrant == 2:
+                            next_quadrant = 3
+                            cycle_direction = "UP"
+        
+                        elif current_quadrant == 3:
+                            next_quadrant = 4 + 1 % 4  
+                            cycle_direction = "UP"
+        
+                        # Down cycle 
+                        elif current_quadrant == 4:
+                            next_quadrant = 3 
+                            cycle_direction = "DOWN"
+        
+                        elif current_quadrant == 3:
+                            next_quadrant = 2   
+                            cycle_direction = "DOWN"
+        
+                        elif current_quadrant == 2:
+                            next_quadrant = 1 
+                            cycle_direction = "DOWN" 
+        
+                        # Update state     
+                        current_quadrant = next_quadrant 
 
                         # Calculate quadrature phase                       
                         if next_quadrant == 1:     
@@ -1085,6 +1095,7 @@ def main():
 
                         lowest_frequency = float('inf')
                         highest_frequency = 0
+                        current_frequency = 0 
 
                         min_quadrant = None  
                         max_quadrant = None
@@ -1594,6 +1605,59 @@ def main():
                                 else:                 
                                     forecast = f"Downtrend likely to continue {sma100 * phi_ratio} points or more in long term"
                                     print(forecast)
+
+                        
+                        # Calculate the minimum and maximum values of the sine wave
+                        sine_wave_min = np.min(sine_wave)
+                        sine_wave_max = np.max(sine_wave)
+
+                        # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
+                        dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+                        dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
+
+                        cycle_direction = "UP"
+                        next_quadrant = 1
+
+                        # Up cycle         
+                        if current_quadrant == 1 and dist_from_close_to_min < 0.25:
+                            next_quadrant = 2
+                            cycle_direction = "UP"
+        
+                        elif current_quadrant == 2:
+                            next_quadrant = 3
+                            cycle_direction = "UP"
+        
+                        elif current_quadrant == 3:
+                            next_quadrant = 4  
+                            cycle_direction = "UP"
+        
+                        # Down cycle 
+                        elif current_quadrant == 4 and dist_from_close_to_max < 0.25:
+                            next_quadrant = 3 
+                            cycle_direction = "DOWN"
+        
+                        elif current_quadrant == 3:
+                            next_quadrant = 2   
+                            cycle_direction = "DOWN"
+        
+                        elif current_quadrant == 2:
+                            next_quadrant = 1 
+                            cycle_direction = "DOWN" 
+        
+                        elif current_quadrant == 1:
+                            next_quadrant = 4   
+                            cycle_direction = "UP"
+
+                        print()
+
+                        print("Distance from close to min:", dist_from_close_to_min)
+                        print("Distance from close to max:", dist_from_close_to_max)
+     
+                        print(f"Close is {dist_from_close_to_min}% from min and {dist_from_close_to_max}% from max")  
+
+                        #print("last quadrant: ", last_quadrant)
+                        print("current quadrant: ", current_quadrant)
+                        print("next quadrant: ", next_quadrant)
 
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
