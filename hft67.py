@@ -562,4 +562,49 @@ print()
 ##################################################
 ##################################################
 
+# Function to calculate momentum forecast 
+def momentum_forecast():
+    
+    # Get candles from multiple timeframes
+    candles_1h = get_1h_candles(TRADE_SYMBOL)
+    candles_4h = get_4h_candles(TRADE_SYMBOL)
+    candles_1D = get_1d_candles(TRADE_SYMBOL)
+    
+    # Initialize momentum variables   
+    momentum = 0
+    momentum_levels = []
+    
+    # Loop through candles and calculate momentum   
+    for candles in [candles_1h, candles_4h, candles_1D]:
+        
+        # Get last 10 closes
+        closes = [c["close"] for c in candles[-10:]]
+        
+        # Calculate momentum as % change from first to last close
+        first_close = closes[0]
+        last_close = candles[-1]["close"]   
+        momentum += (last_close - first_close) / first_close * 100
+        
+    # Add to momentum levels            
+    momentum_levels.append(momentum)
+        
+    # Take average momentum    
+    avg_momentum = np.mean(momentum_levels)
+        
+    print(f"Average 1h, 4h and 1D momentum: {avg_momentum:.2f}%")
+    
+    if avg_momentum > 5:
+        print("Market has strong positive momentum")        
+    elif avg_momentum < -5:
+        print("Market has strong negative momentum")
+    else:   
+        print("Market momentum is neutral")
+            
+# Call function
+momentum_forecast()
+
+print()
+
+##################################################
+##################################################
 
