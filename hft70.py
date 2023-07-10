@@ -399,6 +399,14 @@ def get_historical_candles(symbol, start_time, end_time, timeframe):
 
     return candles_by_timeframe
 
+def get_interval_in_seconds(interval):
+    if interval == "1m":
+        return 60 
+    elif interval == "3m":
+        return 3 * 60
+    elif interval == "5m":
+        return 5 *60
+
 def get_current_price(symbol):
     ticker = client.futures_symbol_ticker(symbol=symbol)
     return float(ticker['price'])
@@ -549,8 +557,6 @@ def main():
     # Define minimum and maximum values for the sine wave
     sine_wave_min = -1
     sine_wave_max = 1
-
-    quadrant = 1
 
     # Define min and max values for percentages from close to min and max of talib HT_SINE
     percent_to_min_val = 10
@@ -889,34 +895,26 @@ def main():
                         cycle_direction = "UP"
                         next_quadrant = 1
 
-                        # Up cycle         
                         if current_quadrant == 1:
-                            next_quadrant = 2
+                            next_quadrant = 2  
                             cycle_direction = "UP"
-        
+
                         elif current_quadrant == 2:
-                            next_quadrant = 3
-                            cycle_direction = "UP"
+                            if cycle_direction == "UP":
+                                next_quadrant = 3
+                            elif cycle_direction == "DOWN":
+                                next_quadrant = 1
         
-                        elif current_quadrant == 3:
-                            next_quadrant = 4 + 1 % 4  
-                            cycle_direction = "UP"
-        
-                        # Down cycle 
-                        elif current_quadrant == 4:
-                            next_quadrant = 3 
-                            cycle_direction = "DOWN"
-        
-                        elif current_quadrant == 3:
-                            next_quadrant = 2   
-                            cycle_direction = "DOWN"
-        
-                        elif current_quadrant == 2:
-                            next_quadrant = 1 
-                            cycle_direction = "DOWN" 
-        
-                        # Update state     
-                        current_quadrant = next_quadrant 
+                        elif current_quadrant == 3:        
+                            if cycle_direction == "UP":
+                                next_quadrant = 4        
+                            elif cycle_direction == "DOWN": 
+                                next_quadrant = 2
+       
+                        elif current_quadrant == 4:        
+                            if cycle_direction == "UP":
+                                next_quadrant = 3
+                                cycle_direction = "DOWN"
 
                         # Calculate quadrature phase                       
                         if next_quadrant == 1:     
@@ -1095,7 +1093,6 @@ def main():
 
                         lowest_frequency = float('inf')
                         highest_frequency = 0
-                        current_frequency = 0 
 
                         min_quadrant = None  
                         max_quadrant = None
@@ -1511,204 +1508,56 @@ def main():
 
                         # Forecast mood 
                         if current_momentum < -2:
-                            forecast_mood = 'bearish'
+                            forecast_mood = 'bullish'
                         elif current_momentum < 0:
-                            forecast_mood = 'slightly bearish'    
+                            forecast_mood = 'slightly bullish'    
                         elif current_momentum == 0:        
                             forecast_mood = 'neutral'
                         elif current_momentum > 0:        
-                            forecast_mood = 'slightly bullish'
+                            forecast_mood = 'slightly bearish'
                         elif current_momentum > 2:
-                            forecast_mood = 'bullish'
+                            forecast_mood = 'bearish'
 
                         print(f"Current momentum: {current_momentum}")     
                         print(f"Trend forecast: {forecast_mood}")    
 
                         print()
-
-                        brun_low  = close_prices[-1] * brun_constant  
-                        brun_high = close_prices[-1] / brun_constant 
-                        #print(brun_low)
-                        #print(brun_high)
-
-                        sma50 = talib.SMA(np.array(close_prices), timeperiod=50)
-                        sma50 = sma50[-1]  
-                        #print("SMA50 is now at: ", sma50)
-
-                        sma100 = talib.SMA(np.array(close_prices), timeperiod=100)
-                        sma100 = sma100[-1]
-                        #print("SMA100 is now at: ", sma100)
-
-                        phi_ratio = sma100 / sma50
-
-                        deviation = close_prices[-1] - sma50  
-                        threshold = 0.03
-
-                        if deviation > threshold: # Reversal signal  
-      
-                            if close_prices[-1] > brun_high: # Above Brun level 
-                                if phi_ratio < 1.2:  
-        
-                                    # Near term       
-                                    forecast = f"Continuation likely for {15*phi_ratio} periods"      
-                                    print(forecast)
-                                elif 1.2 <= phi_ratio < 1.5:       
-        
-                                    # Medium term        
-                                    range = (brun_high - brun_low) * 0.5
-                                    forecast = f"Continuation likely {range*phi_ratio} points in the medium term"  
-                                    print(forecast)
-                                else:  
-        
-                                    # Long term     
-                                    range = brun_high - brun_low
-                                    forecast = f"Strong continuation likely {range*phi_ratio} points or more"
-                                    print(forecast)
-                            elif close_prices[-1] < brun_low: # Below Brun level  # Downtrend reversal signal    
-        
-                                if phi_ratio < 1.2:  
-          
-                                    forecast = f"Reversal likely in {15*phi_ratio} periods"
-                                    print(forecast)
-                                elif 1.2 <= phi_ratio < 1.5:
-          
-                                    range = sma50 - sma100
-                                    forecast = f"Reversal of up to {range*phi_ratio} points possible in medium term"
-                                    print(forecast)
-                                else:
-          
-                                    forecast = f"Reversal of {sma100*phi_ratio} points or more possible in long term" 
-                                    print(forecast)
-                        elif deviation < threshold:  # No reversal signal
-                         
-                            if close_prices[-1] > sma50: # Uptrend
-                   
-                                if phi_ratio < 1.2:   
-                                    forecast = "Uptrend likely to continue in near term"   
-                                    print(forecast)
-                                elif 1.2 <= phi_ratio < 1.5:               
-                                    range = sma50 - sma100
-                                    forecast = f"Uptrend likely to continue {range * phi_ratio} points in medium term"
-                                    print(forecast)
-                                else:               
-                                    forecast = f"Uptrend likely to continue {sma100 * phi_ratio} points or more in long term"
-                                    print(forecast)
-                            elif close_prices[-1] > sma50: # Downtrend       
-              
-                                if phi_ratio < 1.2:  
-                                    forecast = "Downtrend likely to continue in near term" 
-                                    print(forecast)
-                                elif 1.2 <= phi_ratio < 1.5:              
-                                    range = sma100 - sma50       
-                                    forecast ="Downtrend likely to continue {range * phi_ratio} points in medium term"
-                                    print(forecast)
-                                else:                 
-                                    forecast = f"Downtrend likely to continue {sma100 * phi_ratio} points or more in long term"
-                                    print(forecast)
-
                         
-                        # Calculate the minimum and maximum values of the sine wave
-                        sine_wave_min = np.min(sine_wave)
-                        sine_wave_max = np.max(sine_wave)
+                        print("Close price:", close_prices[-1])
+   
+                        # Calculate EMAs 
+                        ema_fast = talib.EMA(close_prices, timeperiod=fast_ema)[-1]    
+                        ema_slow = talib.EMA(close_prices, timeperiod=slow_ema)[-1]
 
-                        # Calculate the distance from close on sine to min and max as percentages on a scale from 0 to 100%
-                        dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
-                        dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
+                        print(close_prices[-1])
+                        print(ema_fast)
+                        print(ema_slow)
 
-                        cycle_direction = "UP"
-                        next_quadrant = 1
-
-                        # Up cycle         
-                        if current_quadrant == 1 and dist_from_close_to_min < 0.25:
-                            next_quadrant = 2
-                            cycle_direction = "UP"
-        
-                        elif current_quadrant == 2:
-                            next_quadrant = 3
-                            cycle_direction = "UP"
-        
-                        elif current_quadrant == 3:
-                            next_quadrant = 4  
-                            cycle_direction = "UP"
-        
-                        # Down cycle 
-                        elif current_quadrant == 4 and dist_from_close_to_max < 0.25:
-                            next_quadrant = 3 
-                            cycle_direction = "DOWN"
-        
-                        elif current_quadrant == 3:
-                            next_quadrant = 2   
-                            cycle_direction = "DOWN"
-        
-                        elif current_quadrant == 2:
-                            next_quadrant = 1 
-                            cycle_direction = "DOWN" 
-        
-                        elif current_quadrant == 1:
-                            next_quadrant = 4   
-                            cycle_direction = "UP"
 
                         print()
 
-                        print("Distance from close to min:", dist_from_close_to_min)
-                        print("Distance from close to max:", dist_from_close_to_max)
-     
-                        print(f"Close is {dist_from_close_to_min}% from min and {dist_from_close_to_max}% from max")  
+                        # Get all open positions
+                        positions = client.futures_position_information()
 
-                        #print("last quadrant: ", last_quadrant)
-                        print("current quadrant: ", current_quadrant)
-                        print("next quadrant: ", next_quadrant)
+                        # Loop through each position
+                        for position in positions:
+                            symbol = position['symbol']
+                            position_amount = float(position['positionAmt'])
 
+                        # Print position if there is nor not     
+                        if position_amount != 0:
+                            print("Position open: ", position_amount)
+                       
+                        elif position_amount == 0:
+                            print("Position not open: ", position_amount)
+
+                        print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
+
+                        print()
                 else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
-
             else:
                 print("Error: '1m' key not found in signals dictionary.")
-
-            print()
-
-            current_time = datetime.datetime.utcnow() + timedelta(hours=3)
-            print(current_time)
-
-            # Get all open positions
-            positions = client.futures_position_information()
-
-            # Loop through each position
-            for position in positions:
-                symbol = position['symbol']
-                position_amount = float(position['positionAmt'])
-
-            # Print position if there is nor not          
-            if position_amount != 0:
-                print("Position open: ", position_amount)
-                       
-            elif position_amount == 0:
-
-                print("Position not open: ", position_amount)
-
-                if current_quadrant == 1 and dist_from_close_to_min <= 10.00:    
-
-                    print("Entry long triggered. Add new trade signal! ") 
-
-                    with open("signals.txt", "a") as f:  
-                        current_time = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
-
-                        timestamp = current_time.strftime('%Y-%m-%d %H:%M:%S')
-                        f.write(f"{timestamp} LONG\n")
-                        f.close()
-
-                elif current_quadrant == 4 and dist_from_close_to_max <= 10.00:  
-              
-                    print("Entry short triggered. Add new trade signal! ")
-
-                    with open("signals.txt", "a") as f:  
-
-                        timestamp = current_time.strftime('%Y-%m-%d %H:%M:%S')
-                        f.write(f"{timestamp} SHORT\n")
-                        f.close()
-
-            print()
-            #print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
             time.sleep(5) # Sleep for 5 seconds      
                 
