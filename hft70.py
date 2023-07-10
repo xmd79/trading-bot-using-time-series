@@ -71,86 +71,56 @@ print(timeframes)
 
 print()
 
+# Define start and end time for historical data
+start_time = int(time.time()) - (86400 * 30)  # 30 days ago
+end_time = int(time.time())
+
+# Fetch historical data for BTCBUSD pair
+candles = {}
+for interval in timeframes:
+    tf_candles = client.futures_klines(symbol=TRADE_SYMBOL, interval=interval, startTime=start_time * 1000, endTime=end_time * 1000)
+    candles[interval] = []
+    for candle in tf_candles:
+        candles[interval].append({
+            'timestamp': candle[0],
+            'open': float(candle[1]),
+            'high': float(candle[2]),
+            'low': float(candle[3]),
+            'close': float(candle[4]),
+            'volume': float(candle[5])
+        })
+
+# Print the historical data for BTCUSDT pair
+#for interval in timeframes:
+#    print(f"Data for {interval} interval:")
+#    print(candles[interval])
+
+print()
+
+
+# Create close prices array for each time frame
+close_prices = {}
+for interval in timeframes:
+    close_prices[interval] = np.array([c['close'] for c in candles[interval]], dtype=np.double)
+    print(f"Close prices for {interval} time frame:")
+    print(close_prices[interval])
+    print()
+
+print()
+
 # Global variables
 closed_positions = []
 
 print()
 
-def get_binance_client():
-    # Read credentials from file    
-    with open("credentials.txt", "r") as f:   
-         lines = f.readlines()
-         api_key = lines[0].strip()  
-         api_secret = lines[1].strip()  
-          
-    # Instantiate client        
-    client = BinanceClient(api_key, api_secret)
-          
-    return client
-
-# Call the function to get the client  
-client = get_binance_client()
-
-
-def get_candles(symbol, timeframe):
-    """Get all candles for a symbol and timeframe"""
-    klines = client.get_klines(
-        symbol=symbol, 
-        interval=timeframe,  
-        limit=1000 # Get max 1000 candles
-    )
-    
-    candles = []
-
-    # Convert klines to candle dict
-    for k in klines:
-        candle = {
-            "time": k[0] / 1000, # Unix timestamp in seconds
-            "open": float(k[1]), 
-            "high": float(k[2]),  
-            "low": float(k[3]),   
-            "close": float(k[4]),    
-            "volume": float(k[5])   
-        }
-        candles.append(candle)
-        
-    return candles
-
-def get_1m_candles(symbol):
-    return get_candles(symbol, client.KLINE_INTERVAL_1MINUTE)
-
-def get_3m_candles(symbol):
-    return get_candles(symbol, client.KLINE_INTERVAL_3MINUTE)
-
-def get_5m_candles(symbol):
-    return get_candles(symbol, client.KLINE_INTERVAL_5MINUTE)
-
-def get_15m_candles(symbol): 
-    return get_candles(symbol, client.KLINE_INTERVAL_15MINUTE)
-
-def get_30m_candles(symbol):
-    return get_candles(symbol, client.KLINE_INTERVAL_30MINUTE)  
-
-def get_1h_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_1HOUR)
-
-def get_4h_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_4HOUR)
-
-candles = get_1m_candles("BTCBUSD")
-#print(candles)
-
 def get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5):
     signals = {}
 
-    # Use the 5m candles passed in      
-    data = np.array([[c['open'], c['high'],  
-                      c['low'], c['close'],      
-                      c['volume']] 
-                     for c in candles])      
+    # Get the OHLCV data for the 1-minute timeframe
+    data = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles['1m']], dtype=np.double)
 
-    # Calculate HT SINE                 
-    sine, leadsine = talib.HT_SINE(data[:, 3]) 
+    # Get the HT sine wave indicator for the 1-minute timeframe
+    sine, leadsine = talib.HT_SINE(data[:, 3])
 
     # Normalize the HT sine wave indicator to the minimum and maximum prices in the market data
     min_price = np.nanmin(data[:, 3])
@@ -203,17 +173,11 @@ def get_mtf_signal(candles, timeframes, percent_to_min=5, percent_to_max=5):
         momentum_distance_max = None
 
     # Store the percentage distance for each timeframe in the signals dictionary
-    for tf in timeframes:            
-        # Get candles for this timeframe           
-        tf_candles = get_5m_candles("BTCBUSD")
+    for tf in timeframes:
+        # Get the OHLCV data for the specified timeframe
+        tf_data = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles[tf]], dtype=np.double)
 
-        # Define tf_data                
-        tf_data = np.array([[c['open'], c['high'],  
-                             c['low'], c['close'],      
-                             c['volume']] 
-                            for c in tf_candles])              
-        
-        # Get the HT sine wave indicator           
+        # Get the HT sine wave indicator for the specified timeframe
         tf_sine, tf_leadsine = talib.HT_SINE(tf_data[:, 3])
 
         # Normalize the HT sine wave indicator to the minimum and maximum prices in the market data
@@ -251,82 +215,102 @@ print("MTF buy/sell signal:", mtf_signal)
 
 print()
 
-def check_mtf_signal(candles_5min, timeframes, mtf_signal): 
-    
-    signal="No Signal"       
-    data=np.array([[c['open'],c['high'],c['low'],c['close'],c['volume']] for c in candles_5min],dtype=np.double)                                   
-    sine,leadsine = talib.HT_SINE(data[:,3])                                                     
-    min_price = np.nanmin(data[:,3])                                   
-    max_price = np.nanmax(data[:,3])                                                         
-    norm_sine = (sine-min_price)/(max_price-min_price)                    
-    min_sine = np.nanmin(norm_sine)                                  
+def check_mtf_signal(candles, timeframes, mtf_signal):
+    signal = "No Signal"
+    # Get the OHLCV data for the 1-minute timeframe
+    data = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles['1m']], dtype=np.double)
+
+    # Get the HT sine wave indicator for the 1-minute timeframe
+    sine, leadsine = talib.HT_SINE(data[:, 3])
+
+    # Normalize the HT sine wave indicator to the minimum and maximum prices in the market data
+    min_price = np.nanmin(data[:, 3])
+    max_price = np.nanmax(data[:, 3])
+    norm_sine = (sine - min_price) / (max_price - min_price)
+    norm_leadsine = (leadsine - min_price) / (max_price - min_price)
+
+    # Get the minimum and maximum values of the normalized HT Sine Wave indicator
+    min_sine = np.nanmin(norm_sine)
     max_sine = np.nanmax(norm_sine)
+
+    # Calculate the time difference between the minimum and maximum values
+    if np.isnan(min_sine) or np.isnan(max_sine):
+        cycle_time_str = "N/A"
+    else:
+        cycle_time = int(abs(np.nanargmax(norm_sine) - np.nanargmin(norm_sine)) * 0.25)
+        cycle_time_str = str(timedelta(minutes=cycle_time, seconds=0)).split(".")[0]
+
+        # Calculate the time remaining until the cycle completes
+        remaining_time = cycle_time % 30
+        if remaining_time == 0:
+            remaining_time = 30
+
+    # Check if the sine wave fits the market cycle
     close = data[-1][-2]
+    if norm_sine[-1] == min_sine and close <= np.nanmin(data[-timeframes['1m']*30:, 3]):
+        print("Close is near the last low on price. Sine wave fits the market cycle.")
+    elif norm_sine[-1] == max_sine and close >= np.nanmax(data[-timeframes['1m']*30:, 3]):
+        print("Close is near the last high on price. Sine wave fits the market cycle.")
+    else:
+        print("Sine wave momentum 1min tf does not fit the market cycle reversals but in range between key points...seeking reversal")
 
-    if mtf_signal=="bearish":         
-         reversal_keypoint=max_sine  
-         momentum_distance_min=100*((close-max_sine)/(max_price-min_price))
-         momentum_distance_max=None     
-    else:         
-          reversal_keypoint=min_sine
-          momentum_distance_min=None  
-          momentum_distance_max=100*((max_sine-close)/(max_price-min_price))           
-     
-    if mtf_signal=="bearish":
-           momentum_range=np.arange(norm_sine[-1],max_sine+0.0001,(max_sine-norm_sine[-1])/100)       
-    else:            
-           momentum_range=np.arange(min_sine-0.0001,norm_sine[-1],(norm_sine[-1]-min_sine)/100)        
-     
-    # Define cycle time           
-    if np.isnan(min_sine) or np.isnan(max_sine):                
-         cycle_time_str="N/A"       
-    else:                  
-          cycle_time = int(abs(np.nanargmax(norm_sine)-np.nanargmin(norm_sine))*0.25)              
-          cycle_time_str = str(timedelta(minutes=cycle_time,seconds=0)).split(".")[0]              
-          remaining_time = cycle_time%30
-          if remaining_time==0:
-               remaining_time = 30
-   
-    if mtf_signal=="bearish" and norm_sine[-1]>=reversal_keypoint:  
-          signal="bearish"            
-    elif mtf_signal=="bullish" and norm_sine[-1]<=reversal_keypoint: 
-          signal="bullish" 
-                                            
-    return signal, momentum_distance_min, momentum_distance_max, momentum_range, cycle_time_str, remaining_time
+    print()
 
-candles_5min = get_5m_candles("BTCBUSD")
-timeframes = "5m"  
-mtf_signal = "bearish"
+    # Calculate the percentage distance from the current close on sine to the minimum and maximum values of the normalized HT Sine Wave indicator
+    percent_to_min = 100 * ((max_sine - norm_sine[-1]) / (max_sine - min_sine))
+    percent_to_max = 100 * ((norm_sine[-1] - min_sine) / (max_sine - min_sine))
 
-momentum_distance_min = None  
-momentum_distance_max = None
-momentum_range = None               
-cycle_time_str = None               
-remaining_time = None 
+    # Print percentages
+    print(f"Current close on sine is {percent_to_min:.2f}% away from the minimum value")
+    print(f"Current close on sine is {percent_to_max:.2f}% away from the maximum value")
+    print()
 
-signal, momentum_distance_min, momentum_distance_max, momentum_range, cycle_time_str, remaining_time = check_mtf_signal(candles_5min, timeframes, mtf_signal)
+    # Calculate the distance from the current momentum to the closest reversal keypoint
+    if mtf_signal == "bearish":
+        reversal_keypoint = max_sine
+        momentum_distance_min = 100 * ((close - max_sine) / (max_price - min_price))
+        momentum_distance_max = 100 * ((close - min_sine) / (max_price - min_price))
+    else:
+        reversal_keypoint = min_sine
+        momentum_distance_min = 100 * ((min_sine - close) / (max_price - min_price))
+        momentum_distance_max = 100 * ((max_sine - close) / (max_price - min_price))
 
-print(momentum_distance_min)  
-# Print the relevant output  
+    # Calculate the range between 0 to 100% from close to first reversal incoming closest to current value of close on sine
+    if mtf_signal == "bearish":
+        momentum_range = np.arange(norm_sine[-1], max_sine + 0.0001, (max_sine - norm_sine[-1]) / 100)
+    else:
+        momentum_range = np.arange(min_sine - 0.0001, norm_sine[-1], (norm_sine[-1] - min_sine) / 100)
 
+    # Determine the trade signal based on momentum and trend signals
+    if mtf_signal == "bearish" and norm_sine[-1] >= reversal_keypoint:
+        signal = "bearish"
+    elif mtf_signal == "bullish" and norm_sine[-1] <= reversal_keypoint:
+        signal = "bullish"
+    else:
+        if percent_to_min > 80:
+            signal = "Momentum Bearish"
+        elif percent_to_max > 80:
+            signal = "Momentum Bullish"
+    
+    print()
+    return signal, momentum_distance_min, momentum_distance_max, momentum_range, cycle_time_str, remaining_time, percent_to_min, percent_to_max
 
+mtf = check_mtf_signal(candles, timeframes, mtf_signal)
+print(mtf[0])
 print()
 
 def get_mtf_signal_v2(candles, timeframes, percent_to_min=5, percent_to_max=5):
-    signal = "No Signal"
+    signals = {}
     
-    # Use the passed-in candles data    
-    data = np.array([[c['open'], c['high'], c['low'], 
-                       c['close'], c['volume']] 
-                      for c in candles],  
-                     dtype=np.double) 
-                    
-    # Get the HT sine wave indicator                 
-    sine, leadsine = talib.HT_SINE(data[:, 3])
+    # Get the OHLCV data for the 1-minute timeframe
+    data_1m = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles['1m']], dtype=np.double)
+    
+    # Get the HT sine wave indicator for the 1-minute timeframe
+    sine, leadsine = talib.HT_SINE(data_1m[:, 3])
     
     # Normalize the HT sine wave indicator to the minimum and maximum prices in the market data
-    min_price = np.nanmin(data[:, 3])  
-    max_price = np.nanmax(data[:, 3])
+    min_price = np.nanmin(data_1m[:, 3])
+    max_price = np.nanmax(data_1m[:, 3])
     norm_sine = (sine - min_price) / (max_price - min_price)
     
     # Get the minimum and maximum values of the normalized HT Sine Wave indicator
@@ -334,13 +318,13 @@ def get_mtf_signal_v2(candles, timeframes, percent_to_min=5, percent_to_max=5):
     max_sine = np.nanmax(norm_sine)
     
     # Calculate the percentage distance from the current close on sine to the minimum and maximum values of the normalized HT Sine Wave indicator
-    close = data[-1][-2]
+    close = data_1m[-1][-2]
     percent_to_min_val = (max_sine - norm_sine[-1]) / (max_sine - min_sine) * 100
     percent_to_max_val = (norm_sine[-1] - min_sine) / (max_sine - min_sine) * 100
     
     for timeframe in timeframes:
         # Get the OHLCV data for the given timeframe
-        ohlc_data = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles], dtype=np.double)
+        ohlc_data = np.array([[c['open'], c['high'], c['low'], c['close'], c['volume']] for c in candles[timeframe]], dtype=np.double)
         
         # Calculate the momentum signal for the given timeframe
         close_prices = ohlc_data[:, 3]
@@ -536,78 +520,19 @@ def calculate_ema(candles, period):
         ema.append((price - ema[-1]) * multiplier + ema[-1])
     return ema
 
-def calculate_pendulum_force(momentum, damping, restoring_force):
-    """Returns the net pendulum force based on momentum, damping and restoring force"""    
-    return momentum - damping + restoring_force
-
-def get_phi_ratio(close_prices):
-    """Calculates the phi ratio between EMA50 and EMA200"""    
-    ema50 = talib.EMA(close_prices, 50)
-    ema200 = talib.EMA(close_prices, 200)    
-    return ema200[-1] / ema50[-1]
-
-def inverse_fisher_transform(correlation):    
-    """Calculates the z-score from the correlation using the Inverse Fisher transform"""
-    z = 0.5 * np.log((1 + correlation) / (1 - correlation))
-    return z
-
-def calculate_momentum(close_prices):    
-    """Calculates momentum  as the change in close prices"""
-    momentum = close_prices[-1] - close_prices[-2]
-    return momentum
-    
-def calculate_damping(close_prices):    
-    """Calculates damping ratio based on ATR relative to close prices"""    
-    atr = talib.ATR(high, low, close)
-    damping = atr[-1] / close_prices[-1]    
-    return damping
-
-def calculate_restoring_force(close_prices):
-    """Calculates restoring force based on volatility relative to close prices"""     
-    volatility = np.std(close_prices)    
-    restoring_force = volatility / close_prices[-1]
-    return restoring_force
-
-# Settings symbol and candle request for all timeframes
-symbol = "BTCUSDT"
-
-# Get 1 minute candles
-candles_1m = get_candles(symbol, client.KLINE_INTERVAL_1MINUTE)
-candle_timeframe = '1min'
-
-# Get 3 minute candles 
-candles_3m = get_candles(symbol, client.KLINE_INTERVAL_3MINUTE)  
-candle_timeframe = '3min'
-
-# Get 5 minute candles
-candles_5m = get_candles(symbol, client.KLINE_INTERVAL_5MINUTE)
-candle_timeframe = '5min'
-
-# Get 15 minute candles
-candles_15m = get_candles(symbol, client.KLINE_INTERVAL_15MINUTE)
-candle_timeframe = '15min' 
-
-# Get 30 minute candles
-candles_30m = get_candles(symbol, client.KLINE_INTERVAL_30MINUTE)
-candle_timeframe = '30min'
-
-# Get 1 hour candles   
-candles_1h = get_candles(symbol, client.KLINE_INTERVAL_1HOUR)
-candle_timeframe = '1h'
-
-# Get 4 hour candles   
-candles_4h = get_candles(symbol, client.KLINE_INTERVAL_4HOUR)
-candle_timeframe = '4h'
-
-timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '4h']
-
 print()
 print("Init main() loop: ")
 print()
 
 def main():
-    # Instantiate Binance client and load credentials from file
-    client = get_binance_client()  
+    # Load credentials from file
+    with open("credentials.txt", "r") as f:
+        lines = f.readlines()
+        api_key = lines[0].strip()
+        api_secret = lines[1].strip()
+
+    # Instantiate Binance client
+    client = BinanceClient(api_key, api_secret)
 
     # Define EM amplitude variables for each quadrant
     em_amp_q1 = 0
@@ -638,6 +563,9 @@ def main():
     # Define constants
     trade_symbol = "BTCBUSD"
      
+    fast_ema = 12       
+    slow_ema = 26         
+    
     # Define PHI constant with 15 decimals
     PHI = 1.6180339887498948482045868343656381177  
    
@@ -706,56 +634,36 @@ def main():
 
     url = "https://api.binance.com/api/v3/time"
     while True:       
-        try:  
-            # Defin timeframes to use for the signals
-            timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '4h']
+        try:   
+            # Get the server time
+            server_time = requests.get('https://api.binance.com/api/v3/time').json()['serverTime']
+            
+            # Calculate the timestamp of your request       
+            timestamp = int(server_time - 500) # Subtract5 seconds
+            
+            # Make your request with the adjusted timestamp
+            response = requests.get(url, params={'timestamp': timestamp})
+            response = requests.get('https://api.binance.com/api/v3/time', auth=(api_key, api_secret))
+            print(response.json())
 
-            candle_map = {
-                '1m': candles_1m,  
-                '3m': candles_3m,
-                '5m': candles_5m,  
-                '15m': candles_15m, 
-                '30m': candles_30m,
-                '1h': candles_1h,
-                '4h': candles_4h,
-                }
+            # Define current_quadrant variable
+            current_quadrant = 0
 
-            symbol = 'BTCBUSD'
+            # Define start and end time for historical data
+            start_time = int(time.time()) - (1800 * 4)  # 60-minute interval (4 candles)
+            end_time = int(time.time())
+
+            # Define the candles and timeframes to use for the signals
+            candles = get_historical_candles(TRADE_SYMBOL, start_time, end_time, '1m')
+            timeframes = ['1m', '3m', '5m']
+
+            # Check if candles is empty
+            if not candles:
+                print("Error: No historical candles found.")
+                continue
 
             bUSD_balance = float(get_account_balance())
             print("My BUSD balance from futures wallet is at: ", bUSD_balance)
-
-            for timeframe in timeframes:
-
-                if timeframe=='1m':     
-                    close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)     
-  
-                elif timeframe=='3m':      
-                    close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double) 
-
-                elif timeframe == '5m':       
-                    close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)  
-
-                elif timeframe == '15m':       
-                    close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)
-
-                elif timeframe == '30m':       
-                    close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)
-
-                elif timeframe == '1h':       
-                    close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)    
-
-                elif timeframe == '4h':       
-                    close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double) 
-
-                # Get fresh candles for this timeframe
-                new_candles = get_candles(symbol, timeframe)
-    
-                # Update candle map 
-                candle_map[timeframe] = new_candles
-    
-                sine, leadsine = talib.HT_SINE(close_prices)  
-            
 
             # Get the MTF signal
             signals = get_mtf_signal_v2(candles, timeframes, percent_to_min=1, percent_to_max=1)
@@ -763,20 +671,19 @@ def main():
             
             print()
 
-            close = get_current_price(trade_symbol)
-
             initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
 
             stop_loss = -0.0144 * initial_pnl
             take_profit = 0.0144 * initial_pnl
 
             # Check if the '1m' key exists in the signals dictionary
-            if '5m' in signals:
-                # Check if the percent to min/max signal keys exist in the '5m' dictionary
-                if 'ht_sine_percent_to_min' in signals['5m'] and 'ht_sine_percent_to_max' in signals['5m']:
-                    percent_to_min_val = signals['5m']['ht_sine_percent_to_min']
-                    percent_to_max_val = signals['5m']['ht_sine_percent_to_max']
+            if '1m' in signals:
+                # Check if the percent to min/max signal keys exist in the '1m' dictionary
+                if 'ht_sine_percent_to_min' in signals['1m'] and 'ht_sine_percent_to_max' in signals['1m']:
+                    percent_to_min_val = signals['1m']['ht_sine_percent_to_min']
+                    percent_to_max_val = signals['1m']['ht_sine_percent_to_max']
 
+                    close_prices = np.array([candle['close'] for candle in candles['1m']])
                     print("Close price:", close_prices[-1])
 
                     # Calculate the sine wave using HT_SINE
@@ -874,7 +781,7 @@ def main():
                         print("EMA slow:", ema_slow)
                         print("EMA fast:", ema_fast)
 
-                        close_prices = candles
+                        close_prices = np.array([candle['close'] for candle in candles['1m']])
 
                         #Calculate X:Y ratio from golden ratio     
                         ratio = 2 * (PHI - 1)  
@@ -923,7 +830,16 @@ def main():
                         em_amp = current_em_amp
                         em_phase = current_em_phase
 
-                        if percent_to_min_val <= 10:
+
+                        # Check if the current price is above the EMAs and the percent to min signals are below 20%
+                        if close_prices[-1] < ema_slow and close_prices[-1] < ema_fast and percent_to_min_val < 20:
+                            print("Buy signal!")
+
+                        # Check if the current price is below the EMAs and the percent to max signals are below 20%
+                        elif close_prices[-1] > ema_slow and close_prices[-1] > ema_fast and percent_to_max_val < 20:
+                            print("Sell signal!")
+
+                        elif percent_to_min_val < 20:
                             print("Bullish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
@@ -938,7 +854,7 @@ def main():
                                 # In quadrant 4, distance from 75% to max of range
                                 print("Bullish momentum in Q4")
 
-                        elif percent_to_max_val <= 10:
+                        elif percent_to_max_val < 20:
                             print("Bearish momentum in trend")
                             if current_quadrant == 1:
                                 # In quadrant 1, distance from min to 25% of range
@@ -971,7 +887,7 @@ def main():
                         cycle_direction = "UP"
                         next_quadrant = 1
 
-                        if current_quadrant == 1 <= 15:
+                        if current_quadrant == 1:
                             next_quadrant = 2  
                             cycle_direction = "UP"
 
@@ -987,7 +903,7 @@ def main():
                             elif cycle_direction == "DOWN": 
                                 next_quadrant = 2
        
-                        elif current_quadrant == 4 <= 15:        
+                        elif current_quadrant == 4:        
                             if cycle_direction == "UP":
                                 next_quadrant = 3
                                 cycle_direction = "DOWN"
@@ -1475,7 +1391,7 @@ def main():
 
                         # Print overall mood  
                         print(f"Overall market mood: {forecast['mood']}")
-                        
+
                         print()
 
                         # Define octahedron points mapped to Metatron's Cube
@@ -1598,33 +1514,28 @@ def main():
                         print(f"Trend forecast: {forecast_mood}")    
 
                         print()
-                        print(close)
 
-                        brun_low  = close * brun_constant  
-                        brun_high = close / brun_constant 
-                        print(brun_low)
-                        print(brun_high)
+                        brun_low  = close_prices[-1] * brun_constant  
+                        brun_high = close_prices[-1] / brun_constant 
+                        #print(brun_low)
+                        #print(brun_high)
 
-                        # ema is now a list
-                        ema = calculate_ema(candles, 50)
+                        sma50 = talib.SMA(np.array(close_prices), timeperiod=50)
+                        sma50 = sma50[-1]  
+                        #print("SMA50 is now at: ", sma50)
 
-                        # ema is now a float
-                        last_ema50 = ema[-1]
+                        sma100 = talib.SMA(np.array(close_prices), timeperiod=100)
+                        sma100 = sma100[-1]
+                        #print("SMA100 is now at: ", sma100)
 
-                        # ema is now a float
-                        ema = calculate_ema(candles, 200)
+                        phi_ratio = sma100 / sma50
 
-                        # ema is now a float
-                        last_ema200 = ema[-1]
-
-                        phi_ratio = last_ema200 / last_ema50
-
-                        deviation = close - last_ema50  
+                        deviation = close_prices[-1] - sma50  
                         threshold = 0.03
 
                         if deviation > threshold: # Reversal signal  
       
-                            if close > brun_high: # Above Brun level 
+                            if close_prices[-1] > brun_high: # Above Brun level 
                                 if phi_ratio < 1.2:  
         
                                     # Near term       
@@ -1642,7 +1553,7 @@ def main():
                                     range = brun_high - brun_low
                                     forecast = f"Strong continuation likely {range*phi_ratio} points or more"
                                     print(forecast)
-                            elif close < brun_low: # Below Brun level  # Downtrend reversal signal    
+                            elif close_prices[-1] < brun_low: # Below Brun level  # Downtrend reversal signal    
         
                                 if phi_ratio < 1.2:  
           
@@ -1650,92 +1561,41 @@ def main():
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:
           
-                                    range = last_ema50 - last_ema200
+                                    range = sma50 - sma100
                                     forecast = f"Reversal of up to {range*phi_ratio} points possible in medium term"
                                     print(forecast)
                                 else:
           
-                                    forecast = f"Reversal of {last_ema200*phi_ratio} points or more possible in long term" 
+                                    forecast = f"Reversal of {sma100*phi_ratio} points or more possible in long term" 
                                     print(forecast)
                         elif deviation < threshold:  # No reversal signal
                          
-                            if close > last_ema50: # Uptrend
+                            if close_prices[-1] > sma50: # Uptrend
                    
                                 if phi_ratio < 1.2:   
                                     forecast = "Uptrend likely to continue in near term"   
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:               
-                                    range = last_ema50 - last_ema200
+                                    range = sma50 - sma100
                                     forecast = f"Uptrend likely to continue {range * phi_ratio} points in medium term"
                                     print(forecast)
                                 else:               
-                                    forecast = f"Uptrend likely to continue {last_ema200 * phi_ratio} points or more in long term"
+                                    forecast = f"Uptrend likely to continue {sma100 * phi_ratio} points or more in long term"
                                     print(forecast)
-                            elif close > last_ema50: # Downtrend       
+                            elif close_prices[-1] > sma50: # Downtrend       
               
                                 if phi_ratio < 1.2:  
                                     forecast = "Downtrend likely to continue in near term" 
                                     print(forecast)
                                 elif 1.2 <= phi_ratio < 1.5:              
-                                    range = last_ema200 - last_ema50       
+                                    range = sma100 - sma50       
                                     forecast ="Downtrend likely to continue {range * phi_ratio} points in medium term"
                                     print(forecast)
                                 else:                 
-                                    forecast = f"Downtrend likely to continue {last_ema200 * phi_ratio} points or more in long term"
+                                    forecast = f"Downtrend likely to continue {sma100 * phi_ratio} points or more in long term"
                                     print(forecast)
-                        print()
 
-                        timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '4h']
-
-                        candle_map = {
-                            '1m': candles_1m,  
-                            '3m': candles_3m,
-                            '5m': candles_5m,  
-                            '15m': candles_15m, 
-                            '30m': candles_30m,
-                            '1h': candles_1h,
-                            '4h': candles_4h,
-                        }
-
-                        symbol = 'BTCBUSD'
-
-                        for timeframe in timeframes:
-
-                            if timeframe=='1m':     
-                                close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)     
-  
-                            elif timeframe=='3m':      
-                                close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double) 
-
-                            elif timeframe == '5m':       
-                                close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)  
-
-                            elif timeframe == '15m':       
-                                close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)
-
-                            elif timeframe == '30m':       
-                                close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)
-
-                            elif timeframe == '1h':       
-                                close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double)    
-
-                            elif timeframe == '4h':       
-                                close_prices = np.array([c['close'] for c in candle_map[timeframe]], dtype=np.double) 
-
-                            # Get fresh candles for this timeframe
-                            new_candles = get_candles(symbol, timeframe)
-    
-                            # Update candle map 
-                            candle_map[timeframe] = new_candles
-    
-                            sine, leadsine = talib.HT_SINE(close_prices)  
-            
-                            # Call function with fresh new data           
-                            signals, mtf_signal = get_mtf_signal(new_candles, timeframes, percent_to_min=5, percent_to_max=5)
-
-                        print()
-
-                else:   
+                else:
                     print("Error: 'ht_sine_percent_to_min' or 'ht_sine_percent_to_max' keys not found in signals dictionary.")
 
             else:
@@ -1743,10 +1603,8 @@ def main():
 
             print()
 
-            current_time = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
-
-            # Print the results
-            print("Current time:", current_time.strftime('%Y-%m-%d %H:%M:%S'))
+            current_time = datetime.datetime.utcnow() + timedelta(hours=3)
+            print(current_time)
 
             # Get all open positions
             positions = client.futures_position_information()
@@ -1756,7 +1614,7 @@ def main():
                 symbol = position['symbol']
                 position_amount = float(position['positionAmt'])
 
-            # Print position if there is nor not     
+            # Print position if there is nor not          
             if position_amount != 0:
                 print("Position open: ", position_amount)
                        
@@ -1786,7 +1644,6 @@ def main():
                         f.close()
 
             print()
-
             #print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
             time.sleep(5) # Sleep for 5 seconds      
