@@ -11,6 +11,10 @@ import decimal
 import random
 import statistics
 
+import warnings
+
+warnings.simplefilter('ignore', RuntimeWarning) 
+
 # binance module imports
 from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException, BinanceOrderException
@@ -556,6 +560,18 @@ def calculate_poly_channel(close_prices):
     poly_low = np.poly1d(coeffs)(range(len(close_prices)))    
     poly_high = poly_low * 1.1      
     return poly_low, poly_high
+
+def mode(nums):
+    counter = {}
+    for num in nums:
+        counter[num] = counter.get(num, 0) + 1
+    most_common = None
+    max_count = 0
+    for num,count in counter.items(): 
+        if count > max_count:
+            most_common = num
+            max_count = count
+    return most_common
 
 
 print()
@@ -1596,6 +1612,7 @@ def main():
 
                         lower = interval[0]  
                         upper = interval[1] + 1
+
                         print(f"Lower Bound: {lower}")
                         print(f"Upper Bound: {upper}")
  
@@ -1693,6 +1710,70 @@ def main():
                         #print(poly_channel[-1])
 
                         print()
+
+                        # Assign to variable    
+                        brun_bounds = [brun_low, brun_high]
+                        fibo_ratios = [fibo_ratio_low, fibo_ratio_high]
+
+                        # Call base function     
+                        poly_low, poly_high = calculate_poly_channel(close_prices)
+
+                        # Extend channel     
+                        poly_low *= brun_bounds[0] / poly_low[0]   
+                        poly_low *= 1 + fibo_ratios[0]  
+                        sentiment_adjust = np.mean([f['mag'] for f in frequencies if f['mood'] == 'bearish'])    
+                        poly_low *= 1 + 0.1 * sentiment_adjust
+                        poly_high = poly_low * 1.1
+
+                        # Get length of poly_channel tuple
+                        n = len(poly_channel)
+
+                        # Calculate reversal point indices   
+                        idx1 = int(n * 0.25) # Dip reversal  
+                        idx2 = int(n * 0.75) # Uptrend reversal
+
+                        # Access those indices  
+                        reversal_point_1 = poly_channel[idx1]    
+                        reversal_point_2 = poly_channel[idx2]
+
+                        # Adjust reversal points    
+                        reversal_point_1 *= -0.995  
+                        reversal_point_2 *= 1.005
+
+                        # Print results    
+                        reversal_point_1_price = [z_to_price(z, close_prices[-1], scale_factor) 
+                          for z in reversal_point_1] 
+                        reversal_point_2_price = [z_to_price(z, close_prices[-1], scale_factor)  
+                          for z in reversal_point_2]
+
+                        # Determine trend forecast 
+ 
+                        # Upward reversal
+                        if close_prices[-1] > any(reversal_point_2):
+                            if close_prices[-2] < close_prices[-1]:
+                                forecast = "upward reversal" 
+
+                        # Downward reversal  
+                        if close_prices[-1] < any(reversal_point_1): 
+                            if close_prices[-2] > close_prices[-1]:
+                                forecast = "downward reversal"
+
+                        # Consolidation         
+                        if (close_prices[-1] > reversal_point_1).all() and (close_prices[-1] < reversal_point_2).all():
+                            if np.std(close_prices[-30:]) < np.std(close_prices[-60:-30]):
+                                forecast = "consolidating"
+
+                        # Accumulation        
+                        if close_prices[-1] < any(reversal_point_1):
+                            if close_volumes[-1] > close_volumes[-30:].mean():
+                                forecast = "accumulating" 
+
+                        # Print results     
+                        print(f"Reversal Point 1 Price: {np.mean(reversal_point_1_price):.2f}")   
+                        print(f"Reversal Point 2 Price: {np.mean(reversal_point_2_price):.2f}")
+                        print(f"Trend Forecast: {forecast}")
+                        print(f"Sentiment Mood: {mode([f['mood'] for f in frequencies])}")        
+                        print(f"Market Volatility: {np.std(close_prices[-30:])}")
 
                         # Get all open positions
                         positions = client.futures_position_information()
