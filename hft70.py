@@ -550,6 +550,13 @@ def z_to_price(z, current_price, scale_factor):
     else:
         return current_price + scale_factor * np.tanh(z)
 
+def calculate_poly_channel(close_prices):  
+    coeffs = [0.5, 0.001, -0.00001]          
+        
+    poly_low = np.poly1d(coeffs)(range(len(close_prices)))    
+    poly_high = poly_low * 1.1      
+    return poly_low, poly_high
+
 
 print()
 print("Init main() loop: ")
@@ -1565,7 +1572,7 @@ def main():
                         print(f"Phi EMA Ratio: {phi_ema_ratio}")
 
                         # Define interval as min/max of last N candles    
-                        N = 20  
+                        N = 56 
 
                         interval = [min(close_prices[-N:]), max(close_prices[-N:])]  
 
@@ -1614,15 +1621,15 @@ def main():
                         resistance_z = max([f['pos'] for f in frequencies])
 
                         # Define scale factor as 1% of current price
-                        scale_factor = close_prices[-1] * 0.01  
-
+                        scale_factor = close_prices[-1] * 0.012  
+                        
                         # Convert z values to price levels
                         support = z_to_price(support_z, close_prices[-1], scale_factor)
                         resistance = z_to_price(resistance_z, close_prices[-1], scale_factor)
-
+                        
                         # Calculate current momentum and trend forecast
                         current_momentum = 0
-
+                       
                         for freq in frequencies:
                             current_momentum += freq['magnitude'] * mood_to_corr[freq['mood']]
 
@@ -1641,7 +1648,6 @@ def main():
 
                         # Print results
                         print(f"Current momentum: {current_momentum:.2f}")
-                        print(f"Trend forecast: {forecast_mood}")
                         print(f"Support : {support:.2f}")
                         print(f"Resistance : {resistance:.2f}")
 
@@ -1657,9 +1663,23 @@ def main():
                          
                         print()
 
+                        # Convert bounds to prices         
+                        brun_low_price = z_to_price(brun_low, close_prices[-1], scale_factor)
+                        brun_high_price = z_to_price(brun_high, close_prices[-1], scale_factor)
+                        
+                        print(brun_low_price)
+                        print(brun_high_price)
 
+                        # Calculate Billinger Bands       
+                        upper, middle, lower = talib.BBANDS(close_prices, timeperiod=N, nbdevup=2, nbdevdn=2)
+                        print(upper[-1], middle[-1], lower[-1])
 
-      
+                        # Calculate Polynomial Channel  
+                        poly_channel = calculate_poly_channel(close_prices)
+                        #print(poly_channel[-1])
+
+                        print()
+
                         # Get all open positions
                         positions = client.futures_position_information()
 
