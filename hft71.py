@@ -573,83 +573,95 @@ def mode(nums):
             max_count = count
     return most_common
 
-# Get quadrant from angle
-def get_quadrant(angle):
-    if angle < 90:
-        return 1
-    elif angle < 180: 
-        return 2 
-    elif angle < 270:
-        return 3
-    else:
-        return 4 
+def get_current_point(point: dict, forecast: dict) -> int:  
+  
+   current_point = None
+   if point['point'] == forecast['min_reversal']['point']:  
+       current_point = forecast['min_reversal']['point']     
+   elif point['point'] == forecast['max_reversal']['point']:    
+       current_point = forecast['max_reversal']['point']
 
-def get_coordinates(angle, point):
-    x = 0
-    y= 0
-    
-    if point == 'Apex':
-       x = 100  
-       y = 100     
-    elif point == 'Left':
-       x = 100 * math.cos(math.radians(angle)) 
-       y = 100 * math.sin(math.radians(angle))          
-    elif point == 'Base':
-       x = 100 * math.cos(math.radians(angle + 180))
-       y = 100 * -math.sin(math.radians(angle + 180))                           
-    elif point == 'Right':
-       x = 100 * -math.cos(math.radians(angle + 180))   
-       y = 100 * math.sin(math.radians(angle + 180))
+   return current_point
+
+def get_current_frequency(current_quadrant):
+    quadrant_1_amplitude = 0.5
+    quadrant_1_phase = 0.2
+
+    quadrant_2_amplitude = 1.0  
+    quadrant_2_phase = 0.5
+
+    quadrant_3_amplitude = 0.8        
+    quadrant_3_phase = 0.7
+
+    quadrant_4_amplitude = 1.2
+    quadrant_4_phase = 0.9
+
+    if current_quadrant == 1:      
+        frequency_amplitude = quadrant_1_amplitude   
+        frequency_phase = quadrant_1_phase
+        current_frequency = frequency_amplitude * frequency_phase
+
+    elif current_quadrant == 2:         
+        frequency_amplitude = quadrant_2_amplitude
+        frequency_phase = quadrant_2_phase            
+   
+    elif current_quadrant == 3:      
+        frequency_amplitude = quadrant_3_amplitude           
+        frequency_phase = quadrant_3_phase
         
-    return (x, y)
+    elif current_quadrant == 4:      
+        frequency_amplitude = quadrant_4_amplitude       
+        frequency_phase = quadrant_4_phase
 
-# Function to calculate x and y coordinates for a given angle with octahedron points added    
-def get_point(angle, point_map):    
-    quadrant = get_quadrant(angle)  
-    point = point_map[quadrant]
-    x, y = get_coordinates(angle, point) 
-    return point, (x, y)
+def get_current_mood(frequencies, current_quadrant):        
+   current_mood = frequencies[current_quadrant]['mood']        
+   return current_mood
 
-def reversalup(angle, point):
-    print(f"{point} signal. New uptrend started.")
+def get_last_point():
+   last_point = 'Left'
+   return last_point     
 
-def reversaldown(angle, point):      
-    print(f"{point} signal. New downtrend started.")
+def calculate_reversals(min_point, max_point):   
+   if min_point == 0:        # Exit condition 
+       return 0
+              
+   if isinstance(min_point, dict):
+       min_freq = min_point['frequency']     
+   else:              
+       min_freq = min_point           
+        
+   if isinstance(max_point, dict):      
+       max_freq = max_point['frequency']    
+   else:
+       max_freq = max_point
+        
+   reversal_threshold = 0.8 * (max_freq - min_freq)  
+   reversals = reversal_threshold  # Calculate reversals  
+        
+   return reversals
 
-def acc_range_up(angle, point):        
-    print(f"Accumulation. In uptrend.")
+def get_angle(point):
+    angle = 0 
 
-def dist_range_down(angle, point):           
-    print(f"Distribution. In downtrend.")
+    if point == 1:
+        return 0  
+    elif point == 2: 
+        return 90  
+    elif point == 3:
+        return 180    
+    elif point == 4:
+        return 270
+    return angle
 
-def get_dip(point_map) -> str:     
-   return get_point(0, point_map)[0]
-   
-def get_top(point_map) -> str:      
-   return get_point(90, point_map)[0]
-   
-def get_acc(point_map) -> str:    
-   return get_point(180, point_map)[0]
-
-def get_dist(point_map) -> str:   
-   return get_point(270, point_map)[0]
-
-def print_current_point(current_angle, point_map, last_angle):
-    point = get_point(current_angle, point_map)[0] 
-    print(f"Current point: {point}")
- 
-    point = get_point(last_angle, point_map)[0]
-    print(f"Last point: {point}")
-
-def print_next_points(current_angle, point_map):
-    next_angle = (current_angle + 30) % 360  
-    point = get_point(next_angle, point_map)[0]      
-    print(f"Next point: {point}")
-    
-    next_angle = (current_angle + 60) % 360  
-    point = get_point(next_angle, point_map)[0]   
-    print(f"Point after: {point}")   
-
+def get_point(angle):
+    if angle == 0:
+        return 1
+    elif angle == 90:
+        return 2
+    elif angle == 180:  
+        return 3
+    elif angle == 270:
+        return 4
 
 print()
 print("Init main() loop: ")
@@ -684,6 +696,19 @@ def main():
     # Define min and max values for percentages from close to min and max of talib HT_SINE
     percent_to_min_val = 10
     percent_to_max_val = 10
+
+    # Define amplitude and phase variables for each quadrant for frequencies implementation
+    quadrant_1_amplitude = 0.5 
+    quadrant_1_phase = 0.2
+
+    quadrant_2_amplitude = 1.0   
+    quadrant_2_phase = 0.5
+
+    quadrant_3_amplitude = 0.8         
+    quadrant_3_phase = 0.7  
+
+    quadrant_4_amplitude = 1.2
+    quadrant_4_phase = 0.9
 
     trade_open = False
     current_quadrant = None
@@ -1203,17 +1228,7 @@ def main():
                                 freq['em_amp'] = em_amp_q4   
                                 freq['em_phase'] = em_phase_q4
 
-                        quadrant_1_amplitude = 0.5
-                        quadrant_1_phase = 0.2
-
-                        quadrant_2_amplitude = 1.0  
-                        quadrant_2_phase = 0.5
-
-                        quadrant_3_amplitude = 0.8        
-                        quadrant_3_phase = 0.7
-
-                        quadrant_4_amplitude = 1.2
-                        quadrant_4_phase = 0.9
+                        #here i used to define amp and phase for freq.
 
                         lowest_frequency = float('inf')
                         highest_frequency = 0
@@ -1854,84 +1869,76 @@ def main():
 
                         print()
 
-                        # Define constants
-                        quadrant_points = ['Apex', 'Left', 'Base', 'Right']
+                        current_point = 0
+                        predicted_min_reversal = 0
+                        predicted_max_reversal = 0
+                        close_price_at_min_reversal = 0
+                        close_price_at_max_reversal = 0
 
-                        # Map quadrants to octahedron points
-                        point_map = {
-                            1: 'Apex',
-                            2: 'Left', 
-                            3: 'Base',
-                            4: 'Right'
-                        }  
-  
-                        # Points for quadrants
-                        quadrant_1 = get_point(0, point_map)
-                        quadrant_2 = get_point(90, point_map)
-                        quadrant_3 = get_point(180, point_map) 
-                        quadrant_4 = get_point(270, point_map)
+                        amplitudes = {
+                            1: 0.5,  
+                            2: 1.0,  
+                            3: 0.8,      
+                            4: 1.2      
+                        }
 
-                        LOWEST = 330
-                        CENTER = 0
-                        HIGH_LEFT = 90 
-                        BOTTOM_LEFT = 180
-                        BOTTOM_RIGHT = 270 
+                        phases = {
+                            1: 0.2,
+                            2: 0.5,
+                            3: 0.7,      
+                            4: 0.9   
+                        }
 
-                        current_angle = CENTER
-                        last_angle = LOWEST
-                        angles = [LOWEST, CENTER, HIGH_LEFT, BOTTOM_LEFT, BOTTOM_RIGHT]
+                        point = {
+                            'point': current_point,  
+                            'close': close_prices[-1]   
+                        }
 
-                        dist = get_dist(point_map)
-
-                        point = get_point(current_angle, point_map)[0]
-                        print(f"Current point: {point}")
-
-                        point = get_point(last_angle, point_map)[0]
-                        print(f"Last point: {point}")
-
-                        next_angle = (current_angle + 30) % 360  
-                        point = get_point(next_angle, point_map)[0]
-                        print(f"Next point: {point}")
-
-                        next_angle = (current_angle + 60) % 360  
-                        point = get_point(next_angle, point_map)[0]  
-                        print(f"Point after: {point}")
-
-                        for angle in angles:    
-                            point = get_point(angle, point_map)[0]
-                            if angle == LOWEST:
-                                print(f"Market at lowest point, bottoming out. Buy signal at {point}")          
-                            elif angle == CENTER: 
-                                print(f"Marked reversed at {point}. Momentum building for uptrend.")
-                            elif angle == HIGH_LEFT:
-                                print(f"Market at peak bullishness. Top of uptrend at {point}")         
-                            elif angle == BOTTOM_LEFT:
-                                print(f"Market reversed at {point}. Downtrend beginning")   
-
-                        for angle in reversed(angles):
-                            point = get_point(angle, point_map)[0] 
-    
-                            if angle == LOWEST:
-                                dip = get_dip(point_map)
-                                reversalup(angle, dip)
-                                print("Dip reversal found. Uptrend triggered.")      
-                            elif angle == CENTER:  
-                                acc = get_acc(point_map)            
-                                acc_range_up(angle, acc)
-                                print("Accumulation. In Uptrend.")              
-                            elif angle == HIGH_LEFT: 
-                                top = get_top(point_map)                 
-                                reversaldown(angle, top)     
-                                print("Top reversal found. Downtrend triggered.")       
-                            elif angle == BOTTOM_LEFT:                      
-                                dist = get_dist(point_map)   
-                                dist_range_down(angle, dist)
-                                print("Distribution. In Downtrend.") 
-
-                        print_current_point(current_angle, point_map, last_angle)
-                        print_next_points(current_angle, point_map)
+                        forecast = {
+                            'min_reversal': {
+                            'point': predicted_min_reversal,
+                            'close': close_price_at_min_reversal
+                            },
+                            'max_reversal': {
+                            'point': predicted_max_reversal,
+                            'close': close_price_at_max_reversal
+                            }      
+                        }   
 
 
+                        # Get current point, frequency and mood   
+                        current_point = get_current_point(point, forecast)
+                        current_frequency = get_current_frequency(current_quadrant)      
+                        current_mood = get_current_mood(frequencies, current_quadrant)
+
+                        # Update corresponding octahedron point          
+                        for octahedron_point in octahedron:
+                            if octahedron_point['point'] == current_point:
+                                octahedron_point['frequency'] = current_frequency   
+                                octahedron_point['mood'] = current_mood
+
+
+                        # Get last point          
+                        last_point = get_last_point()
+
+                        # Find min and max points           
+                        min_point = min(octahedron, key=lambda p: p['frequency'] or float('inf'))
+                        max_point = max(octahedron, key=lambda p: p['frequency'] or float('-inf')) 
+
+                        # Print current point and info    
+                        print(f"Current point: {current_point}")              
+                        print(f"Frequency: {current_frequency}") 
+                        print(f"Mood: {current_mood}")          
+                        print(f"Last point: {last_point}")
+
+                        # Calculate next point                   
+                        next_angle = (get_angle(current_point) + 30) % 360  
+                        next_point = get_point(next_angle)
+                        print(f"Next point: {next_point}")
+
+                        # Calculate reversals from min/max points
+                        reversals = calculate_reversals(min_point, max_point)
+                        print(reversals)
 
 
 
