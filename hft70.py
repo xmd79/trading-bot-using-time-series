@@ -541,6 +541,16 @@ def is_prime(n):
                 return False
         return True
 
+# Define function to convert z values to price levels
+def z_to_price(z, current_price, scale_factor):
+    if z == float("inf"):
+        return current_price + scale_factor
+    elif z == float("-inf"):
+        return current_price - scale_factor
+    else:
+        return current_price + scale_factor * np.tanh(z)
+
+
 print()
 print("Init main() loop: ")
 print()
@@ -795,6 +805,7 @@ def main():
 
                     # Check if EMA periods have been defined
                     if EMA_SLOW_PERIOD and EMA_FAST_PERIOD:
+
                         # Calculate the EMAs
                         ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]
                         ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]
@@ -1598,8 +1609,57 @@ def main():
                         print(f"Fibonacci Ratio Low: {fibo_ratio_low}")
                         print(f"Fibonacci Ratio High: {fibo_ratio_high}")
 
+                        # Calculate support and resistance levels
+                        support_z = min([f['pos'] for f in frequencies])
+                        resistance_z = max([f['pos'] for f in frequencies])
+
+                        # Define scale factor as 1% of current price
+                        scale_factor = close_prices[-1] * 0.01  
+
+                        # Convert z values to price levels
+                        support = z_to_price(support_z, close_prices[-1], scale_factor)
+                        resistance = z_to_price(resistance_z, close_prices[-1], scale_factor)
+
+                        # Calculate current momentum and trend forecast
+                        current_momentum = 0
+
+                        for freq in frequencies:
+                            current_momentum += freq['magnitude'] * mood_to_corr[freq['mood']]
+
+                        current_momentum /= len(frequencies)
+
+                        if current_momentum < -2:
+                            forecast_mood = 'bearish'
+                        elif current_momentum < 0:
+                            forecast_mood = 'slightly bearish'
+                        elif current_momentum == 0:
+                            forecast_mood = 'neutral'
+                        elif current_momentum > 0:
+                            forecast_mood = 'slightly bullish'
+                        elif current_momentum > 2:
+                            forecast_mood = 'bullish'
+
+                        # Print results
+                        print(f"Current momentum: {current_momentum:.2f}")
+                        print(f"Trend forecast: {forecast_mood}")
+                        print(f"Support : {support:.2f}")
+                        print(f"Resistance : {resistance:.2f}")
+
                         print()
 
+                        momentum_signal_1m = signals['1m']['momentum']
+                        momentum_signal_3m = signals['3m']['momentum']
+                        momentum_signal_5m = signals['5m']['momentum']
+
+                        print("Momentum on 1min tf is at : ", momentum_signal_1m)
+                        print("Momentum on 3min tf is at : ", momentum_signal_3m)
+                        print("Momentum on 5min tf is at : ", momentum_signal_5m)
+                         
+                        print()
+
+
+
+      
                         # Get all open positions
                         positions = client.futures_position_information()
 
