@@ -1663,16 +1663,30 @@ def main():
                          
                         print()
 
-                        # Convert bounds to prices         
                         brun_low_price = z_to_price(brun_low, close_prices[-1], scale_factor)
                         brun_high_price = z_to_price(brun_high, close_prices[-1], scale_factor)
-                        
-                        print(brun_low_price)
-                        print(brun_high_price)
+
+                        # Convert bounds to prices         
+                        if brun_low_price > close_prices[-1]:
+                            brun_low_price = close_prices[-1] * 0.99
+
+                        # If upper Brun bound is below close price, set it to close price * 1.01
+                        if brun_high_price < close_prices[-1]:    
+                            brun_high_price  = close_prices[-1] * 1.01
+
+                        print(f"Brun Lower Bound Price: {brun_low_price:.2f}")    
+                        print(f"Brun Upper Bound Price: {brun_high_price:.2f}")
+
+                        print()
 
                         # Calculate Billinger Bands       
                         upper, middle, lower = talib.BBANDS(close_prices, timeperiod=N, nbdevup=2, nbdevdn=2)
-                        print(upper[-1], middle[-1], lower[-1])
+
+                        print("BB high: ", upper[-1])
+                        print("BB mid: ", middle[-1])
+                        print("BB low: ", lower[-1])
+
+                        print()
 
                         # Calculate Polynomial Channel  
                         poly_channel = calculate_poly_channel(close_prices)
