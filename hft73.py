@@ -742,48 +742,7 @@ print()
 ##################################################
 ##################################################
 
-#close = get_close('1m')
 
-# Add Bollinger Bands
-
-def calculate_bollinger_bands(close, period=20, stdev=2):
-    
-    # Convert float close to array    
-    np_close = np.array([close])  
-    
-    # Replace NaNs  
-    np_close = np.nan_to_num(np_close, nan=0.0)
-          
-    # Calculate moving average        
-    ma = talib.EMA(np_close, period)[-1]
-    
-    # Calculate standard deviation        
-    stdev = talib.STDDEV(np_close, period)[-1]
-      
-    # Calculate bands         
-    upper =  ma + stdev * stdev     
-    lower = ma - stdev * stdev          
-           
-    return upper, lower, ma
-
-##################################################
-##################################################
-
-def check_bollinger_bands(close):
-    upper, lower, _ = calculate_bollinger_bands(close)  
-    
-    # Check if close is above upper band      
-    if close > upper:
-        print(f"Close ({close}) above upper Bollinger Band ({upper})")
-        
-    # Check if close is below lower band        
-    if close < lower:
-       print(f"Close ({close}) below lower Bollinger Band ({lower})")
-
-    else:
-        print("Close price is in between upper && lower of bb")
-
-check_bollinger_bands(close)
 
 print()
 
