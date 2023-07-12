@@ -77,7 +77,7 @@ print()
 ##################################################
 ##################################################
 
-# Define binance client reading api key and secret from local file:
+# Define Binance client reading api key and secret from local file:
 
 def get_binance_client():
     # Read credentials from file    
@@ -130,21 +130,34 @@ def get_candles(symbol, timeframes):
             candles.append(candle)    
     return candles
 
-candles = get_candles(TRADE_SYMBOL, timeframes)
+# Get candles  
+candles = get_candles(TRADE_SYMBOL, timeframes) 
 
-candle_map = {}
+# Organize candles by timeframe        
+candle_map = {}  
 for candle in candles:
     timeframe = candle["timeframe"]  
-    if timeframe not in candle_map:
-        candle_map[timeframe] = []        
-    candle_map[timeframe].append(candle)
+    candle_map.setdefault(timeframe, []).append(candle)
 
 ##################################################
 ##################################################
 
-def get_close(candles, timeframes):
-    # Get close price of last candle
-    return candles[-1]['close']
+def get_close(timeframe):
+    # Get candles for this specific timeframe
+    candles = candle_map[timeframe]
+    
+    # Get close of last candle    
+    close = candles[-1]['close']
+    
+    return close
+
+##################################################
+##################################################
+
+# Get close price as <class 'float'> type
+
+close = get_close('1m')
+#print(close)
 
 ##################################################
 ##################################################
@@ -460,10 +473,7 @@ for timeframe, data in patterns.items():
     print(f"Square patterns: {data['square']['count']} ({data['square']['signal']})")
     print(f"45 deg patterns: {data['forty_five']['count']} ({data['forty_five']['signal']})")
 
-
-
 print()
-
 
 ##################################################
 ##################################################
@@ -732,14 +742,68 @@ print()
 ##################################################
 ##################################################
 
+#close = get_close('1m')
 
+# Add Bollinger Bands
+
+def calculate_bollinger_bands(close, period=20, stdev=2):
+    
+    # Convert float close to array    
+    np_close = np.array([close])  
+    
+    # Replace NaNs  
+    np_close = np.nan_to_num(np_close, nan=0.0)
+          
+    # Calculate moving average        
+    ma = talib.EMA(np_close, period)[-1]
+    
+    # Calculate standard deviation        
+    stdev = talib.STDDEV(np_close, period)[-1]
+      
+    # Calculate bands         
+    upper =  ma + stdev * stdev     
+    lower = ma - stdev * stdev          
+           
+    return upper, lower, ma
+
+##################################################
+##################################################
+
+def check_bollinger_bands(close):
+    upper, lower, _ = calculate_bollinger_bands(close)  
+    
+    # Check if close is above upper band      
+    if close > upper:
+        print(f"Close ({close}) above upper Bollinger Band ({upper})")
+        
+    # Check if close is below lower band        
+    if close < lower:
+       print(f"Close ({close}) below lower Bollinger Band ({lower})")
+
+    else:
+        print("Close price is in between upper && lower of bb")
+
+check_bollinger_bands(close)
 
 print()
 
 ##################################################
 ##################################################
 
+print()
 
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
 
 print()
 
