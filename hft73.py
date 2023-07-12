@@ -742,12 +742,125 @@ print()
 ##################################################
 ##################################################
 
+overall_mood = None
 
+def multi_timeframe_filter():
+    
+    moods = {
+        'uptrend': 0,   
+        'downtrend': 0,    
+        'accumulation': 0,   
+        'distribution': 0    
+    }  
+        
+    for timeframe, candles in candle_map.items():
+
+        candle_array = np.array([candle["close"] 
+            for candle in candle_map[timeframe]])  
+        ema_slow, ema_fast = np.array(get_emas(candle_array))
+       
+        close = candle_array[-1]
+        
+        # Calculate % differences  
+        slow_diff = abs((close - ema_slow) / close) * 100 
+        fast_diff = abs((close - ema_fast) / close) * 100
+               
+        if close < ema_slow:      
+           moods['downtrend'] += 1
+
+        if slow_diff < -2:     
+           moods['distribution'] += 1    
+            
+        if slow_diff > 2:       
+           moods['accumulation'] += 1  
+          
+        if close > ema_slow:    
+            moods['uptrend'] += 1 
+            
+    overall_mood = max(moods, key=moods.get)     
+            
+    if moods[overall_mood] >= 5:    
+         print(f"Overall market mood: {overall_mood}")  
+         print("Filtering trades...")        
+         return False
+      
+    # Not enough confirmation, pass the trade    
+    return True
+
+# Call multi timeframe filter
+filter_trade = multi_timeframe_filter()
+
+if filter_trade == False:
+    print("Trade filtered based on multi-timeframe analysis")
+else:
+    print("Taking trade as it aligns with market mood")
+    
+# Print mood counts     
+print(f"Uptrend moods: {moods['uptrend']}")      
+print(f"Downtrend moods: {moods['downtrend']}")   
+print(f"Accumulation moods: {moods['accumulation']}")   
+print(f"Distribution moods: {moods['distribution']}")
+
+# Print overall market mood   
+print(f"Overall market mood: {overall_mood}")   
+    
+# Print filter result
+if filter_trade:
+    print("Trade passed the multi-timeframe filter")
+else:
+    print("Trade filtered by multi-timeframe filter")
 
 print()
 
 ##################################################
 ##################################################
+
+def forecast_fibo_levels():
+    
+    lows = []
+    highs = []  
+    
+    for timeframe, candles in candle_map.items():
+    
+        # Get last 100 candles
+        recent_candles = candles[-100:]  
+              
+        # Find lowest low and highest high
+        lowest_low = min([c["low"] for c in recent_candles])   
+        highest_high = max([c["high"] for c in recent_candles])
+        
+        lows.append(lowest_low)
+        highs.append(highest_high) 
+        
+    # Take average of lows and highs     
+    forecast_low = np.mean(lows)        
+    forecast_high = np.mean(highs)
+    
+    # Calculate Fibonacci ratios
+    fibo_ratios = [0.382, 0.5, 0.618, 1]
+    
+    fibo_supports = []
+    fibo_resistances = []
+    
+    for ratio in fibo_ratios:
+        
+        support = round(forecast_low + ((forecast_high - forecast_low) * ratio), 2)  
+        resistance = round(forecast_high - ((forecast_high - forecast_low) * ratio), 2)  
+        
+        fibo_supports.append(support)
+        fibo_resistances.append(resistance)
+            
+    return (fibo_supports, fibo_resistances)
+
+fibo_supports, fibo_resistances = forecast_fibo_levels()
+
+print("Support levels:")  
+for support in fibo_supports:
+    print(support)
+    
+print("Resistance levels:")     
+for resistance in fibo_resistances:     
+    print(resistance)
 
 print()
 
