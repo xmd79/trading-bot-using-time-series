@@ -615,7 +615,7 @@ def forecast_market():
         slow_diff = (close - ema_slow) / ema_slow * 100
         fast_diff = (close - ema_fast) / ema_fast * 100
         
-       # Check if close is below fast/slow EMA      
+        # Check if close is below fast/slow EMA      
         if close < ema_slow:       
             signals.append({'mood': 'downtrend'})
             moods['downtrend'] += 1
@@ -708,14 +708,25 @@ def analyze_timeframes():
         print(f"{timeframe}:")  
         print(f"  Close {results['ema_diffs']['slow']:.2f}% from slow EMA")
         print(f"   {results['ema_diffs']['fast']:.2f}% from fast EMA")
-
-        print()
-
         print(f"Market mood: {results['mood']}")    
 
         print()
 
 analyze_timeframes()
+
+print()
+
+##################################################
+##################################################
+
+
+
+print()
+
+##################################################
+##################################################
+
+
 
 print()
 
