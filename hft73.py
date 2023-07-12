@@ -183,6 +183,26 @@ def check_cross(ema_slow, ema_fast):
 ##################################################
 ##################################################
 
+def calculate_emas(candle_array):
+    close_prices = candle_array.tolist()  
+     
+    # Check length     
+    if len(close_prices) < EMA_FAST_PERIOD:
+       return 0, 0  
+        
+    # Replace NaN    
+    close_prices = np.nan_to_num(close_prices, nan=0.0)  
+      
+    # Calculate EMAs        
+    ema_slow = talib.EMA(np.array(close_prices), timeperiod=EMA_SLOW_PERIOD)[-1]    
+    ema_fast = talib.EMA(np.array(close_prices), timeperiod=EMA_FAST_PERIOD)[-1]
+      
+    return ema_slow, ema_fast
+
+
+##################################################
+##################################################
+
 # Define ema moving averages crosses and getting percentage dist. from close to each of them:
 
 def calculate_diff(close, ema, hist):  
@@ -213,49 +233,41 @@ print()
 
 NO_SIGNAL = 0
 
-def calc_signal(candle):  
+def calc_signal(candle_map):  
+
+    signals = []
       
-    slow_diff_hist: Histories = {"slow": []} 
-    fast_diff_hist: Histories = {"fast": []}
+    for timeframe in candle_map:     
+        candle_array = np.array([c["close"] for c in candle_map[timeframe]])   
+        ema_slow, ema_fast = calculate_emas(candle_array)
+                
+        slow_diff_hist = {"slow": []}
+        fast_diff_hist = {"fast": []}  
+                
+        close = candle_array[-1]
       
-    entry_long_signal = 0    
-    entry_short_signal = 0
-    
-    for timeframe in candle_map:
-        close = 0
-        for candle in candle_map[timeframe]:
-            candle_array = np.array([candle["close"] for candle in candle_map[timeframe]]) 
-                
-            ema_slow = talib.EMA(candle_array, EMA_SLOW_PERIOD)[-1]     
-            ema_fast = talib.EMA(candle_array, EMA_FAST_PERIOD)[-1]   
-                
-            ema_slow = np.nan_to_num(ema_slow, nan=0.0)
-            ema_fast = np.nan_to_num(ema_fast, nan=0.0)
+        slow_diff = calculate_diff(close, ema_slow,  
+                                   slow_diff_hist)      
+        fast_diff = calculate_diff(close, ema_fast,  
+                                   fast_diff_hist)
           
-            if np.isnan(ema_slow).any() or np.isnan(ema_fast).any():
-                continue  
-                
-            close = candle_array[-1]
-       
-            slow_diff = calculate_diff(close, ema_slow, slow_diff_hist)                       
-            fast_diff = calculate_diff(close, ema_fast, fast_diff_hist)
-      
-            if close < ema_slow * 0.95 and close < ema_fast * 0.8 and ema_slow < ema_fast:      
-                entry_long_signal += 1  
-         
-            if close > ema_slow * 1.2 and close > ema_fast * 1.05 and ema_slow > ema_fast:
-                entry_short_signal += 1
+        signals.append({
+           'timeframe': timeframe, 
+           'slow_diff': slow_diff,
+           'fast_diff': fast_diff   
+        })
             
-            if entry_long_signal > EMA_THRESHOLD:
-                signal = 1        
-            elif entry_short_signal > EMA_THRESHOLD:
-                signal = -1        
-            else:     
-                signal = NO_SIGNAL
+    signal, _ = NO_SIGNAL, None
+            
+    for sig in signals:  
+        print(f"{sig['timeframe']} - {sig['slow_diff']:.2f}% from slow EMA, {sig['fast_diff']:.2f}% from fast EMA")     
+            
+    return signal, _
 
-            close = candle_array[-1]
+signal, _ = calc_signal(candle_map)  
 
-    return signal, timeframe
+if signal == NO_SIGNAL:     
+   print("No clear dominance pattern overall")
 
 signal, _ = calc_signal(candle_map)
 
@@ -267,34 +279,35 @@ print()
 ##################################################
 ##################################################
 
-# Function to check where close is relative to EMAs     
 def get_signal():
     for timeframe, candles in candle_map.items():
-        candle_array = np.array([candle["close"] for candle in candles])
+        candle_array = np.array([candle["close"] for candle in candles])  
         ema_slow, ema_fast = get_emas(candle_array)
 
         if len(candle_array) == 0:
             print(f"No candles found for {timeframe}")
             continue
-
+        
+        close = candle_array[-1]        
+        
         if candle_array[-1] < ema_slow:
             print(f"{timeframe} - Close below slow EMA, potential reversal point.")
-
+        
         if candle_array[-1] < ema_fast:
             print(f"{timeframe} - Close below fast EMA, potential support.")
-
+        
         if candle_array[-1] < ema_slow and candle_array[-1] < ema_fast:
             print(f"{timeframe} - Close below both EMAs, strong reversal signal.")
-
+            
         if candle_array[-1] > ema_slow:
             print(f"{timeframe} - Close above slow EMA, potential resistance.")
-
+            
         if candle_array[-1] > ema_fast:
-            print(f"{timeframe} - Close above fast EMA, potential resistance.")
-
+            print(f"{timeframe} - Close above fast EMA, potential resistance.")   
+            
         if candle_array[-1] > ema_slow and candle_array[-1] > ema_fast:
             print(f"{timeframe} - Close above both EMAs, strong bullish signal.")
-
+            
     return NO_SIGNAL, None
 
 # Call function
@@ -732,4 +745,3 @@ print()
 
 ##################################################
 ##################################################
-
