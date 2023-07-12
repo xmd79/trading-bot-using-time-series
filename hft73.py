@@ -586,6 +586,58 @@ print()
 ##################################################
 ##################################################
 
+def forecast_market():
+    
+    moods = {
+        'uptrend': 0,   
+        'downtrend': 0,    
+        'accumulation': 0,   
+        'distribution': 0    
+    }
+    
+    signals = []
+    reversals = []
+    
+    for timeframe, candles in candle_map.items():
+
+        candle_array = np.array([candle["close"] for candle in candle_map[timeframe]])
+        ema_slow, ema_fast = np.array(get_emas(candle_array))
+
+        close = candle_array[-1]
+
+        slow_diff = (close - ema_slow) / ema_slow * 100
+        fast_diff = (close - ema_fast) / ema_fast * 100
+        
+       # Check if close is below fast/slow EMA      
+        if close < ema_slow:       
+            signals.append({'mood': 'downtrend'})
+            moods['downtrend'] += 1
+
+            if moods['downtrend'] > 5:  
+                reversals.append(timeframe)
+
+        elif slow_diff < -2:     
+            signals.append({'mood': 'distribution'})
+            moods['distribution'] += 1
+            
+        elif slow_diff > 2:       
+            signals.append({'mood': 'accumulation'})    
+            moods['accumulation'] += 1
+              
+        elif close > ema_slow:    
+            signals.append({'mood': 'uptrend'})      
+            moods['uptrend'] += 1
+            
+            if moods['uptrend'] > 5:  
+                reversals.append(timeframe)
+                
+    print(f"Market mood: {max(moods, key=moods.get)}")        
+    print(f"Potential reversals at: {reversals}")
+    print(f"{timeframe} mood: {max(moods, key=moods.get)} - {'%.2f' % ((moods[max(moods, key=moods.get)]/len(candle_array))*100)}%")
+
+forecast_market()
+
+print()
 
 ##################################################
 ##################################################
