@@ -260,7 +260,7 @@ def calc_signal(candle):
 signal, _ = calc_signal(candle_map)
 
 if signal == NO_SIGNAL:    
-   print("No actual signal generated")
+   print("No clear dominance pattern overall")
 
 print()
 
@@ -339,102 +339,253 @@ print()
 ##################################################
 
 def detect_phi_pattern(candles):
-   
-    # Assign initial value    
-    middle_close = candles[0]['close'] 
+    
+    middle_close = candles[0]['close']  
       
     patterns = 0   
     for candle in candles:  
-        if candle['close'] < candle['open']:      
-            patterns += 1
-            if patterns == 3:
-                middle_close = candle['close'] 
-            if candle['close'] >= candle['open'] and patterns >= 3:     
-                patterns = 0   
-            if patterns == 0 and candle['close'] > middle_close:    
-                patterns += 1
-            if patterns == 2:                 
-                if candle['close'] < candle['open']:
-                    print("Phi pattern detected. Potential dip formed!")   
-            else:       
-                print("Phi pattern detected. Potential top formed!")
-            patterns = 0
-            
+        if candle['close'] < candle['open']:         
+           patterns +=1
+           
+           if patterns == 3:
+               middle_close = candle['close']
+                
+           if candle['close'] >= candle['open'] and patterns >= 3:      
+               patterns = 0      
+               
+           if patterns == 0 and candle['close'] > middle_close:
+               patterns +=1
+               
+           if patterns == 2:               
+               patterns = 0
+                
     return patterns
 
 ##################################################
 ##################################################
 
 def detect_square_of_9(candles):
-    patterns = 0  
-      
-    while len(candles) >= 9:  
-        highest = [candles[0]['high'] for _ in range(9)]  
-        lowest = [candles[0]['low'] for _ in range(9)]  
+   patterns  = 0
+     
+   while len(candles) >= 9:
+       highest = [candles[0]['high'] for _ in range(9)]  
+       lowest = [candles[0]['low'] for _ in range(9)]  
        
-        for i in range(1,9):
-            if candles[i]['high'] > highest[i]:
-                highest[i] = candles[i]['high']  
-            if candles[i]['low'] < lowest[i]:       
-                lowest[i] = candles[i]['low']
-              
-        if max(highest) == highest[4] or min(lowest) == lowest[4]:
-            if candles[4]['close'] < candles[4]['open']:  
-                print("Square of 9 detected. Potential dip formed!")
-            else:       
-                print("Square of 9 detected. Potential top formed!")
-            patterns += 1
-            candles = candles[1:]
+       for i in range(1,9):
+           ...
+           
        
-        if len(candles) >= 1:     
-            return patterns + 1  
-      # 1 pattern formed with remaining candles
-        
-    return patterns 
+       if max(highest) == highest[4] or min(lowest) == lowest[4]:
+          patterns += 1
+          
+       candles = candles[1:]  
+         
+   if len(candles) >= 1:      
+      return patterns + 1
+             
+   return patterns
 
 ##################################################
 ##################################################
 
 def detect_forty_five_angle(candles):
     patterns = 0
-   
+    
     for i in range(len(candles)-1):  
         start_open = candles[i]['open']
-        start_close = candles[i]['close']
+        start_close = candles[i]['close'] 
         end_open = candles[i+1]['open']   
         end_close = candles[i+1]['close']
+        
         angle = math.acos((start_close-start_open) / math.sqrt(start_close**2+start_open**2))  
-        angle += math.acos((end_close-end_open) / math.sqrt(end_close**2+end_open**2))
-        if 40 < angle < 50:
-            if candles[i]['close'] < candles[i]['open']:
-                print("45 degree angle detected. Potential dip formed!")
-            else:       
-                print("45 degree angle detected. Potential top formed!")
+        angle += math.acos((end_close-end_open) / math.sqrt(end_close**2+end_open**2)) 
+        
+        if 40 < angle < 50:           
             patterns += 1
-          
-        if len(candles) >= 1:        
-            return patterns + 1  
-     # 1 pattern formed with remaining candle
-               
+            
+        if len(candles) >= 1:       
+           return patterns + 1  
+            
     return patterns
 
 ##################################################
 ##################################################
 
 def check_patterns():
-    for timeframe, candles in candle_map.items():
-        candle_array = np.array([candle["close"] for candle in candles])
-
-        phi_patterns = detect_phi_pattern(candles)
-        square_patterns = detect_square_of_9(candles)    
-        forty_five_patterns = detect_forty_five_angle(candles)
+    results = {}
     
-        print(f"{phi_patterns} phi patterns detected.")
-        print(f"{square_patterns} square of 9 patterns detected.")    
-        print(f"{forty_five_patterns} 45 degree angle patterns detected.")
+    for timeframe, candles in candle_map.items():
+        
+        results[timeframe] = {}
+        results[timeframe]['phi'] = {
+            'count': detect_phi_pattern(candles), 
+            'signal': 'dip' if candles[-1]['close'] < candles[-1]['open'] else 'top'
+        }
+        results[timeframe]['square'] = {
+            'count': detect_square_of_9(candles), 
+            'signal': 'dip' if candles[-1]['close'] < candles[-1]['open']  else 'top'
+        }
+        results[timeframe]['forty_five'] = {
+            'count': detect_forty_five_angle(candles), 
+            'signal': 'dip' if candles[-1]['close'] < candles[-1]['open'] else 'top' 
+        }
+    
+    return results
 
-check_patterns()
+patterns = check_patterns()
+
+for timeframe, data in patterns.items():
+    print(f"{timeframe} timeframe:")
+    print(f"  Phi patterns: {data['phi']['count']} ({data['phi']['signal']})")
+    print(f"Square patterns: {data['square']['count']} ({data['square']['signal']})")
+    print(f"45 deg patterns: {data['forty_five']['count']} ({data['forty_five']['signal']})")
+
+
+
+print()
+
 
 ##################################################
 ##################################################
 
+def forecast_signal():
+    signals = []
+    moods = {
+        'bearish': 0,
+        'bullish': 0,
+        'accumulation': 0, 
+        'distribution': 0
+    }
+        
+    for timeframe, candles in candle_map.items():
+
+        candle_array = np.array([candle["close"] for candle in candles])
+        ema_slow, ema_fast = np.array(get_emas(candle_array))
+        
+        if len(candle_array) == 0:
+            continue
+            
+        close = candle_array[-1]       
+        slow_diff = (close - ema_slow) / ema_slow * 100
+        fast_diff = (close - ema_fast) / ema_fast * 100
+               
+        if close < ema_slow:      
+           signals.append({
+               'timeframe': timeframe,
+               'signal': f'{slow_diff:.2f}% below slow EMA',
+               'mood': 'bearish' 
+           })
+           
+        if close < ema_fast:       
+           signals.append({
+               'timeframe': timeframe,  
+               'signal': f'{fast_diff:.2f}% below fast EMA',
+               'mood': 'accumulation' 
+            })
+ 
+        if close < ema_slow:
+            signals.append({
+               'timeframe': timeframe,  
+               'signal': f'{fast_diff:.2f}% below fast EMA',
+                'mood': 'bearish'
+            })
+            
+        if close < ema_fast:       
+           signals.append({
+               'timeframe': timeframe,  
+               'signal': f'{fast_diff:.2f}% below fast EMA',   
+               'mood': 'accumulation'
+            })
+            
+        if close > ema_slow:
+           signals.append({
+               'mood': 'bullish' 
+           })
+           
+        if close > ema_fast:     
+           signals.append({
+               'mood': 'distribution'
+            })
+         
+        # Do the same for close above EMAs                
+            
+    for signal in signals:
+        moods[signal['mood']] += 1
+            
+    for mood, count in moods.items():
+        print(f"{mood} mood: {count/len(signals)*100:.2f}%")   
+            
+    print("Overall market mood:", max(moods, key=moods.get))
+
+
+forecast_signal()
+
+##################################################
+##################################################
+
+moods = {
+    'uptrend': 0,   
+    'downtrend': 0,    
+    'accumulation': 0,   
+    'distribution': 0    
+}
+
+def calculate_market_mood():   
+
+    timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '8h']
+    
+    overall_moods = {
+        'uptrend': 0,   
+        'downtrend': 0,    
+        'accumulation': 0,   
+        'distribution': 0    
+    }
+
+    for timeframe in timeframes:  
+        candle_array = np.array([candle["close"] for candle in candle_map[timeframe]])
+        ema_slow, ema_fast = np.array(get_emas(candle_array))
+
+        close = candle_array[-1]
+
+        slow_diff = (close - ema_slow) / ema_slow * 100
+        fast_diff = (close - ema_fast) / ema_fast * 100
+
+        if close < ema_slow:    
+            moods['downtrend'] += 1  
+        elif slow_diff < -2:  
+            moods['distribution'] += 1    
+        elif slow_diff > 2:     
+            moods['accumulation'] += 1    
+        elif close > ema_slow:       
+            moods['uptrend'] += 1
+  
+        if close < ema_slow:     
+            moods['downtrend'] += 1
+        elif close > ema_slow:
+            moods['uptrend'] += 1
+            
+    reversals = []
+    for timeframe in timeframes:
+        if moods['uptrend'] > 5:      
+            reversals.append(timeframe)
+            
+        if moods['downtrend'] > 5:
+            reversals.append(timeframe)
+            
+    print(f"Market mood: {max(moods, key=moods.get)}")        
+    print(f"Potential reversals at: {reversals}")
+    print(f"{timeframe} mood: {max(moods, key=moods.get)} - {'%.2f' % ((moods[max(moods, key=moods.get)]/len(candle_array))*100)}%")
+
+    moods['uptrend'] = 0
+    moods['downtrend'] = 0 
+
+calculate_market_mood()
+
+print()
+
+##################################################
+##################################################
+
+
+##################################################
+##################################################
