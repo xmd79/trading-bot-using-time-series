@@ -35,8 +35,6 @@ import decimal
 import random
 import statistics
 
-from typing import Tuple
-
 ##################################################
 ##################################################
 
@@ -79,67 +77,6 @@ print()
 ##################################################
 ##################################################
 
-# Define vars and constants for data calculations:
-
-# Calculate the trade size based on the USDT balance with 20x leverage
-TRADE_SIZE = bUSD_balance * 20
-
-# Global variables
-TRADE_SYMBOL = 'BTCBUSD'
-
-TRADE_TYPE = ''
-TRADE_LVRG = 20
-
-# define % for stoploss
-STOP_LOSS_THRESHOLD = 0.0234 
-
-# define % for takeprofit
-TAKE_PROFIT_THRESHOLD = 0.0234 
-
-# Define EMA-s:
-EMA_SLOW_PERIOD = 12
-EMA_FAST_PERIOD = 5
-
-BUY_THRESHOLD = 5
-SELL_THRESHOLD = 3
-
-EMA_THRESHOLD_LONG = 12 # Close must be within 5% of slow EMA for long entry
-EMA_THRESHOLD_SHORT = 5 # Close must be within 5% of fast EMA for short entry
-
-LONG_SIGNAL = 1
-SHORT_SIGNAL = -1
-NO_SIGNAL = 0 
-
-closed_positions = []
-
-OPPOSITE_SIDE = {'long': 'SELL', 'short': 'BUY'}
-
-##################################################
-##################################################
-
-# Initialize variables for tracking trade state:
-
-trade_open = False
-trade_side = None
-
-trade_entry_pnl = 0
-trade_exit_pnl = 0
-
-trade_entry_time = 0
-trade_exit_time = 0
-
-trade_percentage = 0
-
-##################################################
-##################################################
-
-# Define timeframes:
-
-timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '2h', '4h',  '6h', '8h', '12h', '1D',  '3D']
-
-##################################################
-##################################################
-
 # Define binance client reading api key and secret from local file:
 
 def get_binance_client():
@@ -160,7 +97,16 @@ client = get_binance_client()
 ##################################################
 ##################################################
 
-# Extrct kline data for candels via api from binance eserver:
+# Initialize variables for tracking trade state:
+
+TRADE_SYMBOL = "BTCUSDT"
+
+##################################################
+##################################################
+
+# Define timeframes and get candles:
+
+timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '2h', '4h',  '6h', '8h', '12h', '1D']
 
 def get_candles(symbol, timeframe):
     """Get all candles for a symbol and timeframe"""
@@ -186,276 +132,169 @@ def get_candles(symbol, timeframe):
         
     return candles
 
-##################################################
-##################################################
-
-def get_1m_candles(symbol):
-    return get_candles(symbol, client.KLINE_INTERVAL_1MINUTE)
-
-def get_3m_candles(symbol):
-    return get_candles(symbol, client.KLINE_INTERVAL_3MINUTE)
-
-def get_5m_candles(symbol):
-    return get_candles(symbol, client.KLINE_INTERVAL_5MINUTE)
-
-def get_15m_candles(symbol): 
-    return get_candles(symbol, client.KLINE_INTERVAL_15MINUTE)
-
-def get_30m_candles(symbol):
-    return get_candles(symbol, client.KLINE_INTERVAL_30MINUTE)  
-
-def get_1h_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_1HOUR)
-
-def get_2h_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_2HOUR)
-
-def get_4h_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_4HOUR)
-
-def get_6h_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_6HOUR)
-
-def get_8h_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_8HOUR)
-
-def get_12h_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_12HOUR)
-
-def get_1d_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_1DAY)
-
-def get_3d_candles(symbol):   
-    return get_candles(symbol, client.KLINE_INTERVAL_3DAY)
+candles = get_candles(TRADE_SYMBOL, timeframes)
 
 ##################################################
 ##################################################
 
-# Get 1 minute candles
-candles_1m = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_1MINUTE) 
-
-# Get 3 minute candles
-candles_3m = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_3MINUTE) 
-
-# Get 5 minute candles
-candles_5m = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_5MINUTE)
-
-# Get 15 minute candles
-candles_15m = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_15MINUTE)
-
-# Get 30 minute candles
-candles_30m = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_30MINUTE)
-
-# Get 1hour candles
-candles_1h = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_1HOUR)
-
-# Get 2hour candles
-candles_2h = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_2HOUR)
-
-# Get 4hour candles
-candles_4h = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_4HOUR)
-
-# Get 6hour candles
-candles_6h = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_6HOUR)
-
-# Get 8hour candles
-candles_8h = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_8HOUR)
-
-# Get 6hour candles
-candles_12h = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_12HOUR)
-
-# Get 1day candles
-candles_1D = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_1DAY)
-
-# Get 3day candles
-candles_3D = get_candles(TRADE_SYMBOL, client.KLINE_INTERVAL_3DAY)
+def get_close(candles, timeframes):
+    # Get close price of last candle
+    return candles[-1]['close']
 
 ##################################################
 ##################################################
 
-# move KLINE data received from binance server within candle_map{} dict. :
+EMA_FAST_PERIOD = 12
+EMA_SLOW_PERIOD = 26
 
-candle_map = {
-    '1min': candles_1m,  
-    '3min' : candles_3m,  
-    '5min' : candles_5m,
-    '15min': candles_15m,
-    '30min': candles_30m,  
-    '1h'  : candles_1h,   
-    '2h'  : candles_2h,
-    '4h'  : candles_4h,
-    '6h'  : candles_6h,
-    '8h'  : candles_8h,
-    '12h'  : candles_12h,
-    '1D'  : candles_1D,
-    '3D'  : candles_3D
-}
+EMA_THRESHOLD = 3
 
-##################################################
-##################################################
-
-# Get close price as array
-def get_close(candles):
-  "Get last close price from candles"
-  return candles[-1]["close"]
-
-##################################################
-##################################################
-
-# Function to get EMAs with np arrays
-def get_emas(close_prices: np.ndarray) -> Tuple[float,float]:
-    ema_slow = talib.EMA(close_prices, timeperiod=EMA_SLOW_PERIOD)[-1]   
-    ema_fast = talib.EMA(close_prices, timeperiod=EMA_FAST_PERIOD)[-1]   
+# Function to get EMAs  
+def get_emas(close_prices):
+    close_array = np.array(close_prices)
+    
+    # Check length     
+    if len(close_array) < EMA_FAST_PERIOD:
+       return 0, 0
+    
+    # Replace NaN    
+    close_array = np.nan_to_num(close_array, nan=0.0)
+    
+    # Calculate EMAs      
+    ema_slow = talib.EMA(close_array, timeperiod=EMA_SLOW_PERIOD)[-1]   
+    ema_fast = talib.EMA(close_array, timeperiod=EMA_FAST_PERIOD)[-1]   
+   
     return ema_slow, ema_fast
 
 ##################################################
 ##################################################
 
-#Checking EMA crosees:
+# Checking EMA crosees:
 
-def check_cross(ema_slow: float, ema_fast: float) -> bool:  
-  "Check if EMAs have crossed"
-  return ema_slow < ema_fast  
+def check_cross(ema_slow, ema_fast):  
+    "Check if EMAs have crossed"
+    return ema_slow < ema_fast  
+
+##################################################
+##################################################
 
 # Define ema moving averages crosses and getting percentage dist. from close to each of them:
 
-def get_emacross_mtf_signal(): 
+def calculate_diff(close, ema, hist):  
+    
+    # Calculate difference         
+    diff = abs((close - ema) / close) * 100
+    
+    if np.isnan(diff):
+        # Calculate average of history 
+        diff = np.nanmean(hist[ema])   
+    
+    if ema not in hist:
+        hist[ema] = []
+       
+    # Update history           
+    hist[ema].append(diff)  
+        
+    # Keep last 10 values 
+    hist[ema] = hist[ema][-10:]
+            
+    return np.nanmean(hist[ema])
 
+
+print()
+
+##################################################
+##################################################
+
+NO_SIGNAL = 0
+
+def calc_signal(candle):  
+      
+    slow_diff_hist: Histories = {"slow": []} 
+    fast_diff_hist: Histories = {"fast": []}
+      
     entry_long_signal = 0    
     entry_short_signal = 0
-
-    slow_diff_history = []
-    fast_diff_history = []
-
-    for timeframe, candles in candle_map.items():
-        
-        candle_array = np.array([candle["close"] for candle in candles])
-        
-        ema_slow = talib.EMA(candle_array, timeperiod=EMA_SLOW_PERIOD)[-1]     
-        ema_fast = talib.EMA(candle_array, timeperiod=EMA_FAST_PERIOD)[-1] 
     
-        # Replace NaN with 0
-        ema_slow = np.nan_to_num(ema_slow, nan=0.0)  
-        ema_fast = np.nan_to_num(ema_fast, nan=0.0)
-
-        # Filter out values <= 0      
-        ema_slow = ema_slow[ema_slow > 0]  
-        ema_fast = ema_fast[ema_fast > 0]  
- 
-        close = candle_array[-1]
+    for timeframe in candle_map:
+        close = 0
+        for candle in candle_map[timeframe]:
+            candle_array = np.array([candle["close"] for candle in candle_map[timeframe]]) 
                 
-        slow_diff = abs((close - ema_slow)/close) * 100
-
-        if np.isnan(slow_diff):
-            # If NaN, calculate avg of previous values    
-            slow_diff = np.mean(slow_diff_history)  
-    
-            # Store current value in history    
-            slow_diff_history.append(slow_diff)
-        else:
-            # If not NaN, store current value in history
-           slow_diff_history.append(slow_diff)
-
-        # Limit history to last 10 values     
-        slow_diff_history = slow_diff_history[-10:]
-
-        slow_diff = np.mean(slow_diff)
-
-        fast_diff = abs((close - ema_fast)/close) * 100
-
-        if np.isnan(fast_diff):
-            # If NaN, calculate avg of previous values    
-            fast_diff = np.mean(fast_diff_history)  
-    
-            # Store current value in history    
-            fast_diff_history.append(fast_diff)
-        else:
-            # If not NaN, store current value in history
-           fast_diff_history.append(fast_diff)
-
-        # Limit history to last 10 values     
-        fast_diff_history = fast_diff_history[-10:]
-
-        fast_diff = np.mean(fast_diff) 
-
-        print(f"{timeframe} - Close: {close}")
-        print(f"{timeframe} - Fast EMA: {ema_fast}")   
-        print(f"{timeframe} - Slow EMA: {ema_slow}") 
-
-        print(f"{timeframe} - Close price value to Slow EMA value diff: {slow_diff:.2f}%")
-        print(f"{timeframe} - Close price value to Fast EMA value diff: {fast_diff:.2f}%") 
-
-        print()
-
-        if ema_slow.size > 0 and ema_fast.size > 0 and close < ema_slow * 0.95 and close < ema_fast * 0.8 and ema_slow < ema_fast:
-                print(f"{timeframe} - Potential long entry")       
+            ema_slow = talib.EMA(candle_array, EMA_SLOW_PERIOD)[-1]     
+            ema_fast = talib.EMA(candle_array, EMA_FAST_PERIOD)[-1]   
+                
+            ema_slow = np.nan_to_num(ema_slow, nan=0.0)
+            ema_fast = np.nan_to_num(ema_fast, nan=0.0)
+          
+            if np.isnan(ema_slow).any() or np.isnan(ema_fast).any():
+                continue  
+                
+            close = candle_array[-1]
+       
+            slow_diff = calculate_diff(close, ema_slow, slow_diff_hist)                       
+            fast_diff = calculate_diff(close, ema_fast, fast_diff_hist)
+      
+            if close < ema_slow * 0.95 and close < ema_fast * 0.8 and ema_slow < ema_fast:      
                 entry_long_signal += 1  
-        
-        if ema_slow.size > 0 and ema_fast.size > 0 and close > ema_slow * 1.2 and close > ema_fast * 1.05 and ema_slow >  ema_fast:      
-                print(f"{timeframe} - Potential short entry")        
-                entry_short_signal += 1 
-                
-    if entry_long_signal > BUY_THRESHOLD: 
-       signal = 1      
-    elif entry_short_signal > BUY_THRESHOLD:
-       signal = -1
-    else:
-       signal = 0
-        
+         
+            if close > ema_slow * 1.2 and close > ema_fast * 1.05 and ema_slow > ema_fast:
+                entry_short_signal += 1
+            
+            if entry_long_signal > EMA_THRESHOLD:
+                signal = 1        
+            elif entry_short_signal > EMA_THRESHOLD:
+                signal = -1        
+            else:     
+                signal = NO_SIGNAL
+
+            close = candle_array[-1]
+
     return signal, timeframe
 
-print()
+signal, _ = calc_signal(candle_map)
 
-##################################################
-##################################################
-
-signal, timeframe = get_emacross_mtf_signal()
-
-if timeframe == "Long":
-    print("Generated long signal on:", timeframe)
-
-elif timeframe == "Short":      
-    print("Generated short signal on:", timeframe)  
-    
-else:
-    print("No signal generated")
+if signal == NO_SIGNAL:    
+   print("No actual signal generated")
 
 print()
 
 ##################################################
 ##################################################
 
-# Function to check where close is relative to EMAs   
-def get_signal() -> Tuple[int, str]:
-      
+# Function to check where close is relative to EMAs     
+def get_signal():
     for timeframe, candles in candle_map.items():
-        
-        candle_array = np.array([candle["close"] for candle in candles])   
-        ema_slow, ema_fast = get_emas(candle_array)  
-          
+        candle_array = np.array([candle["close"] for candle in candles])
+        ema_slow, ema_fast = get_emas(candle_array)
+
+        if len(candle_array) == 0:
+            print(f"No candles found for {timeframe}")
+            continue
+
         if candle_array[-1] < ema_slow:
             print(f"{timeframe} - Close below slow EMA, potential reversal point.")
-            
-        if candle_array[-1] < ema_fast:        
+
+        if candle_array[-1] < ema_fast:
             print(f"{timeframe} - Close below fast EMA, potential support.")
-            
+
         if candle_array[-1] < ema_slow and candle_array[-1] < ema_fast:
             print(f"{timeframe} - Close below both EMAs, strong reversal signal.")
-                
+
         if candle_array[-1] > ema_slow:
             print(f"{timeframe} - Close above slow EMA, potential resistance.")
-                    
+
         if candle_array[-1] > ema_fast:
             print(f"{timeframe} - Close above fast EMA, potential resistance.")
-                    
-        if candle_array[-1] > ema_slow and candle_array[-1] > ema_fast:
-           print(f"{timeframe} - Close above both EMAs, strong bullish signal.")
-            
-    return NO_SIGNAL, None
-            
-# Call function       
-signal, timeframe = get_signal() 
 
+        if candle_array[-1] > ema_slow and candle_array[-1] > ema_fast:
+            print(f"{timeframe} - Close above both EMAs, strong bullish signal.")
+
+    return NO_SIGNAL, None
+
+# Call function
+signal, timeframe = get_signal()
+            
 print()
 
 ##################################################
@@ -494,9 +333,7 @@ print()
 ##################################################
 ##################################################
 
-def get_market_mood():
-    candles = candles_1h # Use 1 hour candles
-    
+def get_market_mood(candles, tf):
     high = max([c["high"] for c in candles[-20:]]) # Get highest high in last 20 candles
     low = min([c["low"] for c in candles[-20:]]) # Get lowest low in last 20 candles  
     
@@ -504,7 +341,7 @@ def get_market_mood():
     medium_band = (high - low) * 0.25  
     large_band = (high - low) * 0.5
     
-    close = get_close(candles)
+    close = get_close(candles, timeframes)
     
     if close > high - small_band:
         mood = "Bullish"
@@ -528,9 +365,100 @@ def get_market_mood():
         mood = "Neutral"      
 
     return mood
-    print()
 
-candles = candles_1h # Use 1 hour candles
+# Define the candle data for each timeframe
+candle_1m_1 = {"open": 100, "high": 110, "low": 90, "close": 105}
+candle_1m_2 = {"open": 105, "high": 120, "low": 100, "close": 115}
+candle_1m_3 = {"open": 115, "high": 125, "low": 105, "close": 120}
+candle_1m_4 = {"open": 120, "high": 130, "low": 110, "close": 125}
+
+candle_5m_1 = {"open": 120, "high": 130, "low": 110, "close": 125}
+candle_5m_2 = {"open": 125, "high": 135, "low": 115, "close": 130}
+candle_5m_3 = {"open": 130, "high": 140, "low": 120, "close": 135}
+candle_5m_4 = {"open": 135, "high": 145, "low": 125, "close": 140}
+
+candle_15m_1 = {"open": 135, "high": 145, "low": 125, "close": 140}
+candle_15m_2 = {"open": 140, "high": 150, "low": 130, "close": 145}
+candle_15m_3 = {"open": 145, "high": 155, "low": 135, "close": 150}
+candle_15m_4 = {"open": 150, "high": 160, "low": 140, "close": 155}
+
+candle_1h_1 = {"open": 155, "high": 165, "low": 145, "close": 160}
+candle_1h_2 = {"open": 160, "high": 170, "low": 150, "close": 165}
+candle_1h_3 = {"open": 165, "high": 175, "low": 155, "close": 170}
+candle_1h_4 = {"open": 170, "high": 180, "low": 160, "close": 175}
+
+candle_4h_1 = {"open": 175, "high": 185, "low": 165, "close": 180}
+candle_4h_2 = {"open": 180, "high": 190, "low": 170, "close": 185}
+candle_4h_3 = {"open": 185, "high": 195, "low": 175, "close": 190}
+candle_4h_4 = {"open": 190, "high": 200, "low": 180, "close": 195}
+
+candle_1D_1 = {"open": 195, "high": 205, "low": 185, "close": 200}
+candle_1D_2 = {"open": 200, "high": 210, "low": 190, "close": 205}
+candle_1D_3 = {"open": 205, "high": 215, "low": 195, "close": 210}
+candle_1D_4 = {"open": 210, "high": 220, "low": 200, "close": 215}
+
+# Define the candle_map dictionary
+candle_map = {
+    "1m": [candle_1m_1, candle_1m_2, candle_1m_3, candle_1m_4],
+    "5m": [candle_5m_1, candle_5m_2, candle_5m_3, candle_5m_4],
+    "15m": [candle_15m_1, candle_15m_2, candle_15m_3, candle_15m_4],      
+    "1h": [candle_1h_1, candle_1h_2, candle_1h_3, candle_1h_4],     
+    "4h": [candle_4h_1, candle_4h_2, candle_4h_3, candle_4h_4],      
+    "1D": [candle_1D_1, candle_1D_2, candle_1D_3, candle_1D_4],  
+}
+
+# Define the candle data for each timeframe
+candle_1m_1 = {"open": 100, "high": 110, "low": 90, "close": 105}
+candle_1m_2 = {"open": 105, "high": 120, "low": 100, "close": 115}
+candle_1m_3 = {"open": 115, "high": 125, "low": 105, "close": 120}
+candle_1m_4 = {"open": 120, "high": 130, "low": 110, "close": 125}
+
+candle_5m_1 = {"open": 120, "high": 130, "low": 110, "close": 125}
+candle_5m_2 = {"open": 125, "high": 135, "low": 115, "close": 130}
+candle_5m_3 = {"open": 130, "high": 140, "low": 120, "close": 135}
+candle_5m_4 = {"open": 135, "high": 145, "low": 125, "close": 140}
+
+candle_15m_1 = {"open": 135, "high": 145, "low": 125, "close": 140}
+candle_15m_2 = {"open": 140, "high": 150, "low": 130, "close": 145}
+candle_15m_3 = {"open": 145, "high": 155, "low": 135, "close": 150}
+candle_15m_4 = {"open": 150, "high": 160, "low": 140, "close": 155}
+
+candle_1h_1 = {"open": 155, "high": 165, "low": 145, "close": 160}
+candle_1h_2 = {"open": 160, "high": 170, "low": 150, "close": 165}
+candle_1h_3 = {"open": 165, "high": 175, "low": 155, "close": 170}
+candle_1h_4 = {"open": 170, "high": 180, "low": 160, "close": 175}
+
+candle_4h_1 = {"open": 175, "high": 185, "low": 165, "close": 180}
+candle_4h_2 = {"open": 180, "high": 190, "low": 170, "close": 185}
+candle_4h_3 = {"open": 185, "high": 195, "low": 175, "close": 190}
+candle_4h_4 = {"open": 190, "high": 200, "low": 180, "close": 195}
+
+candle_1D_1 = {"open": 195, "high": 205, "low": 185, "close": 200}
+candle_1D_2 = {"open": 200, "high": 210, "low": 190, "close": 205}
+candle_1D_3 = {"open": 205, "high": 215, "low": 195, "close": 210}
+candle_1D_4 = {"open": 210, "high": 220, "low": 200, "close": 215}
+
+# Define the candle_map dictionary
+candle_map = {
+    "1m": [candle_1m_1, candle_1m_2, candle_1m_3, candle_1m_4],
+    "5m": [candle_5m_1, candle_5m_2, candle_5m_3, candle_5m_4],
+    "15m": [candle_15m_1, candle_15m_2, candle_15m_3, candle_15m_4],
+    "1h": [candle_1h_1, candle_1h_2, candle_1h_3, candle_1h_4],
+    "4h": [candle_4h_1, candle_4h_2, candle_4h_3, candle_4h_4],
+    "1D": [candle_1D_1, candle_1D_2, candle_1D_3, candle_1D_4],
+}
+
+# Create an empty dictionary to store the results
+market_moods = {}
+
+# Iterate through the candle_map dictionary
+for tf, candles in candle_map.items():
+    # Call the get_market_mood function for each timeframe and store the result
+    market_moods[tf] = get_market_mood(candles, tf)
+
+# Print the results
+for tf, mood in market_moods.items():
+    print(f"{tf} market mood: {mood}")
 
 high = max([c["high"] for c in candles[-20:]])  
 low = min([c["low"] for c in candles[-20:]])
@@ -546,7 +474,7 @@ print(f"Small band: {small_band}")
 print(f"Medium band: {medium_band}")
 print(f"Large band: {large_band}")   
 
-close = get_close(candles)
+close = get_close(candles, timeframes)
 
 print(f"Current close: {close}")
 
@@ -556,105 +484,105 @@ distance_to_low = close - low
 print(f"Distance to high: {distance_to_high}")      
 print(f"Distance to low: {distance_to_low}")  
 
-mood = get_market_mood()
+mood = get_market_mood(candles, tf)
 
 print(f"Market mood: {mood}")  
 
 print()
 
+##################################################
+##################################################
+
+def get_high(candles, timeframe):
+    return candles[-1]['high']
+
+def get_close(candles, timeframe):     
+    return candles[-1]['close']
 
 ##################################################
 ##################################################
 
-def ratio_on_sine(): 
-    # Distance from close to min/max in degrees
-    distance_min = 30   
-    distance_max = 150
-
-    # Calculate sine values    
-    sin_close = math.sin(math.radians(90)) 
-    sin_min = math.sin(math.radians(90 - distance_min))    
-    sin_max = math.sin(math.radians(90 + distance_max))
+def ratio_on_sine(candles):
+    """
+    Calculate potential reversal from ratio of current candle 
+    to moving average and unit circle function. 
+    """
+    
+    closes = [c["close"] for c in candle_map[tf][-5:]]
+    ma5 = sum(closes) / 5 # Simple 5 period moving average
+    
+    # Calculate ratio of current close to MA 
+    current_close = candle_map[tf][-1]["close"] 
+    ratio = current_close / ma5  
         
-    # Calculate ratios        
-    sin_close_min_ratio = sin_close / sin_min
-    sin_close_max_ratio = sin_close / sin_max   
+    # Define angles based on range of ratio 
+    if ratio < 0.95:
+        angle_low = 0
+        angle_high = 45
+    elif ratio < 1.05:
+        angle_low = 45 
+        angle_high = 90            
+    else:
+        angle_low = 90
+        angle_high = 135
         
-    # Convert to percentages        
-    min_diff = (1 - sin_close_min_ratio) * 100  
-    max_diff = (1 - sin_close_max_ratio) * 100
-        
+    # Calculate potential reversal based on ratio and angles   
+    min_diff = angle_low * ratio # Potential min reversal  
+    max_diff = angle_high * ratio # Potential max reversal
+    
     return min_diff, max_diff
 
-# Call with different distances
-ratio_on_sine() 
+# Call function and unpack return values    
+min_support, max_resistance = ratio_on_sine(candles)
 
-# Call function   
-min_diff, max_diff = ratio_on_sine()
- 
-distance_min = 20     
-distance_max = 120
-
-print("Relative reversal potential:")    
-print(f"Potential min reversal: {min_diff:.2f}%")    
-print(f"Potential max reversal: {max_diff:.2f}%")
-print()
-
-
+print(f"Potential support level: {min_support:.2f}%")
+print(f"Potential resistance level: {max_resistance:.2f}%")
 
 ##################################################
 ##################################################
 
 # Function to calculate momentum forecast 
-def momentum_forecast():
-    
-    # Get candles from timeframes
-    candles_1m  = get_1m_candles(TRADE_SYMBOL)
-    candles_3m  = get_3m_candles(TRADE_SYMBOL)
-    candles_5m  = get_5m_candles(TRADE_SYMBOL) 
-    candles_15m = get_15m_candles(TRADE_SYMBOL)
-    candles_1h  = get_1h_candles(TRADE_SYMBOL)
-    
-    # Initialize momentum variables    
-    small_momentum = 0
+def momentum_forecast(candles, start, end):
+    small_momentum = 0  
     medium_momentum = 0
-    
-    # Calculate momentum on small timeframes 
-    for candles in [candles_1m, candles_3m, candles_5m]:
-        closes = [c["close"] for c in candles[-10:]]   
-        momentum = (closes[-1] - closes[0]) / closes[0] * 100       
-        small_momentum += momentum  
-    
-    # Calculate average momentum        
-    small_momentum = small_momentum / 3
-    
-    # Calculate momentum on medium timeframes      
-    for candles in [candles_15m, candles_30m, candles_1h]:
-        closes = [c["close"] for c in candles[-10:]]   
-        momentum = (closes[-1] - closes[0]) / closes[0] * 100       
-        medium_momentum += momentum
-        
-    medium_momentum = medium_momentum / 3
-    
-
-    # Average small and medium momentum     
-    avg_momentum = (small_momentum + medium_momentum) / 2
-
-    return small_momentum, medium_momentum, avg_momentum
       
-# Call function
-momentum_forecast()
-min_diff, max_diff = ratio_on_sine()
+    for i in range(start, end):   
+        candle = candles[i]
+        
+        candle["timeframe"] = candle.get("timeframe", "Unknown")
+        
+        close = candle["close"]
+          
+        if "timeframe" in candle and candle["timeframe"] in timeframes:      
+            small_momentum += (close - candles[0]["close"]) / candles[0]["close"] * 100
+        else:                      
+            medium_momentum += (close - candles[0]["close"]) / candles[0]["close"] * 100
+              
+    avg_momentum = (small_momentum + medium_momentum) / 2
+    return small_momentum, medium_momentum, avg_momentum
 
-small_momentum, medium_momentum, avg_momentum = momentum_forecast()
 
-print("Relative reversal potential:")    
-print(f"Potential min reversal: {min_diff:.2f}%")    
-print(f"Potential max reversal: {max_diff:.2f}%")
+small_momentum = 0
+medium_momentum = 0
 
-print("Momentum:")  
-print(f"Average 1-5m momentum: {small_momentum:.2f}%")  
-print(f"Average 15m-1h momentum: {medium_momentum:.2f}%") 
+for tf in candle_map:    
+    tf_candles = candle_map[tf]
+    
+    start = 0  
+    end = len(tf_candles)
+    
+    sm, mm, am = momentum_forecast(tf_candles, start, end)
+    
+    small_momentum += sm   
+    medium_momentum += mm
+
+small_momentum = small_momentum / len(candle_map)      
+medium_momentum = medium_momentum / len(candle_map) 
+
+avg_momentum = (small_momentum + medium_momentum) / 2
+
+print(f"Average small momentum: {small_momentum:.2f}%") 
+print(f"Average medium momentum: {medium_momentum:.2f}%")
 print(f"Overall momentum: {avg_momentum:.2f}%")
 
 print()
@@ -668,13 +596,13 @@ def forecast_levels():
     forecast_low, forecast_high = forecast_low_high()
     
     # Get market mood   
-    market_mood = get_market_mood()
+    market_mood = get_market_mood(candles, tf)
     
     # Calculate sine ratios
-    ratio_on_sine()
+    ratio_on_sine(candles)
     
     # Get momentum forecast
-    momentum_forecast()
+    momentum_forecast(candles, start, end)
 
     if market_mood == "Bullish":
         
@@ -711,9 +639,9 @@ forecast_levels()
 print()
 
 # Call functions and assign returned values  
-small_momentum, medium_momentum, avg_momentum = momentum_forecast()
+small_momentum, medium_momentum, avg_momentum = momentum_forecast(candles, start, end)
 
-min_diff, max_diff = ratio_on_sine() 
+min_diff, max_diff = ratio_on_sine(candles) 
 
 # Use returned values  
 print(f"Average 1-5m momentum: {small_momentum:.2f}%")
@@ -725,18 +653,9 @@ resistance1, resistance2, resistance3 = 0,0,0
 
 print()
 
-# Call get_market_mood() function 
-market_mood = get_market_mood()
-
-print("Market mood:")
-print(market_mood)
-
-print()  
  
-
 ##################################################
 ##################################################
-
 
 def get_angle(ratio):
     if ratio <= 0.1:
@@ -799,14 +718,51 @@ def get_quadrant(angle):
 
 def unit_circle_ratios(candles):
 
+    # Extract high and close from candles
+    high = get_high(candles, timeframe)
+
     # Get close price
-    close = get_close(candles)
+    close = get_close(candles, timeframe)
 
     # Calculate close ratio
     close_ratio = close / high  
     
     # Calculate close angle    
     close_angle = get_angle(close_ratio) 
+
+    close_quadrant =  get_quadrant(close_angle)
+
+    if close_quadrant == 1: # First quadrant
+        
+        # Build support ratio  
+        support_ratio = close_ratio - 0.1 
+        
+        # Build resistance ratio
+        resistance_ratio = close_ratio + 0.1
+        
+    elif close_quadrant == 2: # Second quadrant  
+        
+        # Build support ratio 
+        support_ratio = (2 - close_ratio) - 0.1  
+      
+        # Build resistance ratio   
+        resistance_ratio = (2 - close_ratio) + 0.1
+        
+    elif close_quadrant == 3: # Third quadrant
+        
+        # Build support ratio     
+        support_ratio = (close_ratio - 2) + 0.1
+               
+        # Build resistance ratio     
+        resistance_ratio = (close_ratio - 2) - 0.1  
+        
+    elif close_quadrant == 4: # Fourth quadrant 
+        
+        # Build support ratio     
+        support_ratio = close_ratio + 0.1  
+             
+        # Build resistance ratio     
+        resistance_ratio = close_ratio - 0.1
 
     # Now call get_sincos() after defining close_angle    
     sin_close, cos_close = get_sincos(close_angle)
@@ -852,12 +808,22 @@ def unit_circle_ratios(candles):
         close_quadrant
     )
 
-support_ratio = resistance_ratio = 0.5
+angle_degrees = 45
 
-# Get 5m candles 
-candles = get_5m_candles(TRADE_SYMBOL)
+# Convert to radians        
+angle_radians = math.radians(angle_degrees)
+sin_value = math.sin(angle_radians)        
+cos_value = math.cos(angle_radians)
 
-# Call function with candle data
-ratio_support, support_quadrant, ratio_resistance, resistance_quadrant, close_quadrant = unit_circle_ratios(candles)  
-
-print(ratio_support)
+for timeframe in timeframes:  
+    # Get candles for this timeframe    
+    candles = get_candles(TRADE_SYMBOL, timeframes)
+    
+    # Call function to calculate ratios    
+    ratio_support, support_quadrant, ratio_resistance, resistance_quadrant, close_quadrant = unit_circle_ratios(candles, timeframe)
+        
+    # Print results for this timeframe
+    print(f"Results for {timeframe} timeframe:")        
+    print(f"Ratio support: {ratio_support}")
+    print(f"Ratio resistance: {ratio_resistance}") 
+        
