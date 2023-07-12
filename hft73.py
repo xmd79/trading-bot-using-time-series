@@ -365,23 +365,30 @@ def detect_phi_pattern(candles):
 ##################################################
 
 def detect_square_of_9(candles):
-   patterns  = 0
-     
+   
+   patterns  = 0  
+    
    while len(candles) >= 9:
        highest = [candles[0]['high'] for _ in range(9)]  
        lowest = [candles[0]['low'] for _ in range(9)]  
        
        for i in range(1,9):
-           ...
+           highest[i] = max(highest[i-1], candles[i]['high'])  
+           lowest[i] = min(lowest[i-1], candles[i]['low'])
            
-       
        if max(highest) == highest[4] or min(lowest) == lowest[4]:
-          patterns += 1
-          
-       candles = candles[1:]  
-         
+          patterns += 1  
+            
+       candles = candles[1:]   
+     
+   # Check remaining candles   
    if len(candles) >= 1:      
-      return patterns + 1
+      for candle in candles:  
+         highest.append(candle['high']) 
+         lowest.append(candle['low'])  
+            
+      if max(highest) == highest[4] or min(lowest) == lowest[4]:
+          patterns += 1
              
    return patterns
 
