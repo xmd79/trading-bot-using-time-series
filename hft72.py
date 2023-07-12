@@ -106,33 +106,38 @@ TRADE_SYMBOL = "BTCUSDT"
 
 # Define timeframes and get candles:
 
-timeframes = ['1min', '3min', '5min', '15min', '30min', '1h', '2h', '4h',  '6h', '8h', '12h', '1D']
+timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
 
-def get_candles(symbol, timeframe):
-    """Get all candles for a symbol and timeframe"""
-    klines = client.get_klines(
-        symbol=symbol, 
-        interval=timeframe,  
-        limit=1000 # Get max 1000 candles
-    )
-    
+def get_candles(symbol, timeframes):
     candles = []
-
-    # Convert klines to candle dict
-    for k in klines:
-        candle = {
-            "time": k[0] / 1000, # Unix timestamp in seconds
-            "open": float(k[1]), 
-            "high": float(k[2]),  
-            "low": float(k[3]),   
-            "close": float(k[4]),    
-            "volume": float(k[5])   
-        }
-        candles.append(candle)
-        
+    for timeframe in timeframes:  
+        klines = client.get_klines(
+            symbol=symbol, 
+            interval=timeframe,  
+            limit=1000  
+        )
+        # Convert klines to candle dict
+        for k in klines:
+            candle = {
+                "time": k[0] / 1000,   
+                "open": float(k[1]), 
+                "high": float(k[2]),   
+                "low": float(k[3]),    
+                "close": float(k[4]),   
+                "volume": float(k[5]), 
+                "timeframe": timeframe    
+            }
+            candles.append(candle)    
     return candles
 
 candles = get_candles(TRADE_SYMBOL, timeframes)
+
+candle_map = {}
+for candle in candles:
+    timeframe = candle["timeframe"]  
+    if timeframe not in candle_map:
+        candle_map[timeframe] = []        
+    candle_map[timeframe].append(candle)
 
 ##################################################
 ##################################################
@@ -716,7 +721,7 @@ def get_quadrant(angle):
     if angle >= 270 and angle < 360:
         return 4 
 
-def unit_circle_ratios(candles):
+def unit_circle_ratios(candles, timeframe):
 
     # Extract high and close from candles
     high = get_high(candles, timeframe)
@@ -725,10 +730,11 @@ def unit_circle_ratios(candles):
     close = get_close(candles, timeframe)
 
     # Calculate close ratio
-    close_ratio = close / high  
+    max_ratio = candles[-1]['high']/ candles[0]['low']
+    close_ratio = (candles[-1]['close'] / candles[0]['close']) / max_ratio
     
     # Calculate close angle    
-    close_angle = get_angle(close_ratio) 
+    close_angle = math.degrees(math.acos(close_ratio))  
 
     close_quadrant =  get_quadrant(close_angle)
 
@@ -770,8 +776,8 @@ def unit_circle_ratios(candles):
     print(f"Close angle: {close_angle}")  
 
     # Calculate sin and cos for potential support 
-    support_angle = get_angle(support_ratio)        
-    sin_support, cos_support = get_sincos(support_angle) 
+    support_angle = close_angle - 120      
+    sin_support, cos_support = get_sincos(support_angle)
     
     print(f"Support angle: {support_angle}")
     
@@ -781,7 +787,7 @@ def unit_circle_ratios(candles):
     print(f"Ratio for potential support: {ratio_support}")
     
     # Calculate sin and cos for potential resistance     
-    resistance_angle = get_angle(resistance_ratio)    
+    resistance_angle = close_angle + 120    
     sin_resistance, cos_resistance = get_sincos(resistance_angle)  
 
     print(f"Resistance angle: {resistance_angle}")
