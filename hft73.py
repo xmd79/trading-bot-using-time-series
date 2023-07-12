@@ -648,3 +648,61 @@ print()
 
 ##################################################
 ##################################################
+
+def analyze_timeframe(timeframe, candles):
+
+   candle_array = np.array([candle["close"] for candle in candles])
+
+   def get_ema(period):       
+       ema = talib.EMA(candle_array, period)[-1]       
+       return np.nan_to_num(ema, nan=0.0)
+        
+   def get_percentage(value):         
+       return abs((close - value) / close) * 100 
+       
+   ema_slow = get_ema(26)       
+   ema_fast = get_ema(12)  
+   ema50 = get_ema(50)  
+   ema100 = get_ema(100)   
+   
+   close = candle_array[-1]
+   
+   def calculate_diff(close, forecast):
+       return get_percentage(forecast) 
+   
+   slow_diff = get_percentage(ema_slow)       
+   fast_diff = get_percentage(ema_fast)
+   diff50 = get_percentage(ema50)    
+   diff100 = get_percentage(ema100)     
+   
+   print(f"{timeframe}:")    
+   print(f"  Close {slow_diff:.2f}% from slow EMA")   
+   print(f"  Close {fast_diff:.2f}% from fast EMA")
+   print(f"  Close {diff50:.2f}% from EMA50")
+   print(f"  Close {diff100:.2f}% from EMA100") 
+   
+   fib_levels = [close * 0.786, close * 0.5, close * 1.272]
+
+   print("Forecast levels:")      
+   for level in fib_levels:   
+      print(f"  {level} ({calculate_diff(close, level):.2f}%)")
+   
+   reversals = []
+   for level in fib_levels:     
+       reversals.append("bullish") if close > level else reversals.append("bearish")
+
+   print(f"New reversals: {reversals}") 
+   mood = "accumulation" if reversals[-1] == "bullish" else "distribution"
+
+   print(f"Market mood: {mood}")         
+
+# Call for each timeframe     
+for timeframe, candles in candle_map.items():
+   analyze_timeframe(timeframe, candles)
+
+print()
+
+##################################################
+##################################################
+
+
