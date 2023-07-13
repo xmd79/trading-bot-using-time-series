@@ -815,52 +815,204 @@ print()
 ##################################################
 ##################################################
 
-def forecast_fibo_levels():
+def get_multi_timeframe_rsi():
+    """Calculate RSI from multiple timeframes and average"""
+    rsis = []
     
-    lows = []
-    highs = []  
-    
-    for timeframe, candles in candle_map.items():
-    
-        # Get last 100 candles
-        recent_candles = candles[-100:]  
+    for timeframe in ['1m', '5m', '15m']:
+        
+       # Get candle data               
+       candles = candle_map[timeframe][-100:]  
+        
+       # Calculate RSI
+       rsi = talib.RSI(np.array([c["close"] for c in candles]))
+       rsis.append(rsi[-1])
+       
+    # Average RSIs        
+    avg_rsi = sum(rsis) / len(rsis)
+        
+    return avg_rsi
+
+##################################################
+##################################################
+
+def get_market_mood():
+
+    rsi = get_multi_timeframe_rsi()
+
+    # Define the indicators   
+    indicator1 = rsi  
+    indicator2 = 50
+
+    # Logic to determine market mood 
+    # Based on indicators
+    if indicator1 > indicator2:
+        return "bullish"
+    elif indicator1 < indicator2:
+        return "bearish"
+    else:
+        return "neutral"
+        
+##################################################
+##################################################
+
+def enough_volume(level):
+    # Get volume for the last 100 candles on the 1m timeframe      
+    volume = [c["volume"] for c in candle_map['1m'][-100:]]  
+      
+    # Calculate the average volume      
+    avg_volume = sum(volume) / len(volume)
+      
+    # Get volume around the level (+- 0.5%)  
+    start = level*0.995
+    end = level*1.005
+      
+    # Filter candles within that range      
+    candles = [c for c in candle_map['1m'][-100:]  
+               if start < c["close"] < end]
+               
+    # Sum their volume         
+    volume_at_level = sum([c["volume"] for c in candles]) 
+             
+    # Volume is "enough" if it's > 1 standard deviation above average    
+    return volume_at_level > avg_volume * 1.5
+
+##################################################
+##################################################
+
+def signal_reversal(level):    
+   
+    if level in fibo_supports: # Support level
+       
+        # Check if close is above support
+        if candle_map['1m'][-1]['close'] > level:  
+            return None
+                
+        if enough_volume(level):      
+            return "buy" # Signal up reversal           
+                
+    elif level in fibo_resistances: # Resistance level
+        
+        # Check if close is below resistance              
+        if candle_map['1m'][-1]['close'] < level:
+            return None         
+           
+        if enough_volume(level):                       
+            return "sell" # Signal down reversal
               
-        # Find lowest low and highest high
-        lowest_low = min([c["low"] for c in recent_candles])   
-        highest_high = max([c["high"] for c in recent_candles])
+    return None
+
+##################################################
+##################################################
+
+def get_targets(level, signal):
+    if signal == "buy":
+        fibo_supports.sort()    
+        return fibo_supports  
+    elif signal == "sell":
+        fibo_resistances.sort()                
+        return fibo_resistances
+
+##################################################
+##################################################
+
+def forecast_fibo_levels():
+    lows = []
+    highs = []
+
+    fibo_supports = []    
+    fibo_resistances = []
+  
+    
+    # Get candles from multiple timeframes    
+    for timeframe in ['1m', '5m', '15m']:
+        candles = candle_map[timeframe][-100:]  
         
-        lows.append(lowest_low)
-        highs.append(highest_high) 
-        
-    # Take average of lows and highs     
-    forecast_low = np.mean(lows)        
+        lowest_low = min([c["low"] for c in candles])   
+        highest_high = max([c["high"] for c in candles])
+               
+        lows.append(lowest_low)   
+        highs.append(highest_high)  
+                
+    # Average lows and highs             
+    forecast_low = np.mean(lows)    
     forecast_high = np.mean(highs)
     
-    # Calculate Fibonacci ratios
-    fibo_ratios = [0.382, 0.5, 0.618, 1]
-    
-    fibo_supports = []
-    fibo_resistances = []
-    
-    for ratio in fibo_ratios:
+    # Get current close price
+    current_close = candle_map['1m'][-1]['close']
         
-        support = round(forecast_low + ((forecast_high - forecast_low) * ratio), 2)  
-        resistance = round(forecast_high - ((forecast_high - forecast_low) * ratio), 2)  
-        
-        fibo_supports.append(support)
-        fibo_resistances.append(resistance)
-            
-    return (fibo_supports, fibo_resistances)
+    # Calculate Fibonacci ratios       
+    for ratio in [0.236, 0.382, 0.5]:   
+       
+       support = min(current_close, forecast_low + ((forecast_high - forecast_low) * ratio)) 
+                             
+       fibo_supports.append(support)
+       
+    for ratio in [0.618, 1.0, 1.2]:  
+      
+       resistance = max(current_close, forecast_high - ((forecast_high - forecast_low) * ratio)) 
+           
+       fibo_resistances.append(resistance)
+       
+    return fibo_supports, fibo_resistances
 
 fibo_supports, fibo_resistances = forecast_fibo_levels()
 
-print("Support levels:")  
+market_mood = get_market_mood()
+print(market_mood)
+
+# Check for support level signal    
 for support in fibo_supports:
-    print(support)
     
-print("Resistance levels:")     
-for resistance in fibo_resistances:     
-    print(resistance)
+    # Check if current close is above support level   
+    if candle_map['1m'][-1]['close'] > support: 
+        continue
+    
+    # Check volume at support level    
+    if not enough_volume(support):
+        continue
+        
+    print(f"Support signal at {support}") 
+        
+    break
+    
+# Check for resistance level signal    
+for resistance in fibo_resistances:
+      
+    # Check if current close is below resistance 
+    if candle_map['1m'][-1]['close'] < resistance:
+        continue
+      
+    # Check volume at resistance 
+    if not enough_volume(resistance):
+        continue
+      
+    print(f"Resistance signal at {resistance}")        
+   
+    break
+
+# Check signals
+for level in fibo_supports + fibo_resistances:
+      
+   signal = signal_reversal(level)
+      
+   if signal:
+        
+       print(f"{signal} signal at {level}") 
+       print(market_mood)  
+         
+       targets = get_targets(level, signal)  
+       target = targets[0] 
+        
+def get_targets(level, signal):
+      
+   if signal == "buy":
+       fibo_supports.sort()  
+       return fibo_supports  # Close to far targets  
+   
+   elif signal == "sell":
+       fibo_resistances.sort()           
+       return fibo_resistances 
 
 print()
 
