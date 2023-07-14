@@ -165,6 +165,100 @@ close = get_close('1m')
 ##################################################
 ##################################################
 
+def get_multi_timeframe_rsi():
+    """Calculate RSI from multiple timeframes and average"""
+    rsis = []
+    
+    for timeframe in ['1m', '5m', '15m']:
+        
+       # Get candle data               
+       candles = candle_map[timeframe][-100:]  
+        
+       # Calculate RSI
+       rsi = talib.RSI(np.array([c["close"] for c in candles]))
+       rsis.append(rsi[-1])
+       
+    # Average RSIs        
+    avg_rsi = sum(rsis) / len(rsis)
+        
+    return avg_rsi
+
+mtf_rsi = get_multi_timeframe_rsi()
+print(mtf_rsi)
+
+##################################################
+##################################################
+
+def get_mtf_rsi_market_mood():
+
+    rsi = get_multi_timeframe_rsi()
+
+    # Define the indicators   
+    indicator1 = rsi  
+    indicator2 = 50
+
+    # Logic to determine market mood 
+    # Based on indicators
+    if indicator1 > indicator2:
+        return "bullish"
+    elif indicator1 < indicator2:
+        return "bearish"
+    else:
+        return "neutral"
+
+mood = get_mtf_rsi_market_mood()
+print("MTF rsi mood: ", mood)
+
+##################################################
+##################################################
+
+period = 20
+
+def bollinger_bands(timeframe='3m', period=20, std=2):    
+   
+    candle_data = candle_map[timeframe]
+    closes = [candle['close'] for candle in candle_data[-period:]]   
+    #print(f"Number of closes: {len(closes)}")  
+   
+    # Set default low and high   
+    bb_low = min(closes)     
+    bb_high = max(closes)
+   
+    if len(closes) < period:       
+        return bb_low, bb_high 
+        
+    closes_array = np.array(closes) 
+   
+    sma = talib.SMA(closes_array, timeperiod=period)       
+    stdev = talib.STDDEV(closes_array, timeperiod=period)  
+            
+    bb_upper = sma + (std * stdev)    
+    bb_lower = sma - (std * stdev)
+
+    # Replace NaN with 0    
+    bb_lower = np.nan_to_num(bb_lower)  
+    bb_upper = np.nan_to_num(bb_upper)
+        
+    # Get valid lower and upper bands     
+    bb_lower = bb_lower[np.isfinite(bb_lower) & (bb_lower > 0)]
+    bb_upper = bb_upper[np.isfinite(bb_upper) & (bb_upper > 0)]
+         
+    # Get first non-zero value  
+    bb_low = bb_lower[0]
+    bb_high = bb_upper[0]  
+         
+    return bb_low, bb_high
+
+bb_low, bb_high = bollinger_bands(period=period, std=2)
+
+print("BB low at : ", bb_low)
+print("BB high at : ", bb_high)
+
+print()
+
+##################################################
+##################################################
+
 EMA_FAST_PERIOD = 12
 EMA_SLOW_PERIOD = 26
 
@@ -793,11 +887,6 @@ def multi_timeframe_filter():
 # Call multi timeframe filter
 filter_trade = multi_timeframe_filter()
 
-if filter_trade == False:
-    print("Trade filtered based on multi-timeframe analysis")
-else:
-    print("Taking trade as it aligns with market mood")
-    
 # Print mood counts     
 print(f"Uptrend moods: {moods['uptrend']}")      
 print(f"Downtrend moods: {moods['downtrend']}")   
@@ -806,289 +895,13 @@ print(f"Distribution moods: {moods['distribution']}")
 
 # Print overall market mood   
 print(f"Overall market mood: {overall_mood}")   
-    
-# Print filter result
-if filter_trade:
-    print("Trade passed the multi-timeframe filter")
-else:
-    print("Trade filtered by multi-timeframe filter")
 
 print()
 
-##################################################
-##################################################
 
-support = None
-resistance = None
-
-def forecast_low_high():  
-    lows = []
-    highs = []  
-  
-    # Get last 100 candle lows and highs
-    for candle in candles[-100:]: 
-        lows.append(candle['low'])  
-        highs.append(candle['high'])
-            
-    # Take average of lows and highs      
-    forecast_low = np.mean(lows)       
-    forecast_high = np.mean(highs)
-
-    # Set support and resistance levels     
-    support = forecast_low      
-    resistance = forecast_high
-    
-    return support, resistance
-
-support, resistance = forecast_low_high()
-
-print()
 
 ##################################################
 ##################################################
 
-slope = None  
 
-def calculate_slope():  
-    global slope
-    
-    close = [c['close'] for c in candle_map['1h'][-100:]]
-        
-    try:   
-        x = np.array(range(len(close)))
-        y = np.array(close)
-        z = np.polyfit(x, y, 1)
-        slope = z[0]
-    except:
-        print("Slope could not be calculated!")
 
-# Call function 
-calculate_slope()
-
-##################################################
-##################################################
-
-def get_multi_timeframe_rsi():
-    """Calculate RSI from multiple timeframes and average"""
-    rsis = []
-    
-    for timeframe in ['1m', '5m', '15m']:
-        
-       # Get candle data               
-       candles = candle_map[timeframe][-100:]  
-        
-       # Calculate RSI
-       rsi = talib.RSI(np.array([c["close"] for c in candles]))
-       rsis.append(rsi[-1])
-       
-    # Average RSIs        
-    avg_rsi = sum(rsis) / len(rsis)
-        
-    return avg_rsi
-
-mtf_rsi = get_multi_timeframe_rsi()
-print(mtf_rsi)
-
-##################################################
-##################################################
-
-def get_market_mood():
-
-    rsi = get_multi_timeframe_rsi()
-
-    # Define the indicators   
-    indicator1 = rsi  
-    indicator2 = 50
-
-    # Logic to determine market mood 
-    # Based on indicators
-    if indicator1 > indicator2:
-        return "bullish"
-    elif indicator1 < indicator2:
-        return "bearish"
-    else:
-        return "neutral"
-
-mood = get_market_mood()
-print("MTF rsi mood: ", mood)
-
-##################################################
-##################################################
-
-period=20
-
-dc_low = 0  
-dc_high = 0
-
-def donchian_channel(timeframe = '1m', period=period):
-
-    highs = []
-    lows = []
-    
-    for candle in candle_map[timeframe][-period:]:
-        highs.append(candle['high'])
-        lows.append(candle['low'])
-        
-    dc_low = min(lows)  
-    dc_high = max(highs)
-    
-    return dc_low, dc_high
-
-for tf in timeframes:     
-    dc_low, dc_high = donchian_channel(tf, period)
-
-print("Don low and don high at: ", dc_low, dc_high)
-
-##################################################
-##################################################
-
-period = 100  
-
-pol_low = 0
-pol_high = 0
-
-def poly_channel(timeframe='3m', period=100):
-   
-    calculate_slope()
-    
-    if slope is None:
-        return 0, 0
-        
-    # Get close prices from candles      
-    close = [float(candle['close']) for candle in candle_map[timeframe][-period:]]       
-  
-    # Calculate coefficients  
-    coeffs = np.polyfit(range(period), close, 3)  
-  
-    if slope > 0: # Uptrend       
-        pol_low = np.polyval(coeffs, period) - 0.8*np.std(close)
-        pol_high = np.polyval(coeffs, period) + 1.2*np.std(close)      
-                
-    elif slope < 0: # Downtrend       
-        pol_low = np.polyval(coeffs, period) - 1.2*np.std(close)       
-        pol_high = np.polyval(coeffs, period) + 0.8*np.std(close)
-                
-    else:
-        pol_low, pol_high = 0, 0
-                
-    return pol_low, pol_high
-
-pol_low, pol_high = poly_channel(timeframe='5m', period=100)
-
-print("Poly low and poly high at: ", pol_low, pol_high)
-
-##################################################
-##################################################
-
-period = 20
-
-def bollinger_bands(timeframe='3m', period=20, std=2):    
-   
-    candle_data = candle_map[timeframe]
-    closes = [candle['close'] for candle in candle_data[-period:]]   
-    #print(f"Number of closes: {len(closes)}")  
-   
-    # Set default low and high   
-    bb_low = min(closes)     
-    bb_high = max(closes)
-   
-    if len(closes) < period:       
-        return bb_low, bb_high 
-        
-    closes_array = np.array(closes) 
-   
-    sma = talib.SMA(closes_array, timeperiod=period)       
-    stdev = talib.STDDEV(closes_array, timeperiod=period)  
-            
-    bb_upper = sma + (std * stdev)    
-    bb_lower = sma - (std * stdev)
-
-    # Replace NaN with 0    
-    bb_lower = np.nan_to_num(bb_lower)  
-    bb_upper = np.nan_to_num(bb_upper)
-        
-    # Get valid lower and upper bands     
-    bb_lower = bb_lower[np.isfinite(bb_lower) & (bb_lower > 0)]
-    bb_upper = bb_upper[np.isfinite(bb_upper) & (bb_upper > 0)]
-         
-    # Get first non-zero value  
-    bb_low = bb_lower[0]
-    bb_high = bb_upper[0]  
-         
-    return bb_low, bb_high
-
-bb_low, bb_high = bollinger_bands(period=period, std=2)
-
-print("BB low and high at : ", bb_low, bb_high)
-
-##################################################
-##################################################
-
-def fibo_ratios():
-    fib = [0,1]
-    
-    for i in range(30):
-        fib.append(fib[i] + fib[i+1])
-        
-    # Fibonacci scale ratios    
-    fib_ratios = []  
-
-    for i in range(1, len(fib)-1):
-        ratio = fib[i] / fib[i+1] 
-        fib_ratios.append(ratio)
-        
-    # Golden ratio    
-    phi = (1 + math.sqrt(5)) / 2  
-
-    return fib_ratios, phi
-
-fib_ratios, phi = fibo_ratios()
-
-#print(f"Fibonacci ratios: {fib_ratios}")  
-#print(f"Golden ratio φ: {phi}")
-
-print()
-
-##################################################
-##################################################
-
-def calculate_levels():
-    sup1, sup2, sup3 = 0, 0, 0
-    res1, res2, res3 = 0, 0, 0
-    
-    for timeframe, candles in candle_map.items():  
-        
-       sup1, res1 = donchian_channel(tf, period)
-       sup2, res2 = poly_channel(timeframe='3m', period=100)
-       sup3, res3 = bollinger_bands(period=period, std=2)
-        
-    return sup1, sup2, sup3, res1, res2, res3
-
-sup1, sup2, sup3, res1, res2, res3 = calculate_levels()
-
-print(f"Support levels: {sup1}, {sup2}, {sup3}")
-print(f"Resistance levels: {res1}, {res2}, {res3}")
-
-print()
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
