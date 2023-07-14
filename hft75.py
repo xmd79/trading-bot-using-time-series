@@ -199,14 +199,35 @@ def get_sma(timeframe, length):
 # Call the function
 sma_lengths = [5, 12, 21, 27, 56, 72, 100, 150, 200, 250, 369]
 
-for timeframe in timeframes:
-    for length in sma_lengths:
-       sma = get_sma(timeframe, length)
-       print(f"SMA {length} for {timeframe}: {sma}")
+#for timeframe in timeframes:
+#    for length in sma_lengths:
+#       sma = get_sma(timeframe, length)
+#       print(f"SMA {length} for {timeframe}: {sma}")
 
 print()
 
 ##################################################
 ##################################################
 
+def get_sma_diff(timeframe, length):
+    close = get_close(timeframe)
+    sma = get_sma(timeframe, length)[-1]
+    
+    diff = (close - sma) / sma * 100 if sma != 0 else 0
+    
+    position = "CLOSE ABOVE" if close > sma else "CLOSE BELOW"
+    
+    return diff, position
 
+# Call the function   
+for timeframe in timeframes: 
+    for length in sma_lengths:
+       diff, position = get_sma_diff(timeframe, length)
+        
+       print(f"SMA {length} diff for {timeframe}: {diff}% - {position}") 
+
+
+print()
+
+##################################################
+##################################################
