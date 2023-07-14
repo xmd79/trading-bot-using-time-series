@@ -231,3 +231,83 @@ print()
 
 ##################################################
 ##################################################
+
+def get_sma_ratio(timeframe):    
+    above_ratios = []    
+    below_ratios = []
+    
+    for length in sma_lengths:
+         diff, position = get_sma_diff(timeframe, length)
+          
+         if position == "CLOSE ABOVE":
+             above_ratios.append(diff)
+         else:  
+             below_ratios.append(diff)
+            
+    if above_ratios:        
+        above_avg = statistics.mean(above_ratios)
+    else:
+        above_avg = 0
+        
+    if below_ratios:                
+        below_avg = statistics.mean(below_ratios)          
+    else:
+        below_avg = 0
+            
+    return above_avg, below_avg
+
+# Call the function
+for timeframe in timeframes:
+    above_avg, below_avg =  get_sma_ratio(timeframe)
+    
+    if below_avg > above_avg:
+        print(f"{timeframe} Close is at a local dip! {below_avg}% below SMAs")        
+    elif above_avg > below_avg:
+        print(f"{timeframe} Close is at a local top! {above_avg}% above SMAs")
+
+print()
+
+##################################################
+##################################################
+
+def forecast_market(timeframe):
+    
+    moods = {
+        'uptrend': 0,   
+        'downtrend': 0,    
+        'accumulation': 0,   
+        'distribution': 0    
+    }
+    
+    signals = []
+    
+    above_avg, below_avg = get_sma_ratio(timeframe)
+    
+    if below_avg > above_avg:
+        if below_avg < 50:
+            signals.append('accumulation')    
+            moods['accumulation'] += 1  
+        else: 
+            signals.append('downtrend')     
+            moods['downtrend'] += 1           
+            
+    elif above_avg > below_avg:   
+        if above_avg < 50:
+           signals.append('distribution') 
+           moods['distribution'] += 1          
+        else:
+           signals.append('uptrend')      
+           moods['uptrend'] += 1
+                    
+    print(f"{timeframe} mood: {max(moods, key=moods.get)} - {'%.2f' % ((moods[max(moods, key=moods.get)]/len(candle_map[timeframe]))*100)}%")
+
+# Forecast for small, medium and large timeframes    
+forecast_market('1m')     # Short-term  
+forecast_market('5m')     # Medium-term
+forecast_market('1h')     # Long-term
+
+print()
+
+##################################################
+##################################################
+
