@@ -34,6 +34,7 @@ from decimal import Decimal
 import decimal
 import random
 import statistics
+from statistics import mean
 
 ##################################################
 ##################################################
@@ -220,13 +221,35 @@ def get_sma_diff(timeframe, length):
     return diff, position
 
 # Call the function   
-for timeframe in timeframes: 
+for timeframe in timeframes:
     for length in sma_lengths:
-       diff, position = get_sma_diff(timeframe, length)
-        
-       print(f"SMA {length} diff for {timeframe}: {diff}% - {position}") 
-
-
+       
+       # Get close price
+       close = get_close(timeframe)
+       
+       # Get SMA 
+       sma = get_sma(timeframe, length)[-1]
+       
+       # Calculate % diff from close  
+       close_diff = (close - sma) / sma * 100  
+       
+       # Initialize diff arrays 
+       sma_diffs = []
+       sma_values = []
+           
+       # Get SMA value for all lengths 
+       for l in sma_lengths:
+           sma_value = get_sma(timeframe, l)[-1]
+           sma_values.append(sma_value)
+           
+       # Calculate diff between all SMAs       
+       for i in range(len(sma_values)-1):
+           sma_diff = abs(sma_values[i] - sma_values[i+1])
+           sma_diffs.append(sma_diff)
+            
+       # Calculate average SMA diff     
+       avg_sma_diff = mean(sma_diffs)       
+         
 print()
 
 ##################################################
@@ -261,53 +284,13 @@ for timeframe in timeframes:
     above_avg, below_avg =  get_sma_ratio(timeframe)
     
     if below_avg > above_avg:
-        print(f"{timeframe} Close is at a local dip! {below_avg}% below SMAs")        
+        print(f"{timeframe} Close is below SMAs at a local dip")        
     elif above_avg > below_avg:
-        print(f"{timeframe} Close is at a local top! {above_avg}% above SMAs")
+        print(f"{timeframe} Close is above SMAs at a local top")
 
 print()
 
 ##################################################
 ##################################################
 
-def forecast_market(timeframe):
-    
-    moods = {
-        'uptrend': 0,   
-        'downtrend': 0,    
-        'accumulation': 0,   
-        'distribution': 0    
-    }
-    
-    signals = []
-    
-    above_avg, below_avg = get_sma_ratio(timeframe)
-    
-    if below_avg > above_avg:
-        if below_avg < 50:
-            signals.append('accumulation')    
-            moods['accumulation'] += 1  
-        else: 
-            signals.append('downtrend')     
-            moods['downtrend'] += 1           
-            
-    elif above_avg > below_avg:   
-        if above_avg < 50:
-           signals.append('distribution') 
-           moods['distribution'] += 1          
-        else:
-           signals.append('uptrend')      
-           moods['uptrend'] += 1
-                    
-    print(f"{timeframe} mood: {max(moods, key=moods.get)} - {'%.2f' % ((moods[max(moods, key=moods.get)]/len(candle_map[timeframe]))*100)}%")
-
-# Forecast for small, medium and large timeframes    
-forecast_market('1m')     # Short-term  
-forecast_market('5m')     # Medium-term
-forecast_market('1h')     # Long-term
-
-print()
-
-##################################################
-##################################################
 
