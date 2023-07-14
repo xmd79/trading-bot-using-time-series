@@ -1047,6 +1047,47 @@ print()
 ##################################################
 ##################################################
 
+def calculate_levels():
+    # Initialize support and resistance levels
+    sup1, sup2, sup3 = 0, 0, 0  
+    res1, res2, res3 = 0, 0, 0
+    
+    # Initialize mood counters
+    mood_small = {'uptrend':0, 'downtrend':0, 'accumulation':0, 'distribution':0}
+    mood_med = {'uptrend':0, 'downtrend':0, 'accumulation':0, 'distribution':0} 
+    mood_large = {'uptrend':0, 'downtrend':0, 'accumulation':0, 'distribution':0}
+    
+    for timeframe, candles in candle_map.items():
+       
+       # Include all function calls to calculate levels and mood      
+       sup1, sup2 = forecast_low_high()
+       res1, res2 = forecast_low_high()
+       _ = detect_phi_pattern(candles)
+       _ = detect_square_of_9(candles)
+       _ = detect_forty_five_angle(candles)
+       _ = get_signal()  
+       _ = calculate_market_mood()
+           
+       if timeframe in ['1m','3m','5m']:
+           mood_small = calculate_market_mood()  
+       elif timeframe in ['15m','30m','1h']:
+           mood_med = calculate_market_mood()
+       elif timeframe in ['1h','2h','4h']:  
+           mood_large = calculate_market_mood()
+              
+       # After iterating all timeframes, you will have:
+       # 3 levels of support and resistance
+       # Market mood for small, medium and large timeframes         
+       
+    print(f"Support levels: {sup1}, {sup2}, {sup3}")
+    print(f"Resistance levels: {res1}, {res2}, {res3}")      
+    print(f"Small timeframe market mood: {mood_small}")
+    print(f"Medium timeframe market mood: {mood_med}")   
+    print(f"Large timeframe market mood: {mood_large}")
+
+forecast = calculate_levels()
+print(forecast)
+
 print()
 ##################################################
 ##################################################
