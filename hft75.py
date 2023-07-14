@@ -35,9 +35,6 @@ import decimal
 import random
 import statistics
 
-from scipy.stats import linregress
-import traceback2 as traceback
-
 ##################################################
 ##################################################
 
