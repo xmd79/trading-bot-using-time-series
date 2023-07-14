@@ -898,10 +898,52 @@ print(f"Overall market mood: {overall_mood}")
 
 print()
 
-
-
 ##################################################
 ##################################################
 
+period = 20
 
+def bollinger_bands(timeframe, period=20, std=2):    
+   
+    candle_data = candle_map[timeframe]
+    closes = [candle['close'] for candle in candle_data[-period:]]   
+    #print(f"Number of closes: {len(closes)}")  
+   
+    # Set default low and high   
+    bb_low = min(closes)     
+    bb_high = max(closes)
+   
+    if len(closes) < period:       
+        return bb_low, bb_high 
+        
+    closes_array = np.array(closes) 
+   
+    sma = talib.SMA(closes_array, timeperiod=period)       
+    stdev = talib.STDDEV(closes_array, timeperiod=period)  
+            
+    bb_upper = sma + (std * stdev)    
+    bb_lower = sma - (std * stdev)
+
+    # Replace NaN with 0    
+    bb_lower = np.nan_to_num(bb_lower)  
+    bb_upper = np.nan_to_num(bb_upper)
+        
+    # Get valid lower and upper bands     
+    bb_lower = bb_lower[np.isfinite(bb_lower) & (bb_lower > 0)]
+    bb_upper = bb_upper[np.isfinite(bb_upper) & (bb_upper > 0)]
+         
+    # Get first non-zero value  
+    bb_low = bb_lower[0]
+    bb_high = bb_upper[0]  
+         
+    return bb_low, bb_high
+
+for timeframe in timeframes:
+    bb_low, bb_high = bollinger_bands(timeframe, period=20, std=2)
+
+    print(f"Timeframe: {timeframe}")   
+    print("BB low at : ", bb_low)      
+    print("BB high at : ", bb_high) 
+
+print()
 
