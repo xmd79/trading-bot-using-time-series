@@ -135,12 +135,15 @@ def get_candles(symbol, timeframes):
 
 # Get candles  
 candles = get_candles(TRADE_SYMBOL, timeframes) 
+#print(candles)
 
 # Organize candles by timeframe        
 candle_map = {}  
 for candle in candles:
     timeframe = candle["timeframe"]  
     candle_map.setdefault(timeframe, []).append(candle)
+
+#print(candle_map)
 
 ##################################################
 ##################################################
@@ -165,111 +168,48 @@ close = get_close('1m')
 ##################################################
 ##################################################
 
-def get_multi_timeframe_rsi():
-    """Calculate RSI from multiple timeframes and average"""
-    rsis = []
+# Get entire list of close prices as <class 'list'> type
+
+def get_closes(timeframe):
+    closes = []
+    candles = candle_map[timeframe]
     
-    for timeframe in ['1m', '5m', '15m']:
-        
-       # Get candle data               
-       candles = candle_map[timeframe][-100:]  
-        
-       # Calculate RSI
-       rsi = talib.RSI(np.array([c["close"] for c in candles]))
-       rsis.append(rsi[-1])
-       
-    # Average RSIs        
-    avg_rsi = sum(rsis) / len(rsis)
-        
-    return avg_rsi
-
-mtf_rsi = get_multi_timeframe_rsi()
-print(mtf_rsi)
-
-##################################################
-##################################################
-
-def get_mtf_rsi_market_mood():
-
-    rsi = get_multi_timeframe_rsi()
-
-    # Define the indicators   
-    indicator1 = rsi  
-    indicator2 = 50
-
-    # Logic to determine market mood 
-    # Based on indicators
-    if indicator1 > indicator2:
-        return "bullish"
-    elif indicator1 < indicator2:
-        return "bearish"
-    else:
-        return "neutral"
-
-mood = get_mtf_rsi_market_mood()
-print("MTF momentum rsi mood: ", mood)
-
-print()
-
-##################################################
-##################################################
-
-period = 20
-
-def bollinger_bands(timeframe, period=20, std=2):    
-   
-    candle_data = candle_map[timeframe]
-    closes = [candle['close'] for candle in candle_data[-period:]]   
-    #print(f"Number of closes: {len(closes)}")  
-   
-    # Set default low and high   
-    bb_low = min(closes)     
-    bb_high = max(closes)
-   
-    if len(closes) < period:       
-        return bb_low, bb_high 
-        
-    closes_array = np.array(closes) 
-   
-    sma = talib.SMA(closes_array, timeperiod=period)       
-    stdev = talib.STDDEV(closes_array, timeperiod=period)  
+    for c in candles:
+        close = c['close']
+        if not np.isnan(close):     
+            closes.append(close)
             
-    bb_upper = sma + (std * stdev)    
-    bb_lower = sma - (std * stdev)
+    return closes
 
-    # Replace NaN with 0    
-    bb_lower = np.nan_to_num(bb_lower)  
-    bb_upper = np.nan_to_num(bb_upper)
-        
-    # Get valid lower and upper bands     
-    bb_lower = bb_lower[np.isfinite(bb_lower) & (bb_lower > 0)]
-    bb_upper = bb_upper[np.isfinite(bb_upper) & (bb_upper > 0)]
-         
-    # Get first non-zero value  
-    bb_low = bb_lower[0]
-    bb_high = bb_upper[0]  
-         
-    return bb_low, bb_high
+closes = get_closes('1m')
+#print(type(closes))
+
+##################################################
+##################################################
+
+# Get SMA for all timeframes and for all intervals lengths
+
+def get_sma(timeframe, length):
+   closes = get_closes(timeframe)  
+    
+   sma = talib.SMA(np.array(closes), timeperiod=length)
+
+   # Filter out NaN  
+   sma = sma[np.isnan(sma) == False]
+      
+   return sma
+
+# Call the function
+sma_lengths = [5, 12, 21, 27, 56, 72, 100, 150, 200, 250, 369]
 
 for timeframe in timeframes:
-    bb_low, bb_high = bollinger_bands(timeframe, period=20, std=2)
-
-    print(f"Timeframe: {timeframe}")   
-    print("BB low at : ", bb_low)      
-    print("BB high at : ", bb_high) 
+    for length in sma_lengths:
+       sma = get_sma(timeframe, length)
+       print(f"SMA {length} for {timeframe}: {sma}")
 
 print()
 
 ##################################################
 ##################################################
-
-
-print()
-
-
-
-##################################################
-##################################################
-
 
 
