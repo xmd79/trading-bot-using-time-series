@@ -847,7 +847,7 @@ print()
 ##################################################
 ##################################################
 
-slope = None
+slope = None  
 
 def calculate_slope():  
     global slope
@@ -937,7 +937,6 @@ def donchian_channel(timeframe = '1m', period=period):
 for tf in timeframes:     
     dc_low, dc_high = donchian_channel(tf, period)
 
-
 print("Don low and don high at: ", dc_low, dc_high)
 
 ##################################################
@@ -949,26 +948,32 @@ pol_low = 0
 pol_high = 0
 
 def poly_channel(timeframe='3m', period=100):
-    if timeframe == '1m':
-        candle_data = candle_map['1m']
-    elif timeframe == '3m':
-        candle_data = candle_map['3m']
-    elif timeframe == '5m':
-        candle_data = candle_map['5m']
-
-    # Get close prices from candles
-    close = [float(candle['close']) for candle in candle_data[-period:]]
-
-    # Calculate coefficients of polynomial  
-    coeffs = np.polyfit(range(period), close, 3) 
-
-    # Calculate lower and upper bands
-    pol_low = np.polyval(coeffs, period) - 0.5*np.std(close)
-    pol_high = np.polyval(coeffs, period) + 0.5*np.std(close)
-
+   
+    calculate_slope()
+    
+    if slope is None:
+        return 0, 0
+        
+    # Get close prices from candles      
+    close = [float(candle['close']) for candle in candle_map[timeframe][-period:]]       
+  
+    # Calculate coefficients  
+    coeffs = np.polyfit(range(period), close, 3)  
+  
+    if slope > 0: # Uptrend       
+        pol_low = np.polyval(coeffs, period) - 0.8*np.std(close)
+        pol_high = np.polyval(coeffs, period) + 1.2*np.std(close)      
+                
+    elif slope < 0: # Downtrend       
+        pol_low = np.polyval(coeffs, period) - 1.2*np.std(close)       
+        pol_high = np.polyval(coeffs, period) + 0.8*np.std(close)
+                
+    else:
+        pol_low, pol_high = 0, 0
+                
     return pol_low, pol_high
 
-pol_low, pol_high = poly_channel(timeframe='3m', period=100)
+pol_low, pol_high = poly_channel(timeframe='5m', period=100)
 
 print("Poly low and poly high at: ", pol_low, pol_high)
 
@@ -981,7 +986,7 @@ def bollinger_bands(timeframe='3m', period=20, std=2):
    
     candle_data = candle_map[timeframe]
     closes = [candle['close'] for candle in candle_data[-period:]]   
-    print(f"Number of closes: {len(closes)}")  
+    #print(f"Number of closes: {len(closes)}")  
    
     # Set default low and high   
     bb_low = min(closes)     
@@ -1048,45 +1053,21 @@ print()
 ##################################################
 
 def calculate_levels():
-    # Initialize support and resistance levels
-    sup1, sup2, sup3 = 0, 0, 0  
+    sup1, sup2, sup3 = 0, 0, 0
     res1, res2, res3 = 0, 0, 0
     
-    # Initialize mood counters
-    mood_small = {'uptrend':0, 'downtrend':0, 'accumulation':0, 'distribution':0}
-    mood_med = {'uptrend':0, 'downtrend':0, 'accumulation':0, 'distribution':0} 
-    mood_large = {'uptrend':0, 'downtrend':0, 'accumulation':0, 'distribution':0}
-    
-    for timeframe, candles in candle_map.items():
-       
-       # Include all function calls to calculate levels and mood      
-       sup1, sup2 = forecast_low_high()
-       res1, res2 = forecast_low_high()
-       _ = detect_phi_pattern(candles)
-       _ = detect_square_of_9(candles)
-       _ = detect_forty_five_angle(candles)
-       _ = get_signal()  
-       _ = calculate_market_mood()
-           
-       if timeframe in ['1m','3m','5m']:
-           mood_small = calculate_market_mood()  
-       elif timeframe in ['15m','30m','1h']:
-           mood_med = calculate_market_mood()
-       elif timeframe in ['1h','2h','4h']:  
-           mood_large = calculate_market_mood()
-              
-       # After iterating all timeframes, you will have:
-       # 3 levels of support and resistance
-       # Market mood for small, medium and large timeframes         
-       
-    print(f"Support levels: {sup1}, {sup2}, {sup3}")
-    print(f"Resistance levels: {res1}, {res2}, {res3}")      
-    print(f"Small timeframe market mood: {mood_small}")
-    print(f"Medium timeframe market mood: {mood_med}")   
-    print(f"Large timeframe market mood: {mood_large}")
+    for timeframe, candles in candle_map.items():  
+        
+       sup1, res1 = donchian_channel(tf, period)
+       sup2, res2 = poly_channel(timeframe='3m', period=100)
+       sup3, res3 = bollinger_bands(period=period, std=2)
+        
+    return sup1, sup2, sup3, res1, res2, res3
 
-forecast = calculate_levels()
-print(forecast)
+sup1, sup2, sup3, res1, res2, res3 = calculate_levels()
+
+print(f"Support levels: {sup1}, {sup2}, {sup3}")
+print(f"Resistance levels: {res1}, {res2}, {res3}")
 
 print()
 ##################################################
