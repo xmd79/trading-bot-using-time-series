@@ -1025,6 +1025,28 @@ print("BB low and high at : ", bb_low, bb_high)
 ##################################################
 ##################################################
 
+def fibo_ratios():
+    fib = [0,1]
+    
+    for i in range(30):
+        fib.append(fib[i] + fib[i+1])
+        
+    # Fibonacci scale ratios    
+    fib_ratios = []  
+
+    for i in range(1, len(fib)-1):
+        ratio = fib[i] / fib[i+1] 
+        fib_ratios.append(ratio)
+        
+    # Golden ratio    
+    phi = (1 + math.sqrt(5)) / 2  
+
+    return fib_ratios, phi
+
+fib_ratios, phi = fibo_ratios()
+
+print(f"Fibonacci ratios: {fib_ratios}")  
+print(f"Golden ratio φ: {phi}")
 
 print()
 
