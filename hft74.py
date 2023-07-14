@@ -865,12 +865,6 @@ def calculate_slope():
 # Call function 
 calculate_slope()
 
-# Check if slope is None   
-if slope is not None:
-    support_low = support - slope * 0.005 * support
-else:
-    support_low = support
-
 ##################################################
 ##################################################
 
@@ -1045,8 +1039,8 @@ def fibo_ratios():
 
 fib_ratios, phi = fibo_ratios()
 
-print(f"Fibonacci ratios: {fib_ratios}")  
-print(f"Golden ratio φ: {phi}")
+#print(f"Fibonacci ratios: {fib_ratios}")  
+#print(f"Golden ratio φ: {phi}")
 
 print()
 
