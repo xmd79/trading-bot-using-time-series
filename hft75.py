@@ -408,6 +408,256 @@ print()
 ##################################################
 ##################################################
 
+EMA_FAST_PERIOD = 12
+EMA_SLOW_PERIOD = 26
+
+EMA_THRESHOLD = 3
+
+# Function to get EMAs  
+def get_emas(close_prices):
+    close_array = np.array(close_prices)
+    
+    # Check length     
+    if len(close_array) < EMA_FAST_PERIOD:
+       return 0, 0
+    
+    # Replace NaN    
+    close_array = np.nan_to_num(close_array, nan=0.0)
+    
+    # Calculate EMAs      
+    ema_slow = talib.EMA(close_array, timeperiod=EMA_SLOW_PERIOD)[-1]   
+    ema_fast = talib.EMA(close_array, timeperiod=EMA_FAST_PERIOD)[-1]   
+   
+    return ema_slow, ema_fast
+
+##################################################
+##################################################
+
+# Checking EMA crosees:
+
+def check_cross(ema_slow, ema_fast):  
+    "Check if EMAs have crossed"
+    return ema_slow < ema_fast  
+
+##################################################
+##################################################
+
+def calculate_emas(candle_array):
+    close_prices = candle_array.tolist()  
+     
+    # Check length     
+    if len(close_prices) < EMA_FAST_PERIOD:
+       return 0, 0  
+        
+    # Replace NaN    
+    close_prices = np.nan_to_num(close_prices, nan=0.0)  
+      
+    # Calculate EMAs        
+    ema_slow = talib.EMA(np.array(close_prices), timeperiod=EMA_SLOW_PERIOD)[-1]    
+    ema_fast = talib.EMA(np.array(close_prices), timeperiod=EMA_FAST_PERIOD)[-1]
+      
+    return ema_slow, ema_fast
+
+
+##################################################
+##################################################
+
+# Define ema moving averages crosses and getting percentage dist. from close to each of them:
+
+def calculate_diff(close, ema, hist):  
+    
+    # Calculate difference         
+    diff = abs((close - ema) / close) * 100
+    
+    if np.isnan(diff):
+        # Calculate average of history 
+        diff = np.nanmean(hist[ema])   
+    
+    if ema not in hist:
+        hist[ema] = []
+       
+    # Update history           
+    hist[ema].append(diff)  
+        
+    # Keep last 10 values 
+    hist[ema] = hist[ema][-10:]
+            
+    return np.nanmean(hist[ema])
+
+
+print()
+
+##################################################
+##################################################
+
+NO_SIGNAL = 0
+
+def calc_signal(candle_map):  
+
+    signals = []
+      
+    for timeframe in candle_map:     
+        candle_array = np.array([c["close"] for c in candle_map[timeframe]])   
+        ema_slow, ema_fast = calculate_emas(candle_array)
+                
+        slow_diff_hist = {"slow": []}
+        fast_diff_hist = {"fast": []}  
+                
+        close = candle_array[-1]
+      
+        slow_diff = calculate_diff(close, ema_slow,  
+                                   slow_diff_hist)      
+        fast_diff = calculate_diff(close, ema_fast,  
+                                   fast_diff_hist)
+          
+        signals.append({
+           'timeframe': timeframe, 
+           'slow_diff': slow_diff,
+           'fast_diff': fast_diff   
+        })
+            
+    signal, _ = NO_SIGNAL, None
+            
+    for sig in signals:  
+        print(f"{sig['timeframe']} - {sig['slow_diff']:.2f}% from slow EMA, {sig['fast_diff']:.2f}% from fast EMA")     
+            
+    return signal, _
+
+signal, _ = calc_signal(candle_map)  
+
+if signal == NO_SIGNAL:     
+   print("No clear dominance pattern overall")
+
+signal, _ = calc_signal(candle_map)
+
+if signal == NO_SIGNAL:    
+   print("No clear dominance pattern overall")
+
+print()
+
+##################################################
+##################################################
+
+def get_signal():
+    for timeframe, candles in candle_map.items():
+        candle_array = np.array([candle["close"] for candle in candles])  
+        ema_slow, ema_fast = get_emas(candle_array)
+
+        if len(candle_array) == 0:
+            print(f"No candles found for {timeframe}")
+            continue
+        
+        close = candle_array[-1]        
+        
+        if candle_array[-1] < ema_slow:
+            print(f"{timeframe} - Close below slow EMA, potential reversal point.")
+        
+        if candle_array[-1] < ema_fast:
+            print(f"{timeframe} - Close below fast EMA, potential support.")
+        
+        if candle_array[-1] < ema_slow and candle_array[-1] < ema_fast:
+            print(f"{timeframe} - Close below both EMAs, strong reversal signal.")
+            
+        if candle_array[-1] > ema_slow:
+            print(f"{timeframe} - Close above slow EMA, potential resistance.")
+            
+        if candle_array[-1] > ema_fast:
+            print(f"{timeframe} - Close above fast EMA, potential resistance.")   
+            
+        if candle_array[-1] > ema_slow and candle_array[-1] > ema_fast:
+            print(f"{timeframe} - Close above both EMAs, strong bullish signal.")
+            
+    return NO_SIGNAL, None
+
+# Call function
+signal, timeframe = get_signal()
+            
+print()
+
+##################################################
+##################################################
+
+def get_closes_last_n_minutes(interval, n):
+    """Generate mock closing prices for the last n minutes"""
+    closes = []
+    for i in range(n):
+        closes.append(random.uniform(0, 100))
+    return closes
+
+print()
+
+##################################################
+##################################################
+
+def get_multi_timeframe_rsi():
+    """Calculate RSI from multiple timeframes and average"""
+    rsis = []
+    
+    for timeframe in ['1m', '5m', '15m']:
+        
+       # Get candle data               
+       candles = candle_map[timeframe][-100:]  
+        
+       # Calculate RSI
+       rsi = talib.RSI(np.array([c["close"] for c in candles]))
+       rsis.append(rsi[-1])
+       
+    # Average RSIs        
+    avg_rsi = sum(rsis) / len(rsis)
+        
+    return avg_rsi
+
+mtf_rsi = get_multi_timeframe_rsi()
+print("MTF rsi value is now at: ", mtf_rsi)
+
+print()
+
+##################################################
+##################################################
+
+def get_mtf_rsi_market_mood():
+    rsi = get_multi_timeframe_rsi()
+    closes = get_closes_last_n_minutes("1m", 50)
+
+    # Define the indicators   
+    indicator1 = rsi  
+    indicator2 = 50
+
+    # Define the thresholds for dip and top reversals
+    dip_threshold = 30
+    top_threshold = 70
+
+    # Check if the close price is in the dip reversal area
+    if closes[-1] <= dip_threshold and closes[-2] > dip_threshold:
+        mood = "dip up reversal"
+    # Check if the close price is in the top reversal area
+    elif closes[-1] >= top_threshold and closes[-2] < top_threshold:
+        mood = "top down reversal"
+    # Check if the close price is in the accumulation area
+    elif closes[-1] > dip_threshold and closes[-1] < indicator2:
+        mood = "accumulation"
+    # Check if the close price is in the distribution area
+    elif closes[-1] < top_threshold and closes[-1] > indicator2:
+        mood = "distribution"
+    # Check if the market is in a downtrend
+    elif indicator1 < indicator2 and indicator1 < 50:
+        mood = "downtrend"
+    # Check if the market is in an uptrend
+    elif indicator1 > indicator2 and indicator1 > 50:
+        mood = "uptrend"
+    else:
+        mood = "neutral"
+
+    return mood
+
+mood = get_mtf_rsi_market_mood()
+print("MTF rsi mood: ", mood)
+
+print()
+
+##################################################
+##################################################
+
 def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2):
     """
     Calculate thresholds and averages based on min and max percentages. 
@@ -518,14 +768,3 @@ print()
 ##################################################
 ##################################################
 
-
-print()
-
-##################################################
-##################################################
-
-
-print()
-
-##################################################
-##################################################
