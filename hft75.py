@@ -340,5 +340,4 @@ def scale_to_sine(timeframe):
 for timeframe in timeframes:         
     scale_to_sine(timeframe)
         
-for timeframe in timeframes:
-    scale_to_sine(timeframe)
+
