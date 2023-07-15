@@ -406,3 +406,78 @@ print()
 
 ##################################################
 ##################################################
+
+def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2):
+    """
+    Calculate thresholds and averages based on min and max percentages. 
+    """
+  
+    # Get min/max close    
+    min_close = np.nanmin(close_prices)
+    max_close = np.nanmax(close_prices)
+    
+    # Convert close_prices to numpy array
+    close_prices = np.array(close_prices)
+    
+    # Calculate momentum
+    momentum = talib.MOM(close_prices, timeperiod=period)
+    
+    # Get min/max momentum    
+    min_momentum = np.nanmin(momentum)   
+    max_momentum = np.nanmax(momentum)
+    
+    # Calculate custom percentages 
+    min_percentage_custom = minimum_percentage / 100  
+    max_percentage_custom = maximum_percentage / 100
+
+    # Calculate thresholds       
+    min_threshold = min_close - (max_close - min_close) * min_percentage_custom  
+    max_threshold = max_close + (max_close - min_close) * max_percentage_custom
+        
+    # Filter close prices
+    with np.errstate(invalid='ignore'):
+        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
+        filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
+        
+    # Calculate avg    
+    avg_mtf = np.nanmean(filtered_close)
+
+    # Get current momentum       
+    current_momentum = momentum[-1]
+
+    # Calculate % to min/max momentum    
+    with np.errstate(invalid='ignore', divide='ignore'):
+        percent_to_min_momentum = ((max_momentum - current_momentum) /   
+                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
+
+        percent_to_max_momentum = ((current_momentum - min_momentum) / 
+                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
+ 
+    # Calculate combined percentages              
+    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
+    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
+      
+    # Combined momentum signal     
+    momentum_signal = percent_to_max_combined - percent_to_min_combined
+
+    return min_threshold, max_threshold, avg_mtf, momentum_signal
+
+
+# Call function with minimum percentage of 2% and maximum percentage of 2%
+min_threshold, max_threshold, avg_mtf, momentum_signal = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2)
+print("Minimum threshold:", min_threshold)
+print("Maximum threshold:", max_threshold)
+print("Average MTF:", avg_mtf)
+print("Momentum signal:", momentum_signal)
+
+print()
+
+##################################################
+##################################################
+
+
+print()
+
+##################################################
+##################################################
+
