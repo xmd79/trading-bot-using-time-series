@@ -526,12 +526,9 @@ def calc_signal(candle_map):
 signal, _ = calc_signal(candle_map)  
 
 if signal == NO_SIGNAL:     
-   print("No clear dominance pattern overall")
+   print("No clear dominance at the moment")
 
 signal, _ = calc_signal(candle_map)
-
-if signal == NO_SIGNAL:    
-   print("No clear dominance pattern overall")
 
 print()
 
@@ -768,3 +765,74 @@ print()
 ##################################################
 ##################################################
 
+def get_multi_timeframe_momentum():
+    """Calculate momentum from multiple timeframes and average"""
+    momentums = []
+    
+    for timeframe in ['1m', '5m', '15m', '30m', '1h']:
+        
+        # Get candle data               
+        candles = candle_map[timeframe][-100:]  
+        
+        # Calculate momentum using talib MOM
+        momentum = talib.MOM(np.array([c["close"] for c in candles]), timeperiod=14)
+        momentums.append(momentum[-1])
+       
+    # Average momentums        
+    avg_momentum = sum(momentums) / len(momentums)
+        
+    return avg_momentum
+
+for timeframe in ['1m', '5m', '15m', '30m', '1h']:
+    momentum = get_multi_timeframe_momentum()
+    print(f"Momentum for {timeframe}: {momentum}")
+
+print()
+
+##################################################
+##################################################
+
+def get_mtf_market_mood():
+    rsi_mood = get_mtf_rsi_market_mood()
+    momentum = get_multi_timeframe_momentum()
+
+    # Define the thresholds for momentum signals
+    small_range_threshold = 5
+    medium_range_threshold = 10
+
+    # Define the indicators   
+    indicator1 = momentum  
+    indicator2 = 0
+
+    # Check if the momentum signal is in the small range
+    if abs(indicator1) < small_range_threshold:
+        mood = "small range"
+    # Check if the momentum signal is in the medium range
+    elif abs(indicator1) < medium_range_threshold:
+        mood = "medium range"
+    # Check if the market is in a downtrend
+    elif indicator1 < indicator2:
+        mood = "downtrend"
+    # Check if the market is in an uptrend
+    elif indicator1 > indicator2:
+        mood = "uptrend"
+    else:
+        mood = "neutral"
+
+    # Combine the RSI mood and momentum mood
+    if rsi_mood == "dip up reversal" or rsi_mood == "uptrend":
+        mood += " bullish"
+    elif rsi_mood == "top down reversal" or rsi_mood == "downtrend":
+        mood += " bearish"
+    else:
+        mood += " neutral"
+
+    return mood
+
+print()
+
+mtf_market_mood = get_mtf_market_mood()
+print("MTF market mood: ", mtf_market_mood)
+
+##################################################
+##################################################
