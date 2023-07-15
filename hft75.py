@@ -333,74 +333,7 @@ print()
 ##################################################
 ##################################################
 
-def scale_trends_to_sine(timeframe):
-  
-    # Get close prices     
-    close_prices = np.array(get_closes(timeframe))
-        
-    # Get last close          
-    current_close = close_prices[-1]
-        
-    # Calculate 3 sine waves        
-    small_avrg_sine, _ = calculate_sine(["1min", "3min", "5min"])       
-    med_avrg_sine, _  = calculate_sine(["15min", "30min", "1H"])      
-    long_avrg_sine, _ = calculate_sine(["2H", "4H", "1D"])
-    
-    # Get last sine values        
-    current_sine1 = small_avrg_sine[-1]        
-    current_sine2 = med_avrg_sine[-1]        
-    current_sine3 = long_avrg_sine[-1] 
-    
-    # Calculate min/max        
-    small_min, small_max = get_min_max(small_avrg_sine)        
-    med_min, med_max = get_min_max(med_avrg_sine)       
-    long_min, long_max= get_min_max(long_avrg_sine)
 
-    # Calculate % distances           
-
-    dist_small_min = ((current_sine1 - small_min) /  
-                      (small_max - small_min)) * 100
-                  
-    dist_small_max = ((small_max - current_sine1) /
-                      (small_max - small_min)) * 100 
-
-    # Medium term
-    dist_med_min = ((current_sine2 - med_min) /  
-                     (med_max - med_min)) * 100
-              
-    dist_med_max = ((med_max - current_sine2) /
-                    (med_max - med_min)) * 100
-
-    # Long term            
-    dist_long_min = ((current_sine3 - long_min) /  
-                     (long_max - long_min)) * 100
-               
-    dist_long_max = ((long_max - current_sine3) /
-                     (long_max - long_min)) * 100
-
-    # Initialize result string
-    result = f"{timeframe} Close is now at: "
-    
-    # Append small cycle results      
-    result += f" - Small cycle: "      
-    result += f"{dist_small_min:.2f}% from min, "   
-    result += f"{dist_small_max:.2f}% from max\n"
-  
-    # Append medium cycle results   
-    result += f" - Medium cycle: "      
-    result += f"{dist_med_min:.2f}% from min, "  
-    result += f"{dist_med_max:.2f}% from max\"\n"
-   
-    # Append large cycle results
-    result += f" - Long cycle: "    
-    result += f"{dist_long_min:.2f}% from min, "    
-    result += f"{dist_long_max:.2f}% from max"
-            
-    return result
-
-# Call function           
-for timeframe in timeframes:        
-    print(scale_trends_to_sine(timeframe))
 
 print()
 
