@@ -364,11 +364,43 @@ def collect_results():
 # Call function      
 overall_dist_min, overall_dist_max, results = collect_results()
 print()
+
+# Fast range - 1, 3, 5 mins
+fast_range = results[:3]
+fast_dist_min = sum([r[0] for r in fast_range]) / len(fast_range)  
+fast_dist_max = sum([r[1] for r in fast_range]) / len(fast_range)  
+
+# Medium range - 15min, 30min, 1hr       
+medium_range = results[3:6]     
+medium_dist_min = sum([r[0] for r in medium_range]) / len(medium_range)
+medium_dist_max = sum([r[1] for r in medium_range]) / len(medium_range)
+
+# Long range - 2hr to 1 day       
+long_range = results[6:]    
+long_dist_min = sum([r[0] for r in long_range]) / len(long_range)  
+long_dist_max = sum([r[1] for r in long_range]) / len(long_range)
+
 print("Overall distances:")
 print(f"  To minimum: {overall_dist_min:.2f}%")  
 print(f"  To maximum: {overall_dist_max:.2f}%")
 
+print()
 
+print("Fast range averages:")
+print(f" To minimum: {fast_dist_min:.2f}%")   
+print(f" To maximum: {fast_dist_max:.2f}%")
+
+print()
+
+print("Medium range averages:")       
+print(f" To minimum: {medium_dist_min:.2f}%")  
+print(f" To maximum: {medium_dist_max:.2f}%")
+
+print()
+
+print("Long range averages:")                 
+print(f" To minimum: {long_dist_min:.2f}%")
+print(f" To maximum: {long_dist_max:.2f}%")
 
 print()
 
