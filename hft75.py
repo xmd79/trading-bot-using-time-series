@@ -282,9 +282,9 @@ for timeframe in timeframes:
     above_avg, below_avg =  get_sma_ratio(timeframe)
     
     if below_avg > above_avg:
-        print(f"{timeframe} Close is below SMAs at a local dip")        
+        print(f"{timeframe} Close is below SMAs at local DIP")        
     elif above_avg > below_avg:
-        print(f"{timeframe} Close is above SMAs at a local top")
+        print(f"{timeframe} Close is above SMAs at local TOP")
 
 print()
 
@@ -319,11 +319,90 @@ def scale_to_sine(timeframe):
     dist_from_close_to_max = ((sine_wave_max - current_sine) / 
                        (sine_wave_max - sine_wave_min)) * 100
                 
-    print(f"Close: {current_close} "       
-          f"Dist. to min: {dist_from_close_to_min:.2f}% "
-          f"Dist. to max: {dist_from_close_to_max:.2f}%")
+    print(f"{timeframe} Close is now at "       
+          f"dist. to min: {dist_from_close_to_min:.2f}% "
+          f"and at "
+          f"dist. to max: {dist_from_close_to_max:.2f}%")
 
 # Call function           
 for timeframe in timeframes:        
     scale_to_sine(timeframe)
 
+print()
+
+##################################################
+##################################################
+
+def scale_trends_to_sine(timeframe):
+  
+    # Get close prices     
+    close_prices = np.array(get_closes(timeframe))
+        
+    # Get last close          
+    current_close = close_prices[-1]
+        
+    # Calculate 3 sine waves        
+    small_avrg_sine, _ = calculate_sine(["1min", "3min", "5min"])       
+    med_avrg_sine, _  = calculate_sine(["15min", "30min", "1H"])      
+    long_avrg_sine, _ = calculate_sine(["2H", "4H", "1D"])
+    
+    # Get last sine values        
+    current_sine1 = small_avrg_sine[-1]        
+    current_sine2 = med_avrg_sine[-1]        
+    current_sine3 = long_avrg_sine[-1] 
+    
+    # Calculate min/max        
+    small_min, small_max = get_min_max(small_avrg_sine)        
+    med_min, med_max = get_min_max(med_avrg_sine)       
+    long_min, long_max= get_min_max(long_avrg_sine)
+
+    # Calculate % distances           
+
+    dist_small_min = ((current_sine1 - small_min) /  
+                      (small_max - small_min)) * 100
+                  
+    dist_small_max = ((small_max - current_sine1) /
+                      (small_max - small_min)) * 100 
+
+    # Medium term
+    dist_med_min = ((current_sine2 - med_min) /  
+                     (med_max - med_min)) * 100
+              
+    dist_med_max = ((med_max - current_sine2) /
+                    (med_max - med_min)) * 100
+
+    # Long term            
+    dist_long_min = ((current_sine3 - long_min) /  
+                     (long_max - long_min)) * 100
+               
+    dist_long_max = ((long_max - current_sine3) /
+                     (long_max - long_min)) * 100
+
+    # Initialize result string
+    result = f"{timeframe} Close is now at: "
+    
+    # Append small cycle results      
+    result += f" - Small cycle: "      
+    result += f"{dist_small_min:.2f}% from min, "   
+    result += f"{dist_small_max:.2f}% from max\n"
+  
+    # Append medium cycle results   
+    result += f" - Medium cycle: "      
+    result += f"{dist_med_min:.2f}% from min, "  
+    result += f"{dist_med_max:.2f}% from max\"\n"
+   
+    # Append large cycle results
+    result += f" - Long cycle: "    
+    result += f"{dist_long_min:.2f}% from min, "    
+    result += f"{dist_long_max:.2f}% from max"
+            
+    return result
+
+# Call function           
+for timeframe in timeframes:        
+    print(scale_trends_to_sine(timeframe))
+
+print()
+
+##################################################
+##################################################
