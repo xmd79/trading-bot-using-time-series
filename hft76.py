@@ -919,12 +919,23 @@ def generate_em_index_with_sma():
     for em_dict in em_index:
         smas = em_dict['smas'].values()
         if smas:
-            phis.append(sum(smas) / len(smas))
+            phi_avg = sum(smas) / len(smas)
+            em_dict['phi_avg'] = phi_avg
+            phis.append(phi_avg)
         else:
+            em_dict['phi_avg'] = 0
             phis.append(0)
-    phi_avg = sum(phis) / len(phis)
-    # Add to top level
-    em_index.append({'phi_avg': phi_avg})
+    
+    # Sort phis from most negative to most positive
+    sorted_phis = sorted(phis)
+    
+    # Print phis in sorted order
+    print("Phis in sorted order:")
+    for phi in sorted_phis:
+        print(phi)
+    
+    # Add sorted phis to top level
+    em_index.append({'sorted_phis': sorted_phis})
 
     return em_index
 
