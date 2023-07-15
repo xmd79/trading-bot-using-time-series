@@ -291,53 +291,39 @@ print()
 ##################################################
 ##################################################
 
-# Scale close prices to sine wave       
-def scale_to_sine(timeframe):
-    
-    # Get close prices    
-    close_prices = np.array(get_closes(timeframe))  
+# Scale current close price to sine wave       
+def scale_to_sine(timeframe):  
+  
+    close_prices = np.array(get_closes(timeframe))
+  
+    # Get last close price 
+    current_close = close_prices[-1]      
         
-    # Set sine limits
-    sin_min = 0  
-    sin_max = 360
-        
-    # Calculate sine wave    
-    sine_wave, _ = talib.HT_SINE(close_prices)   
-      
-    # Filter NaN     
+    # Calculate sine wave        
+    sine_wave, _ = talib.HT_SINE(close_prices)
+            
+    # Replace NaN values with 0        
     sine_wave = np.nan_to_num(sine_wave)
-      
-    # Invert sine wave        
-    sine_wave = -sine_wave  
-      
-    # Get min/max sine     
-    min_sine = np.min(sine_wave)       
-    max_sine = np.max(sine_wave)
-      
-    for i in range(len(close_prices)):
-      
-        # Get close price      
-        close = close_prices[i]  
-                
-        # Calculate sine value from 0-360               
-        sine = sin_min + (sin_max - sin_min)*(sine_wave[i] + 1)/2  
-                
-        # Determine quadrant   
-        quadrant = 1 if sine < 90 else 2 if sine < 180 else 3 if sine < 270 else 4 
-                
-        # Calculate % distance from min/max based on sine    
-        dist_to_min = ((sine_wave[i] - min_sine)/(max_sine - min_sine))*100
-   
-        # Calculate % distance from max sine       
-        dist_to_max = ((max_sine - sine_wave[i])/(max_sine - min_sine))*100
+    sine_wave = -sine_wave
         
-        print(f"Close: {close} Sine: {sine} "   
-              f"Quadrant: {quadrant} " 
-              f"Dist. to min: {dist_to_min:.2f}% "  
-              f"Dist. to max: {dist_to_max:.2f}%")  
-          
+    # Get the sine value for last close      
+    current_sine = sine_wave[-1]
+            
+    # Calculate the min and max sine           
+    sine_wave_min = np.min(sine_wave)        
+    sine_wave_max = np.max(sine_wave)
+            
+    # Calculate distances as percentages        
+    dist_from_close_to_min = ((current_sine - sine_wave_min) /  
+                       (sine_wave_max - sine_wave_min)) * 100            
+    dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                       (sine_wave_max - sine_wave_min)) * 100
+                
+    print(f"Close: {current_close} "       
+          f"Dist. to min: {dist_from_close_to_min:.2f}% "
+          f"Dist. to max: {dist_from_close_to_max:.2f}%")
+
 # Call function           
-for timeframe in timeframes:         
+for timeframe in timeframes:        
     scale_to_sine(timeframe)
-        
 
