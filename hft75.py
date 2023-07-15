@@ -300,7 +300,7 @@ def scale_to_sine(timeframe):
     current_close = close_prices[-1]      
         
     # Calculate sine wave        
-    sine_wave, _ = talib.HT_SINE(close_prices)
+    sine_wave, leadsine = talib.HT_SINE(close_prices)
             
     # Replace NaN values with 0        
     sine_wave = np.nan_to_num(sine_wave)
