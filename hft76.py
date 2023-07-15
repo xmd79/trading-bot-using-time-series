@@ -112,24 +112,28 @@ timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12
 
 def get_candles(symbol, timeframes):
     candles = []
-    for timeframe in timeframes:  
+    for timeframe in timeframes:
+        limit = 1000  # default limit
+        tf_value = int(timeframe[:-1])  # extract numeric value of timeframe
+        if tf_value >= 4:  # check if timeframe is 4h or above
+            limit = 2000  # increase limit for 4h timeframe and above
         klines = client.get_klines(
-            symbol=symbol, 
-            interval=timeframe,  
-            limit=1000  
+            symbol=symbol,
+            interval=timeframe,
+            limit=limit
         )
         # Convert klines to candle dict
         for k in klines:
             candle = {
-                "time": k[0] / 1000,   
-                "open": float(k[1]), 
-                "high": float(k[2]),   
-                "low": float(k[3]),    
-                "close": float(k[4]),   
-                "volume": float(k[5]), 
-                "timeframe": timeframe    
+                "time": k[0] / 1000,
+                "open": float(k[1]),
+                "high": float(k[2]),
+                "low": float(k[3]),
+                "close": float(k[4]),
+                "volume": float(k[5]),
+                "timeframe": timeframe
             }
-            candles.append(candle)    
+            candles.append(candle)
     return candles
 
 # Get candles  
@@ -408,8 +412,8 @@ print()
 ##################################################
 ##################################################
 
-EMA_FAST_PERIOD = 12
-EMA_SLOW_PERIOD = 26
+EMA_FAST_PERIOD = 50
+EMA_SLOW_PERIOD = 200
 
 EMA_THRESHOLD = 3
 
@@ -783,10 +787,6 @@ def get_multi_timeframe_momentum():
         
     return avg_momentum
 
-for timeframe in ['1m', '5m', '15m', '30m', '1h']:
-    momentum = get_multi_timeframe_momentum()
-    print(f"Momentum for {timeframe}: {momentum}")
-
 print()
 
 ##################################################
@@ -833,6 +833,131 @@ print()
 
 mtf_market_mood = get_mtf_market_mood()
 print("MTF market mood: ", mtf_market_mood)
+
+print()
+
+##################################################
+##################################################
+
+def get_momentum(timeframe):
+    """Calculate momentum for a single timeframe"""
+    # Get candle data               
+    candles = candle_map[timeframe][-100:]  
+    # Calculate momentum using talib MOM
+    momentum = talib.MOM(np.array([c["close"] for c in candles]), timeperiod=14)
+    return momentum[-1]
+
+# Calculate momentum for each timeframe
+for timeframe in ['1m', '5m', '15m', '30m', '1h']:
+    momentum = get_momentum(timeframe)
+    print(f"Momentum for {timeframe}: {momentum}")
+
+print()
+
+##################################################
+##################################################
+
+# Electromagnetic constants
+phi = 1.618 # Golden ratio
+e = 2.71828 # Euler's number
+pi = 3.14159265358979 # Pi
+c = 300000 # Speed of light in km/s
+
+##################################################
+##################################################
+timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h']
+sma_lengths = [5, 12, 21, 27, 56, 72, 100, 150, 200, 250, 369]
+
+FREQ_RANGES = [
+    ("Radio waves", 0, 3e11 * phi / c),
+    ("Microwaves", 3e11 * phi / c, 3e8 * e / c),
+    ("Infrared", 3e8 * e / c, 3e11 * pi / c),
+    ("Visible light", 3e11 * pi / c, 4.3e14 * i),
+    ("Ultraviolet", 4.3e14 * i, 7.5e14 * phi),
+    ("X-rays", 7.5e14 * phi, 3e17 * e * pi),
+    ("Gamma rays", 3e17 * e * pi, 3e20 * c)
+]
+
+# Define a function to generate the EM index with SMA lengths included
+def generate_em_index_with_sma():
+    global timeframes
+    global phi
+    global e
+    global pi
+    global c
+
+    em_index = []
+    for name, f_min, f_max in FREQ_RANGES:
+        em_dict = {
+            "name": name,
+            "min": f_min,
+            "max": f_max,
+            "freq_range": f"{f_min} < freq < {f_max}",
+            "smas": {}
+        }
+        em_index.append(em_dict)
+
+    # Loop through all timeframes and SMA lengths
+    for timeframe in timeframes:
+        for length in sma_lengths:
+            # Calculate SMA
+            sma = get_sma(timeframe, length)
+            # Calculate EMAs
+            ema200 = talib.EMA(sma, timeperiod=200)[-1]    
+            ema50 = talib.EMA(sma, timeperiod=50)[-1]
+            # Calculate Phi
+            phi = ema200 / ema50
+            # Map timeframe to EM spectrum index
+            tf_index = timeframes.index(timeframe)
+            # Add to index
+            for i, em_dict in enumerate(em_index):
+                if em_dict['min'] <= phi <= em_dict['max']:
+                    em_index[i]['smas'][(tf_index, length)] = phi
+
+    # Calculate average PHI across spectrum
+    phis = []
+    for em_dict in em_index:
+        smas = em_dict['smas'].values()
+        if smas:
+            phis.append(sum(smas) / len(smas))
+        else:
+            phis.append(0)
+    phi_avg = sum(phis) / len(phis)
+    # Add to top level
+    em_index.append({'phi_avg': phi_avg})
+
+    return em_index
+
+# Call the function and print the result
+em_index = generate_em_index_with_sma()
+print(em_index)
+
+print()
+
+##################################################
+##################################################
+
+def map_to_em_spectrum(time_period):
+    """Map time period to EM spectrum index"""
+    for i, em in enumerate(em_index):
+        if em['min'] <= time_period <= em['max']:
+            return i
+    # If the time period is outside the range of the EM spectrum, return None
+    return None
+
+ema_fast = 12
+ema_slow = 26
+sma = 50
+
+ema_fast_index = map_to_em_spectrum(ema_fast)
+ema_slow_index = map_to_em_spectrum(ema_slow)
+sma_index = map_to_em_spectrum(sma)
+
+print(f"EMA fast ({ema_fast}) maps to index {ema_fast_index}")
+print(f"EMA slow ({ema_slow}) maps to index {ema_slow_index}")
+print(f"SMA ({sma}) maps to index {sma_index}")
+
+print()
 
 ##################################################
 ##################################################
