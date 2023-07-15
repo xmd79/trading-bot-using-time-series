@@ -180,7 +180,6 @@ def get_closes(timeframe):
     return closes
 
 closes = get_closes('1m')
-#print(type(closes))
 
 ##################################################
 ##################################################
@@ -312,26 +311,62 @@ def scale_to_sine(timeframe):
     # Calculate the min and max sine           
     sine_wave_min = np.min(sine_wave)        
     sine_wave_max = np.max(sine_wave)
-            
-    # Calculate distances as percentages        
-    dist_from_close_to_min = ((current_sine - sine_wave_min) /  
-                       (sine_wave_max - sine_wave_min)) * 100            
-    dist_from_close_to_max = ((sine_wave_max - current_sine) / 
-                       (sine_wave_max - sine_wave_min)) * 100
+
+    # Calculate % distances            
+    dist_min, dist_max = [], []
+ 
+    for close in close_prices:    
+        # Calculate distances as percentages        
+        dist_from_close_to_min = ((current_sine - sine_wave_min) /  
+                           (sine_wave_max - sine_wave_min)) * 100            
+        dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                           (sine_wave_max - sine_wave_min)) * 100
                 
+        dist_min.append(dist_from_close_to_min)       
+        dist_max.append(dist_from_close_to_max)
+
+    # Take average % distances    
+    avg_dist_min = sum(dist_min) / len(dist_min)
+    avg_dist_max = sum(dist_max) / len(dist_max) 
+
     print(f"{timeframe} Close is now at "       
           f"dist. to min: {dist_from_close_to_min:.2f}% "
           f"and at "
           f"dist. to max: {dist_from_close_to_max:.2f}%")
 
+    return dist_from_close_to_min, dist_from_close_to_max
+
 # Call function           
-for timeframe in timeframes:        
-    scale_to_sine(timeframe)
+#for timeframe in timeframes:        
+    #scale_to_sine(timeframe)
 
 print()
 
 ##################################################
 ##################################################
+
+def collect_results():
+    results = []
+    
+    for timeframe in timeframes:
+        # Call existing function 
+        dist_to_min, dist_to_max = scale_to_sine(timeframe)  
+        
+        # Append result tuple
+        results.append((dist_to_min, dist_to_max)) 
+        
+    # Calculate overall percentages      
+    overall_dist_min = sum([r[0] for r in results]) / len(results)    
+    overall_dist_max = sum([r[1] for r in results]) / len(results)
+    
+    return overall_dist_min, overall_dist_max, results
+
+# Call function      
+overall_dist_min, overall_dist_max, results = collect_results()
+print()
+print("Overall distances:")
+print(f"  To minimum: {overall_dist_min:.2f}%")  
+print(f"  To maximum: {overall_dist_max:.2f}%")
 
 
 
