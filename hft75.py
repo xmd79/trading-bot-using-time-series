@@ -250,8 +250,6 @@ for timeframe in timeframes:
        # Calculate average SMA diff     
        avg_sma_diff = mean(sma_diffs)       
          
-print()
-
 ##################################################
 ##################################################
 
@@ -293,4 +291,54 @@ print()
 ##################################################
 ##################################################
 
-
+# Scale close prices to sine wave       
+def scale_to_sine(timeframe):
+    
+    # Get close prices    
+    close_prices = np.array(get_closes(timeframe))  
+        
+    # Set sine limits
+    sin_min = 0  
+    sin_max = 360
+        
+    # Calculate sine wave    
+    sine_wave, _ = talib.HT_SINE(close_prices)   
+      
+    # Filter NaN     
+    sine_wave = np.nan_to_num(sine_wave)
+      
+    # Invert sine wave        
+    sine_wave = -sine_wave  
+      
+    # Get min/max sine     
+    min_sine = np.min(sine_wave)       
+    max_sine = np.max(sine_wave)
+      
+    for i in range(len(close_prices)):
+      
+        # Get close price      
+        close = close_prices[i]  
+                
+        # Calculate sine value from 0-360               
+        sine = sin_min + (sin_max - sin_min)*(sine_wave[i] + 1)/2  
+                
+        # Determine quadrant   
+        quadrant = 1 if sine < 90 else 2 if sine < 180 else 3 if sine < 270 else 4 
+                
+        # Calculate % distance from min/max based on sine    
+        dist_to_min = ((sine_wave[i] - min_sine)/(max_sine - min_sine))*100
+   
+        # Calculate % distance from max sine       
+        dist_to_max = ((max_sine - sine_wave[i])/(max_sine - min_sine))*100
+        
+        print(f"Close: {close} Sine: {sine} "   
+              f"Quadrant: {quadrant} " 
+              f"Dist. to min: {dist_to_min:.2f}% "  
+              f"Dist. to max: {dist_to_max:.2f}%")  
+          
+# Call function           
+for timeframe in timeframes:         
+    scale_to_sine(timeframe)
+        
+for timeframe in timeframes:
+    scale_to_sine(timeframe)
