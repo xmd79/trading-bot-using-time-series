@@ -1228,20 +1228,6 @@ print()
 ##################################################
 ##################################################
 
-def get_reversal_keypoints(timeframes):
-    keypoints = []
-    for timeframe in timeframes:
-        closes = get_closes(timeframe)
-        dominant_frequency = get_dominant_frequency(timeframe)
-        quadrants = quadrants(dominant_frequency)
-        current_quadrant, next_quadrant, last_quadrant = quadrants
-        reversal_keypoint = (last_quadrant[-1][0], next_quadrant[0][1], current_quadrant[-1][1])
-        keypoints.append(reversal_keypoint)
-    return keypoints
-
-keypoints = get_reversal_keypoints(timeframes)
-print(keypoints)
-
 print()
 
 ##################################################
