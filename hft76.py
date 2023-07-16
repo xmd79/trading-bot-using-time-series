@@ -878,15 +878,20 @@ FREQ_RANGES = [
     ("Gamma rays", 3e17 * e * pi, 3e20 * c)
 ]
 
+# Define global EM index
+em_index = []
+
 # Define a function to generate the EM index with SMA lengths included
 def generate_em_index_with_sma():
     global timeframes
+    global em_index
     global phi
     global e
     global pi
     global c
 
-    em_index = []
+    #em_index = []
+
     for name, f_min, f_max in FREQ_RANGES:
         em_dict = {
             "name": name,
@@ -949,26 +954,147 @@ print()
 ##################################################
 
 def map_to_em_spectrum(time_period):
-    """Map time period to EM spectrum index"""
-    for i, em in enumerate(em_index):
-        if em['min'] <= time_period <= em['max']:
-            return i
-    # If the time period is outside the range of the EM spectrum, return None
+    # Convert time period to minutes
+    if time_period.endswith("m"):
+        minutes = int(time_period[:-1])
+    elif time_period.endswith("h"):
+        minutes = int(time_period[:-1]) * 60
+    else:
+        raise ValueError("Invalid time period")
+    
+    # Find the appropriate EM spectrum index
+    for em in FREQ_RANGES:
+        if em[1] <= minutes <= em[2]:
+            return FREQ_RANGES.index(em)
+    
+    # If no EM spectrum index is found, return None
     return None
-
-ema_fast = 12
-ema_slow = 26
-sma = 50
-
-ema_fast_index = map_to_em_spectrum(ema_fast)
-ema_slow_index = map_to_em_spectrum(ema_slow)
-sma_index = map_to_em_spectrum(sma)
-
-print(f"EMA fast ({ema_fast}) maps to index {ema_fast_index}")
-print(f"EMA slow ({ema_slow}) maps to index {ema_slow_index}")
-print(f"SMA ({sma}) maps to index {sma_index}")
 
 print()
 
 ##################################################
 ##################################################
+from scipy.fftpack import dct, dst
+from scipy.signal import find_peaks
+
+def get_dominant_frequency(timeframe):
+    close_prices = get_closes(timeframe)
+    
+    # Compute the DCT of the signal
+    dct_signal = dct(close_prices, type=2, norm='ortho')
+    
+    # Compute the DST of the DCT coefficients
+    dst_dct = dst(np.sign(dct_signal)*np.sqrt(np.abs(dct_signal)), type=2, norm='ortho')
+    
+    # Find the peaks in the DST spectrum
+    peaks, _ = find_peaks(np.abs(dst_dct), height=0)
+    
+    # Find the dominant frequency
+    dominant_peak = np.argmax(np.abs(dst_dct[peaks]))
+    dominant_frequency = peaks[dominant_peak] / len(close_prices)
+    
+    return dominant_frequency
+
+##################################################
+##################################################
+
+def generate_forecast(close, em_index):
+    # Calculate high/low prices
+    high = np.max(close)
+    low = np.min(close)
+    
+    # Convert to arrays
+    close = np.array(close)
+    high = np.array([high] * close.size)
+    low = np.array([low] * close.size)
+    
+    # Reshape arrays
+    close = close.reshape(-1, 1)
+    high = high.reshape(-1, 1)
+    low = low.reshape(-1, 1)
+    
+    # Calculate dominant frequencies
+    fast_freq = get_dominant_frequency("1m")
+    min5_freq = get_dominant_frequency("5m")
+    min15_freq = get_dominant_frequency("15m")
+    hour_freq = get_dominant_frequency("1h")
+    
+    # Initialize sine variables
+    fast_sine = None
+    min5_sine = None
+    min15_sine = None
+    hour_sine = None
+    
+    # Initialize distance variables
+    fast_dist = 0
+    min5_dist = 0
+    min15_dist = 0
+    hour_dist = 0
+    
+    # Generate forecasts
+    forecasts = []
+    for timeframe, freq, sine, dist in zip(["1m", "5m", "15m", "1h"],
+                                           [fast_freq, min5_freq, min15_freq, hour_freq],
+                                           [fast_sine, min5_sine, min15_sine, hour_sine],
+                                           [fast_dist, min5_dist, min15_dist, hour_dist]):
+        
+        # Get the EM spectrum index for the current timeframe
+        em_index_i = map_to_em_spectrum(timeframe)
+        
+        # Get the EM spectrum dictionary for the current timeframe
+        em_dict = em_index[em_index_i]
+        
+        # Calculate 1m HT_SINE values
+        close_prices = np.array(get_closes(timeframe))
+        sine_wave, leadsine = talib.HT_SINE(close_prices)
+        current_sine = sine_wave[-1]
+        
+        if timeframe == "1m":
+            fast_sine, fast_dist = current_sine, 40 # Example values
+        elif timeframe == "5m":
+            min5_sine, min5_dist = current_sine, 50 # Example values
+        elif timeframe == "15m":
+            min15_sine, min15_dist = current_sine, 60 # Example values
+        elif timeframe == "1h":
+            hour_sine, hour_dist = current_sine, 70 # Example values
+        
+        # Calculate HT_DCPHASE reversals
+        dphase = talib.HT_DCPHASE(close_prices)
+        reversals = np.where(dphase >= 90)[0]
+        
+        # Generate forecasts
+        if em_dict['phi_avg'] < 1:
+            mood = "Bearish"
+        else:
+            mood = "Bullish"
+            
+        specs = (
+            f"Dominant frequency: {freq}", 
+            f"HT_SINE: {sine}",
+            f"Average dist. to min: {dist:.2f}%",
+            f"{len(reversals)} Reversal points")  
+          
+        forecasts.append({
+            'name': timeframe,  
+            'forecast': {
+                'mood': mood,      
+                'specs': specs,
+                'reversals': reversals.tolist(),  
+                'dphase': dphase.tolist(),
+                'sine': sine_wave.tolist()
+            }  
+        })  
+          
+    return {'high': high, 'low': low, 'close': close, 'forecasts': forecasts}
+
+# Call function    
+results = generate_forecast(close, em_index)
+
+print(results)
+
+print()
+
+##################################################
+##################################################
+
+
