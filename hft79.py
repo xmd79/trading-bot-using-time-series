@@ -827,10 +827,13 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_
 
 # Call function with minimum percentage of 2% and maximum percentage of 2%
 min_threshold, max_threshold, avg_mtf, momentum_signal = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2)
+
+print("Momentum signal:", momentum_signal)
+print()
+
 print("Minimum threshold:", min_threshold)
 print("Maximum threshold:", max_threshold)
 print("Average MTF:", avg_mtf)
-print("Momentum signal:", momentum_signal)
 
 print()
 
