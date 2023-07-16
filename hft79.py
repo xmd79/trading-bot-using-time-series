@@ -551,22 +551,22 @@ def get_signal():
         close = candle_array[-1]        
         
         if candle_array[-1] < ema_slow:
-            print(f"{timeframe} - Close below slow EMA, potential reversal point.")
+            print(f"{timeframe} - Close below slow EMA, potential reversal UP point.")
         
         if candle_array[-1] < ema_fast:
             print(f"{timeframe} - Close below fast EMA, potential support.")
         
         if candle_array[-1] < ema_slow and candle_array[-1] < ema_fast:
-            print(f"{timeframe} - Close below both EMAs, strong reversal signal.")
+            print(f"{timeframe} - Close below both EMAs, strong reversal UP signal.")
             
         if candle_array[-1] > ema_slow:
-            print(f"{timeframe} - Close above slow EMA, potential resistance.")
+            print(f"{timeframe} - Close above slow EMA, potential reversal DOWN point.")
             
         if candle_array[-1] > ema_fast:
             print(f"{timeframe} - Close above fast EMA, potential resistance.")   
             
         if candle_array[-1] > ema_slow and candle_array[-1] > ema_fast:
-            print(f"{timeframe} - Close above both EMAs, strong bullish signal.")
+            print(f"{timeframe} - Close above both EMAs, strong reversal DOWN signal.")
             
     return NO_SIGNAL, None
 
@@ -773,7 +773,7 @@ def get_multi_timeframe_momentum():
     """Calculate momentum from multiple timeframes and average"""
     momentums = []
     
-    for timeframe in ['1m', '5m', '15m', '30m', '1h']:
+    for timeframe in timeframes:
         
         # Get candle data               
         candles = candle_map[timeframe][-100:]  
