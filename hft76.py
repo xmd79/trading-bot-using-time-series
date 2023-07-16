@@ -935,7 +935,7 @@ def generate_em_index_with_sma():
     sorted_phis = sorted(phis)
     
     # Print phis in sorted order
-    print("Phis in sorted order:")
+    print("Phi values on frequencies range spectrum in sorted order:")
     for phi in sorted_phis:
         print(phi)
     
@@ -946,6 +946,9 @@ def generate_em_index_with_sma():
 
 # Call the function and print the result
 em_index = generate_em_index_with_sma()
+
+print()
+
 print(em_index)
 
 print()
@@ -1085,14 +1088,50 @@ def generate_forecast(close, em_index):
             }  
         })  
           
-    return {'high': high, 'low': low, 'close': close, 'forecasts': forecasts}
+    return {'high': high[-1], 'low': low[-1], 'close': close[-1], 'forecasts': forecasts[-1]}
 
 # Call function    
 results = generate_forecast(close, em_index)
 
-print(results)
+# print(results)
 
 print()
+
+##################################################
+##################################################
+
+def get_market_mood(points, trend, reversal_target):
+    if len(points) < 2:
+        return "Unknown"
+    elif len(points) == 2:
+        if points[0][1] < points[1][1]:
+            return "Bullish"
+        else:
+            return "Bearish"
+    else:
+        # Fit a quadratic curve to the points
+        x = [point[0] for point in points]
+        y = [point[1] for point in points]
+        quadratic_coefficients = np.polyfit(x, y, 2)
+
+        # Determine the slope of the curve at the last point
+        last_point = points[-1]
+        slope = 2 * quadratic_coefficients[0] * last_point[0] + quadratic_coefficients[1]
+
+        if slope > 0:
+            if trend == "Bullish":
+                return "Strong bullish"
+            elif trend == "Bearish":
+                return "Reversal up"
+            else:
+                return "Bullish"
+        else:
+            if trend == "Bullish":
+                return "Reversal down"
+            elif trend == "Bearish":
+                return "Strong bearish"
+            else:
+                return "Bearish"
 
 ##################################################
 ##################################################
@@ -1108,8 +1147,9 @@ def quadrants():
     radius = 1
 
     for timeframe in timeframes:
+        # Get the closes for this timeframe
         closes = get_closes(timeframe)
-        
+
         # Find the dominant frequency
         dominant_frequency = get_dominant_frequency(timeframe)
 
@@ -1127,11 +1167,70 @@ def quadrants():
             else:
                 quadrant4.append(point)
 
-    # Print the points for each quadrant
-    print("Quadrant 1 points:", quadrant1)
-    print("Quadrant 2 points:", quadrant2)
-    print("Quadrant 3 points:", quadrant3)
-    print("Quadrant 4 points:", quadrant4)
+        # Determine the current quadrant
+        current_quadrant = None
+        if dominant_frequency < 0.25:
+            current_quadrant = quadrant1
+        elif dominant_frequency < 0.5:
+            current_quadrant = quadrant2
+        elif dominant_frequency < 0.75:
+            current_quadrant = quadrant3
+        else:
+            current_quadrant = quadrant4
+
+        # Determine the next quadrant
+        next_quadrant = None
+        if current_quadrant is quadrant1:
+            next_quadrant = quadrant2
+        elif current_quadrant is quadrant2:
+            next_quadrant = quadrant3
+        elif current_quadrant is quadrant3:
+            next_quadrant = quadrant4
+        else:
+            next_quadrant = quadrant1
+
+        # Determine the last quadrant
+        last_quadrant = None
+        if current_quadrant is quadrant1:
+            last_quadrant = quadrant4
+        elif current_quadrant is quadrant2:
+            last_quadrant = quadrant1
+        elif current_quadrant is quadrant3:
+            last_quadrant = quadrant2
+        else:
+            last_quadrant = quadrant3
+
+        # Determine the reversal keypoints forecast
+        if len(current_quadrant) > 0 and len(next_quadrant) > 0 and len(last_quadrant) > 0:
+            current_quadrant_last_point = current_quadrant[-1]
+            next_quadrant_first_point = next_quadrant[0]
+            last_quadrant_last_point = last_quadrant[-1]
+            reversal_keypoints_forecast = [
+                current_quadrant_last_point,
+                next_quadrant_first_point,
+                last_quadrant_last_point
+            ]
+
+            # Print the reversal keypoints forecast
+            print("Reversal keypoints forecast for", timeframe, "timeframe:", reversal_keypoints_forecast)
+
+            # Determine the market mood for each quadrant
+            market_mood = {}
+            if len(quadrant1) > 0:
+                reversal_up_target = current_quadrant_last_point[1] + (next_quadrant_first_point[1] - current_quadrant_last_point[1]) * 2
+                market_mood["quadrant1"] = get_market_mood(quadrant1, "Reversal up", reversal_up_target)
+            if len(quadrant2) > 0:
+                market_mood["quadrant2"] = get_market_mood(quadrant2, "Bullish", None)
+            if len(quadrant3) > 0:
+                reversal_down_target = current_quadrant_last_point[1] - (current_quadrant_last_point[1] - last_quadrant_last_point[1]) * 2
+                market_mood["quadrant3"] = get_market_mood(quadrant3, "Reversal down", reversal_down_target)
+            if len(quadrant4) > 0:
+                market_mood["quadrant4"] = get_market_mood(quadrant4, "Bearish", None)
+
+            # Print the market mood for each quadrant
+            print("Market mood for", timeframe, "timeframe:", market_mood)
 
 # Call the function to get the quadrants
 quadrants()
+
+
