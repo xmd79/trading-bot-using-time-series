@@ -1097,4 +1097,41 @@ print()
 ##################################################
 ##################################################
 
+# Define the unit circle
+def quadrants():
+    quadrant1 = []
+    quadrant2 = []
+    quadrant3 = []
+    quadrant4 = []
 
+    center = (0, 0)
+    radius = 1
+
+    for timeframe in timeframes:
+        closes = get_closes(timeframe)
+        
+        # Find the dominant frequency
+        dominant_frequency = get_dominant_frequency(timeframe)
+
+        # Divide the points into quadrants based on the dominant frequency
+        for i in range(len(closes)):
+            angle = i * 2 * math.pi / len(closes)
+            point = (center[0] + radius * math.cos(angle), center[1] + radius * math.sin(angle))
+
+            if dominant_frequency < 0.25:
+                quadrant1.append(point)
+            elif dominant_frequency < 0.5:
+                quadrant2.append(point)
+            elif dominant_frequency < 0.75:
+                quadrant3.append(point)
+            else:
+                quadrant4.append(point)
+
+    # Print the points for each quadrant
+    print("Quadrant 1 points:", quadrant1)
+    print("Quadrant 2 points:", quadrant2)
+    print("Quadrant 3 points:", quadrant3)
+    print("Quadrant 4 points:", quadrant4)
+
+# Call the function to get the quadrants
+quadrants()
