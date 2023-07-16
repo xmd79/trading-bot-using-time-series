@@ -1228,6 +1228,135 @@ print()
 ##################################################
 ##################################################
 
+close_prices = get_closes(timeframe)
+
+def calculate_quadrants(timeframes, close_prices, get_market_mood_func):
+    quadrant_forecasts = []
+
+    for i, timeframe in enumerate(timeframes):
+ 
+        # Get last close price 
+        current_close = close_prices[-1]
+
+        close_prices = np.array(get_closes(timeframe))
+  
+        # Get last close price 
+        current_close = close_prices[-1]      
+        
+        # Calculate sine wave        
+        sine_wave, leadsine = talib.HT_SINE(close_prices)
+            
+        # Replace NaN values with 0        
+        sine_wave = np.nan_to_num(sine_wave)
+        sine_wave = -sine_wave
+        
+        # Get the sine value for last close      
+        current_sine = sine_wave[-1]
+            
+        # Calculate the min and max sine           
+        sine_wave_min = np.min(sine_wave)        
+        sine_wave_max = np.max(sine_wave)
+
+        # Scale current close price to sine wave
+        dist_from_close_to_min, dist_from_close_to_max = scale_to_sine(timeframe)
+
+        # Divide the points into quadrants based on the sine wave
+        quadrant1 = []
+        quadrant2 = []
+        quadrant3 = []
+        quadrant4 = []
+
+        for i in range(len(close_prices)):
+            angle = i * 2 * math.pi / len(close_prices)
+            point = (math.cos(angle), math.sin(angle))
+
+            if dist_from_close_to_min < 25:
+                quadrant1.append(point)
+            elif dist_from_close_to_min < 50:
+                quadrant2.append(point)
+            elif dist_from_close_to_min < 75:
+                quadrant3.append(point)
+            else:
+                quadrant4.append(point)
+
+        # Determine the current quadrant
+        if dist_from_close_to_min < 25:
+            current_quadrant = quadrant1
+        elif dist_from_close_to_min < 50:
+            current_quadrant = quadrant2
+        elif dist_from_close_to_min < 75:
+            current_quadrant = quadrant3
+        else:
+            current_quadrant = quadrant4
+
+        # Determine the next quadrant
+        if current_quadrant == quadrant1:
+            next_quadrant = quadrant2
+        elif current_quadrant == quadrant2:
+            next_quadrant = quadrant3
+        elif current_quadrant == quadrant3:
+            next_quadrant = quadrant4
+        else:
+            next_quadrant = quadrant1
+
+        # Determine the last quadrant
+        if current_quadrant == quadrant1:
+            last_quadrant = quadrant4
+        elif current_quadrant == quadrant2:
+            last_quadrant = quadrant1
+        elif current_quadrant == quadrant3:
+            last_quadrant = quadrant2
+        else:
+            last_quadrant = quadrant3
+
+        # Determine the reversal keypoints forecast
+        if len(current_quadrant) > 0 and len(next_quadrant) > 0 and len(last_quadrant) > 0:
+            current_quadrant_last_point = current_quadrant[-1]
+            next_quadrant_first_point = next_quadrant[0]
+            last_quadrant_last_point = last_quadrant[-1]
+            reversal_keypoints_forecast = [
+                current_quadrant_last_point,
+                next_quadrant_first_point,
+                last_quadrant_last_point
+            ]
+
+            # Determine the market mood for each quadrant
+            market_mood = {}
+
+            if len(quadrant1) > 0:
+
+                reversal_up_target = current_quadrant_last_point[1] + (next_quadrant_first_point[1] - current_quadrant_last_point[1]) * 2
+                market_mood["quadrant1"] = get_market_mood(quadrant1, "Reversal up", reversal_up_target)
+
+            if len(quadrant2) > 0:
+
+                market_mood["quadrant2"] = get_market_mood(quadrant2, "Bullish", None)
+
+            if len(quadrant3) > 0:
+
+                reversal_down_target = current_quadrant_last_point[1] - (current_quadrant_last_point[1] - last_quadrant_last_point[1]) * 2
+                market_mood["quadrant3"] = get_market_mood(quadrant3, "Reversal down", reversal_down_target)
+
+            if len(quadrant4) > 0:
+
+                market_mood["quadrant4"] = get_market_mood(quadrant4, "Bearish", None)
+
+            # Store the forecast and market mood for this timeframe
+            quadrant_forecasts.append({
+                "timeframe": timeframe,
+                "reversal_keypoints_forecast": reversal_keypoints_forecast,
+                "market_mood": market_mood
+            })
+
+    return quadrant_forecasts
+
+
+# Call the function to get the quadrant forecasts
+quadrant_forecasts = calculate_quadrants(timeframes, close_prices, get_market_mood)
+
+# Print the quadrant forecasts
+print(quadrant_forecasts)
+
 print()
 
 ##################################################
