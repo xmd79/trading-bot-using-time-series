@@ -1001,105 +1001,6 @@ def get_dominant_frequency(timeframe):
 ##################################################
 ##################################################
 
-def generate_forecast(close, em_index):
-    # Calculate high/low prices
-    high = np.max(close)
-    low = np.min(close)
-    
-    # Convert to arrays
-    close = np.array(close)
-    high = np.array([high] * close.size)
-    low = np.array([low] * close.size)
-    
-    # Reshape arrays
-    close = close.reshape(-1, 1)
-    high = high.reshape(-1, 1)
-    low = low.reshape(-1, 1)
-    
-    # Calculate dominant frequencies
-    fast_freq = get_dominant_frequency("1m")
-    min5_freq = get_dominant_frequency("5m")
-    min15_freq = get_dominant_frequency("15m")
-    hour_freq = get_dominant_frequency("1h")
-    
-    # Initialize sine variables
-    fast_sine = None
-    min5_sine = None
-    min15_sine = None
-    hour_sine = None
-    
-    # Initialize distance variables
-    fast_dist = 0
-    min5_dist = 0
-    min15_dist = 0
-    hour_dist = 0
-    
-    # Generate forecasts
-    forecasts = []
-    for timeframe, freq, sine, dist in zip(["1m", "5m", "15m", "1h"],
-                                           [fast_freq, min5_freq, min15_freq, hour_freq],
-                                           [fast_sine, min5_sine, min15_sine, hour_sine],
-                                           [fast_dist, min5_dist, min15_dist, hour_dist]):
-        
-        # Get the EM spectrum index for the current timeframe
-        em_index_i = map_to_em_spectrum(timeframe)
-        
-        # Get the EM spectrum dictionary for the current timeframe
-        em_dict = em_index[em_index_i]
-        
-        # Calculate 1m HT_SINE values
-        close_prices = np.array(get_closes(timeframe))
-        sine_wave, leadsine = talib.HT_SINE(close_prices)
-        current_sine = sine_wave[-1]
-        
-        if timeframe == "1m":
-            fast_sine, fast_dist = current_sine, 40 # Example values
-        elif timeframe == "5m":
-            min5_sine, min5_dist = current_sine, 50 # Example values
-        elif timeframe == "15m":
-            min15_sine, min15_dist = current_sine, 60 # Example values
-        elif timeframe == "1h":
-            hour_sine, hour_dist = current_sine, 70 # Example values
-        
-        # Calculate HT_DCPHASE reversals
-        dphase = talib.HT_DCPHASE(close_prices)
-        reversals = np.where(dphase >= 90)[0]
-        
-        # Generate forecasts
-        if em_dict['phi_avg'] < 1:
-            mood = "Bearish"
-        else:
-            mood = "Bullish"
-            
-        specs = (
-            f"Dominant frequency: {freq}", 
-            f"HT_SINE: {sine}",
-            f"Average dist. to min: {dist:.2f}%",
-            f"{len(reversals)} Reversal points")  
-          
-        forecasts.append({
-            'name': timeframe,  
-            'forecast': {
-                'mood': mood,      
-                'specs': specs,
-                'reversals': reversals.tolist(),  
-                'dphase': dphase.tolist(),
-                'sine': sine_wave.tolist()
-            }  
-        })  
-          
-    return {'high': high[-1], 'low': low[-1], 'close': close[-1], 'forecasts': forecasts[-1]}
-
-# Call function    
-results = generate_forecast(close, em_index)
-
-# print(results)
-
-print()
-
-##################################################
-##################################################
-
 def get_market_mood(points, trend, reversal_target):
     if len(points) < 2:
         return "Unknown"
@@ -1263,6 +1164,7 @@ print()
 
 ##################################################
 ##################################################
+
 
 print()
 
