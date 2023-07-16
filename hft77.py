@@ -971,6 +971,17 @@ print()
 
 print(em_index)
 
+def print_phi_ratios(em_index):
+    for em_dict in em_index:
+        phi_ratios = em_dict.get('phi_ratios')
+        if phi_ratios:
+            # Join phi ratios with commas and print them on separate lines
+            print(f"{em_dict['name']} phi ratios: {', '.join(map(str, phi_ratios))}\n")
+
+print()
+
+print_phi_ratios(em_index)
+
 print()
 
 ##################################################
