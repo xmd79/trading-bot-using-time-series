@@ -659,28 +659,6 @@ print()
 ##################################################
 ##################################################
 
-def get_next_minute_target(closes, n_components):
-    # Calculate FFT of closing prices
-    fft = fftpack.fft(closes)
-    frequencies = fftpack.fftfreq(len(closes))
-
-    # Sort frequencies by magnitude and keep only the top n_components
-    idx = np.argsort(np.abs(fft))[::-1][:n_components]
-    top_frequencies = frequencies[idx]
-
-    # Filter out the top frequencies and reconstruct the signal
-    filtered_fft = np.zeros_like(fft)
-    filtered_fft[idx] = fft[idx]
-    filtered_signal = np.real(fftpack.ifft(filtered_fft))
-
-    # Calculate the target price as the next value after the last closing price
-    target_price = filtered_signal[-1]
-
-    return target_price
-
-##################################################
-##################################################
-
 def get_multi_timeframe_momentum():
     """Calculate momentum from multiple timeframes and average"""
     momentums = []
@@ -765,9 +743,6 @@ for timeframe in timeframes:
     print(f"Momentum for {timeframe}: {momentum}")
 
 print()
-
-##################################################
-##################################################
 
 ##################################################
 ##################################################
@@ -889,6 +864,13 @@ print()
 ##################################################
 ##################################################
 
+# New sinewave to build here
+
+print()
+
+##################################################
+##################################################
+
 def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2):
     """
     Calculate thresholds and averages based on min and max percentages. 
@@ -959,6 +941,25 @@ print()
 
 ##################################################
 ##################################################
+
+def get_next_minute_target(closes, n_components):
+    # Calculate FFT of closing prices
+    fft = fftpack.fft(closes)
+    frequencies = fftpack.fftfreq(len(closes))
+
+    # Sort frequencies by magnitude and keep only the top n_components
+    idx = np.argsort(np.abs(fft))[::-1][:n_components]
+    top_frequencies = frequencies[idx]
+
+    # Filter out the top frequencies and reconstruct the signal
+    filtered_fft = np.zeros_like(fft)
+    filtered_fft[idx] = fft[idx]
+    filtered_signal = np.real(fftpack.ifft(filtered_fft))
+
+    # Calculate the target price as the next value after the last closing price
+    target_price = filtered_signal[-1]
+
+    return target_price
 
 # Example usage
 closes = get_closes("1m")
