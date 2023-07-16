@@ -971,6 +971,11 @@ print()
 
 print(em_index)
 
+print()
+
+##################################################
+##################################################
+
 def print_phi_ratios(em_index):
     for em_dict in em_index:
         phi_ratios = em_dict.get('phi_ratios')
@@ -978,9 +983,30 @@ def print_phi_ratios(em_index):
             # Join phi ratios with commas and print them on separate lines
             print(f"{em_dict['name']} phi ratios: {', '.join(map(str, phi_ratios))}\n")
 
+print_phi_ratios(em_index)
+
 print()
 
-print_phi_ratios(em_index)
+##################################################
+##################################################
+
+def print_phi_ratios_particles(em_index):
+    for em_dict in em_index:
+        phi_ratios = em_dict.get('phi_ratios')
+        if phi_ratios:
+            # Join phi ratios with commas and print them on separate lines
+            print(f"{em_dict['name']} phi ratios: {', '.join(map(str, phi_ratios))}\n")
+
+em_index = [
+    {'name': 'photon', 'phi_ratios': [0.5, 1.0]},
+    {'name': 'gluon', 'phi_ratios': [0.1, 0.2, 0.3]},
+    {'name': 'W boson'},
+    {'name': 'Z boson', 'phi_ratios': [0.4, 0.5]},
+    {'name': 'Higgs boson', 'phi_ratios': [0.8]}
+]
+
+print_phi_ratios_particles(em_index)
+
 
 print()
 
