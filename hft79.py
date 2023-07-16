@@ -769,6 +769,126 @@ print()
 ##################################################
 ##################################################
 
+##################################################
+##################################################
+
+# Scale current close price to sine wave       
+def scale_to_sine(timeframe):  
+  
+    close_prices = np.array(get_closes(timeframe))
+  
+    # Get last close price 
+    current_close = close_prices[-1]      
+        
+    # Calculate sine wave        
+    sine_wave, leadsine = talib.HT_SINE(close_prices)
+            
+    # Replace NaN values with 0        
+    sine_wave = np.nan_to_num(sine_wave)
+    sine_wave = -sine_wave
+        
+    # Get the sine value for last close      
+    current_sine = sine_wave[-1]
+            
+    # Calculate the min and max sine           
+    sine_wave_min = np.min(sine_wave)        
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate % distances            
+    dist_min, dist_max = [], []
+ 
+    for close in close_prices:    
+        # Calculate distances as percentages        
+        dist_from_close_to_min = ((current_sine - sine_wave_min) /  
+                           (sine_wave_max - sine_wave_min)) * 100            
+        dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                           (sine_wave_max - sine_wave_min)) * 100
+                
+        dist_min.append(dist_from_close_to_min)       
+        dist_max.append(dist_from_close_to_max)
+
+    # Take average % distances    
+    avg_dist_min = sum(dist_min) / len(dist_min)
+    avg_dist_max = sum(dist_max) / len(dist_max) 
+
+    print(f"{timeframe} Close is now at "       
+          f"dist. to min: {dist_from_close_to_min:.2f}% "
+          f"and at "
+          f"dist. to max: {dist_from_close_to_max:.2f}%")
+
+    return dist_from_close_to_min, dist_from_close_to_max
+
+# Call function           
+#for timeframe in timeframes:        
+    #scale_to_sine(timeframe)
+
+print()
+
+##################################################
+##################################################
+
+def collect_results():
+    results = []
+    
+    for timeframe in timeframes:
+        # Call existing function 
+        dist_to_min, dist_to_max = scale_to_sine(timeframe)  
+        
+        # Append result tuple
+        results.append((dist_to_min, dist_to_max)) 
+        
+    # Calculate overall percentages      
+    overall_dist_min = sum([r[0] for r in results]) / len(results)    
+    overall_dist_max = sum([r[1] for r in results]) / len(results)
+    
+    return overall_dist_min, overall_dist_max, results
+
+# Call function      
+overall_dist_min, overall_dist_max, results = collect_results()
+print()
+
+# Fast range - 1, 3, 5 mins
+fast_range = results[:3]
+fast_dist_min = sum([r[0] for r in fast_range]) / len(fast_range)  
+fast_dist_max = sum([r[1] for r in fast_range]) / len(fast_range)  
+
+# Medium range - 15min, 30min, 1hr       
+medium_range = results[3:6]     
+medium_dist_min = sum([r[0] for r in medium_range]) / len(medium_range)
+medium_dist_max = sum([r[1] for r in medium_range]) / len(medium_range)
+
+# Long range - 2hr to 1 day       
+long_range = results[6:]    
+long_dist_min = sum([r[0] for r in long_range]) / len(long_range)  
+long_dist_max = sum([r[1] for r in long_range]) / len(long_range)
+
+print("Overall distances:")
+print(f"  To minimum: {overall_dist_min:.2f}%")  
+print(f"  To maximum: {overall_dist_max:.2f}%")
+
+print()
+
+print("Fast range averages:")
+print(f" To minimum: {fast_dist_min:.2f}%")   
+print(f" To maximum: {fast_dist_max:.2f}%")
+
+print()
+
+print("Medium range averages:")       
+print(f" To minimum: {medium_dist_min:.2f}%")  
+print(f" To maximum: {medium_dist_max:.2f}%")
+
+print()
+
+print("Long range averages:")                 
+print(f" To minimum: {long_dist_min:.2f}%")
+print(f" To maximum: {long_dist_max:.2f}%")
+
+print()
+
+##################################################
+##################################################
+
 def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2):
     """
     Calculate thresholds and averages based on min and max percentages. 
