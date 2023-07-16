@@ -1228,166 +1228,25 @@ print()
 ##################################################
 ##################################################
 
-# Define frequency ranges and phi ratios
-FREQ_RANGES = [
-    ('radio', 3e3, 3e9, 1.618),
-    ('microwave', 3e9, 3e12, 1.324),
-    ('infrared', 3e12, 4.3e14, 1.220),
-    ('visible', 4.3e14, 7.5e14, 1.618),
-    ('ultraviolet', 7.5e14, 3e17, 1.324),
-    ('xray', 3e17, 3e19, 1.220),
-    ('gamma', 3e19, 3e22, 1.618)
-]
+def get_reversal_keypoints(timeframes):
+    keypoints = []
+    for timeframe in timeframes:
+        closes = get_closes(timeframe)
+        dominant_frequency = get_dominant_frequency(timeframe)
+        quadrants = quadrants(dominant_frequency)
+        current_quadrant, next_quadrant, last_quadrant = quadrants
+        reversal_keypoint = (last_quadrant[-1][0], next_quadrant[0][1], current_quadrant[-1][1])
+        keypoints.append(reversal_keypoint)
+    return keypoints
 
-# Define a function to generate an EM index
-def generate_spectrum():
-    em_index = []
-    for name, f_min, f_max, phi_ratio in FREQ_RANGES:
-        frequencies = np.linspace(f_min, f_max, num=1000)
-        phi_values = frequencies * phi_ratio
-        em_dict = {
-            'name': name,
-            'frequencies': frequencies,
-            'phi_values': phi_values,
-            'phi_ratio': phi_ratio
-        }
-        em_index.append(em_dict)
-    return em_index
-
-# Generate the EM index
-em_index = generate_spectrum()
-
-# Print the EM index
-for em_dict in em_index:
-    print(f"{em_dict['name']} frequencies: {em_dict['frequencies'][:10]}...")
-    print(f"{em_dict['name']} phi values: {em_dict['phi_values'][:10]}...")
+keypoints = get_reversal_keypoints(timeframes)
+print(keypoints)
 
 print()
 
 ##################################################
 ##################################################
 
-def find_em_dict(em_index, freq):
-    for em_dict in em_index:
-        if freq in em_dict['frequencies']:
-            return em_dict
-    return None
-
-def find_reversal_keypoints(circuit):
-    reversal_keypoints = []
-    for component in circuit:
-        note, freq, resistance, capacitance = component
-        if resistance > capacitance:
-            reversal_keypoints.append(component)
-    return reversal_keypoints
-
-def find_fast_cycles(circuit):
-    fast_cycles = []
-    for i in range(len(circuit)):
-        for j in range(i + 1, len(circuit)):
-            freqs = [circuit[i][1], circuit[j][1]]
-            period = calculate_period(freqs)
-            if period <= 0.5:
-                fast_cycles.append((circuit[i], circuit[j]))
-    return fast_cycles
-
-def build_symmetry(circuit):
-    # Find the component with the highest frequency
-    max_freq_component = max(circuit, key=lambda x: x[1])
-    max_freq = max_freq_component[1]
-    
-    # Build a symmetric circuit by mirroring components across the midpoint
-    symmetry_circuit = []
-    for component in circuit:
-        note, freq, resistance, capacitance = component
-        mirror_freq = 2 * max_freq - freq
-        symmetry_component = (note, mirror_freq, capacitance, resistance)
-        symmetry_circuit.append(component)
-        symmetry_circuit.append(symmetry_component)
-    return symmetry_circuit
-
-def generate_stationary_circuit(em_index, solfeggio_frequencies):
-    # Construct stationary circuits for both bullish and bearish market moods
-    circuits = {}
-    for mood in ['bullish', 'bearish']:
-        # Filter solfeggio frequencies for the current market mood
-        if mood == 'bullish':
-            filtered_frequencies = solfeggio_frequencies[3:]
-        else:
-            filtered_frequencies = solfeggio_frequencies[:3]
-
-        # Construct stationary circuit using the filtered frequencies
-        circuit = []
-        for note, freq in filtered_frequencies:
-            em_dict = find_em_dict(em_index, freq)
-            if em_dict:
-                # Use phi values to calculate resistance and capacitance
-                phi_values = em_dict['phi_values']
-                resistance = calculate_resistance(phi_values)
-                capacitance = calculate_capacitance(phi_values)
-                component = (note, freq, resistance, capacitance)
-                circuit.append(component)
-            else:
-                print(f"No matching em_dict found for frequency {freq} Hz")
-
-        # Check if circuit is empty before proceeding
-        if not circuit:
-            print(f"No frequencies found for {mood} market mood")
-            continue
-
-        circuits[mood] = circuit
-
-        # Print details of the circuit for the current market mood
-        print(f"Stationary circuit for {mood} market mood:")
-        for note, freq, resistance, capacitance in circuit:
-            print(f"{note} ({freq} Hz): R = {resistance:.2f} ohms, C = {capacitance:.2f} F")
-        print()
-
-        # Find reversal keypoints in the circuit and calculate distance from close price
-        reversal_keypoints = find_reversal_keypoints(circuit)
-        if reversal_keypoints:
-            close_price = get_close_price(mood)
-            print(f"Reversal keypoints for {mood} market mood:")
-            for note, freq, resistance, capacitance in reversal_keypoints:
-                distance = calculate_distance(close_price, freq)
-                print(f"{note} ({freq} Hz): R = {resistance:.2f} ohms, C = {capacitance:.2f} F, distance = {distance:.2f}%")
-            print()
-
-        # Find fast cycles in the circuit
-        fast_cycles = find_fast_cycles(circuit)
-        if fast_cycles:
-            print(f"Fast cycles for {mood} market mood:")
-            for cycle in fast_cycles:
-                freqs = [note_freq[1] for note_freq in cycle]
-                print(f"{freqs}: {calculate_period(freqs):.2f} seconds")
-            print()
-
-        # Build symmetry in the circuit
-        symmetry_circuit = build_symmetry(circuit)
-        if symmetry_circuit:
-            print(f"Symmetry circuit for {mood} market mood:")
-            for note, freq, resistance, capacitance in symmetry_circuit:
-                print(f"{note} ({freq} Hz): R = {resistance:.2f} ohms, C = {capacitance:.2f} F")
-            print()
-
-    return circuits
-
-generate_stationary_circuit(em_index, solfeggio_frequencies)
-
-print()
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
 
 print()
 
