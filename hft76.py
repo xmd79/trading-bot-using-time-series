@@ -1233,4 +1233,63 @@ def quadrants():
 # Call the function to get the quadrants
 quadrants()
 
+print()
 
+##################################################
+##################################################
+
+def generate_solfeggio_frequencies(em_index):
+    solfeggio_frequencies = []
+    solfeggio_dict = {'UT': 396, 'RE': 417, 'MI': 528, 'FA': 639, 'SOL': 741, 'LA': 852}
+    
+    for em_dict in em_index:
+        phi_avg = em_dict.get('phi_avg', 0)
+        if phi_avg < 1:
+            # Use UT, RE, and MI for bearish mood
+            solfeggio_frequencies.append(('UT', solfeggio_dict['UT']))
+            solfeggio_frequencies.append(('RE', solfeggio_dict['RE']))
+            solfeggio_frequencies.append(('MI', solfeggio_dict['MI']))
+        else:
+            # Use SOL, LA, and FA for bullish mood
+            solfeggio_frequencies.append(('SOL', solfeggio_dict['SOL']))
+            solfeggio_frequencies.append(('LA', solfeggio_dict['LA']))
+            solfeggio_frequencies.append(('FA', solfeggio_dict['FA']))
+    
+    return solfeggio_frequencies
+
+solfeggio_frequencies = generate_solfeggio_frequencies(em_index)
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
