@@ -812,27 +812,27 @@ def get_mtf_market_mood():
         mood = "medium range"
     # Check if the market is in a downtrend
     elif indicator1 < indicator2:
-        mood = "downtrend"
+        mood = "MTF trend downtrend"
     # Check if the market is in an uptrend
     elif indicator1 > indicator2:
-        mood = "uptrend"
+        mood = "MTF trend uptrend"
     else:
-        mood = "neutral"
+        mood = "MTF trend neutral"
 
     # Combine the RSI mood and momentum mood
     if rsi_mood == "dip up reversal" or rsi_mood == "uptrend":
-        mood += " bullish"
+        mood += " momentum bullish"
     elif rsi_mood == "top down reversal" or rsi_mood == "downtrend":
-        mood += " bearish"
+        mood += " momentum bearish"
     else:
-        mood += " neutral"
+        mood += " momentum neutral"
 
     return mood
 
 print()
 
 mtf_market_mood = get_mtf_market_mood()
-print("MTF market mood: ", mtf_market_mood)
+print("MTF RSI and MOM market mood: ", mtf_market_mood)
 
 print()
 
