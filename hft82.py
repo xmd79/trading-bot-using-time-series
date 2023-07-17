@@ -974,10 +974,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-import datetime
-import talib
-
 def generate_momentum_sinewave(timeframes):
     # Initialize variables
     momentum_sorter = []
