@@ -1019,13 +1019,13 @@ def generate_momentum_sorter():
         
         # Determine market mood based on % distances
         if avg_dist_min <= 5:
-            mood = "Bullish"
-        elif avg_dist_max <= 5:
-            mood = "Bearish"
-        elif avg_dist_min < avg_dist_max:
             mood = "At DIP Reversal and Up to Bullish"
-        else:
+        elif avg_dist_max <= 5:
             mood = "At TOP Reversal and Down to Bearish"
+        elif avg_dist_min < avg_dist_max:
+            mood = "Bullish"
+        else:
+            mood = "Bearish"
             
         # Append momentum score and market mood to lists
         momentum_score = avg_dist_max - avg_dist_min
