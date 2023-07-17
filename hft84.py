@@ -1163,9 +1163,9 @@ def generate_momentum_sinewave(timeframes):
         print(f"Last reversal was at {last_reversal} on the sine wave at {last_reversal_value_on_sine:.2f} ")
 
     # Return the momentum sorter, market mood, close prices between min and max sine, and reversal info
-    return momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max, last_reversal, last_reversal_value_on_sine, last_reversal_value_on_price, next_reversal, next_reversal_value_on_sine, next_reversal_value_on_price
+    return momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max, last_reversal, last_reversal_value_on_sine, last_reversal_value_on_price, next_reversal, next_reversal_value_on_sine, next_reversal_value_on_price
 
-momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max, last_reversal, last_reversal_value_on_sine, last_reversal_value_on_price, next_reversal, next_reversal_value_on_sine, next_reversal_value_on_price = generate_momentum_sinewave(timeframes)
+momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max, last_reversal, last_reversal_value_on_sine, last_reversal_value_on_price, next_reversal, next_reversal_value_on_sine, next_reversal_value_on_price = generate_momentum_sinewave(timeframes)
 
 print()
 
@@ -1175,6 +1175,8 @@ print()
 print()
 
 print("Current close on sine value now at: ", current_sine)
+print("last reversal is: ", last_reversal)
+print("last reversal value on sine :", last_reversal_value_on_sine)
 print("distances as percentages from close to min: ", dist_from_close_to_min, "%")
 print("distances as percentages from close to max: ", dist_from_close_to_max, "%")
 print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
@@ -1182,14 +1184,120 @@ print("Mood on 1min timeframe is now at: ", market_mood[-12])
 
 print()
 
-print("last reversal is: ", last_reversal)
-print("last reversal value on sine :", last_reversal_value_on_sine)
-
-print()
-
 ##################################################
 ##################################################
 
+def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50):
+    # Calculate the sine wave using HT_SINE
+    sine_wave, _ = talib.HT_SINE(close_prices)
+    
+    # Replace NaN values with 0 using nan_to_num
+    sine_wave = np.nan_to_num(sine_wave)
+    sine_wave = -sine_wave
+
+    print("Current close on Sine wave:", sine_wave[-1])
+
+    # Calculate the minimum and maximum values of the sine wave
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate the distance from close to min and max as percentages on a scale from 0 to 100%
+    dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+    dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
+
+    print("Distance from close to min:", dist_from_close_to_min)
+    print("Distance from close to max:", dist_from_close_to_max)
+
+    # Calculate the range of values for each quadrant
+    range_q1 = (sine_wave_max - sine_wave_min) / 4
+    range_q2 = (sine_wave_max - sine_wave_min) / 4
+    range_q3 = (sine_wave_max - sine_wave_min) / 4
+    range_q4 = (sine_wave_max - sine_wave_min) / 4
+
+    # Set the EM amplitude for each quadrant based on the range of values
+    em_amp_q1 = range_q1 / percent_to_max_val
+    em_amp_q2 = range_q2 / percent_to_max_val
+    em_amp_q3 = range_q3 / percent_to_max_val
+    em_amp_q4 = range_q4 / percent_to_max_val
+
+    # Calculate the EM phase for each quadrant
+    em_phase_q1 = 0
+    em_phase_q2 = math.pi/2
+    em_phase_q3 = math.pi
+    em_phase_q4 = 3*math.pi/2
+
+    # Calculate the current position of the price on the sine wave
+    current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
+    current_quadrant = 0
+
+    # Determine which quadrant the current position is in
+    if current_position < 0.25:
+        # In quadrant 1
+        em_amp = em_amp_q1
+        em_phase = em_phase_q1
+        current_quadrant = 1
+        print("Current position is in quadrant 1. Distance from 0% to 25% of range:", (current_position - 0.0) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    elif current_position < 0.5:
+        # In quadrant 2
+        em_amp = em_amp_q2
+        em_phase = em_phase_q2
+        current_quadrant = 2
+        print("Current position is in quadrant 2. Distance from 25% to 50% of range:", (current_position - 0.25) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    elif current_position < 0.75:
+        # In quadrant 3
+        em_amp = em_amp_q3
+        em_phase = em_phase_q3
+        current_quadrant = 3
+        print("Current position is in quadrant 3. Distance from 50% to 75% of range:", (current_position - 0.5) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    else:
+        # In quadrant 4
+        em_amp = em_amp_q4
+        em_phase = em_phase_q4
+        current_quadrant = 4
+        print("Current position is in quadrant 4. Distance from 75% to 100% of range:", (current_position - 0.75) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+
+    print("EM amplitude:", em_amp)
+    print("EM phase:", em_phase)
+
+    # Calculate the EM value
+    em_value = em_amp * math.sin(em_phase)
+
+    print("EM value:", em_value)
+
+    # Determine the trend direction based on the EM phase differences
+    if em_phase_q1 - em_phase_q2 >=math.pi/2 and em_phase_q2 - em_phase_q3 >= math.pi/2 and em_phase_q3 - em_phase_q4 >= math.pi/2:
+        trend_direction = "Up"
+    elif em_phase_q1 - em_phase_q2 <= -math.pi/2 and em_phase_q2 - em_phase_q3 <= -math.pi/2 and em_phase_q3 - em_phase_q4 <= -math.pi/2:
+        trend_direction = "Down"
+    else:
+        trend_direction = "Sideways"
+
+    print("Trend direction:", trend_direction)
+
+    # Calculate the percentage of the price range
+    price_range = candles[-1]["high"] - candles[-1]["low"]
+    price_range_percent = (close_prices[-1] - candles[-1]["low"]) / price_range * 100
+
+    print("Price range percent:", price_range_percent)
+
+    # Calculate the momentum value
+    momentum = em_value * price_range_percent / 100
+
+    print("Momentum value:", momentum)
+
+    # Calculate the new close price based on the momentum value
+    new_close = close_prices[-1] + momentum
+
+    print("New close price:", new_close)
+
+    return new_close
+
+new_sine = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
+print(new_sine)
 
 print()
 
