@@ -801,77 +801,6 @@ print()
 
 ##################################################
 ##################################################
-# timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
-
-overall_ranges = [
-    ['1m', '5m'],
-    ['3m', '15m'],
-    ['5m', '30m'],
-    ['15m', '1h'],
-    ['30m', '2h'],
-    ['1h', '4h'],
-    ['2h', '6h'],
-    ['6h', '12h'],
-    ['8h', '1d'],
-]
-
-def collect_results():
-    results = []
-    
-    for timeframes_for_range in overall_ranges:
-        dist_min_sum = 0
-        dist_max_sum = 0
-        for timeframe in timeframes_for_range:
-            # Call existing function 
-            dist_to_min, dist_to_max = scale_to_sine(timeframe)  
-        
-            # Add distances to running sum
-            dist_min_sum += dist_to_min
-            dist_max_sum += dist_to_max
-        
-        # Calculate average distances for this range
-        num_timeframes = len(timeframes_for_range)
-        dist_min_avg = dist_min_sum / num_timeframes
-        dist_max_avg = dist_max_sum / num_timeframes
-        
-        # Append result tuple
-        results.append((dist_min_avg, dist_max_avg))
-        
-    # Calculate overall percentages      
-    overall_dist_min = sum([r[0] for r in results]) / len(results)    
-    overall_dist_max = sum([r[1] for r in results]) / len(results)
-    
-    return overall_dist_min, overall_dist_max, results
-
-# Call function      
-overall_dist_min, overall_dist_max, results = collect_results()
-print()
-
-print("Overall distances:")
-print(f"  To minimum: {overall_dist_min:.2f}%")  
-print(f"  To maximum: {overall_dist_max:.2f}%")
-
-print()
-
-for i in range(len(overall_ranges)):
-    timeframes_for_range = overall_ranges[i]
-    dist_min_avg, dist_max_avg = results[i]
-    print(f"Overall range {i+1} ({', '.join(timeframes_for_range)}):")
-    print(f"  To minimum: {dist_min_avg:.2f}%")  
-    print(f"  To maximum: {dist_max_avg:.2f}%")
-    print()
-
-print()
-
-##################################################
-##################################################
-
-# New sinewave to build here
-
-print()
-
-##################################################
-##################################################
 
 def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2):
     """
@@ -980,6 +909,164 @@ print()
 
 ##################################################
 ##################################################
+# timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
+
+overall_ranges = [
+    ['1m', '5m'],
+    ['3m', '15m'],
+    ['5m', '30m'],
+    ['15m', '1h'],
+    ['30m', '2h'],
+    ['1h', '4h'],
+    ['2h', '6h'],
+    ['6h', '12h'],
+    ['8h', '1d'],
+]
+
+def collect_results():
+    results = []
+    
+    for timeframes_for_range in overall_ranges:
+        dist_min_sum = 0
+        dist_max_sum = 0
+        for timeframe in timeframes_for_range:
+            # Call existing function 
+            dist_to_min, dist_to_max = scale_to_sine(timeframe)  
+        
+            # Add distances to running sum
+            dist_min_sum += dist_to_min
+            dist_max_sum += dist_to_max
+        
+        # Calculate average distances for this range
+        num_timeframes = len(timeframes_for_range)
+        dist_min_avg = dist_min_sum / num_timeframes
+        dist_max_avg = dist_max_sum / num_timeframes
+        
+        # Append result tuple
+        results.append((dist_min_avg, dist_max_avg))
+        
+    # Calculate overall percentages      
+    overall_dist_min = sum([r[0] for r in results]) / len(results)    
+    overall_dist_max = sum([r[1] for r in results]) / len(results)
+    
+    return overall_dist_min, overall_dist_max, results
+
+# Call function      
+overall_dist_min, overall_dist_max, results = collect_results()
+print()
+
+print("Overall distances:")
+print(f"  To minimum: {overall_dist_min:.2f}%")  
+print(f"  To maximum: {overall_dist_max:.2f}%")
+
+print()
+
+for i in range(len(overall_ranges)):
+    timeframes_for_range = overall_ranges[i]
+    dist_min_avg, dist_max_avg = results[i]
+    print(f"Overall range {i+1} ({', '.join(timeframes_for_range)}):")
+    print(f"  To minimum: {dist_min_avg:.2f}%")  
+    print(f"  To maximum: {dist_max_avg:.2f}%")
+    print()
+
+print()
+
+##################################################
+##################################################
+
+def generate_momentum_sorter():
+    # Initialize variables
+    momentum_sorter = []
+    market_mood = []
+    
+    # Loop over timeframes
+    for timeframe in timeframes:
+        # Get close prices for current timeframe
+        close_prices = np.array(get_closes(timeframe))
+        
+        # Get last close price 
+        current_close = close_prices[-1]
+        
+        # Calculate sine wave for current timeframe       
+        sine_wave, leadsine = talib.HT_SINE(close_prices)
+        
+        # Replace NaN values with 0        
+        sine_wave = np.nan_to_num(sine_wave)
+        sine_wave = -sine_wave
+        
+        # Get the sine value for last close      
+        current_sine = sine_wave[-1]
+        
+        # Calculate the min and max sine           
+        sine_wave_min = np.min(sine_wave)
+        sine_wave_max = np.max(sine_wave)
+        
+        # Calculate % distances            
+        dist_min, dist_max = [], []
+        for close in close_prices:    
+            # Calculate distances as percentages        
+            dist_from_close_to_min = ((current_sine - sine_wave_min) /  
+                                      (sine_wave_max - sine_wave_min)) * 100            
+            dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                                      (sine_wave_max - sine_wave_min)) * 100
+                
+            dist_min.append(dist_from_close_to_min)       
+            dist_max.append(dist_from_close_to_max)
+
+        # Take average % distances    
+        avg_dist_min = sum(dist_min) / len(dist_min)
+        avg_dist_max = sum(dist_max) / len(dist_max) 
+        
+        # Determine market mood based on % distances
+        if avg_dist_min <= 25:
+            mood = "Bullish"
+        elif avg_dist_max <= 25:
+            mood = "Bearish"
+        elif avg_dist_min < avg_dist_max:
+            mood = "Neutral to Bullish"
+        else:
+            mood = "Neutral to Bearish"
+            
+        # Append momentum score and market mood to lists
+        momentum_score = avg_dist_max - avg_dist_min
+        momentum_sorter.append(momentum_score)
+        market_mood.append(mood)
+        
+        # Print distances and market mood
+        print(f"{timeframe} Close is now at "       
+              f"dist. to min: {avg_dist_min:.2f}% "
+              f"and at "
+              f"dist. to max: {avg_dist_max:.2f}%. "
+              f"Market mood: {mood}")
+        print()
+    
+    # Generate new sine wave for fastest cycle
+    close_prices = np.array(get_closes('1m'))
+    sine_wave, leadsine = talib.HT_SINE(close_prices)
+    new_sine = -sine_wave[-1]
+    
+    # Determine market mood based on new sine value
+    if new_sine >= 0:
+        new_mood = "Bullish"
+    else:
+        new_mood = "Bearish"
+    
+    # Print new sine and market mood
+    print(f"New sine value for fastest cycle is: {new_sine:.2f}. "
+          f"Market mood: {new_mood}")
+    
+    return momentum_sorter, market_mood
+
+avrg_sine = generate_momentum_sorter()
+print(avrg_sine)
+
+print()
+
+
+
+##################################################
+##################################################
+
 
 
 print()
