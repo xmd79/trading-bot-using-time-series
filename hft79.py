@@ -802,15 +802,38 @@ print()
 ##################################################
 ##################################################
 
+overall_ranges = [
+    ['1m', '5m'],
+    ['3m', '15m'],
+    ['5m', '30m'],
+    ['15m', '1h'],
+    ['1h', '4h'],
+    ['2h', '6h'],
+    ['6h', '12h'],
+    ['8h', '1d'],
+]
+
 def collect_results():
     results = []
     
-    for timeframe in timeframes:
-        # Call existing function 
-        dist_to_min, dist_to_max = scale_to_sine(timeframe)  
+    for timeframes_for_range in overall_ranges:
+        dist_min_sum = 0
+        dist_max_sum = 0
+        for timeframe in timeframes_for_range:
+            # Call existing function 
+            dist_to_min, dist_to_max = scale_to_sine(timeframe)  
+        
+            # Add distances to running sum
+            dist_min_sum += dist_to_min
+            dist_max_sum += dist_to_max
+        
+        # Calculate average distances for this range
+        num_timeframes = len(timeframes_for_range)
+        dist_min_avg = dist_min_sum / num_timeframes
+        dist_max_avg = dist_max_sum / num_timeframes
         
         # Append result tuple
-        results.append((dist_to_min, dist_to_max)) 
+        results.append((dist_min_avg, dist_max_avg))
         
     # Calculate overall percentages      
     overall_dist_min = sum([r[0] for r in results]) / len(results)    
@@ -822,42 +845,19 @@ def collect_results():
 overall_dist_min, overall_dist_max, results = collect_results()
 print()
 
-# Fast range - 1, 3, 5 mins
-fast_range = results[:3]
-fast_dist_min = sum([r[0] for r in fast_range]) / len(fast_range)  
-fast_dist_max = sum([r[1] for r in fast_range]) / len(fast_range)  
-
-# Medium range - 15min, 30min, 1hr       
-medium_range = results[3:6]     
-medium_dist_min = sum([r[0] for r in medium_range]) / len(medium_range)
-medium_dist_max = sum([r[1] for r in medium_range]) / len(medium_range)
-
-# Long range - 2hr to 1 day       
-long_range = results[6:]    
-long_dist_min = sum([r[0] for r in long_range]) / len(long_range)  
-long_dist_max = sum([r[1] for r in long_range]) / len(long_range)
-
 print("Overall distances:")
 print(f"  To minimum: {overall_dist_min:.2f}%")  
 print(f"  To maximum: {overall_dist_max:.2f}%")
 
 print()
 
-print("Fast range averages:")
-print(f" To minimum: {fast_dist_min:.2f}%")   
-print(f" To maximum: {fast_dist_max:.2f}%")
-
-print()
-
-print("Medium range averages:")       
-print(f" To minimum: {medium_dist_min:.2f}%")  
-print(f" To maximum: {medium_dist_max:.2f}%")
-
-print()
-
-print("Long range averages:")                 
-print(f" To minimum: {long_dist_min:.2f}%")
-print(f" To maximum: {long_dist_max:.2f}%")
+for i in range(len(overall_ranges)):
+    timeframes_for_range = overall_ranges[i]
+    dist_min_avg, dist_max_avg = results[i]
+    print(f"Overall range {i+1} ({', '.join(timeframes_for_range)}):")
+    print(f"  To minimum: {dist_min_avg:.2f}%")  
+    print(f"  To maximum: {dist_max_avg:.2f}%")
+    print()
 
 print()
 
