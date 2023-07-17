@@ -1071,9 +1071,13 @@ def generate_momentum_sinewave():
 
     # Take average % distances    
     avg_dist_min = sum(dist_min) / len(dist_min)
-    avg_dist_max = sum(dist_max) / len(dist_max) 
+    avg_dist_max = sum(dist_max) / len(dist_max)
 
-    print(f"{timeframe} Close is now at "       
+    print()
+
+    print("-" * 75)
+
+    print(f"On 1min timeframe, Close is now at "       
           f"dist. to min: {dist_from_close_to_min:.2f}% "
           f"and at "
           f"dist. to max: {dist_from_close_to_max:.2f}%")
@@ -1081,10 +1085,10 @@ def generate_momentum_sinewave():
     # Return the momentum sorter and market mood lists
     return momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine
 
-avrg_sine = generate_momentum_sinewave()
+momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
 print("-" * 75)
 
-print()
+print(dist_from_close_to_min, dist_from_close_to_max, current_sine)
 
 ##################################################
 ##################################################
