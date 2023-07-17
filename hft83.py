@@ -1140,7 +1140,7 @@ print("distances as percentages from close to max: ", dist_from_close_to_max, "%
 print("Current close on sine value now at: ", current_sine)
 
 # Calculate time distance from current time to reversal key points and print market mood for 1min timeframe
-calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, current_sine, market_mood[-1], timeframe=1)
+calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, current_sine, market_mood[-12], timeframe=1)
 
 
 
