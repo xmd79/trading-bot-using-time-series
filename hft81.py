@@ -1088,7 +1088,8 @@ def generate_momentum_sinewave():
 momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
 print("-" * 100)
 
-print(dist_from_close_to_min, dist_from_close_to_max, current_sine)
+print()
+
 print("distances as percentages from close to min: ", dist_from_close_to_min)
 print("distances as percentages from close to max: ", dist_from_close_to_max)
 print("Current close on sine value now at: ", current_sine)
