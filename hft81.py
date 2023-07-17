@@ -1074,6 +1074,8 @@ def generate_momentum_sinewave():
     avg_dist_max = sum(dist_max) / len(dist_max)
 
     print()
+    print(sine_wave_min)
+    print(sine_wave_max)
 
     print("-" * 100)
 
