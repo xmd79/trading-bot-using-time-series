@@ -1018,9 +1018,9 @@ def generate_momentum_sorter():
         avg_dist_max = sum(dist_max) / len(dist_max) 
         
         # Determine market mood based on % distances
-        if avg_dist_min <= 5:
+        if avg_dist_min <= 15:
             mood = "At DIP Reversal and Up to Bullish"
-        elif avg_dist_max <= 5:
+        elif avg_dist_max <= 15:
             mood = "At TOP Reversal and Down to Bearish"
         elif avg_dist_min < avg_dist_max:
             mood = "Bullish"
