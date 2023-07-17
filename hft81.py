@@ -1074,10 +1074,11 @@ def generate_momentum_sinewave():
     avg_dist_max = sum(dist_max) / len(dist_max)
 
     print()
+
     print(sine_wave_min)
     print(sine_wave_max)
 
-    print("-" * 100)
+    print()
 
     print(f"On 1min timeframe, Close is now at "       
           f"dist. to min: {dist_from_close_to_min:.2f}% "
@@ -1087,19 +1088,14 @@ def generate_momentum_sinewave():
     # Return the momentum sorter and market mood lists
     return momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine
 
-momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
-print("-" * 100)
+# momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
 
 print()
 
-print("distances as percentages from close to min: ", dist_from_close_to_min)
-print("distances as percentages from close to max: ", dist_from_close_to_max)
-print("Current close on sine value now at: ", current_sine)
-
 ##################################################
 ##################################################
 
-def calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, timeframe):
+def calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, current_sine, market_mood, timeframe):
     # Get current date and time
     now = datetime.datetime.now()
 
@@ -1128,11 +1124,18 @@ def calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, time
     # Print time distances and estimated times for reversal key points
     print(f"Time distance to min: {time_distance_to_min_str}, estimated time for reversal key point: {time_of_min_str}")
     print(f"Time distance to max: {time_distance_to_max_str}, estimated time for reversal key point: {time_of_max_str}")
+    print(f"Market mood for 1min timeframe: {market_mood}")
 
 momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
 
-# Calculate time distance from current time to reversal key points
-calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, timeframe=1)
+print("distances as percentages from close to min: ", dist_from_close_to_min, "%")
+print("distances as percentages from close to max: ", dist_from_close_to_max, "%")
+print("Current close on sine value now at: ", current_sine)
+
+# Calculate time distance from current time to reversal key points and print market mood for 1min timeframe
+calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, current_sine, market_mood[-1], timeframe=1)
+
+
 
 print()
 
