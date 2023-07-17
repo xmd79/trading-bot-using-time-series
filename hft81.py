@@ -1099,7 +1099,40 @@ print("Current close on sine value now at: ", current_sine)
 ##################################################
 ##################################################
 
+def calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, timeframe):
+    # Get current date and time
+    now = datetime.datetime.now()
 
+    # Calculate estimated time for reversal key points
+    time_to_min = datetime.timedelta(minutes=dist_from_close_to_min / 100 * timeframe)
+    time_to_max = datetime.timedelta(minutes=dist_from_close_to_max / 100 * timeframe)
+
+    # Calculate actual time for reversal key points
+    time_of_min = now + time_to_min
+    time_of_max = now + time_to_max
+
+    # Format time strings
+    time_format = "%H:%M:%S"
+    time_of_min_str = time_of_min.strftime(time_format)
+    time_of_max_str = time_of_max.strftime(time_format)
+
+    # Calculate time distance from current time to reversal key points
+    time_distance_to_min = time_of_min - now
+    time_distance_to_max = time_of_max - now
+
+    # Format time distance strings
+    time_distance_format = "%H:%M:%S"
+    time_distance_to_min_str = str(time_distance_to_min).split(".")[0]
+    time_distance_to_max_str = str(time_distance_to_max).split(".")[0]
+
+    # Print time distances and estimated times for reversal key points
+    print(f"Time distance to min: {time_distance_to_min_str}, estimated time for reversal key point: {time_of_min_str}")
+    print(f"Time distance to max: {time_distance_to_max_str}, estimated time for reversal key point: {time_of_max_str}")
+
+momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
+
+# Calculate time distance from current time to reversal key points
+calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, timeframe=1)
 
 print()
 
