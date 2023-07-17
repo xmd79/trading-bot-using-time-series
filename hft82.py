@@ -978,33 +978,33 @@ def generate_momentum_sinewave():
     # Initialize variables
     momentum_sorter = []
     market_mood = []
-    
+
     # Loop over timeframes
     for timeframe in timeframes:
         # Get close prices for current timeframe
         close_prices = np.array(get_closes(timeframe))
-        
-        # Get last close price 
+
+        # Get last close price
         current_close = close_prices[-1]
-        
-        # Calculate sine wave for current timeframe       
+
+        # Calculate sine wave for current timeframe
         sine_wave, leadsine = talib.HT_SINE(close_prices)
-        
-        # Replace NaN values with 0        
+
+        # Replace NaN values with 0
         sine_wave = np.nan_to_num(sine_wave)
         sine_wave = -sine_wave
-        
-        # Get the sine value for last close      
+
+        # Get the sine value for last close
         current_sine = sine_wave[-1]
-        
-        # Calculate the min and max sine           
+
+        # Calculate the min and max sine
         sine_wave_min = np.min(sine_wave)
         sine_wave_max = np.max(sine_wave)
-        
-        # Calculate % distances            
+
+        # Calculate % distances
         newsine_dist_min, newsine_dist_max = [], []
-        for close in close_prices:    
-            # Calculate distances as percentages        
+        for close in close_prices:
+            # Calculate distances as percentages
             dist_from_close_to_min = ((current_sine - sine_wave_min) /  
                                       (sine_wave_max - sine_wave_min)) * 100            
             dist_from_close_to_max = ((sine_wave_max - current_sine) / 
@@ -1013,10 +1013,10 @@ def generate_momentum_sinewave():
             newsine_dist_min.append(dist_from_close_to_min)       
             newsine_dist_max.append(dist_from_close_to_max)
 
-        # Take average % distances    
+        # Take average % distances
         avg_dist_min = sum(newsine_dist_min) / len(newsine_dist_min)
-        avg_dist_max = sum(newsine_dist_max) / len(newsine_dist_max) 
-        
+        avg_dist_max = sum(newsine_dist_max) / len(newsine_dist_max)
+
         # Determine market mood based on % distances
         if avg_dist_min <= 15:
             mood = "At DIP Reversal and Up to Bullish"
@@ -1026,68 +1026,61 @@ def generate_momentum_sinewave():
             mood = "Bullish"
         else:
             mood = "Bearish"
-            
+
         # Append momentum score and market mood to lists
         momentum_score = avg_dist_max - avg_dist_min
         momentum_sorter.append(momentum_score)
         market_mood.append(mood)
-        
+
         # Print distances and market mood
         print(f"{timeframe} Close is now at "       
               f"dist. to min: {avg_dist_min:.2f}% "
               f"and at "
               f"dist. to max: {avg_dist_max:.2f}%. "
               f"Market mood: {mood}")
-        
+
     # Get close prices for the 1-minute timeframe and last 3 closes
     close_prices = np.array(get_closes('1m'))
 
-    # Calculate sine wave        
+    # Calculate sine wave
     sine_wave, leadsine = talib.HT_SINE(close_prices)
-            
-    # Replace NaN values with 0        
+
+    # Replace NaN values with 0
     sine_wave = np.nan_to_num(sine_wave)
     sine_wave = -sine_wave
-        
-    # Get the sine value for last close      
+
+    # Get the sine value for last close
     current_sine = sine_wave[-1]
-            
-    # Calculate the min and max sine           
-    sine_wave_min = np.min(sine_wave)        
+
+    # Calculate the min and max sine
+    sine_wave_min = np.min(sine_wave)
     sine_wave_max = np.max(sine_wave)
 
-    # Calculate % distances            
-    dist_min, dist_max = [], []
- 
-    for close in close_prices:    
-        # Calculate distances as percentages        
-        dist_from_close_to_min = ((current_sine - sine_wave_min) /  
-                           (sine_wave_max - sine_wave_min)) * 100            
-        dist_from_close_to_max = ((sine_wave_max - current_sine) / 
-                           (sine_wave_max - sine_wave_min)) * 100
-                
-        dist_min.append(dist_from_close_to_min)       
-        dist_max.append(dist_from_close_to_max)
+    # Calculate % distances
+    dist_from_close_to_min = ((current_sine - sine_wave_min) / 
+                              (sine_wave_max - sine_wave_min)) * 100
+    dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                              (sine_wave_max - sine_wave_min)) * 100
 
-    # Take average % distances    
-    avg_dist_min = sum(dist_min) / len(dist_min)
-    avg_dist_max = sum(dist_max) / len(dist_max)
+    # Determine market mood based on % distances
+    if dist_from_close_to_min <= 15:
+        mood = "At DIP Reversal and Up to Bullish"
+    elif dist_from_close_to_max <= 15:
+        mood = "At TOP Reversal and Down to Bearish"
+    elif dist_from_close_to_min < dist_from_close_to_max:
+        mood = "Bullish"
+    else:
+        mood = "Bearish"
 
-    print()
-
-    print(sine_wave_min)
-    print(sine_wave_max)
-
-    print()
-
+    # Print distances and market mood for 1-minute timeframe
     print(f"On 1min timeframe, Close is now at "       
           f"dist. to min: {dist_from_close_to_min:.2f}% "
           f"and at "
-          f"dist. to max: {dist_from_close_to_max:.2f}%")
-    
+          f"dist. to max: {dist_from_close_to_max:.2f}%. "
+          f"Market mood: {mood}")
+
     # Return the momentum sorter and market mood lists
     return momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine
-
 # momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
 
 print()
