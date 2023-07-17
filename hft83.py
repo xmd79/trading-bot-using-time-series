@@ -1095,7 +1095,7 @@ print()
 ##################################################
 ##################################################
 
-def calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, current_sine, market_mood, last_reversal, timeframe):
+def calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, current_sine, market_mood, last_reversal, last_min, last_max, timeframe):
     # Get current date and time
     now = datetime.datetime.now()
 
@@ -1139,7 +1139,15 @@ def calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, curr
     else:
         sine_values = np.linspace(min_sine, last_reversal, num=100)
 
-    return sine_values
+    # Calculate values of sine wave between last two complete reversals
+    if last_max > last_min:
+        sine_values_last_reversal_to_max = np.linspace(last_min, last_max, num=100)
+        sine_values_last_reversal_to_min = np.linspace(last_max, min_sine, num=100)
+    else:
+        sine_values_last_reversal_to_min = np.linspace(last_max, last_min, num=100)
+        sine_values_last_reversal_to_max = np.linspace(last_min, max_sine, num=100)
+
+    return sine_values, sine_values_last_reversal_to_min, sine_values_last_reversal_to_max
 
 momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
 
@@ -1149,7 +1157,9 @@ print("Current close on sine value now at: ", current_sine)
 
 # Calculate time distance from current time to reversal key points and print market mood for 1min timeframe
 last_reversal = 0.5  # example value for last reversal
-sine_values = calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, current_sine, market_mood[-12], last_reversal, timeframe=1)
+last_min = 0.3  # example value for last minimum
+last_max = 0.7  # example value for last maximum
+sine_values, sine_values_last_reversal_to_min, sine_values_last_reversal_to_max = calculate_time_distance(dist_from_close_to_min, dist_from_close_to_max, current_sine, market_mood[-12], last_reversal, last_min, last_max, timeframe=1)
 
 print()
 
@@ -1157,6 +1167,12 @@ print()
 print("Values of sine wave between last reversal and current min/max values:")
 print(sine_values)
 
+print()
+
+# Print values of sine wave between last two complete reversals
+print("Values of sine wave between last two complete reversals:")
+print(sine_values_last_reversal_to_min)
+print(sine_values_last_reversal_to_max)
 
 
 print()
