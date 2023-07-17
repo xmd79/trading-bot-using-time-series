@@ -974,6 +974,8 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
 def generate_momentum_sinewave():
     # Initialize variables
     momentum_sorter = []
@@ -1001,14 +1003,17 @@ def generate_momentum_sinewave():
         sine_wave_min = np.min(sine_wave)
         sine_wave_max = np.max(sine_wave)
 
+        # Calculate the difference between the max and min sine
+        sine_wave_diff = sine_wave_max - sine_wave_min
+
         # Calculate % distances
         newsine_dist_min, newsine_dist_max = [], []
         for close in close_prices:
             # Calculate distances as percentages
             dist_from_close_to_min = ((current_sine - sine_wave_min) /  
-                                      (sine_wave_max - sine_wave_min)) * 100            
+                                      sine_wave_diff) * 100            
             dist_from_close_to_max = ((sine_wave_max - current_sine) / 
-                                      (sine_wave_max - sine_wave_min)) * 100
+                                      sine_wave_diff) * 100
                 
             newsine_dist_min.append(dist_from_close_to_min)       
             newsine_dist_max.append(dist_from_close_to_max)
@@ -1052,15 +1057,21 @@ def generate_momentum_sinewave():
     # Get the sine value for last close
     current_sine = sine_wave[-1]
 
+    # Get current date and time
+    now = datetime.datetime.now()
+
     # Calculate the min and max sine
     sine_wave_min = np.min(sine_wave)
     sine_wave_max = np.max(sine_wave)
 
+    # Calculate the difference between the max and min sine
+    sine_wave_diff = sine_wave_max - sine_wave_min
+
     # Calculate % distances
     dist_from_close_to_min = ((current_sine - sine_wave_min) / 
-                              (sine_wave_max - sine_wave_min)) * 100
+                              sine_wave_diff) * 100
     dist_from_close_to_max = ((sine_wave_max - current_sine) / 
-                              (sine_wave_max - sine_wave_min)) * 100
+                              sine_wave_diff) * 100
 
     # Determine market mood based on % distances
     if dist_from_close_to_min <= 15:
@@ -1072,20 +1083,22 @@ def generate_momentum_sinewave():
     else:
         mood = "Bearish"
 
-    print()
+    # Get the close prices that correspond to the min and max sine values
+    close_prices_between_min_and_max = close_prices[(sine_wave >= sine_wave_min) & (sine_wave <= sine_wave_max)]
 
+    print()
+    
     # Print distances and market mood for 1-minute timeframe
-    print(f"On 1min timeframe, Close is now at "       
+    print(f"On 1min timeframe,Close is now at "       
           f"dist. to min: {dist_from_close_to_min:.2f}% "
           f"and at "
-          f"dist. to max: {dist_from_close_to_max:.2f}%. "
+          f"dist. to max:{dist_from_close_to_max:.2f}%. "
           f"Market mood: {mood}")
+    
+    # Return the momentum sorter, market mood, and close prices between min and max sine
+    return momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max
 
-    # Return the momentum sorter and market mood lists
-    return momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine
-
-
-momentum_sorter, market_mood, dist_from_close_to_min, dist_from_close_to_max, current_sine = generate_momentum_sinewave()
+momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max = generate_momentum_sinewave()
 
 print(market_mood[-12])
 
@@ -1094,9 +1107,7 @@ print()
 print("distances as percentages from close to min: ", dist_from_close_to_min, "%")
 print("distances as percentages from close to max: ", dist_from_close_to_max, "%")
 print("Current close on sine value now at: ", current_sine)
-
-
-
+print(close_prices_between_min_and_max)
 
 print()
 
