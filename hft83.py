@@ -1004,11 +1004,28 @@ def generate_momentum_sinewave(timeframes):
         current_sine = sine_wave[-1]
 
         # Calculate the min and max sine
-        sine_wave_min = np.min(sine_wave)
-        sine_wave_max = np.max(sine_wave)
+        sine_wave_min = np.nanmin(sine_wave) # Use nanmin to ignore NaN values
+        sine_wave_max = np.nanmax(sine_wave)
+
+        # Calculate price values at min and max sine
+        sine_wave_min_price = close_prices[sine_wave == sine_wave_min][0]
+        sine_wave_max_price = close_prices[sine_wave == sine_wave_max][0]
+     
 
         # Calculate the difference between the max and min sine
         sine_wave_diff = sine_wave_max - sine_wave_min
+
+        # If last close was the lowest, set as last reversal                                  
+        if current_sine == sine_wave_min:
+            last_reversal = 'dip'
+            last_reversal_value_on_sine = sine_wave_min 
+            last_reversal_value_on_price = sine_wave_min_price
+        
+        # If last close was the highest, set as last reversal                                 
+        if current_sine == sine_wave_max:
+            last_reversal = 'top'
+            last_reversal_value_on_sine = sine_wave_max
+            last_reversal_value_on_price = sine_wave_max_price
 
         # Calculate % distances
         newsine_dist_min, newsine_dist_max = [], []
