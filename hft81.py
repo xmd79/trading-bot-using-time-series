@@ -1018,14 +1018,14 @@ def generate_momentum_sorter():
         avg_dist_max = sum(dist_max) / len(dist_max) 
         
         # Determine market mood based on % distances
-        if avg_dist_min <= 25:
+        if avg_dist_min <= 5:
             mood = "Bullish"
-        elif avg_dist_max <= 25:
+        elif avg_dist_max <= 5:
             mood = "Bearish"
         elif avg_dist_min < avg_dist_max:
-            mood = "Neutral to Bullish"
+            mood = "At DIP Reversal and Up to Bullish"
         else:
-            mood = "Neutral to Bearish"
+            mood = "At TOP Reversal and Down to Bearish"
             
         # Append momentum score and market mood to lists
         momentum_score = avg_dist_max - avg_dist_min
@@ -1039,11 +1039,11 @@ def generate_momentum_sorter():
               f"dist. to max: {avg_dist_max:.2f}%. "
               f"Market mood: {mood}")
         
-    # Get close prices for fastest cycle and last 3 closes
+    # Get close prices for the 1-minute timeframe and last 3 closes
     close_prices = np.array(get_closes('1m'))
     last_three_closes = np.array(get_closes('1m')[-3:])
     
-    # Calculate sine wave for fastest cycle and last 3 closes
+    # Calculate sine wave for the 1-minute timeframe and last 3 closes
     sine_wave, leadsine = talib.HT_SINE(close_prices)
     last_three_sine_waves, leadsine = talib.HT_SINE(last_three_closes)
     
@@ -1053,37 +1053,31 @@ def generate_momentum_sorter():
     
     # Get the sine values for the last 3 closes and current close
     current_sine = sine_wave[-1]
-    last_three_sine_values = -last_three_sine_waves
+    last_three_sine_values = last_three_sine_waves
     
     # Calculate the min and max sine values of the last 3 closes
     last_three_sine_min = np.min(last_three_sine_values)
     last_three_sine_max = np.max(last_three_sine_values)
     
     # Determine market mood based on the current sine value and last three sine values
-    if (current_close <= last_three_closes).all() and (current_sine <= last_three_sine_min):
-        new_mood = "Bearish"
-    elif (current_close >= last_three_closes).all() and (current_sine >= last_three_sine_max):
-        new_mood = "Bullish"
+    if current_close >= last_three_closes[-1] and current_sine >= last_three_sine_max:
+        new_mood = "At DIP Reversal and Up to Bullish"
+    elif current_close <= last_three_closes[-1] and current_sine <= last_three_sine_min:
+        new_mood = "At TOP Reversal and Down to Bearish"
     else:
         new_mood = "Neutral"
     
-    # Calculate the new sine value for the fastest cycle
-    new_sine = -sine_wave[-1]
+    # Calculate the new sine value for the 1-minute timeframe
+    new_sine_wave, leadsine = talib.HT_SINE(close_prices)
+    new_sine_wave = np.nan_to_num(new_sine_wave)
+    new_sine_value = -new_sine_wave[-1]
     
     # Print market mood and new sine value
     print("-" * 50)
     print()
     print(f"Market mood: {new_mood}")
     print()
-    print(f"New sine value for fastest cycle is: {new_sine:.2f}. ")
-    print()
-    
-    # Append momentum score and market mood to lists
-    momentum_score = np.nan
-    momentum_sorter.append(momentum_score)
-    market_mood.append(new_mood)
-    
-    return momentum_sorter, market_mood
+    print(f"New sine value for 1-minute timeframe is: {new_sine_value:.2f}. ")
 
 avrg_sine = generate_momentum_sorter()
 print("-" * 50)
