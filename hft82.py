@@ -975,11 +975,19 @@ print()
 ##################################################
 
 import numpy as np
+import datetime
+import talib
 
-def generate_momentum_sinewave():
+def generate_momentum_sinewave(timeframes):
     # Initialize variables
     momentum_sorter = []
     market_mood = []
+    last_reversal = None
+    last_reversal_value_on_sine = None
+    last_reversal_value_on_price = None
+    next_reversal = None
+    next_reversal_value_on_sine = None
+    next_reversal_value_on_price = None
 
     # Loop over timeframes
     for timeframe in timeframes:
@@ -1025,8 +1033,16 @@ def generate_momentum_sinewave():
         # Determine market mood based on % distances
         if avg_dist_min <= 15:
             mood = "At DIP Reversal and Up to Bullish"
+            if last_reversal != 'dip':
+                next_reversal = 'dip'
+                next_reversal_value_on_sine = sine_wave_min
+                next_reversal_value_on_price = close_prices[sine_wave == sine_wave_min][0]
         elif avg_dist_max <= 15:
             mood = "At TOP Reversal and Down to Bearish"
+            if last_reversal != 'top':
+                next_reversal = 'top'
+                next_reversal_value_on_sine = sine_wave_max
+                next_reversal_value_on_price = close_prices[sine_wave == sine_wave_max][0]
         elif avg_dist_min < avg_dist_max:
             mood = "Bullish"
         else:
@@ -1043,6 +1059,15 @@ def generate_momentum_sinewave():
               f"and at "
               f"dist. to max: {avg_dist_max:.2f}%. "
               f"Market mood: {mood}")
+
+        # Update last and next reversal info
+        if next_reversal:
+            last_reversal = next_reversal
+            last_reversal_value_on_sine = next_reversal_value_on_sine
+            last_reversal_value_on_price = next_reversal_value_on_price
+            next_reversal = None
+            next_reversal_value_on_sine = None
+            next_reversal_value_on_price = None
 
     # Get close prices for the 1-minute timeframe and last 3 closes
     close_prices = np.array(get_closes('1m'))
@@ -1064,7 +1089,7 @@ def generate_momentum_sinewave():
     sine_wave_min = np.min(sine_wave)
     sine_wave_max = np.max(sine_wave)
 
-    # Calculate the difference between the max and min sine
+    # Calculate the difference between the maxand min sine
     sine_wave_diff = sine_wave_max - sine_wave_min
 
     # Calculate % distances
@@ -1076,8 +1101,16 @@ def generate_momentum_sinewave():
     # Determine market mood based on % distances
     if dist_from_close_to_min <= 15:
         mood = "At DIP Reversal and Up to Bullish"
+        if last_reversal != 'dip':
+            next_reversal = 'dip'
+            next_reversal_value_on_sine = sine_wave_min
+            next_reversal_value_on_price = close_prices[sine_wave == sine_wave_min][0]
     elif dist_from_close_to_max <= 15:
         mood = "At TOP Reversal and Down to Bearish"
+        if last_reversal != 'top':
+            next_reversal = 'top'
+            next_reversal_value_on_sine = sine_wave_max
+            next_reversal_value_on_price = close_prices[sine_wave == sine_wave_max][0]
     elif dist_from_close_to_min < dist_from_close_to_max:
         mood = "Bullish"
     else:
@@ -1087,18 +1120,39 @@ def generate_momentum_sinewave():
     close_prices_between_min_and_max = close_prices[(sine_wave >= sine_wave_min) & (sine_wave <= sine_wave_max)]
 
     print()
-    
+
     # Print distances and market mood for 1-minute timeframe
     print(f"On 1min timeframe,Close is now at "       
           f"dist. to min: {dist_from_close_to_min:.2f}% "
           f"and at "
           f"dist. to max:{dist_from_close_to_max:.2f}%. "
           f"Market mood: {mood}")
-    
-    # Return the momentum sorter, market mood, and close prices between min and max sine
-    return momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max
 
-momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max = generate_momentum_sinewave()
+    # Update last and next reversal info
+    if next_reversal:
+        last_reversal = next_reversal
+        last_reversal_value_on_sine = next_reversal_value_on_sine
+        last_reversal_value_on_price = next_reversal_value_on_price
+        next_reversal = None
+        next_reversal_value_on_sine = None
+        next_reversal_value_on_price = None
+
+    # Print last and next reversal info
+    if last_reversal:
+        print(f"Last reversal was at {last_reversal} on the sine wave at {last_reversal_value_on_sine:.2f} "
+              f"and at {last_reversal_value_on_price:.2f} on the price chart.")
+    else:
+        print("No reversal detected yet.")
+    if next_reversal:
+        print(f"Next reversal is expected to be at {next_reversal} on the sine wave at {next_reversal_value_on_sine:.2f} "
+              f"and at {next_reversal_value_on_price:.2f} on the price chart.")
+    else:
+        print("No reversal expected yet.")
+
+    # Return the momentum sorter, market mood, close prices between min and max sine, and reversal info
+    return momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max, last_reversal, last_reversal_value_on_sine, last_reversal_value_on_price, next_reversal, next_reversal_value_on_sine, next_reversal_value_on_price
+
+momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max, last_reversal, last_reversal_value_on_sine, last_reversal_value_on_price, next_reversal, next_reversal_value_on_sine, next_reversal_value_on_price = generate_momentum_sinewave(timeframes)
 
 print(market_mood[-12])
 
@@ -1107,7 +1161,8 @@ print()
 print("distances as percentages from close to min: ", dist_from_close_to_min, "%")
 print("distances as percentages from close to max: ", dist_from_close_to_max, "%")
 print("Current close on sine value now at: ", current_sine)
-print(close_prices_between_min_and_max)
+print()
+print(momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, current_sine, close_prices_between_min_and_max, last_reversal, last_reversal_value_on_sine, last_reversal_value_on_price, next_reversal, next_reversal_value_on_sine, next_reversal_value_on_price)
 
 print()
 
