@@ -1268,7 +1268,7 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50,
 
     print("EM value:", em_value)
 
-    # Determine the trend direction based on the EM phase differences
+    # Determine the trend direction based onthe EM phase differences
     if em_phase_q1 - em_phase_q2 >= math.pi/2 and em_phase_q2 - em_phase_q3 >= math.pi/2 and em_phase_q3 - em_phase_q4 >= math.pi/2:
         trend_direction = "Up"
     elif em_phase_q1 - em_phase_q2 <= -math.pi/2 and em_phase_q2 - em_phase_q3 <= -math.pi/2 and em_phase_q3 - em_phase_q4 <= -math.pi/2:
@@ -1289,15 +1289,23 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50,
 
     print("Momentum value:", momentum)
 
-    # Calculate the new close price based on the momentum value
-    new_close = close_prices[-1] + momentum
+    print()
 
-    print("New close price:", new_close)
+    # Return a dictionary of all the features
+    return {
+        "current_close": sine_wave[-1],
+        "dist_from_close_to_min": dist_from_close_to_min,
+        "dist_from_close_to_max": dist_from_close_to_max,
+        "current_quadrant": current_quadrant,
+        "em_amplitude": em_amp,
+        "em_phase": em_phase,
+        "trend_direction": trend_direction,
+        "price_range_percent": price_range_percent,
+        "momentum": momentum,
+    }
 
-    return new_close
-
-new_sine = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
-print(new_sine)
+sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
+print(sine_wave)
 
 print()
 
@@ -1327,8 +1335,101 @@ omega_ratio = PI / PHI
 alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
 omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
 
+def generate_cycle_direction(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50):
+    # Call generate_new_momentum_sinewave to get the sine wave and other features
+    sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=percent_to_max_val, percent_to_min_val=percent_to_min_val)
 
-print()
+    current_quadrant = sine_wave["current_quadrant"]
+    em_phase_q1 = sine_wave["em_phase"]
+    em_phase_q2 = em_phase_q1 + math.pi/2
+    em_phase_q3 = em_phase_q1 + math.pi
+    em_phase_q4 = em_phase_q1 + 3*math.pi/2
+
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177
+
+    # Calculate the Brun constant from the phi ratio and sqrt(5)
+    brun_constant = math.sqrt(PHI * math.sqrt(5))
+
+    # Define PI constant with 15 decimals
+    PI = 3.1415926535897932384626433832795028842
+
+    # Calculate sacred frequency
+    sacred_freq = (432 * PHI ** 2) / 360
+
+    # Calculate Alpha and Omega ratios
+    alpha_ratio = PHI / PI
+    omega_ratio = PI / PHI
+
+    # Calculate Alpha and Omega spiral angle rates
+    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
+    # Calculate quadrature phase shift based on current quadrant
+    if current_quadrant == 1:
+        # Up cycle from Q1 to Q4
+        quadrature_phase = em_phase_q1
+        em_phase = alpha_spiral
+    elif current_quadrant == 2:
+        quadrature_phase = em_phase_q2
+        em_phase = omega_spiral
+    elif current_quadrant == 3:
+        quadrature_phase = em_phase_q3
+        em_phase = omega_spiral
+    else:
+        quadrature_phase = em_phase_q4
+        em_phase = alpha_spiral
+
+    cycle_direction = "UP"
+    next_quadrant = 1
+
+    if current_quadrant == 1:
+        next_quadrant = 2
+        cycle_direction = "UP"
+
+    elif current_quadrant == 2:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+        elif cycle_direction == "DOWN":
+            next_quadrant = 1
+
+    elif current_quadrant == 3:
+        if cycle_direction == "UP":
+            next_quadrant = 4
+        elif cycle_direction == "DOWN":
+            next_quadrant = 2
+
+    elif current_quadrant == 4:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+            cycle_direction = "DOWN"
+
+    # Calculate quadrature phase
+    if next_quadrant == 1:
+        next_quadrature_phase = em_phase_q1
+    elif next_quadrant == 2:
+        next_quadrature_phase = em_phase_q2
+    elif next_quadrant == 3:
+        next_quadrature_phase = em_phase_q3
+    else:
+        next_quadrature_phase = em_phase_q4
+
+    # Calculate EM value
+    em_value = sine_wave["em_amplitude"] * math.sin(em_phase)
+
+    # Calculate quadrature phase shift from current to next quadrant
+    quadrature = next_quadrature_phase - quadrature_phase
+
+    if quadrature > 0:
+        cycle_direction = "UP"
+    else:
+        cycle_direction = "DOWN"
+
+    print("Current quadrant:", current_quadrant)
+    print("Cycle direction:", cycle_direction)
+    print("Next quadrant:", next_quadrant)
+
+    return cycle_direction
 
 ##################################################
 ##################################################
