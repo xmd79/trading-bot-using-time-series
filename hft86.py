@@ -1877,5 +1877,51 @@ def forecast_octahedron(market_mood_forecast):
 ##################################################
 ##################################################
 
+# Example usage
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
+
+# Generate some example data
+close_prices = np.random.normal(loc=100, scale=10, size=100)
+
+# Calculate the thresholds and momentum signal
+min_threshold, max_threshold, avg_mtf, momentum_signal = calculate_thresholds(close_prices)
+
+# Generate the octahedron vertices
+market_mood_forecast = {'bullish': 0.6, 'bearish': 0.4}
+vertices = forecast_octahedron(market_mood_forecast)
+
+# Plot the octahedron and the threshold range
+fig = plt.figure(figsize=(8,8))
+ax = fig.add_subplot(111, projection='3d')
+
+# Plot the octahedron
+for i in range(len(vertices)):
+    x, y, z = vertices[i]
+    ax.scatter(x, y, z, color='blue')
+    ax.text(x, y, z, str(i+1), color='black', fontsize=12)
+
+# Plot the threshold range
+min_x, max_x = -1, 1
+min_y, max_y = -1, 1
+min_z, max_z = min_threshold, max_threshold
+verts = [(min_x, min_y, min_z), (min_x, max_y, min_z), (max_x, max_y, min_z), (max_x, min_y, min_z), (min_x, min_y, min_z)]
+ax.add_collection3d(Poly3DCollection([verts], alpha=0.2, facecolor='green', edgecolor='green'))
+
+
+# Plot the forecasted price
+ax.scatter(0, 0, avg_mtf, color='red')
+ax.text(0, 0, avg_mtf, f'Avg Close Price: {avg_mtf:.2f}', color='black', fontsize=12)
+
+# Adjust the view and labels
+ax.view_init(30, 45)
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+ax.set_title('Octahedron with Threshold Range and Forecasted Price')
+
+plt.show()
 
