@@ -1664,7 +1664,126 @@ print()
 ##################################################
 ##################################################
 
-print()
+def generate_market_mood_forecast_gr(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
+    """
+    Generates a market mood forecast based on the given inputs.
+
+    Args:
+    close_prices (list): A list of close prices.
+    candles (list): A list of candlestick data.
+    percent_to_max_val (float): The percent to maximum value for the sine wave.
+    percent_to_min_val (float): The percent to minimum value for the sine wave.
+
+    Returns:
+    A dictionary containing the market mood forecast and various mood and market forecasts.
+    """
+
+    # Define constants and ratios
+    pi = 3.14159
+    max_val = max(close_prices)
+    min_val = min(close_prices)
+    total_range = max_val - min_val
+    time_dilation = 1.0 / len(close_prices)
+    quadrants = ["I", "II", "III", "IV"]
+
+    # Determine frequency bands
+    frequencies = {}
+    for i in range(1, 5):
+        frequencies[i] = 1 / (total_range / (i * pi))
+    sorted_frequencies = sorted(frequencies, key=frequencies.get)
+    min_node = sorted_frequencies[0]
+    max_node = sorted_frequencies[-1]
+
+    # Calculate emotional values for frequency bands
+    forecast_moods = {}
+    for band in frequencies:
+        phase = 2 * pi * (band / 4)
+        val = percent_to_max_val * abs(math.sin(phase)) + percent_to_min_val
+        forecast_moods[band] = val
+
+    # Apply time dilation to frequency bands
+    dilated_forecast_moods = {}
+    for band in forecast_moods:
+        dilated_forecast_moods[band] = forecast_moods[band] * time_dilation
+
+    # Calculate average moods for dilated frequencies
+    num_frequencies = 2
+    dilated_high_moods = []
+    dilated_low_moods = []
+
+    if dilated_forecast_moods:
+        dilated_high_moods = [dilated_forecast_moods[band] for band in sorted_frequencies[-num_frequencies:]]
+        dilated_low_moods = [dilated_forecast_moods[band] for band in sorted_frequencies[:num_frequencies]]
+
+    dilated_avg_high_mood = sum(dilated_high_moods) / len(dilated_high_moods) if dilated_high_moods else 0
+    dilated_avg_low_mood = sum(dilated_low_moods) / len(dilated_low_moods) if dilated_low_moods else 0
+
+    # Calculate weighted averages for dilated frequencies
+    weights = [num_frequencies - i for i in range(num_frequencies)]
+    dilated_weighted_high_mood = 0
+    dilated_weighted_low_mood = 0
+
+    if dilated_forecast_moods:
+        dilated_high_freqs = list(dilated_forecast_moods.keys())[-num_frequencies:]
+        dilated_high_moods = [dilated_forecast_moods[freq] for freq in dilated_high_freqs]
+
+        for i in range(num_frequencies):
+            dilated_weighted_high_mood += weights[i] * dilated_high_moods[i]
+
+        dilated_weighted_high_mood /= sum(weights)
+
+        dilated_low_freqs = list(dilated_forecast_moods.keys())[:num_frequencies]
+        dilated_low_moods = [dilated_forecast_moods[freq] for freq in dilated_low_freqs]
+
+        for i in range(num_frequencies):
+            dilated_weighted_low_mood += weights[i] * dilated_low_moods[i]
+
+        dilated_weighted_low_mood /= sum(weights)
+
+    # Determine reversal forecast based on dilated frequencies
+    dilated_mood_reversal_forecast = ""
+
+    if dilated_forecast_moods and dilated_forecast_moods[min_node] < dilated_avg_low_mood and dilated_forecast_moods[max_node] > dilated_avg_high_mood:
+        dilated_mood_reversal_forecast = "Mood reversal possible"
+
+    # Determine market mood based on dilated average moods
+    dilated_market_mood = ""
+
+    if dilated_avg_high_mood > 0 and dilated_avg_low_mood > 0:
+        dilated_market_mood = "Positive" if dilated_avg_high_mood > dilated_avg_low_mood else "Negative"
+
+    # Create dictionary of mood and market forecasts
+    forecast_dict = {
+        "dilated_mood_reversal_forecast": dilated_mood_reversal_forecast,
+        "dilated_market_mood": dilated_market_mood,
+        "dilated_avg_high_mood": dilated_avg_high_mood,
+        "dilated_avg_low_mood": dilated_avg_low_mood,
+        "dilated_weighted_high_mood": dilated_weighted_high_mood,
+        "dilated_weighted_low_mood": dilated_weighted_low_mood
+    }
+
+    # Determine quadrant based on current price position
+    current_price = close_prices[-1]
+    quadrant = ""
+    if current_price > max_val - (total_range / 2):
+        if current_price > max_val - (total_range / 4):
+            quadrant = quadrants[0]
+        else:
+            quadrant = quadrants[1]
+    else:
+        if current_price < min_val + (total_range / 4):
+            quadrant = quadrants[2]
+        else:
+            quadrant = quadrants[3]
+
+    # Add quadrant to forecast dictionary
+    forecast_dict["quadrant"] = quadrant
+
+    return forecast_dict
+
+forecast = generate_market_mood_forecast_gr(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5)
+
+print(forecast)
 
 ##################################################
 ##################################################
