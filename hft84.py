@@ -1304,8 +1304,8 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50,
         "momentum": momentum,
     }
 
-sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
-print(sine_wave)
+#sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
+#print(sine_wave)
 
 print()
 
@@ -1430,6 +1430,37 @@ def generate_cycle_direction(close_prices, candles, percent_to_max_val=50, perce
     print("Next quadrant:", next_quadrant)
 
     return cycle_direction
+
+generate_cycle_direction(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
+
+print()
+
+##################################################
+##################################################
+
+
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
 
 ##################################################
 ##################################################
