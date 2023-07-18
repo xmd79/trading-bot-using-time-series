@@ -1269,7 +1269,7 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=50,
     print("EM value:", em_value)
 
     # Determine the trend direction based on the EM phase differences
-    if em_phase_q1 - em_phase_q2 >=math.pi/2 and em_phase_q2 - em_phase_q3 >= math.pi/2 and em_phase_q3 - em_phase_q4 >= math.pi/2:
+    if em_phase_q1 - em_phase_q2 >= math.pi/2 and em_phase_q2 - em_phase_q3 >= math.pi/2 and em_phase_q3 - em_phase_q4 >= math.pi/2:
         trend_direction = "Up"
     elif em_phase_q1 - em_phase_q2 <= -math.pi/2 and em_phase_q2 - em_phase_q3 <= -math.pi/2 and em_phase_q3 - em_phase_q4 <= -math.pi/2:
         trend_direction = "Down"
@@ -1303,6 +1303,30 @@ print()
 
 ##################################################
 ##################################################
+
+# Define PHI constant with 15 decimals
+PHI = 1.6180339887498948482045868343656381177
+
+# Calculate the Brun constant from the phi ratio and sqrt(5)
+brun_constant = math.sqrt(PHI * math.sqrt(5))
+
+# Define PI constant with 15 decimals
+PI = 3.1415926535897932384626433832795028842
+
+# Define e constant with 15 decimals
+e =  2.718281828459045235360287471352662498
+
+# Calculate sacred frequency
+sacred_freq = (432 * PHI ** 2) / 360
+
+# Calculate Alpha and Omega ratios
+alpha_ratio = PHI / PI
+omega_ratio = PI / PHI
+
+# Calculate Alpha and Omega spiral angle rates
+alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
 
 print()
 
