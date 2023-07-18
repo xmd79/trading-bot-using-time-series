@@ -1785,15 +1785,97 @@ forecast = generate_market_mood_forecast_gr(close_prices, candles, percent_to_ma
 
 print(forecast)
 
-##################################################
-##################################################
-
 print()
 
 ##################################################
 ##################################################
 
-print()
+import math
+
+def construct_octahedron(market_mood_forecast):
+    # Calculate the percentage of bullish and bearish market mood forecast
+    bullish_percent = market_mood_forecast['bullish'] * 100
+    bearish_percent = market_mood_forecast['bearish'] * 100
+
+    # Calculate the X, Y, and Z coordinates of the vertices
+    x1, y1, z1 = 0, 0, 1
+    x2, y2, z2 = 1, 0, 0
+    x3, y3, z3 = 0, 1, 0
+    x4, y4, z4 = -1, 0, 0
+    x5, y5, z5 = 0, -1, 0
+    x6, y6, z6 = 0, 0, -1
+
+    # Calculate the coordinates of the bullish and bearish vertices
+    theta_bullish = math.radians(bullish_percent * 360 / 100)
+    theta_bearish = math.radians(bearish_percent * 360 / 100)
+
+    x_bullish = math.sqrt(2/3) * math.cos(theta_bullish)
+    y_bullish = math.sqrt(2/3) * math.sin(theta_bullish)
+    z_bullish = -(1/3)
+
+    x_bearish = math.sqrt(2/3) * math.cos(theta_bearish)
+    y_bearish = math.sqrt(2/3) * math.sin(theta_bearish)
+    z_bearish = 1/3
+
+    # Combine the coordinates into a list of vertices
+    vertices = [(x1, y1, z1), (x2, y2, z2), (x3, y3, z3), (x4, y4, z4), (x5, y5, z5), (x6, y6, z6),
+                (x_bullish, y_bullish, z_bullish), (x_bearish, y_bearish, z_bearish)]
+
+    # Define the edges of the octahedron
+    edges = [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (2, 3), (3, 4), (4, 1),
+            (5, 1), (5, 2), (5, 3), (5, 4),
+            (6, 1), (6, 2), (6, 3), (6, 4)]
+
+    # Define the faces of the octahedron
+    faces = [(0, 1, 2), (0, 2, 3), (0, 3, 4), (0, 4, 1),
+            (5, 1, 2), (5, 2, 3), (5, 3, 4), (5, 4, 1),
+            (6, 1, 2), (6, 2, 3), (6, 3, 4), (6, 4, 1)]
+
+    # Return the vertices, edges, and faces of the octahedron
+    return vertices, edges, faces
+
+
+market_mood_forecast = {'bullish': 0.6, 'bearish': 0.4}
+vertices, edges, faces = construct_octahedron(market_mood_forecast)
+
+print(vertices, edges, faces)
 
 ##################################################
 ##################################################
+
+def forecast_octahedron(market_mood_forecast):
+    # Calculate the percentage of bullish and bearish market mood forecast
+    bullish_percent = market_mood_forecast['bullish'] * 100
+    bearish_percent = market_mood_forecast['bearish'] * 100
+
+    # Calculate the X, Y, and Z coordinates of the vertices
+    x1, y1, z1 = 0, 0, 1
+    x2, y2, z2 = 1, 0, 0
+    x3, y3, z3 = 0, 1, 0
+    x4, y4, z4 = -1, 0, 0
+    x5, y5, z5 = 0, -1, 0
+    x6, y6, z6 = 0, 0, -1
+
+    # Calculate the coordinates of the bullish and bearish vertices
+    theta_bullish = math.radians(bullish_percent * 360 / 100)
+    theta_bearish = math.radians(bearish_percent * 360 / 100)
+
+    x_bullish = math.sqrt(2/3) * math.cos(theta_bullish)
+    y_bullish = math.sqrt(2/3) * math.sin(theta_bullish)
+    z_bullish = -(1/3)
+
+    x_bearish = math.sqrt(2/3) * math.cos(theta_bearish)
+    y_bearish = math.sqrt(2/3) * math.sin(theta_bearish)
+    z_bearish = 1/3
+
+    # Combine the coordinates into a list of vertices
+    vertices = [(x1, y1, z1), (x2, y2, z2), (x3, y3, z3), (x4, y4, z4), (x5, y5, z5), (x6, y6, z6),
+                (x_bullish, y_bullish, z_bullish), (x_bearish, y_bearish, z_bearish)]
+
+    return vertices
+
+##################################################
+##################################################
+
+
+
