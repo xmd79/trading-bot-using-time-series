@@ -2826,13 +2826,13 @@ print()
 ##################################################
 
 def calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2,
-                         phi_ratio=1.61803398875, prime_twins=None, nested_radical=None):
-    # Exclude NaN and zero values from the closes array
+                         phi_ratio=1.61803398875, prime_twins=None, nested_radical=None, min_ext=0.02, max_ext=0.02, mtf_ext=[0.01, 0.02, 0.03]):
+    # Exclude NaN, zero, and negative values from the closes array
     closes = np.array(closes)
-    closes = closes[np.logical_not(np.logical_or(np.isnan(closes), closes == 0))]
+    closes = closes[np.logical_not(np.logical_or(np.isnan(closes), np.logical_or(closes == 0, closes < 0)))]
 
     # Calculate the moving averages and standard deviations
-    mtf = np.zeros_like(closes)
+    mtf = np.zeros_like(closes)  # Initialize mtf to an array of zeros
     stf = np.zeros_like(closes)
     for i in range(period-1, len(closes)):
         mtf[i] = np.sum(closes[i-period+1:i+1]) / period
@@ -2840,7 +2840,9 @@ def calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percen
 
     # Calculate the thresholds
     min_threshold = mtf - stf * minimum_percentage / 100
+    min_threshold = np.maximum(min_threshold, np.min(closes) * (1 - min_ext))
     max_threshold = mtf + stf * maximum_percentage / 100
+    max_threshold = np.minimum(max_threshold, np.max(closes) * (1 + max_ext))
 
     # Calculate the momentum signal
     momentum_signal = mtf[-1] - mtf[-2]
@@ -2869,6 +2871,9 @@ def calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percen
         current_mood = "distribution"
         next_mood = "range down to DIP reversal"
 
+    # Add extensions to the MTF signal
+    mtf_extensions = [mtf[-1] + ext for ext in mtf_ext]
+
     # Remove NaN, zero, and negative values from the arrays
     min_threshold = min_threshold[np.logical_not(np.logical_or(np.isnan(min_threshold), np.logical_or(min_threshold == 0, min_threshold < 0)))]
     max_threshold = max_threshold[np.logical_not(np.logical_or(np.isnan(max_threshold), np.logical_or(max_threshold == 0, max_threshold < 0)))]
@@ -2876,10 +2881,17 @@ def calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percen
     momentum_signal = momentum_signal if not np.isnan(momentum_signal) and momentum_signal > 0 else 0
 
     # Return the calculated values
-    return min_threshold, max_threshold, mtf[-1], momentum_signal, current_mood, next_mood
+    return min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood, mtf_extensions
 
-min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2)
-print(min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood)
+min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood, mtf_extensions = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2)
+
+print("Min threshold at: ", min_threshold[-1])
+print("Max threshold at: ", max_threshold[-1])
+print("MTF signal at: ", mtf[-1])
+print("Momentum signal at: ", momentum_signal)
+print("Current mood is: ", current_mood)
+print("Next mood is: ", next_mood)
+print("mtf_extensions: ", mtf_extensions)
 
 print()
 
