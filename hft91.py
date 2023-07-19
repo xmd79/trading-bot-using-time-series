@@ -2677,7 +2677,7 @@ print
 ##################################################
 from math import sin, pi, log, sqrt
 
-def three_phi_triangles(close_prices, candles):
+def three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold):
 
     output = octa_metatron_cube(close_prices, candles) 
 
@@ -2733,12 +2733,12 @@ def three_phi_triangles(close_prices, candles):
         for node in circle_nodes:      
            if position == node:   
                reversal = True 
- 
-    circle_center = (0, 0)  
+
+    print("Triangle positions before reversal:", triangle_positions)
          
     if reversal: 
-       for position in triangle_positions:
-            position = circle_center 
+       for i in range(len(triangle_positions)):
+            triangle_positions[i] = (0, 0) 
 
     for position in triangle_positions:        
         for node in circle_nodes:
@@ -2746,20 +2746,38 @@ def three_phi_triangles(close_prices, candles):
                reversal = True
                
     if reversal:
-       for position in triangle_positions:
-            position = circle_center   
+       for i in range(len(triangle_positions)):
+            triangle_positions[i] = (0, 0)   
     else:      
-        for i, position in triangle_positions:    
+        for i, position in enumerate(triangle_positions):    
             node_index = i * 2     
-            position = new_position
+            position = (node_index, node_index)
+
+    print("Triangle positions after reversal:", triangle_positions)
+    
+    # Calculate the forecasted market mood for the next cycle
+    forecasted_market_mood = market_mood + mood - 0.5
             
-    return mood, reversal, len(triangle_positions)
+    if forecasted_market_mood > positive_threshold:
+        forecast = "Bullish"
+    elif forecasted_market_mood < negative_threshold:
+        forecast = "Bearish"
+    else:
+        forecast = "Neutral"
+    
+    return mood, reversal, len(triangle_positions), forecasted_market_mood, forecast
 
-# Call the three_phi_triangles function with the defined triangles
-mood, reversal, duration = three_phi_triangles(close_prices, candles)
+# Call the three_phi_triangles function with the defined triangles and a market mood of 0.5
+market_mood = 0.5
+positive_threshold = 0.1
+negative_threshold = -0.1
+mood, reversal, duration, forecasted_market_mood, forecast = three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold)
 
-print(mood, reversal, duration)
-
+print("Mood:", mood)
+print("Reversal:", reversal)
+print("Duration:", duration)
+print("Forecasted market mood for next cycle:", forecasted_market_mood)
+print("Forecast:", forecast)
 print
 
 ##################################################
