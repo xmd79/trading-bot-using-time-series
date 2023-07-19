@@ -1792,72 +1792,6 @@ print()
 ##################################################
 ##################################################
 
-def fractal_polarity_symmetry(frequencies):
-    
-    points = [
-        {'point': 'Apex'},      
-        {'point': 'Left'},   
-        {'point': 'Base'},
-        {'point': 'Right'}, 
-        {'point': 'Phi'},     
-        {'point': 'Pi'},
-        {'point': 'e'},       
-        {'point': 'Origin'}      
-    ]
-      
-    polarities = []
-    
-    for point in points:  
-        
-        frequency_sum = 0
-        count = 0
-        
-        for freq in frequencies:
-            if freq['point'] == point['point']:
-                frequency_sum += freq['frequency']
-                count += 1
-                
-        if count > 0:                  
-            avg_frequency = frequency_sum / count  
-            point['frequency'] = avg_frequency
-            
-            if avg_frequency < 125:
-                point['polarity'] = 'negative'
-               
-            elif 125 <= avg_frequency < 175:
-                if point['polarity'] != 'neutral': 
-                    point['polarity'] = 'neutral from positive'
-                                
-            elif 175 <= avg_frequency < 225:                   
-                point['polarity'] = 'neutral'                                  
-            
-            elif 225 <= avg_frequency < 275:
-                if point['polarity'] != 'neutral':
-                   point['polarity'] = 'neutral from negative'                      
-                          
-            else:
-                point['polarity'] = 'positive'  
-                
-        polarities.append(point['polarity'])                
- 
-    positive_count = polarities.count('positive')  
-    negative_count = polarities.count('negative')
-   
-    if positive_count > negative_count:
-        symmetry = 'asymmetry'
-    else:
-        symmetry = 'symmetry'
-        
-    return points, polarities, symmetry
-
-#fractal_polarity_symmetry = fractal_polarity_symmetry(frequencies)
-#print(fractal_polarity_symmetry)
-
-print()
-
-##################################################
-##################################################
-
 def octa_metatron_cube(close_prices, candles,  
                        percent_to_max_val=5,  
                        percent_to_min_val=5):
@@ -2717,6 +2651,16 @@ def octa_metatron_cube(close_prices, candles,
 
     print()
 
+    em_amp = []  
+    em_phase = []
+
+    em_amp.append(current_em_amp)
+    em_phase.append(current_em_phase)
+
+
+
+    return em_amp, em_phase
+
 sine_wave = generate_new_momentum_sinewave(close_prices, candles,  
                                            percent_to_max_val=5, 
                                            percent_to_min_val=5)      
@@ -2725,17 +2669,89 @@ sine_wave_max = sine_wave["max"]
 sine_wave_min = sine_wave["min"]
 
 octa_metatron_cube(close_prices, candles)  
+print(octa_metatron_cube(close_prices, candles))
+
+
+print
+
+##################################################
+##################################################
+from math import sin, pi, log
+
+def three_phi_triangles(close_prices, candles):
+    output = octa_metatron_cube(close_prices, candles) 
+
+    em_amp = output[0]  
+    em_phase = output[1]
+    
+    triangle_side_length = 1  
+    triangle_height = triangle_side_length / (2 * sin(pi / 3))  
+    triangle_apothem = triangle_height / 2   
+    triangle_area = 0.5 * triangle_side_length * triangle_height     
+    triangle_positions = [(0, 0), (triangle_apothem, -triangle_side_length / 2), (-triangle_apothem, -triangle_side_length / 2)]
+
+    z_sum = 0      
+    for i in range(len(em_amp)):      
+        r = em_amp[i] / em_phase[i]       
+        z = 0.5 * log((1 + r) / (1 - r))          
+        z_sum += z        
+    z_transform = [z_sum / len(em_amp)]
+    z_transform[0]           
+
+    sentiments = []  
+
+    for i in range(4): 
+
+        denom = max(z_transform) - min(z_transform)
+
+        if denom != 0:
+            sentiment = (z_transform[i] - min(z_transform)) / denom       
+        else:
+            sentiment = 0
+
+        sentiments.append(sentiment)
+     
+    mood = sum(sentiments) / len(sentiments)
+       
+    reversal = False 
+
+    circle_nodes = [(0,0), (1,1), (2,2)]
+    for position in triangle_positions:        
+        for node in circle_nodes:      
+           if position == node:   
+               reversal = True 
+ 
+    circle_center = (0, 0)  
+         
+    if reversal: 
+       for position in triangle_positions:
+            position = circle_center 
+
+    for position in triangle_positions:        
+        for node in circle_nodes:
+           if position == node:   
+               reversal = True
+               
+    if reversal:
+       for position in triangle_positions:
+            position = circle_center   
+    else:      
+        for i, position in triangle_positions:    
+            node_index = i * 2     
+            position = new_position
+            
+    return mood, reversal, len(triangle_positions)
+
+# Call the three_phi_triangles function with the defined triangles
+mood, reversal, duration = three_phi_triangles(close_prices, candles)
+
+print(mood, reversal, duration)
 
 print
 
 ##################################################
 ##################################################
 
-print
-
-##################################################
-##################################################
-
 print()
 
 ##################################################
@@ -2750,4 +2766,3 @@ print()
 
 ##################################################
 ##################################################
-
