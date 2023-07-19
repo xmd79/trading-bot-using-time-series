@@ -1924,10 +1924,14 @@ def octa_metatron_cube(close_prices, candles,
     frequencies = []
 
     freq_range = 26
-
-    for i in range(1, 27):
+    
+    em_amp = 10
+   
+    for i in range(26):
         frequency = i * sacred_freq
-        
+    
+        em_value = em_amp * math.sin(sine_wave["em_phase"] * frequency)
+    
         frequencies.append({
             'number': i,
             'frequency': frequency,  
@@ -1940,18 +1944,6 @@ def octa_metatron_cube(close_prices, candles,
             'mood': 'neutral'      
         }) 
       
-        frequencies_next.append({
-            'number': i,       
-            'frequency': frequency,        
-            'em_amp': 0,
-            'em_phase': 0,          
-            'em_value': 0,
-            'phi': PHI,    
-            'pi': PI,
-            'e': e,           
-            'mood': 'neutral'       
-        })
-
     forecast = []
 
     for freq in frequencies:
