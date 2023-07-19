@@ -1866,10 +1866,9 @@ def octa_metatron_cube(close_prices, candles,
                                percent_to_max_val, 
                                percent_to_min_val)  
   
-    #sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=percent_to_max_val, percent_to_min_val=percent_to_min_val)
-
     current_quadrant = sine_wave["current_quadrant"]
     current_value = sine_wave["current_close"]
+    current_quadrant = 0
 
     sine_wave_max = sine_wave["max"]    
     sine_wave_min = sine_wave["min"] 
@@ -1956,6 +1955,9 @@ def octa_metatron_cube(close_prices, candles,
     forecast = []
 
     for freq in frequencies:
+        forecast.append(freq)  
+                
+    for freq in frequencies:
 
         # Get PHI raised to the frequency number         
         phi_power = PHI ** freq['number'] 
@@ -1980,8 +1982,6 @@ def octa_metatron_cube(close_prices, candles,
             freq['mood_next_1h'] = 'extremely negative'
 
         forecast.append(freq)    # Define current_quadrant variable
-
-    current_quadrant = 0
 
     #Calculate X:Y ratio from golden ratio     
     ratio = 2 * (PHI - 1)  
@@ -2009,15 +2009,6 @@ def octa_metatron_cube(close_prices, candles,
     mid_q2 = mid_q1 + em_amp_q1
     mid_q3 = mid_q2 + em_amp_q2
     mid_q4 = max(sine_wave)
-
-    print(sine_wave_min)
-    print(em_amp_q1)
-
-    print(mid_q1)
-    print(type("mid_q1"))
-
-    print(current_value)
-    print(type("current_value"))
 
     #Compare current sine wave value to determine quadrant
     if current_value <= mid_q1:
@@ -2203,7 +2194,8 @@ def octa_metatron_cube(close_prices, candles,
     frequencies.sort(key=lambda x: x['em_value'])   
         
     print("Quadrant is in: " + cycle_direction + " cycle")  
-                
+ 
+        
     for freq in frequencies:               
         print(freq['number'], freq['em_value'], freq['mood'])    
         
@@ -2660,7 +2652,17 @@ print
 ##################################################
 ##################################################
 
-print
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
 
 ##################################################
 ##################################################
