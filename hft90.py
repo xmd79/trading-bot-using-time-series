@@ -2668,27 +2668,40 @@ sine_wave = generate_new_momentum_sinewave(close_prices, candles,
 sine_wave_max = sine_wave["max"]   
 sine_wave_min = sine_wave["min"]
 
-octa_metatron_cube(close_prices, candles)  
-print(octa_metatron_cube(close_prices, candles))
-
+#octa_metatron_cube(close_prices, candles)  
+#print(octa_metatron_cube(close_prices, candles))
 
 print
 
 ##################################################
 ##################################################
-from math import sin, pi, log
+from math import sin, pi, log, sqrt
 
 def three_phi_triangles(close_prices, candles):
+
     output = octa_metatron_cube(close_prices, candles) 
+
+    phi = 1.6180339887498948482045868343656381177
 
     em_amp = output[0]  
     em_phase = output[1]
     
-    triangle_side_length = 1  
-    triangle_height = triangle_side_length / (2 * sin(pi / 3))  
+    phi_ratio = phi
+    
+    short_side = 1
+    long_side = phi_ratio * short_side
+    
+    triangle_side_lengths = [short_side, long_side, short_side]
+
+    triangle_height = triangle_side_lengths[0] / (2 * sin(pi / 3)) 
+    
+    triangle_positions = [(0, 0),  
+                          (triangle_height/2, -long_side/2),
+                          (-triangle_height/2, -long_side/2)]
+ 
+    triangle_height = triangle_side_lengths[0] / (2 * sin(pi / 3)) 
     triangle_apothem = triangle_height / 2   
-    triangle_area = 0.5 * triangle_side_length * triangle_height     
-    triangle_positions = [(0, 0), (triangle_apothem, -triangle_side_length / 2), (-triangle_apothem, -triangle_side_length / 2)]
+    triangle_area = 0.5 * triangle_side_lengths[0] * triangle_height   
 
     z_sum = 0      
     for i in range(len(em_amp)):      
