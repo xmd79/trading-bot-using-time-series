@@ -2678,73 +2678,58 @@ print
 from math import sin, pi, log, sqrt
 
 def three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold):
-
     output = octa_metatron_cube(close_prices, candles) 
-
     phi = 1.6180339887498948482045868343656381177
-
     em_amp = output[0]  
     em_phase = output[1]
-    
     phi_ratio = phi
-    
     short_side = 1
     long_side = phi_ratio * short_side
-    
     triangle_side_lengths = [short_side, long_side, short_side]
-
-    triangle_height = triangle_side_lengths[0] / (2 * sin(pi / 3)) 
-    
+    triangle_height = triangle_side_lengths[0] / (2 * sin(pi / 3))
     triangle_positions = [(0, 0),  
                           (triangle_height/2, -long_side/2),
                           (-triangle_height/2, -long_side/2)]
- 
-    triangle_height = triangle_side_lengths[0] / (2 * sin(pi / 3)) 
+    triangle_height = triangle_side_lengths[0] / (2 * sin(pi / 3))
     triangle_apothem = triangle_height / 2   
     triangle_area = 0.5 * triangle_side_lengths[0] * triangle_height   
-
     z_sum = 0      
     for i in range(len(em_amp)):      
         r = em_amp[i] / em_phase[i]       
         z = 0.5 * log((1 + r) / (1 - r))          
         z_sum += z        
     z_transform = [z_sum / len(em_amp)]
-    z_transform[0]           
-
+    z_transform[0]
     sentiments = []  
-
-    for i in range(4): 
-
-        denom = max(z_transform) - min(z_transform)
-
-        if denom != 0:
-            sentiment = (z_transform[i] - min(z_transform)) / denom       
-        else:
-            sentiment = 0
-
-        sentiments.append(sentiment)
-     
-    mood = sum(sentiments) / len(sentiments)
-       
+    if len(z_transform) >= 4:
+        for i in range(4): 
+            max_z = max(z_transform)
+            min_z = min(z_transform)
+            if max_z != min_z:
+                denom = max_z - min_z
+                sentiment = (z_transform[i] - min_z) / denom       
+            else:
+                sentiment = 0
+            sentiments.append(sentiment)
+    else:
+        # Handle the case where z_transform has fewer than four elements
+        # For example, set all sentiments to zero
+        sentiments = [0, 0, 0, 0]
+    mood = sum(sentiments) / len(sentiments) 
     reversal = False 
-
     circle_nodes = [(0,0), (1,1), (2,2)]
     for position in triangle_positions:        
         for node in circle_nodes:      
            if position == node:   
                reversal = True 
-
-    print("Triangle positions before reversal:", triangle_positions)
-         
+    print("Triangle positions before reversal:", triangle_positions)         
     if reversal: 
        for i in range(len(triangle_positions)):
             triangle_positions[i] = (0, 0) 
-
     for position in triangle_positions:        
         for node in circle_nodes:
            if position == node:   
                reversal = True
-               
     if reversal:
        for i in range(len(triangle_positions)):
             triangle_positions[i] = (0, 0)   
@@ -2752,33 +2737,89 @@ def three_phi_triangles(close_prices, candles, market_mood, positive_threshold, 
         for i, position in enumerate(triangle_positions):    
             node_index = i * 2     
             position = (node_index, node_index)
-
     print("Triangle positions after reversal:", triangle_positions)
-    
     # Calculate the forecasted market mood for the next cycle
-    forecasted_market_mood = market_mood + mood - 0.5
-            
+    forecasted_market_mood = market_mood + mood - 0.5          
     if forecasted_market_mood > positive_threshold:
-        forecast = "Bullish"
+        forecast = "range up to TOP reversal"
     elif forecasted_market_mood < negative_threshold:
-        forecast = "Bearish"
+        forecast = "range down to DIP reversal"
     else:
-        forecast = "Neutral"
-    
-    return mood, reversal, len(triangle_positions), forecasted_market_mood, forecast
+        if mood < 0.05:
+            forecast = "DIP reversal"
+        elif mood > 0.95:
+            forecast = "TOP reversal"
+        elif mood > 0.75:
+            forecast = "distribution"
+        elif mood > 0.5:
+            forecast = "accumulation"
+        else:
+            forecast = "range"
+
+    # Determine the current and next mood based on the forecast
+    current_mood = ""
+    next_mood = ""
+
+    if forecast == "DIP reversal":
+        current_mood = "range down to DIP reversal"
+        next_mood = "accumulation"
+    elif forecast == "accumulation":
+        current_mood = "DIP reversal"
+        next_mood = "range up to TOP reversal"
+    elif forecast == "range up to TOP reversal":
+        current_mood = "accumulation"
+        next_mood = "TOP reversal"
+    elif forecast == "TOP reversal":
+        current_mood = "range up to TOP reversal"
+        next_mood = "distribution"
+    elif forecast == "distribution":
+        current_mood = "TOP reversal"
+        next_mood = "range down to DIP reversal"
+    elif forecast == "range down to DIP reversal":
+        current_mood = "distribution"
+        next_mood = "DIP reversal"
+
+    return mood, reversal, len(triangle_positions), forecasted_market_mood, forecast, current_mood, next_mood
 
 # Call the three_phi_triangles function with the defined triangles and a market mood of 0.5
 market_mood = 0.5
 positive_threshold = 0.1
 negative_threshold = -0.1
-mood, reversal, duration, forecasted_market_mood, forecast = three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold)
+mood, reversal, duration, forecasted_market_mood, forecast, current_mood, next_mood = three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold)
 
 print("Mood:", mood)
 print("Reversal:", reversal)
 print("Duration:", duration)
 print("Forecasted market mood for next cycle:", forecasted_market_mood)
 print("Forecast:", forecast)
-print
+
+# Call the three_phi_triangles function with the defined triangles and a market mood of 0.5
+market_mood = 0.5
+positive_threshold = 0.1
+negative_threshold = -0.1
+mood, reversal, duration, forecasted_market_mood, forecast, current_mood, next_mood = three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold)
+
+print("Mood:", mood)
+print("Reversal:", reversal)
+print("Duration:", duration)
+print("Forecasted market mood for next cycle:", forecasted_market_mood)
+print("Forecast:", forecast)
+
+# Call the three_phi_triangles function with the defined triangles and a market mood of 0.5
+market_mood = 0.5
+positive_threshold = 0.1
+negative_threshold = -0.1
+mood, reversal, duration, forecasted_market_mood, forecast, current_mood, next_mood = three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold)
+
+print("Mood:", mood)
+print("Reversal:", reversal)
+print("Duration:", duration)
+print("Forecasted market mood for next cycle:", forecasted_market_mood)
+print("Forecast:", forecast)
+print("Current mood: ", current_mood)
+print("Next mood: ", next_mood)
+
+print()
 
 ##################################################
 ##################################################
