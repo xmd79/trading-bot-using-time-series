@@ -1865,28 +1865,35 @@ def octa_metatron_cube(close_prices, candles,
     sine_wave = generate_new_momentum_sinewave(close_prices, candles,  
                                percent_to_max_val, 
                                percent_to_min_val)  
-
   
+    #sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=percent_to_max_val, percent_to_min_val=percent_to_min_val)
+
+    current_quadrant = sine_wave["current_quadrant"]
+    current_value = sine_wave["current_close"]
+
+    sine_wave_max = sine_wave["max"]    
+    sine_wave_min = sine_wave["min"] 
+
     if sine_wave["current_quadrant"] == 1:
          print("In quadrant 1!")
-    elif sine_wave["current_quadrant"] == 2:
-         print("In quadrant 2!")      
+    elif sine_wave["current_quadrant"] == 2:  
+         print("In quadrant 2!")            
     elif sine_wave["current_quadrant"] == 3:               
-         print("In quadrant 3!")  
-    elif sine_wave["current_quadrant"] == 4:
+         print("In quadrant 3!")           
+    elif sine_wave["current_quadrant"] == 4:                 
          print("In quadrant 4!")
+    
+    print()
 
-    sine_wave_max = sine_wave[sine_wave]    
-    sine_wave_min = sine_wave[sine_wave]
+    print("Close price map on sine now at: ", sine_wave)
 
-    # Calculate midpoint of Q1        
-    mid_q1 = sine_wave_min + 0.25 * (sine_wave_max - sine_wave_min)
-        
-    if sine_wave.any() <= mid_q1:
-        print("In quadrant 1!")  
+    print()
+
+    print("Min at:", sine_wave_min)
+    print("Max at: ", sine_wave_max)
+
+    print() 
  
-
-
     # Get the current quadrant and EM phase of the sine wave
     current_quadrant = sine_wave["current_quadrant"]
     em_phase = sine_wave["em_phase"]
@@ -2003,27 +2010,32 @@ def octa_metatron_cube(close_prices, candles,
     mid_q3 = mid_q2 + em_amp_q2
     mid_q4 = max(sine_wave)
 
+    print(sine_wave_min)
+    print(em_amp_q1)
+
+    print(mid_q1)
+    print(type("mid_q1"))
+
+    print(current_value)
+    print(type("current_value"))
+
     #Compare current sine wave value to determine quadrant
-    if sine_wave.any() <= mid_q1:
+    if current_value <= mid_q1:
         current_quadrant = 1
         current_em_amp = em_amp_q1
         current_em_phase = em_phase_q1
 
-    if sine_wave["value"] <= mid_q1:
-        # In quadrant 1!
-        print("In quadrant 1!")
-
-    elif sine_wave.any() <= mid_q2:
+    elif current_value <= mid_q2:
         current_quadrant = 2
         current_em_amp = em_amp_q2
         current_em_phase = em_phase_q2
 
-    elif sine_wave.any() <= mid_q3:
+    elif current_value <= mid_q3:
         current_quadrant = 3
         current_em_amp = em_amp_q3
         current_em_phase = em_phase_q3
 
-    elif sine_wave.any() <= mid_q4:
+    elif current_value <= mid_q4:
         current_quadrant = 4
         current_em_amp = em_amp_q4
         current_em_phase = em_phase_q4
@@ -2359,7 +2371,7 @@ def octa_metatron_cube(close_prices, candles,
     forecast.sort(key=lambda f: mood_map[f['mood_next_1h']])  
     
     # Get average mood of highest/lowest 3 frequencies 
-    highest_3 = next_1h_forecast[:3]
+    highest_3 = forecast[:3]
     highest_3_mood = 0
    
     for freq in highest_3:
@@ -2367,7 +2379,7 @@ def octa_metatron_cube(close_prices, candles,
         highest_3_mood += mood_val
         highest_3_mood = highest_3_mood / len(highest_3)
 
-    lowest_3 = next_1h_forecast[-3:]
+    lowest_3 = forecast[-3:]
     lowest_3_mood = 0
 
     for freq in lowest_3:
@@ -2396,12 +2408,12 @@ def octa_metatron_cube(close_prices, candles,
             return total / total_weight
 
     # Calculate weighted averages  
-    top_n_weights = [freq['magnitude'] for freq in next_1h_forecast[:n]]
-    top_n_moods = [mood_map[freq['mood_next_1h']] for freq in next_1h_forecast[:n]]
+    top_n_weights = [freq['magnitude'] for freq in forecast[:n]]
+    top_n_moods = [mood_map[freq['mood_next_1h']] for freq in forecast[:n]]
     top_n_weighted_avg = calculate_weighted_avg(top_n_weights, top_n_moods)
 
-    bottom_n_weights = [freq['magnitude'] for freq in next_1h_forecast[-n:]]  
-    bottom_n_moods = [mood_map[freq['mood_next_1h']] for freq in next_1h_forecast[-n:]]
+    bottom_n_weights = [freq['magnitude'] for freq in forecast[-n:]]  
+    bottom_n_moods = [mood_map[freq['mood_next_1h']] for freq in forecast[-n:]]
     bottom_n_weighted_avg = calculate_weighted_avg(bottom_n_weights, bottom_n_moods)
 
     overall_mood = top_n_weighted_avg - bottom_n_weighted_avg
