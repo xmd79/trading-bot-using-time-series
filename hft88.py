@@ -2000,7 +2000,7 @@ def octa_metatron_cube(close_prices, candles,
     mid_q1 = sine_wave_min + em_amp_q1 / 2
     mid_q2 = mid_q1 + em_amp_q1
     mid_q3 = mid_q2 + em_amp_q2
-    mid_q4 = max(sine_wave)
+    mid_q4 = float(sine_wave['max'])
 
     #Compare current sine wave value to determine quadrant
     if current_value <= mid_q1:
