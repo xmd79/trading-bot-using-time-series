@@ -1859,29 +1859,34 @@ print()
 ##################################################
 
 def octa_metatron_cube(close_prices, candles,  
-                       percent_to_max_val=5, 
+                       percent_to_max_val=5,  
                        percent_to_min_val=5):
-    
-    sine_wave = generate_new_momentum_sinewave(close_prices, candles,  
-                                   percent_to_max_val, 
-                                   percent_to_min_val)
 
-    sine_wave_max = sine_wave["max"]    
-    sine_wave_min = sine_wave["min"]  
-        
-    total_range = sine_wave_max - sine_wave_min
-    mid_q1 = sine_wave_min + 0.25 * total_range
-      
+    sine_wave = generate_new_momentum_sinewave(close_prices, candles,  
+                               percent_to_max_val, 
+                               percent_to_min_val)  
+
+  
     if sine_wave["current_quadrant"] == 1:
          print("In quadrant 1!")
     elif sine_wave["current_quadrant"] == 2:
-         print("In quadrant 2!")
-    elif sine_wave["current_quadrant"] == 3:
+         print("In quadrant 2!")      
+    elif sine_wave["current_quadrant"] == 3:               
          print("In quadrant 3!")  
     elif sine_wave["current_quadrant"] == 4:
          print("In quadrant 4!")
 
-    
+    sine_wave_max = sine_wave[sine_wave]    
+    sine_wave_min = sine_wave[sine_wave]
+
+    # Calculate midpoint of Q1        
+    mid_q1 = sine_wave_min + 0.25 * (sine_wave_max - sine_wave_min)
+        
+    if sine_wave.any() <= mid_q1:
+        print("In quadrant 1!")  
+ 
+
+
     # Get the current quadrant and EM phase of the sine wave
     current_quadrant = sine_wave["current_quadrant"]
     em_phase = sine_wave["em_phase"]
@@ -2003,6 +2008,10 @@ def octa_metatron_cube(close_prices, candles,
         current_quadrant = 1
         current_em_amp = em_amp_q1
         current_em_phase = em_phase_q1
+
+    if sine_wave["value"] <= mid_q1:
+        # In quadrant 1!
+        print("In quadrant 1!")
 
     elif sine_wave.any() <= mid_q2:
         current_quadrant = 2
@@ -2611,7 +2620,12 @@ def octa_metatron_cube(close_prices, candles,
     print(f"Pi: {octahedron[5]['frequency']}")
     print(f"e: {octahedron[6]['frequency']}")
     print(f"Origin: {octahedron[7]['frequency']}")
+
     print("Current point is at: ", forecast[f'min_reversal']['point'] if forecast[f'min_reversal']['point'] == point else forecast[f'max_reversal']['point']) 
+
+    # Extract current quadrant and EM phase
+    current_quadrant = sine_wave["current_quadrant"]   
+    em_phase = sine_wave["em_phase"]
 
     print()
 
@@ -2622,9 +2636,20 @@ sine_wave = generate_new_momentum_sinewave(close_prices, candles,
 sine_wave_max = sine_wave["max"]   
 sine_wave_min = sine_wave["min"]
 
-octa_metatron_cube(close_prices, candles,
-                   sine_wave_max,  
-                   sine_wave_min,  
-                   percent_to_max_val=5,
-                   percent_to_min_val=5)
+octa_metatron_cube(close_prices, candles)  
+
+print
+
+##################################################
+##################################################
+
+print
+
+##################################################
+##################################################
+
+print
+
+##################################################
+##################################################
 
