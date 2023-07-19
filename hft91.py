@@ -2675,6 +2675,7 @@ print
 
 ##################################################
 ##################################################
+
 from math import sin, pi, log, sqrt
 
 def three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold):
@@ -2823,6 +2824,62 @@ print()
 
 ##################################################
 ##################################################
+
+def calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2,
+                         phi_ratio=1.61803398875, prime_twins=None, nested_radical=None):
+    # Exclude NaN and zero values from the closes array
+    closes = np.array(closes)
+    closes = closes[np.logical_not(np.logical_or(np.isnan(closes), closes == 0))]
+
+    # Calculate the moving averages and standard deviations
+    mtf = np.zeros_like(closes)
+    stf = np.zeros_like(closes)
+    for i in range(period-1, len(closes)):
+        mtf[i] = np.sum(closes[i-period+1:i+1]) / period
+        stf[i] = np.sqrt(np.sum((closes[i-period+1:i+1] - mtf[i])**2) / period)
+
+    # Calculate the thresholds
+    min_threshold = mtf - stf * minimum_percentage / 100
+    max_threshold = mtf + stf * maximum_percentage / 100
+
+    # Calculate the momentum signal
+    momentum_signal = mtf[-1] - mtf[-2]
+
+    # Determine the current and next mood based on the target price
+    target_price = closes[-1]
+    if target_price > np.max(max_threshold):
+        current_mood = "TOP reversal"
+        next_mood = "distribution"
+    elif target_price < np.min(min_threshold):
+        current_mood = "DIP reversal"
+        next_mood = "range down to DIP reversal"
+    elif target_price <= mtf[-1]:
+        current_mood = "range down to DIP reversal"
+        next_mood = "accumulation"
+    elif target_price > mtf[-1] and target_price < phi_ratio * np.max(max_threshold):
+        current_mood = "accumulation"
+        next_mood = "range up to TOP reversal"
+    elif prime_twins is not None and target_price >= phi_ratio * np.max(max_threshold) and target_price < prime_twins[-1]:
+        current_mood = "range up to TOP reversal"
+        next_mood = "TOP reversal"
+    elif prime_twins is not None and nested_radical is not None and target_price >= prime_twins[-1] and target_price < nested_radical(prime_twins[-1]):
+        current_mood = "TOP reversal"
+        next_mood = "distribution"
+    else:
+        current_mood = "distribution"
+        next_mood = "range down to DIP reversal"
+
+    # Remove NaN, zero, and negative values from the arrays
+    min_threshold = min_threshold[np.logical_not(np.logical_or(np.isnan(min_threshold), np.logical_or(min_threshold == 0, min_threshold < 0)))]
+    max_threshold = max_threshold[np.logical_not(np.logical_or(np.isnan(max_threshold), np.logical_or(max_threshold == 0, max_threshold < 0)))]
+    mtf = mtf[np.logical_not(np.logical_or(np.isnan(mtf), np.logical_or(mtf == 0, mtf < 0)))]
+    momentum_signal = momentum_signal if not np.isnan(momentum_signal) and momentum_signal > 0 else 0
+
+    # Return the calculated values
+    return min_threshold, max_threshold, mtf[-1], momentum_signal, current_mood, next_mood
+
+min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2)
+print(min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood)
 
 print()
 
