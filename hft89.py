@@ -1896,6 +1896,7 @@ def octa_metatron_cube(close_prices, candles,
     # Get the current quadrant and EM phase of the sine wave
     current_quadrant = sine_wave["current_quadrant"]
     em_phase = sine_wave["em_phase"]
+    em_amp = sine_wave["em_amplitude"]
 
     # Define PHI constant with 15 decimals
     PHI = 1.6180339887498948482045868343656381177  
@@ -1925,13 +1926,17 @@ def octa_metatron_cube(close_prices, candles,
 
     freq_range = 26
     
-    em_amp = 10
-   
+    print(em_phase)
+    print(em_amp) 
+
+    print()
+  
     for i in range(26):
         frequency = i * sacred_freq
     
         em_value = em_amp * math.sin(sine_wave["em_phase"] * frequency)
-    
+        print(em_value)
+
         frequencies.append({
             'number': i,
             'frequency': frequency,  
