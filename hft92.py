@@ -2578,8 +2578,29 @@ print()
 
 ##################################################
 ##################################################
+from sklearn.linear_model import LinearRegression
 
-def get_consecutive_targets(closes, n_components, num_targets):
+def harmonic_analysis(closes, frequency):
+    time = np.arange(len(closes))
+    cosines = np.cos(2*np.pi*frequency*time)
+    sines = np.sin(2*np.pi*frequency*time)
+    X = np.column_stack((cosines, sines))
+    model = LinearRegression().fit(X, closes)
+    trend = model.predict(X)
+    residuals = closes - trend
+    amplitude = np.sqrt(np.square(model.coef_[0]) + np.square(model.coef_[1]))
+    phase = np.arctan2(model.coef_[1], model.coef_[0])
+    return amplitude, phase, residuals
+
+def poly_slope(closes, degree):
+    time = np.arange(len(closes))
+    coeffs = np.polyfit(time, closes, degree)
+    slope = coeffs[-2]
+    return slope
+
+def get_consecutive_targets(closes, n_components, num_targets, current_time, current_close):
+    print(f"current_time: {current_time}")
+    print(f"current_close: {current_close}")
     # Calculate FFT of closing prices
     fft = fftpack.fft(closes)
     frequencies = fftpack.fftfreq(len(closes))
@@ -2595,55 +2616,67 @@ def get_consecutive_targets(closes, n_components, num_targets):
 
     # Calculate the targets for the next num_targets minutes
     targets = []
+    target_times = []
+    est_time_diffs = []
+    price_diffs = []
 
-    # Calculate the first target with a minimum of 5% difference from the current close price
-    current_close = closes[-1]
-    target_diff = (current_close * 0.05) if current_close * 0.05 > 1 else 1
-    target_price = current_close + target_diff
-    targets.append((target_price, target_diff))
+    # Calculate the first target as the next value after the last closing price in the filtered signal
+    target_price = filtered_signal[-1]
 
-    # Calculate the remaining targets with a gradually increasing difference from the previous target and the current close price
-    for i in range(1, num_targets):
-        perc_diff = 0.05 + i * 0.03  # Gradually increase the percentage difference
-        target_diff = targets[-1][1] * (1 + perc_diff)  # Calculate the target difference
-        target_price = current_close + target_diff  # Calculate the target price
-        targets.append((target_price, target_diff))
-
-    # Convert the targets to differences relative to the current close price and add the time, estimated time difference, and close price
-    current_time = datetime.datetime.now()
-
-    # Print the current close price and time
-    print(f"Current close price: {current_close}")
-    print(f"Current time: {current_time.strftime('%H:%M:%S')}")
-
-    print()
-
+    # Calculate the remaining targets with increasing increments from the previous target price
     for i in range(num_targets):
-        target_price, target_diff = targets[i]
-        targets[i] = (target_price, target_diff + np.random.uniform(-0.01, 0.01)) # Add some noise for realism
-        
-        # Add the time, estimated time difference, and close price to the target dictionary
-        time_diff = datetime.timedelta(minutes=i+1)
-        target_time = (current_time + time_diff)
-        est_time_diff = (target_time - datetime.datetime.now()).total_seconds() / 60
-        targets[i] = {'time': target_time.strftime('%H:%M:%S'), 'est_time_diff': f"{est_time_diff:.2f} minutes", 'price_diff': targets[i][1], 'close_price': current_close, 'target_price': targets[i][0]}
+        harmonic_freq = top_frequencies[-1-i%3] if i%3 < 3 else top_frequencies[i%3-3] # Use the last 3 highest and lowest frequencies for harmonic analysis
+        amplitude, phase, residuals = harmonic_analysis(closes, harmonic_freq)
+        slope = poly_slope(residuals, 1) # Use linear regression to estimate the slope of the residuals
+        if harmonic_freq == 0:
+            time_to_target = 1e6
+        else:
+            time_to_target = np.abs(np.arctan2(target_price-current_close, amplitude*np.cos(harmonic_freq*(len(closes)+i+1)+phase)+slope*(len(closes)+i+1))-np.arctan2(current_close-current_close, amplitude*np.cos(harmonic_freq*(len(closes))+phase)+slope*(len(closes))))/harmonic_freq # Use trigonometry to calculate the time to the target
+        if time_to_target < 1e5:
+            target_time = (current_time + datetime.timedelta(minutes=time_to_target)).strftime('%H:%M:%S')
+            est_time_diff = f"{time_to_target:.2f} minutes from now"
+            target_price += target_price * 0.005 # Increase the target price by 0.5% for each additional minute
+            price_diff = target_price - current_close
+            targets.append(target_price)
+            target_times.append(target_time)
+            est_time_diffs.append(est_time_diff)
+            price_diffs.append(price_diff)
+        else:
+            print(f"Failed to calculate target {i+1}.")
 
-        # Print the target information
-        print(f"Target {i+1} minute(s) in the future: {targets[i]['time']} ({targets[i]['est_time_diff']} from now) - {targets[i]['price_diff']:.4f} - {targets[i]['close_price']:.2f}")
+    if len(targets) == len(target_times) == len(est_time_diffs) == len(price_diffs) == num_targets:
+        print("Targets:")
+        for target_time, target_price, price_diff in zip(target_times, targets, price_diffs):
+            print(f"{target_time}: {target_price:.2f} ({price_diff:+.4f})")
 
-    return targets
+        print("Estimated time differences:")
+        for target_time, est_time_diff in zip(target_times, est_time_diffs):
+            print(f"{target_time}: {est_time_diff}")
+    else:
+        print("Failed to calculate all targets.")
 
-# Example usage
-closes = get_closes("5m")
+    return targets, target_times, est_time_diffs, price_diffs
+
+# Set the number of components and targets
 n_components = 5
-num_targets = 5
+num_targets = 3
 
-# Get the consecutive targets for the next num_targets minutes
-targets = get_consecutive_targets(closes, n_components, num_targets)
+# Call the get_consecutive_targets function
+# Define the current time and close price
+current_time = datetime.datetime.now()
+current_close = closes[-1]
 
-# Print the predicted targets for the next num_targets minutes
-for i, target in enumerate(targets):
-    print(f"Target {i+1} minute(s) in the future: {target['time']} ({target['est_time_diff']} from now) - {target['price_diff']} - {target['close_price']}")
+# Calculate the consecutive targets
+targets, target_times, est_time_diffs, price_diffs = get_consecutive_targets(closes, n_components, num_targets, current_time, current_close)
+
+# Print the results
+print("Targets:")
+for i in range(num_targets):
+    print(f"{target_times[i]}: {targets[i]:.2f} ({price_diffs[i]:+.4f})")
+
+print("Estimated time differences:")
+for i in range(num_targets):
+    print(f"{target_times[i]}: {est_time_diffs[i]}")
 
 print()
 
