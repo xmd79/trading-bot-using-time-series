@@ -1444,10 +1444,24 @@ def reversals_unit_circle(close_prices, candles, percent_to_max_val=5, percent_t
     print("\nMood Reversal Forecast: {}".format(mood_reversal_forecast))
     print("Market Mood: {}".format(market_mood))
 
-reversals = reversals_unit_circle(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5)
-print(reversals)
+    return {
+        "quadrant_emotional_values": quadrant_emotional_values,
+        "forecast_moods": forecast_moods,
+        "min_node": min_node,
+        "max_node": max_node,
+        "avg_moods": avg_moods,
+        "weighted_moods": weighted_moods,
+        "forecast_direction": forecast_direction,
+        "mood_reversal_forecast": mood_reversal_forecast, 
+        "market_mood": market_mood  
+    }
 
-print()
+results = reversals_unit_circle(close_prices, candles)
+
+quadrant_emotional_values, forecast_moods, min_node, max_node, avg_moods, weighted_moods, forecast_direction, mood_reversal_forecast, market_mood = results.values()
+
+# Now you have all the results as separate variables  
+print(quadrant_emotional_values, forecast_moods, min_node, max_node, avg_moods, weighted_moods, forecast_direction, mood_reversal_forecast, market_mood)
 
 ##################################################
 ##################################################
@@ -2462,6 +2476,63 @@ print()
 ##################################################
 ##################################################
 
+def get_octant_coordinates(emotional_values):
+    if isinstance(emotional_values, dict):
+        emotional_values = [emotional_values.get(key, {}).get('phase', 0) for key in ['Apex', 'Left', 'Base', 'Right']]
+    octant_coordinates = []
+    for emotional_value in emotional_values:
+        if isinstance(emotional_value, (int, float)):
+            x = math.cos(emotional_value * math.pi / 180)
+            y = math.sin(emotional_value * math.pi / 180)
+            octant_coordinates.append((x, y))
+    return octant_coordinates
+
+def metatron_reversals_unit_circle(quadrant_emotional_values, close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
+    close_prices = np.array(close_prices) # Convert close_prices to a numpy.ndarray
+    results = reversals_unit_circle(close_prices, candles, percent_to_max_val, percent_to_min_val)
+    forecast_moods = results['forecast_moods']
+    min_node = results['min_node']
+    max_node = results['max_node']
+    avg_moods = results['avg_moods']
+    weighted_moods = results['weighted_moods']
+    forecast_direction = results['forecast_direction']
+    mood_reversal_forecast = results['mood_reversal_forecast']
+    market_mood = results['market_mood']
+
+    octant_coordinates = get_octant_coordinates(quadrant_emotional_values)
+    output = {
+        "octant_coordinates": octant_coordinates,
+        "forecast_moods": forecast_moods,
+        "min_node": min_node,
+        "max_node": max_node,
+        "avg_moods": avg_moods,
+        "weighted_moods": weighted_moods,
+        "forecast_direction": forecast_direction,
+        "mood_reversal_forecast": mood_reversal_forecast,
+        "market_mood": market_mood
+    }
+    return output
+
+print()
+
+quadrant_emotional_values = {
+    'Apex': {'amplitude': 0.75, 'phase': 0},
+    'Left': {'amplitude': 0.5, 'phase': 1.5707963267948966},
+    'Base': {'amplitude': 0.25, 'phase': 3.141592653589793},
+    'Right': {'amplitude': 0.49999999999999994, 'phase': 4.71238898038469}
+}
+
+percent_to_max_val = 5
+percent_to_min_val = 5
+
+print("quadrant_emotional_values: ", quadrant_emotional_values)
+metatron_reversals_unit_circle(quadrant_emotional_values, close_prices, candles, percent_to_max_val, percent_to_min_val)
+
+print()
+
+##################################################
+##################################################
+
 ##################################################
 ##################################################
 
@@ -2617,6 +2688,21 @@ for i in range(len(closes) - 1):
 
 # Print the predicted targets for the next minute
 print("Target for 5min tf:", targets[-1])
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
 
 print()
 
