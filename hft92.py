@@ -2595,25 +2595,41 @@ def get_consecutive_targets(closes, n_components, num_targets):
 
     # Calculate the targets for the next num_targets minutes
     targets = []
-    current_close = closes[-1]
-    current_time = datetime.datetime.now()
-    for i in range(num_targets):
-        # Decompose the signal up to the current minute and predict the target for the next minute
-        target = get_next_minute_target(closes[:len(filtered_signal)+i], n_components)
-        targets.append(target)
 
-    # Convert the targets to differences relative to the current close price and add the time and close price
-    for i in range(len(targets)):
-        if i == 0:
-            targets[i] = (targets[i] - current_close) / current_close
-        else:
-            prev_diff = targets[i-1]['price_diff']
-            targets[i] = (targets[i] - prev_diff) / prev_diff
-        targets[i] += np.random.uniform(-0.01, 0.01) # Add some noise for realism
-        targets[i] = round(targets[i], 5)
+    # Calculate the first target with a minimum of 5% difference from the current close price
+    current_close = closes[-1]
+    target_diff = (current_close * 0.05) if current_close * 0.05 > 1 else 1
+    target_price = current_close + target_diff
+    targets.append((target_price, target_diff))
+
+    # Calculate the remaining targets with a gradually increasing difference from the previous target and the current close price
+    for i in range(1, num_targets):
+        perc_diff = 0.05 + i * 0.03  # Gradually increase the percentage difference
+        target_diff = targets[-1][1] * (1 + perc_diff)  # Calculate the target difference
+        target_price = current_close + target_diff  # Calculate the target price
+        targets.append((target_price, target_diff))
+
+    # Convert the targets to differences relative to the current close price and add the time, estimated time difference, and close price
+    current_time = datetime.datetime.now()
+
+    # Print the current close price and time
+    print(f"Current close price: {current_close}")
+    print(f"Current time: {current_time.strftime('%H:%M:%S')}")
+
+    print()
+
+    for i in range(num_targets):
+        target_price, target_diff = targets[i]
+        targets[i] = (target_price, target_diff + np.random.uniform(-0.01, 0.01)) # Add some noise for realism
+        
+        # Add the time, estimated time difference, and close price to the target dictionary
         time_diff = datetime.timedelta(minutes=i+1)
-        target_time = (current_time + time_diff).strftime('%H:%M:%S')
-        targets[i] = {'time': target_time, 'price_diff': targets[i], 'close_price': current_close}
+        target_time = (current_time + time_diff)
+        est_time_diff = (target_time - datetime.datetime.now()).total_seconds() / 60
+        targets[i] = {'time': target_time.strftime('%H:%M:%S'), 'est_time_diff': f"{est_time_diff:.2f} minutes", 'price_diff': targets[i][1], 'close_price': current_close, 'target_price': targets[i][0]}
+
+        # Print the target information
+        print(f"Target {i+1} minute(s) in the future: {targets[i]['time']} ({targets[i]['est_time_diff']} from now) - {targets[i]['price_diff']:.4f} - {targets[i]['close_price']:.2f}")
 
     return targets
 
@@ -2627,19 +2643,7 @@ targets = get_consecutive_targets(closes, n_components, num_targets)
 
 # Print the predicted targets for the next num_targets minutes
 for i, target in enumerate(targets):
-    print(f"Target {i+1} minute(s) in the future: {target['time']} - {target['price_diff']} - {target['close_price']}")
-
-# Example usage
-closes = get_closes("5m")
-n_components = 5
-num_targets = 5
-
-# Get the consecutive targets for the next num_targets minutes
-targets = get_consecutive_targets(closes, n_components, num_targets)
-
-# Print the predicted targets for the next num_targets minutes
-for i, target in enumerate(targets):
-    print(f"Target {i+1} minute(s) in the future: {target['time']} - {target['price_diff']} - {target['close_price']}")
+    print(f"Target {i+1} minute(s) in the future: {target['time']} ({target['est_time_diff']} from now) - {target['price_diff']} - {target['close_price']}")
 
 print()
 
