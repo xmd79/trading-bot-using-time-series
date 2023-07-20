@@ -802,7 +802,7 @@ print()
 ##################################################
 ##################################################
 
-def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2):
+def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
     """
     Calculate thresholds and averages based on min and max percentages. 
     """
@@ -826,9 +826,12 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_
     max_percentage_custom = maximum_percentage / 100
 
     # Calculate thresholds       
-    min_threshold = min_close - (max_close - min_close) * min_percentage_custom  
-    max_threshold = max_close + (max_close - min_close) * max_percentage_custom
-        
+    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
+    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
+
+    # Calculate range of prices within a certain distance from the current close price
+    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
+
     # Filter close prices
     with np.errstate(invalid='ignore'):
         filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
@@ -855,11 +858,11 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_
     # Combined momentum signal     
     momentum_signal = percent_to_max_combined - percent_to_min_combined
 
-    return min_threshold, max_threshold, avg_mtf, momentum_signal
+    return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
 
 
-# Call function with minimum percentage of 2% and maximum percentage of 2%
-min_threshold, max_threshold, avg_mtf, momentum_signal = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2)
+# Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
+min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
 
 print("Momentum signal:", momentum_signal)
 print()
@@ -867,6 +870,9 @@ print()
 print("Minimum threshold:", min_threshold)
 print("Maximum threshold:", max_threshold)
 print("Average MTF:", avg_mtf)
+
+print("Range of prices within distance from current close price:")
+print(range_price)
 
 print()
 
@@ -2668,165 +2674,17 @@ sine_wave = generate_new_momentum_sinewave(close_prices, candles,
 sine_wave_max = sine_wave["max"]   
 sine_wave_min = sine_wave["min"]
 
-#octa_metatron_cube(close_prices, candles)  
-#print(octa_metatron_cube(close_prices, candles))
+octa_metatron_cube(close_prices, candles)  
+print(octa_metatron_cube(close_prices, candles))
 
-print
-
-##################################################
-##################################################
-
-from math import sin, pi, log, sqrt
-
-def three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold):
-    output = octa_metatron_cube(close_prices, candles) 
-    phi = 1.6180339887498948482045868343656381177
-    em_amp = output[0]  
-    em_phase = output[1]
-    phi_ratio = phi
-    short_side = 1
-    long_side = phi_ratio * short_side
-    triangle_side_lengths = [short_side, long_side, short_side]
-    triangle_height = triangle_side_lengths[0] / (2 * sin(pi / 3))
-    triangle_positions = [(0, 0),  
-                          (triangle_height/2, -long_side/2),
-                          (-triangle_height/2, -long_side/2)]
-    triangle_height = triangle_side_lengths[0] / (2 * sin(pi / 3))
-    triangle_apothem = triangle_height / 2   
-    triangle_area = 0.5 * triangle_side_lengths[0] * triangle_height   
-    z_sum = 0      
-    for i in range(len(em_amp)):      
-        r = em_amp[i] / em_phase[i]       
-        z = 0.5 * log((1 + r) / (1 - r))          
-        z_sum += z        
-    z_transform = [z_sum / len(em_amp)]
-    z_transform[0]
-    sentiments = []  
-    if len(z_transform) >= 4:
-        for i in range(4): 
-            max_z = max(z_transform)
-            min_z = min(z_transform)
-            if max_z != min_z:
-                denom = max_z - min_z
-                sentiment = (z_transform[i] - min_z) / denom       
-            else:
-                sentiment = 0
-            sentiments.append(sentiment)
-    else:
-        # Handle the case where z_transform has fewer than four elements
-        # For example, set all sentiments to zero
-        sentiments = [0, 0, 0, 0]
-    mood = sum(sentiments) / len(sentiments) 
-    reversal = False 
-    circle_nodes = [(0,0), (1,1), (2,2)]
-    for position in triangle_positions:        
-        for node in circle_nodes:      
-           if position == node:   
-               reversal = True 
-    print("Triangle positions before reversal:", triangle_positions)         
-    if reversal: 
-       for i in range(len(triangle_positions)):
-            triangle_positions[i] = (0, 0) 
-    for position in triangle_positions:        
-        for node in circle_nodes:
-           if position == node:   
-               reversal = True
-    if reversal:
-       for i in range(len(triangle_positions)):
-            triangle_positions[i] = (0, 0)   
-    else:      
-        for i, position in enumerate(triangle_positions):    
-            node_index = i * 2     
-            position = (node_index, node_index)
-    print("Triangle positions after reversal:", triangle_positions)
-    # Calculate the forecasted market mood for the next cycle
-    forecasted_market_mood = market_mood + mood - 0.5          
-    if forecasted_market_mood > positive_threshold:
-        forecast = "range up to TOP reversal"
-    elif forecasted_market_mood < negative_threshold:
-        forecast = "range down to DIP reversal"
-    else:
-        if mood < 0.05:
-            forecast = "DIP reversal"
-        elif mood > 0.95:
-            forecast = "TOP reversal"
-        elif mood > 0.75:
-            forecast = "distribution"
-        elif mood > 0.5:
-            forecast = "accumulation"
-        else:
-            forecast = "range"
-
-    # Determine the current and next mood based on the forecast
-    current_mood = ""
-    next_mood = ""
-
-    if forecast == "DIP reversal":
-        current_mood = "range down to DIP reversal"
-        next_mood = "accumulation"
-    elif forecast == "accumulation":
-        current_mood = "DIP reversal"
-        next_mood = "range up to TOP reversal"
-    elif forecast == "range up to TOP reversal":
-        current_mood = "accumulation"
-        next_mood = "TOP reversal"
-    elif forecast == "TOP reversal":
-        current_mood = "range up to TOP reversal"
-        next_mood = "distribution"
-    elif forecast == "distribution":
-        current_mood = "TOP reversal"
-        next_mood = "range down to DIP reversal"
-    elif forecast == "range down to DIP reversal":
-        current_mood = "distribution"
-        next_mood = "DIP reversal"
-
-    return mood, reversal, len(triangle_positions), forecasted_market_mood, forecast, current_mood, next_mood
-
-# Call the three_phi_triangles function with the defined triangles and a market mood of 0.5
-market_mood = 0.5
-positive_threshold = 0.1
-negative_threshold = -0.1
-mood, reversal, duration, forecasted_market_mood, forecast, current_mood, next_mood = three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold)
-
-print("Mood:", mood)
-print("Reversal:", reversal)
-print("Duration:", duration)
-print("Forecasted market mood for next cycle:", forecasted_market_mood)
-print("Forecast:", forecast)
-
-# Call the three_phi_triangles function with the defined triangles and a market mood of 0.5
-market_mood = 0.5
-positive_threshold = 0.1
-negative_threshold = -0.1
-mood, reversal, duration, forecasted_market_mood, forecast, current_mood, next_mood = three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold)
-
-print("Mood:", mood)
-print("Reversal:", reversal)
-print("Duration:", duration)
-print("Forecasted market mood for next cycle:", forecasted_market_mood)
-print("Forecast:", forecast)
-
-# Call the three_phi_triangles function with the defined triangles and a market mood of 0.5
-market_mood = 0.5
-positive_threshold = 0.1
-negative_threshold = -0.1
-mood, reversal, duration, forecasted_market_mood, forecast, current_mood, next_mood = three_phi_triangles(close_prices, candles, market_mood, positive_threshold, negative_threshold)
-
-print("Mood:", mood)
-print("Reversal:", reversal)
-print("Duration:", duration)
-print("Forecasted market mood for next cycle:", forecasted_market_mood)
-print("Forecast:", forecast)
-print("Current mood: ", current_mood)
-print("Next mood: ", next_mood)
 
 print()
 
 ##################################################
 ##################################################
 
-def calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2,
-                         phi_ratio=1.61803398875, prime_twins=None, nested_radical=None, min_ext=0.02, max_ext=0.02, mtf_ext=[0.01, 0.02, 0.03]):
+def calculate_thresholds2(closes, period=14, minimum_percentage=5, maximum_percentage=5,
+                         phi_ratio=1.61803398875, prime_twins=None, nested_radical=None, min_ext=0.1, max_ext=0.1, mtf_ext=[0.2, 0.3, 0.4]):
     # Exclude NaN, zero, and negative values from the closes array
     closes = np.array(closes)
     closes = closes[np.logical_not(np.logical_or(np.isnan(closes), np.logical_or(closes == 0, closes < 0)))]
@@ -2841,8 +2699,15 @@ def calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percen
     # Calculate the thresholds
     min_threshold = mtf - stf * minimum_percentage / 100
     min_threshold = np.maximum(min_threshold, np.min(closes) * (1 - min_ext))
+    min_threshold = np.minimum(min_threshold, np.max(closes) * (1 - min_ext))
     max_threshold = mtf + stf * maximum_percentage / 100
     max_threshold = np.minimum(max_threshold, np.max(closes) * (1 + max_ext))
+    max_threshold = np.maximum(max_threshold, np.min(closes) * (1 + max_ext))
+
+    # Scale the thresholds to fit the 1-minute data
+    scale_factor = closes[-1] / mtf[-1]
+    min_threshold *= scale_factor
+    max_threshold *= scale_factor
 
     # Calculate the momentum signal
     momentum_signal = mtf[-1] - mtf[-2]
@@ -2874,24 +2739,50 @@ def calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percen
     # Add extensions to the MTF signal
     mtf_extensions = [mtf[-1] + ext for ext in mtf_ext]
 
-    # Remove NaN, zero, and negative values from the arrays
-    min_threshold = min_threshold[np.logical_not(np.logical_or(np.isnan(min_threshold), np.logical_or(min_threshold == 0, min_threshold < 0)))]
-    max_threshold = max_threshold[np.logical_not(np.logical_or(np.isnan(max_threshold), np.logical_or(max_threshold == 0, max_threshold < 0)))]
-    mtf = mtf[np.logical_not(np.logical_or(np.isnan(mtf), np.logical_or(mtf == 0, mtf < 0)))]
-    momentum_signal = momentum_signal if not np.isnan(momentum_signal) and momentum_signal > 0 else 0
+    # Calculate the next support and resistance levels
+    next_support = np.min(min_threshold) * (1 - min_ext)
+    next_resistance = np.max(max_threshold) * (1 + max_ext)
+
+    # Determine the market mood to the next reversal
+    if current_mood == "TOP reversal":
+        market_mood = "bearish"
+    elif current_mood == "DIP reversal":
+        market_mood = "bullish"
+    elif current_mood == "range down to DIP reversal" and next_mood == "accumulation":
+        market_mood = "bullish"
+    elif current_mood == "range up to TOP reversal" and next_mood == "distribution":
+        market_mood = "bearish"
+    else:
+        market_mood = "neutral"
+
+    # Print the calculated values
+    print("Min threshold at:", min_threshold[-1])
+    print("Max threshold at:", max_threshold[-1])
+    print("MTF signal at:", mtf[-1])
+    print("Momentum signal at:", momentum_signal)
+    print("Current mood is:", current_mood)
+    print("Next mood is:", next_mood)
+    print("Next support level is:", next_support)
+    print("Next resistance level is:", next_resistance)
+    print("Market mood to next reversal is:", market_mood)
 
     # Return the calculated values
-    return min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood, mtf_extensions
+    return min_threshold[-1], max_threshold[-1], mtf[-1], momentum_signal, current_mood, next_mood, next_support, next_resistance, market_mood, mtf_extensions
 
-min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood, mtf_extensions = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2)
+# Example usage
+min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood, next_support, next_resistance, market_mood, mtf_extensions = calculate_thresholds2(closes, period=14, minimum_percentage=5, maximum_percentage=5, min_ext=0.05, max_ext=0.05, mtf_ext=[0.1, 0.2, 0.3])
 
-print("Min threshold at: ", min_threshold[-1])
-print("Max threshold at: ", max_threshold[-1])
-print("MTF signal at: ", mtf[-1])
-print("Momentum signal at: ", momentum_signal)
-print("Current mood is: ", current_mood)
-print("Next mood is: ", next_mood)
-print("mtf_extensions: ", mtf_extensions)
+# Print the calculated values
+#print("Min threshold at:", min_threshold)
+#print("Max threshold at:", max_threshold)
+#print("MTF signal at:", mtf)
+#print("Momentum signal at:", momentum_signal)
+#print("Current mood is:", current_mood)
+#print("Next mood is:", next_mood)
+#print("Next support level is:", next_support)
+#print("Next resistance level is:", next_resistance)
+#print("Market mood to next reversal is:", market_mood)
+#print("MTF extensions:", mtf_extensions)
 
 print()
 
