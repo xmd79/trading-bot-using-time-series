@@ -113,10 +113,10 @@ timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12
 def get_candles(symbol, timeframes):
     candles = []
     for timeframe in timeframes:
-        limit = 1000  # default limit
+        limit = 10000  # default limit
         tf_value = int(timeframe[:-1])  # extract numeric value of timeframe
         if tf_value >= 4:  # check if timeframe is 4h or above
-            limit = 2000  # increase limit for 4h timeframe and above
+            limit = 20000  # increase limit for 4h timeframe and above
         klines = client.get_klines(
             symbol=symbol,
             interval=timeframe,
@@ -185,112 +185,6 @@ def get_closes(timeframe):
     return closes
 
 closes = get_closes('1m')
-
-##################################################
-##################################################
-
-# Get SMA for all timeframes and for all intervals lengths
-
-def get_sma(timeframe, length):
-   closes = get_closes(timeframe)  
-    
-   sma = talib.SMA(np.array(closes), timeperiod=length)
-
-   # Filter out NaN  
-   sma = sma[np.isnan(sma) == False]
-      
-   return sma
-
-# Call the function
-sma_lengths = [5, 7, 9, 12, 15, 18, 21, 27, 56, 72, 100, 127, 150, 200]
-
-#for timeframe in timeframes:
-#    for length in sma_lengths:
-#       sma = get_sma(timeframe, length)
-#       print(f"SMA {length} for {timeframe}: {sma}")
-
-print()
-
-##################################################
-##################################################
-
-def get_sma_diff(timeframe, length):
-    close = get_close(timeframe)
-    sma = get_sma(timeframe, length)[-1]
-    
-    diff = (close - sma) / sma * 100 if sma != 0 else 0
-    
-    position = "CLOSE ABOVE" if close > sma else "CLOSE BELOW"
-    
-    return diff, position
-
-# Call the function   
-for timeframe in timeframes:
-    for length in sma_lengths:
-       
-       # Get close price
-       close = get_close(timeframe)
-       
-       # Get SMA 
-       sma = get_sma(timeframe, length)[-1]
-       
-       # Calculate % diff from close  
-       close_diff = (close - sma) / sma * 100  
-       
-       # Initialize diff arrays 
-       sma_diffs = []
-       sma_values = []
-           
-       # Get SMA value for all lengths 
-       for l in sma_lengths:
-           sma_value = get_sma(timeframe, l)[-1]
-           sma_values.append(sma_value)
-           
-       # Calculate diff between all SMAs       
-       for i in range(len(sma_values)-1):
-           sma_diff = abs(sma_values[i] - sma_values[i+1])
-           sma_diffs.append(sma_diff)
-            
-       # Calculate average SMA diff     
-       avg_sma_diff = mean(sma_diffs)       
-         
-##################################################
-##################################################
-
-def get_sma_ratio(timeframe):    
-    above_ratios = []    
-    below_ratios = []
-    
-    for length in sma_lengths:
-         diff, position = get_sma_diff(timeframe, length)
-          
-         if position == "CLOSE ABOVE":
-             above_ratios.append(diff)
-         else:  
-             below_ratios.append(diff)
-            
-    if above_ratios:        
-        above_avg = statistics.mean(above_ratios)
-    else:
-        above_avg = 0
-        
-    if below_ratios:                
-        below_avg = statistics.mean(below_ratios)          
-    else:
-        below_avg = 0
-            
-    return above_avg, below_avg
-
-# Call the function
-for timeframe in timeframes:
-    above_avg, below_avg =  get_sma_ratio(timeframe)
-    
-    if below_avg > above_avg:
-        print(f"{timeframe} Close is below SMAs at local DIP")        
-    elif above_avg > below_avg:
-        print(f"{timeframe} Close is above SMAs at local TOP")
-
-print()
 
 ##################################################
 ##################################################
@@ -2638,7 +2532,7 @@ print()
 
 print("Minimum threshold:", min_threshold)
 print("Maximum threshold:", max_threshold)
-print("Average MTF:", avg_mtf)
+#print("Average MTF:", avg_mtf)
 
 #print("Range of prices within distance from current close price:")
 #print(range_price[-1])
@@ -2668,7 +2562,7 @@ def get_next_minute_target(closes, n_components):
     return target_price
 
 # Example usage
-closes = get_closes("1m")
+closes = get_closes("5m")
 n_components = 5
 targets = []
 
@@ -2681,6 +2575,113 @@ for i in range(len(closes) - 1):
 print("Target for next minutes:", targets[-1])
 
 print()
+
+##################################################
+##################################################
+from datetime import datetime
+
+def get_lows(timeframes, n=1):
+    if isinstance(timeframes, str):
+        timeframes = [timeframes]
+    
+    lows = {}
+    for tf in timeframes:
+        # Get candles for this specific timeframe
+        candles = candle_map[tf]
+        
+        # Get last n low prices
+        lows[tf] = [candle['low'] for candle in candles[-n:]]
+    
+    return lows
+
+lows = get_lows('1m', n=10000)
+#print(lows)
+
+##################################################
+##################################################
+
+def get_last_3_low_data(timeframe):
+    candles = candle_map[timeframe]
+
+    sorted_candles = sorted(candles, key=lambda c: c['low']) 
+    last_3_candles = sorted_candles[-3:]
+
+    low_data = []
+    for i in range(len(last_3_candles)):
+        candle = last_3_candles[i]
+        label = ['first', 'second', 'third'][i]
+        if i > 0:
+            time_diff = datetime.fromtimestamp(candle['time']) - datetime.fromtimestamp(last_3_candles[i-1]['time'])
+            time_string = str(time_diff).split('.')[0]
+        else:
+            time_string = ''
+        low_price = candle['low']
+        data = {'label': label, 'time_diff': time_string, 'low_price': low_price}
+        low_data.append(data)
+
+    return low_data
+
+#low_data = get_last_3_low_data('1m')
+#for data in low_data:
+    #print(f"{data['label']} low: {data['low_price']}, time diff: {data['time_diff']}")
+
+##################################################
+##################################################
+
+def get_last_4_low_data(timeframe):
+    candles = candle_map[timeframe]
+
+    sorted_candles = sorted(candles, key=lambda c: c['low']) 
+    last_4_candles = sorted_candles[-4:]
+
+    low_data = []
+    for i in range(len(last_4_candles)):
+        candle = last_4_candles[i]
+        label = ['first', 'second', 'third', 'fourth'][i]
+        if i > 0:
+            time_diff = datetime.fromtimestamp(candle['time']) - datetime.fromtimestamp(last_4_candles[i-1]['time'])
+        else:
+            time_diff = None
+        low_price = candle['low']
+        data = {'label': label, 'time_diff': time_diff, 'low_price': low_price}
+        low_data.append(data)
+
+    return low_data
+
+low_data = get_last_4_low_data('1m')
+for data in low_data:
+    print(f"{data['label']} low: {data['low_price']}, time diff: {data['time_diff']}")
+
+print()
+
+##################################################
+##################################################
+
+def calculate_fibonacci_pivots(timeframe):
+    low_data = get_last_4_low_data(timeframe)
+    time_diffs = [data['time_diff'] for data in low_data if data['time_diff']]
+    if len(time_diffs) < 3:
+        return []
+
+    time_diffs = sorted([time_diff.total_seconds() for time_diff in time_diffs])
+    time_range = max(time_diffs) - min(time_diffs)
+
+    pivots = []
+    for level in [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]:
+        time_level = min(time_diffs) + time_range * level
+        pivot_price = low_data[0]['low_price'] - (low_data[0]['low_price'] - low_data[3]['low_price']) * level
+        pivots.append({'time': time_level, 'price': pivot_price})
+
+    return pivots
+
+pivots = calculate_fibonacci_pivots('1m')
+for pivot in pivots:
+    print(f"Pivot at {pivot['price']} at {pivot['time']} seconds after the fourth low")
+
+print()
+
+##################################################
+##################################################
 
 print()
 
