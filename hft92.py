@@ -2533,9 +2533,6 @@ print()
 ##################################################
 ##################################################
 
-##################################################
-##################################################
-
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
     """
     Calculate thresholds and averages based on min and max percentages. 
