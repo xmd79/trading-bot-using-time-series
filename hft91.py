@@ -801,120 +801,6 @@ print()
 
 ##################################################
 ##################################################
-
-def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
-    """
-    Calculate thresholds and averages based on min and max percentages. 
-    """
-  
-    # Get min/max close    
-    min_close = np.nanmin(close_prices)
-    max_close = np.nanmax(close_prices)
-    
-    # Convert close_prices to numpy array
-    close_prices = np.array(close_prices)
-    
-    # Calculate momentum
-    momentum = talib.MOM(close_prices, timeperiod=period)
-    
-    # Get min/max momentum    
-    min_momentum = np.nanmin(momentum)   
-    max_momentum = np.nanmax(momentum)
-    
-    # Calculate custom percentages 
-    min_percentage_custom = minimum_percentage / 100  
-    max_percentage_custom = maximum_percentage / 100
-
-    # Calculate thresholds       
-    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
-    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
-
-    # Calculate range of prices within a certain distance from the current close price
-    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
-
-    # Filter close prices
-    with np.errstate(invalid='ignore'):
-        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
-        filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
-        
-    # Calculate avg    
-    avg_mtf = np.nanmean(filtered_close)
-
-    # Get current momentum       
-    current_momentum = momentum[-1]
-
-    # Calculate % to min/max momentum    
-    with np.errstate(invalid='ignore', divide='ignore'):
-        percent_to_min_momentum = ((max_momentum - current_momentum) /   
-                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
-
-        percent_to_max_momentum = ((current_momentum - min_momentum) / 
-                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
- 
-    # Calculate combined percentages              
-    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
-    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
-      
-    # Combined momentum signal     
-    momentum_signal = percent_to_max_combined - percent_to_min_combined
-
-    return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
-
-
-# Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
-min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-
-print("Momentum signal:", momentum_signal)
-print()
-
-print("Minimum threshold:", min_threshold)
-print("Maximum threshold:", max_threshold)
-print("Average MTF:", avg_mtf)
-
-print("Range of prices within distance from current close price:")
-print(range_price)
-
-print()
-
-##################################################
-##################################################
-
-def get_next_minute_target(closes, n_components):
-    # Calculate FFT of closing prices
-    fft = fftpack.fft(closes)
-    frequencies = fftpack.fftfreq(len(closes))
-
-    # Sort frequencies by magnitude and keep only the top n_components
-    idx = np.argsort(np.abs(fft))[::-1][:n_components]
-    top_frequencies = frequencies[idx]
-
-    # Filter out the top frequencies and reconstruct the signal
-    filtered_fft = np.zeros_like(fft)
-    filtered_fft[idx] = fft[idx]
-    filtered_signal = np.real(fftpack.ifft(filtered_fft))
-
-    # Calculate the target price as the next value after the last closing price
-    target_price = filtered_signal[-1]
-
-    return target_price
-
-# Example usage
-closes = get_closes("1m")
-n_components = 5
-targets = []
-
-for i in range(len(closes) - 1):
-    # Decompose the signal up to the current minute and predict the target for the next minute
-    target = get_next_minute_target(closes[:i+1], n_components)
-    targets.append(target)
-
-# Print the predicted targets for the next minute
-print("Target for next minutes:", targets[-1])
-
-print()
-
-##################################################
-##################################################
 # timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
 
 overall_ranges = [
@@ -2677,112 +2563,124 @@ sine_wave_min = sine_wave["min"]
 octa_metatron_cube(close_prices, candles)  
 print(octa_metatron_cube(close_prices, candles))
 
+print()
+
+##################################################
+##################################################
+
+##################################################
+##################################################
+
+def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
+    """
+    Calculate thresholds and averages based on min and max percentages. 
+    """
+  
+    # Get min/max close    
+    min_close = np.nanmin(close_prices)
+    max_close = np.nanmax(close_prices)
+    
+    # Convert close_prices to numpy array
+    close_prices = np.array(close_prices)
+    
+    # Calculate momentum
+    momentum = talib.MOM(close_prices, timeperiod=period)
+    
+    # Get min/max momentum    
+    min_momentum = np.nanmin(momentum)   
+    max_momentum = np.nanmax(momentum)
+    
+    # Calculate custom percentages 
+    min_percentage_custom = minimum_percentage / 100  
+    max_percentage_custom = maximum_percentage / 100
+
+    # Calculate thresholds       
+    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
+    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
+
+    # Calculate range of prices within a certain distance from the current close price
+    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
+
+    # Filter close prices
+    with np.errstate(invalid='ignore'):
+        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
+        filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
+        
+    # Calculate avg    
+    avg_mtf = np.nanmean(filtered_close)
+
+    # Get current momentum       
+    current_momentum = momentum[-1]
+
+    # Calculate % to min/max momentum    
+    with np.errstate(invalid='ignore', divide='ignore'):
+        percent_to_min_momentum = ((max_momentum - current_momentum) /   
+                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
+
+        percent_to_max_momentum = ((current_momentum - min_momentum) / 
+                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
+ 
+    # Calculate combined percentages              
+    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
+    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
+      
+    # Combined momentum signal     
+    momentum_signal = percent_to_max_combined - percent_to_min_combined
+
+    return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
+
+
+# Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
+min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
+
+print("Momentum signal:", momentum_signal)
+print()
+
+print("Minimum threshold:", min_threshold)
+print("Maximum threshold:", max_threshold)
+print("Average MTF:", avg_mtf)
+
+#print("Range of prices within distance from current close price:")
+#print(range_price[-1])
 
 print()
 
 ##################################################
 ##################################################
 
-def calculate_thresholds2(closes, period=14, minimum_percentage=5, maximum_percentage=5,
-                         phi_ratio=1.61803398875, prime_twins=None, nested_radical=None, min_ext=0.1, max_ext=0.1, mtf_ext=[0.2, 0.3, 0.4]):
-    # Exclude NaN, zero, and negative values from the closes array
-    closes = np.array(closes)
-    closes = closes[np.logical_not(np.logical_or(np.isnan(closes), np.logical_or(closes == 0, closes < 0)))]
+def get_next_minute_target(closes, n_components):
+    # Calculate FFT of closing prices
+    fft = fftpack.fft(closes)
+    frequencies = fftpack.fftfreq(len(closes))
 
-    # Calculate the moving averages and standard deviations
-    mtf = np.zeros_like(closes)  # Initialize mtf to an array of zeros
-    stf = np.zeros_like(closes)
-    for i in range(period-1, len(closes)):
-        mtf[i] = np.sum(closes[i-period+1:i+1]) / period
-        stf[i] = np.sqrt(np.sum((closes[i-period+1:i+1] - mtf[i])**2) / period)
+    # Sort frequencies by magnitude and keep only the top n_components
+    idx = np.argsort(np.abs(fft))[::-1][:n_components]
+    top_frequencies = frequencies[idx]
 
-    # Calculate the thresholds
-    min_threshold = mtf - stf * minimum_percentage / 100
-    min_threshold = np.maximum(min_threshold, np.min(closes) * (1 - min_ext))
-    min_threshold = np.minimum(min_threshold, np.max(closes) * (1 - min_ext))
-    max_threshold = mtf + stf * maximum_percentage / 100
-    max_threshold = np.minimum(max_threshold, np.max(closes) * (1 + max_ext))
-    max_threshold = np.maximum(max_threshold, np.min(closes) * (1 + max_ext))
+    # Filter out the top frequencies and reconstruct the signal
+    filtered_fft = np.zeros_like(fft)
+    filtered_fft[idx] = fft[idx]
+    filtered_signal = np.real(fftpack.ifft(filtered_fft))
 
-    # Scale the thresholds to fit the 1-minute data
-    scale_factor = closes[-1] / mtf[-1]
-    min_threshold *= scale_factor
-    max_threshold *= scale_factor
+    # Calculate the target price as the next value after the last closing price
+    target_price = filtered_signal[-1]
 
-    # Calculate the momentum signal
-    momentum_signal = mtf[-1] - mtf[-2]
-
-    # Determine the current and next mood based on the target price
-    target_price = closes[-1]
-    if target_price > np.max(max_threshold):
-        current_mood = "TOP reversal"
-        next_mood = "distribution"
-    elif target_price < np.min(min_threshold):
-        current_mood = "DIP reversal"
-        next_mood = "range down to DIP reversal"
-    elif target_price <= mtf[-1]:
-        current_mood = "range down to DIP reversal"
-        next_mood = "accumulation"
-    elif target_price > mtf[-1] and target_price < phi_ratio * np.max(max_threshold):
-        current_mood = "accumulation"
-        next_mood = "range up to TOP reversal"
-    elif prime_twins is not None and target_price >= phi_ratio * np.max(max_threshold) and target_price < prime_twins[-1]:
-        current_mood = "range up to TOP reversal"
-        next_mood = "TOP reversal"
-    elif prime_twins is not None and nested_radical is not None and target_price >= prime_twins[-1] and target_price < nested_radical(prime_twins[-1]):
-        current_mood = "TOP reversal"
-        next_mood = "distribution"
-    else:
-        current_mood = "distribution"
-        next_mood = "range down to DIP reversal"
-
-    # Add extensions to the MTF signal
-    mtf_extensions = [mtf[-1] + ext for ext in mtf_ext]
-
-    # Calculate the next support and resistance levels
-    next_support = np.min(min_threshold) * (1 - min_ext)
-    next_resistance = np.max(max_threshold) * (1 + max_ext)
-
-    # Determine the market mood to the next reversal
-    if current_mood == "TOP reversal":
-        market_mood = "bearish"
-    elif current_mood == "DIP reversal":
-        market_mood = "bullish"
-    elif current_mood == "range down to DIP reversal" and next_mood == "accumulation":
-        market_mood = "bullish"
-    elif current_mood == "range up to TOP reversal" and next_mood == "distribution":
-        market_mood = "bearish"
-    else:
-        market_mood = "neutral"
-
-    # Print the calculated values
-    print("Min threshold at:", min_threshold[-1])
-    print("Max threshold at:", max_threshold[-1])
-    print("MTF signal at:", mtf[-1])
-    print("Momentum signal at:", momentum_signal)
-    print("Current mood is:", current_mood)
-    print("Next mood is:", next_mood)
-    print("Next support level is:", next_support)
-    print("Next resistance level is:", next_resistance)
-    print("Market mood to next reversal is:", market_mood)
-
-    # Return the calculated values
-    return min_threshold[-1], max_threshold[-1], mtf[-1], momentum_signal, current_mood, next_mood, next_support, next_resistance, market_mood, mtf_extensions
+    return target_price
 
 # Example usage
-min_threshold, max_threshold, mtf, momentum_signal, current_mood, next_mood, next_support, next_resistance, market_mood, mtf_extensions = calculate_thresholds2(closes, period=14, minimum_percentage=5, maximum_percentage=5, min_ext=0.05, max_ext=0.05, mtf_ext=[0.1, 0.2, 0.3])
+closes = get_closes("1m")
+n_components = 5
+targets = []
 
-# Print the calculated values
-#print("Min threshold at:", min_threshold)
-#print("Max threshold at:", max_threshold)
-#print("MTF signal at:", mtf)
-#print("Momentum signal at:", momentum_signal)
-#print("Current mood is:", current_mood)
-#print("Next mood is:", next_mood)
-#print("Next support level is:", next_support)
-#print("Next resistance level is:", next_resistance)
-#print("Market mood to next reversal is:", market_mood)
-#print("MTF extensions:", mtf_extensions)
+for i in range(len(closes) - 1):
+    # Decompose the signal up to the current minute and predict the target for the next minute
+    target = get_next_minute_target(closes[:i+1], n_components)
+    targets.append(target)
+
+# Print the predicted targets for the next minute
+print("Target for next minutes:", targets[-1])
+
+print()
 
 print()
 
