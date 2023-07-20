@@ -2644,14 +2644,17 @@ def get_consecutive_targets(closes, n_components, num_targets, current_time, cur
         else:
             print(f"Failed to calculate target {i+1}.")
 
-    print()
+
 
     if len(targets) == len(target_times) == len(est_time_diffs) == len(price_diffs) == num_targets:
+ 
+        print()
+
         print("Targets:")
         for target_time, target_price, price_diff in zip(target_times, targets, price_diffs):
             print(f"{target_time}: {target_price:.2f} ({price_diff:+.4f})")
 
-    print()
+        print()
 
         print("Estimated time differences:")
         for target_time, est_time_diff in zip(target_times, est_time_diffs):
