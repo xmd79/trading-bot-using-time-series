@@ -2669,6 +2669,8 @@ current_close = closes[-1]
 # Calculate the consecutive targets
 targets, target_times, est_time_diffs, price_diffs = get_consecutive_targets(closes, n_components, num_targets, current_time, current_close)
 
+print()
+
 # Print the results
 print("Targets:")
 for i in range(num_targets):
