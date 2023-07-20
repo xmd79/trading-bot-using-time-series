@@ -2599,11 +2599,9 @@ def poly_slope(closes, degree):
     return slope
 
 def get_consecutive_targets(closes, n_components, num_targets, current_time, current_close):
-    print(f"current_time: {current_time}")
-    print(f"current_close: {current_close}")
     # Calculate FFT of closing prices
-    fft = fftpack.fft(closes)
-    frequencies = fftpack.fftfreq(len(closes))
+    fft = np.fft.fft(closes)
+    frequencies = np.fft.fftfreq(len(closes))
 
     # Sort frequencies by magnitude and keep only the top n_components
     idx = np.argsort(np.abs(fft))[::-1][:n_components]
@@ -2612,7 +2610,7 @@ def get_consecutive_targets(closes, n_components, num_targets, current_time, cur
     # Filter out the top frequencies and reconstruct the signal
     filtered_fft = np.zeros_like(fft)
     filtered_fft[idx] = fft[idx]
-    filtered_signal = np.real(fftpack.ifft(filtered_fft))
+    filtered_signal = np.real(np.fft.ifft(filtered_fft))
 
     # Calculate the targets for the next num_targets minutes
     targets = []
@@ -2625,37 +2623,29 @@ def get_consecutive_targets(closes, n_components, num_targets, current_time, cur
 
     # Calculate the remaining targets with increasing increments from the previous target price
     for i in range(num_targets):
+        diff_factor = 0.01  # Use a fixed difference factor of 1%
         harmonic_freq = top_frequencies[-1-i%3] if i%3 < 3 else top_frequencies[i%3-3] # Use the last 3 highest and lowest frequencies for harmonic analysis
         amplitude, phase, residuals = harmonic_analysis(closes, harmonic_freq)
         slope = poly_slope(residuals, 1) # Use linear regression to estimate the slope of the residuals
-        if harmonic_freq == 0:
-            time_to_target = 1e6
-        else:
-            time_to_target = np.abs(np.arctan2(target_price-current_close, amplitude*np.cos(harmonic_freq*(len(closes)+i+1)+phase)+slope*(len(closes)+i+1))-np.arctan2(current_close-current_close, amplitude*np.cos(harmonic_freq*(len(closes))+phase)+slope*(len(closes))))/harmonic_freq # Use trigonometry to calculate the time to the target
+        time_to_target = np.abs(np.arctan2(target_price-current_close, amplitude*np.cos(harmonic_freq*(len(closes)+i+1)+phase)+slope*(len(closes)+i+1))-np.arctan2(current_close-current_close, amplitude*np.cos(harmonic_freq*(len(closes))+phase)+slope*(len(closes))))/harmonic_freq # Use trigonometry to calculate the time to the target
         if time_to_target < 1e5:
             target_time = (current_time + datetime.timedelta(minutes=time_to_target)).strftime('%H:%M:%S')
             est_time_diff = f"{time_to_target:.2f} minutes from now"
-            target_price += target_price * 0.005 # Increase the target price by 0.5% for each additional minute
+            target_price += target_price * diff_factor # Increase the target price by a fixed factor based on the difference factor
             price_diff = target_price - current_close
             targets.append(target_price)
             target_times.append(target_time)
             est_time_diffs.append(est_time_diff)
             price_diffs.append(price_diff)
+            current_close = target_price  # Update current close price to the latest target price
         else:
             print(f"Failed to calculate target {i+1}.")
 
-
-
     if len(targets) == len(target_times) == len(est_time_diffs) == len(price_diffs) == num_targets:
- 
-        print()
-
         print("Targets:")
         for target_time, target_price, price_diff in zip(target_times, targets, price_diffs):
             print(f"{target_time}: {target_price:.2f} ({price_diff:+.4f})")
-
         print()
-
         print("Estimated time differences:")
         for target_time, est_time_diff in zip(target_times, est_time_diffs):
             print(f"{target_time}: {est_time_diff}")
