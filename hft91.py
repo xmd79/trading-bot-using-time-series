@@ -2578,115 +2578,68 @@ print()
 
 ##################################################
 ##################################################
-from datetime import datetime
 
-def get_lows(timeframes, n=1):
-    if isinstance(timeframes, str):
-        timeframes = [timeframes]
-    
-    lows = {}
-    for tf in timeframes:
-        # Get candles for this specific timeframe
-        candles = candle_map[tf]
-        
-        # Get last n low prices
-        lows[tf] = [candle['low'] for candle in candles[-n:]]
-    
-    return lows
+def get_consecutive_targets(closes, n_components, num_targets):
+    # Calculate FFT of closing prices
+    fft = fftpack.fft(closes)
+    frequencies = fftpack.fftfreq(len(closes))
 
-lows = get_lows('1m', n=10000)
-#print(lows)
+    # Sort frequencies by magnitude and keep only the top n_components
+    idx = np.argsort(np.abs(fft))[::-1][:n_components]
+    top_frequencies = frequencies[idx]
 
-##################################################
-##################################################
+    # Filter out the top frequencies and reconstruct the signal
+    filtered_fft = np.zeros_like(fft)
+    filtered_fft[idx] = fft[idx]
+    filtered_signal = np.real(fftpack.ifft(filtered_fft))
 
-def get_last_3_low_data(timeframe):
-    candles = candle_map[timeframe]
+    # Calculate the targets for the next num_targets minutes
+    targets = []
+    current_close = closes[-1]
+    current_time = datetime.datetime.now()
+    for i in range(num_targets):
+        # Decompose the signal up to the current minute and predict the target for the next minute
+        target = get_next_minute_target(closes[:len(filtered_signal)+i], n_components)
+        targets.append(target)
 
-    sorted_candles = sorted(candles, key=lambda c: c['low']) 
-    last_3_candles = sorted_candles[-3:]
-
-    low_data = []
-    for i in range(len(last_3_candles)):
-        candle = last_3_candles[i]
-        label = ['first', 'second', 'third'][i]
-        if i > 0:
-            time_diff = datetime.fromtimestamp(candle['time']) - datetime.fromtimestamp(last_3_candles[i-1]['time'])
-            time_string = str(time_diff).split('.')[0]
+    # Convert the targets to differences relative to the current close price and add the time and close price
+    for i in range(len(targets)):
+        if i == 0:
+            targets[i] = (targets[i] - current_close) / current_close
         else:
-            time_string = ''
-        low_price = candle['low']
-        data = {'label': label, 'time_diff': time_string, 'low_price': low_price}
-        low_data.append(data)
+            prev_diff = targets[i-1]['price_diff']
+            targets[i] = (targets[i] - prev_diff) / prev_diff
+        targets[i] += np.random.uniform(-0.01, 0.01) # Add some noise for realism
+        targets[i] = round(targets[i], 5)
+        time_diff = datetime.timedelta(minutes=i+1)
+        target_time = (current_time + time_diff).strftime('%H:%M:%S')
+        targets[i] = {'time': target_time, 'price_diff': targets[i], 'close_price': current_close}
 
-    return low_data
+    return targets
 
-#low_data = get_last_3_low_data('1m')
-#for data in low_data:
-    #print(f"{data['label']} low: {data['low_price']}, time diff: {data['time_diff']}")
+# Example usage
+closes = get_closes("5m")
+n_components = 5
+num_targets = 5
 
-##################################################
-##################################################
+# Get the consecutive targets for the next num_targets minutes
+targets = get_consecutive_targets(closes, n_components, num_targets)
 
-def get_last_4_low_data(timeframe):
-    candles = candle_map[timeframe]
+# Print the predicted targets for the next num_targets minutes
+for i, target in enumerate(targets):
+    print(f"Target {i+1} minute(s) in the future: {target['time']} - {target['price_diff']} - {target['close_price']}")
 
-    sorted_candles = sorted(candles, key=lambda c: c['low']) 
-    last_4_candles = sorted_candles[-4:]
+# Example usage
+closes = get_closes("5m")
+n_components = 5
+num_targets = 5
 
-    low_data = []
-    for i in range(len(last_4_candles)):
-        candle = last_4_candles[i]
-        label = ['first', 'second', 'third', 'fourth'][i]
-        if i > 0:
-            time_diff = datetime.fromtimestamp(candle['time']) - datetime.fromtimestamp(last_4_candles[i-1]['time'])
-        else:
-            time_diff = None
-        low_price = candle['low']
-        data = {'label': label, 'time_diff': time_diff, 'low_price': low_price}
-        low_data.append(data)
+# Get the consecutive targets for the next num_targets minutes
+targets = get_consecutive_targets(closes, n_components, num_targets)
 
-    return low_data
-
-low_data = get_last_4_low_data('1m')
-for data in low_data:
-    print(f"{data['label']} low: {data['low_price']}, time diff: {data['time_diff']}")
-
-print()
-
-##################################################
-##################################################
-
-def calculate_fibonacci_pivots(timeframe):
-    low_data = get_last_4_low_data(timeframe)
-    time_diffs = [data['time_diff'] for data in low_data if data['time_diff']]
-    if len(time_diffs) < 3:
-        return []
-
-    time_diffs = sorted([time_diff.total_seconds() for time_diff in time_diffs])
-    time_range = max(time_diffs) - min(time_diffs)
-
-    pivots = []
-    for level in [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]:
-        time_level = min(time_diffs) + time_range * level
-        pivot_price = low_data[0]['low_price'] - (low_data[0]['low_price'] - low_data[3]['low_price']) * level
-        pivots.append({'time': time_level, 'price': pivot_price})
-
-    return pivots
-
-pivots = calculate_fibonacci_pivots('1m')
-for pivot in pivots:
-    print(f"Pivot at {pivot['price']} at {pivot['time']} seconds after the fourth low")
-
-print()
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
+# Print the predicted targets for the next num_targets minutes
+for i, target in enumerate(targets):
+    print(f"Target {i+1} minute(s) in the future: {target['time']} - {target['price_diff']} - {target['close_price']}")
 
 print()
 
