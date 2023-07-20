@@ -2644,10 +2644,14 @@ def get_consecutive_targets(closes, n_components, num_targets, current_time, cur
         else:
             print(f"Failed to calculate target {i+1}.")
 
+    print()
+
     if len(targets) == len(target_times) == len(est_time_diffs) == len(price_diffs) == num_targets:
         print("Targets:")
         for target_time, target_price, price_diff in zip(target_times, targets, price_diffs):
             print(f"{target_time}: {target_price:.2f} ({price_diff:+.4f})")
+
+    print()
 
         print("Estimated time differences:")
         for target_time, est_time_diff in zip(target_times, est_time_diffs):
@@ -2661,24 +2665,22 @@ def get_consecutive_targets(closes, n_components, num_targets, current_time, cur
 n_components = 5
 num_targets = 3
 
-# Call the get_consecutive_targets function
+
 # Define the current time and close price
 current_time = datetime.datetime.now()
 current_close = closes[-1]
 
-# Calculate the consecutive targets
+print()
+
+# # Call the get_consecutive_targets function
 targets, target_times, est_time_diffs, price_diffs = get_consecutive_targets(closes, n_components, num_targets, current_time, current_close)
 
 print()
 
 # Print the results
-print("Targets:")
-for i in range(num_targets):
-    print(f"{target_times[i]}: {targets[i]:.2f} ({price_diffs[i]:+.4f})")
-
-print("Estimated time differences:")
-for i in range(num_targets):
-    print(f"{target_times[i]}: {est_time_diffs[i]}")
+#print("Targets:")
+#for i in range(num_targets):
+    #print(f"{target_times[i]}: {targets[i]:.2f} ({price_diffs[i]:+.4f})")
 
 print()
 
