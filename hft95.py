@@ -236,7 +236,7 @@ def scale_to_sine(timeframe):
           #f"and at "
           #f"dist. to max: {dist_from_close_to_max:.2f}%")
 
-    return dist_from_close_to_min, dist_from_close_to_max
+    return dist_from_close_to_min, dist_from_close_to_max, current_sine
 
 # Call function           
 #for timeframe in timeframes:        
@@ -253,7 +253,7 @@ def collect_results():
     
     for timeframe in timeframes:
         # Call existing function 
-        dist_to_min, dist_to_max = scale_to_sine(timeframe)  
+        dist_to_min, dist_to_max, current_sine = scale_to_sine(timeframe)  
         
         # Append result tuple
         results.append((dist_to_min, dist_to_max)) 
@@ -501,7 +501,7 @@ def collect_results():
         dist_max_sum = 0
         for timeframe in timeframes_for_range:
             # Call existing function 
-            dist_to_min, dist_to_max = scale_to_sine(timeframe)  
+            dist_to_min, dist_to_max, current_sine = scale_to_sine(timeframe)  
         
             # Add distances to running sum
             dist_min_sum += dist_to_min
@@ -2485,11 +2485,14 @@ def main():
     timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
     TRADE_SYMBOL = "BTCUSDT"
 
+    ##################################################
+    ##################################################
+
     while True:
         
         # Get fresh closes for the current timeframe
         closes = get_closes('1m')
-        
+       
         # Get close price as <class 'float'> type
         close = get_close('1m')
         
@@ -2507,13 +2510,15 @@ def main():
             sine, leadsine = talib.HT_SINE(close_prices)
                 
             # Call scale_to_sine() function   
-            dist_from_close_to_min, dist_from_close_to_max = scale_to_sine('1m')
+            #dist_from_close_to_min, dist_from_close_to_max = scale_to_sine('1m')
 
-            # Print results   
-            print(f"1m Close is now at "    
-              f"dist. to min: {dist_from_close_to_min:.2f}% "
-              f"and at "
-              f"dist. to max: {dist_from_close_to_max:.2f}%")
+            for timeframe in timeframes:
+                dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
+
+                # Print results        
+                print(f"On {timeframe} Close price value on sine is now at: {current_sine})")
+                print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
+                print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
 
         except Exception as e:
             print(f"An error occurred: {e}")
