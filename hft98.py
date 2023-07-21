@@ -2539,15 +2539,15 @@ def main():
             sine, leadsine = talib.HT_SINE(close_prices)
                 
             # Call scale_to_sine() function   
-            #dist_from_close_to_min, dist_from_close_to_max = scale_to_sine('1m')
+            # dist_from_close_to_min, dist_from_close_to_max = scale_to_sine('1m')
 
-            #for timeframe in timeframes:
-                #dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
+            for timeframe in timeframes:
+                dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
 
                 # Print results        
-                #print(f"On {timeframe} Close price value on sine is now at: {current_sine})")
-                #print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
-                #print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
+                print(f"On {timeframe} Close price value on sine is now at: {current_sine})")
+                print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
+                print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
 
             print()
 
@@ -2556,6 +2556,13 @@ def main():
             print()
 
             sine_wave[-1], dist_from_close_to_min, dist_from_close_to_max, current_quadrant, em_amp, em_phase, trend_direction, price_range_percent, momentum, sine_wave_max, sine_wave_min = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5) 
+
+            print()
+
+            print("Current close on sine value now at: ", current_sine)
+            print("Distance as percentages from close to min: ", dist_from_close_to_min, "%")
+            print("Distance as percentages from close to max: ", dist_from_close_to_max, "%")
+            print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
 
             print()
 
@@ -2576,13 +2583,6 @@ def main():
 
             mtf_market_mood = get_mtf_market_mood()
             print("MTF RSI and MOM market mood: ", mtf_market_mood)
-
-            print()
-
-            print("Current close on sine value now at: ", current_sine)
-            print("Distance as percentages from close to min: ", dist_from_close_to_min, "%")
-            print("Distance as percentages from close to max: ", dist_from_close_to_max, "%")
-            print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
 
             print()
 
