@@ -1194,8 +1194,6 @@ def main():
             ##################################################
             ##################################################
 
-            cycle_direction, quadrant_emotional_values, forecast_moods, sorted_frequencies, avg_high_mood, avg_low_mood, weighted_high_mood, weighted_low_mood, mapped_quadrants, min_node, max_node, mood_reversal_forecast, market_mood, current_point, next_point = generate_market_mood_forecast(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50) 
-
             market_mood_forecast = generate_market_mood_forecast(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
 
             cycle_direction = market_mood_forecast["cycle_direction"]
