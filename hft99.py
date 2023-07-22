@@ -2666,6 +2666,13 @@ particles["Neutron"]["RF band"] = get_rf_band(neutron_freq)
 particles["Photon"]["RF band"] = get_rf_band(photon_freq)
 particles["Quark"]["RF band"] = get_rf_band(quark_freq)
 
+print()
+
+# Prints full particle map
+print(particles)
+
+print()
+
 # Access particle details   
 electron_momentum = particles["Electron"]["Momentum"]
 print(electron_momentum)
@@ -2678,11 +2685,6 @@ print(proton_properties)
 neutron_transitions = particles["Neutron"]["Transitions"]                 
 print(neutron_transitions)
 # "Neutron spin flip transitions and electron capture"          
-
-print()
-
-# Prints full particle map
-print(particles)
 
 print()
 
@@ -2890,6 +2892,8 @@ def main():
             # Prints full particle map
             print(particles)
 
+            print()
+
             # Access particle details   
             electron_momentum = particles["Electron"]["Momentum"]
             print(electron_momentum)
@@ -2933,3 +2937,12 @@ print()
 
 ##################################################
 ##################################################
+
+print()
+
+##################################################
+##################################################
+
+# Run the main function
+if __name__ == '__main__':
+    main()
