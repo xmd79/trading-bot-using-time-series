@@ -731,6 +731,16 @@ def generate_market_mood_forecast(close_prices, candles, percent_to_max_val=5, p
     if next_quadrant == 4:
         next_point = "Right"
 
+    # Get the previous point 
+    if current_point == "Apex":
+        last_point = "Right"
+    elif current_point == "Left":
+        last_point = "Base"      
+    elif current_point == "Base":        
+        last_point = "Left"       
+    else:  
+        last_point = "Apex"
+
     # Calculate quadrature phase
     if next_quadrant == 1:
         next_quadrature_phase = em_phase_q1
@@ -779,6 +789,29 @@ def generate_market_mood_forecast(close_prices, candles, percent_to_max_val=5, p
     # Sort the frequencies from most negative to most positive based on their emotional value
     sorted_frequencies = sorted(forecast_moods, key=lambda x: forecast_moods[x])
 
+    # Get the previous frequency  
+    if current_point == "Apex":
+        last_frequency = sorted_frequencies[-1]
+    elif current_point == "Left":
+        last_frequency = sorted_frequencies[-2]       
+    elif current_point == "Base":        
+        last_frequency = sorted_frequencies[-3]
+    else:  
+        last_frequency = sorted_frequencies[-4]  
+
+    # Get the current frequency
+    current_frequency = sorted_frequencies[0]
+
+    # Get the next frequency         
+    if next_point == "Apex":
+        next_frequency = sorted_frequencies[1]        
+    elif next_point == "Left":
+        next_frequency = sorted_frequencies[2]            
+    elif next_point == "Base": 
+        next_frequency = sorted_frequencies[3]
+    else:
+        next_frequency = sorted_frequencies[4]  
+
     # Calculate average moods for the highest 3 and lowest 3 frequencies to determine the overall trend
     high_moods = [forecast_moods[band] for band in sorted_frequencies[-3:]]
     low_moods = [forecast_moods[band] for band in sorted_frequencies[:3]]
@@ -818,16 +851,23 @@ def generate_market_mood_forecast(close_prices, candles, percent_to_max_val=5, p
         market_mood = "Neutral"
 
     # Return the market mood forecast
-    return {"cycle_direction": cycle_direction, "quadrant_emotional_values": quadrant_emotional_values, "forecast_moods": forecast_moods, "sorted_frequencies": sorted_frequencies, "avg_high_mood": avg_high_mood, "avg_low_mood": avg_low_mood, "weighted_high_mood": weighted_high_mood, "weighted_low_mood": weighted_low_mood, "mapped_quadrants": mapped_quadrants, "min_node": min_node, "max_node": max_node, "mood_reversal_forecast": mood_reversal_forecast, "market_mood": market_mood, "current_point": current_point, "next_point": next_point}
+    return {"cycle_direction": cycle_direction, "quadrant_emotional_values": quadrant_emotional_values, "forecast_moods": forecast_moods, "sorted_frequencies": sorted_frequencies, "last_frequency": last_frequency, "current_frequency": current_frequency, "next_frequency": next_frequency, "avg_high_mood": avg_high_mood, "avg_low_mood": avg_low_mood, "weighted_high_mood": weighted_high_mood, "weighted_low_mood": weighted_low_mood, "mapped_quadrants": mapped_quadrants, "min_node": min_node, "max_node": max_node, "mood_reversal_forecast": mood_reversal_forecast, "market_mood": market_mood, "last_point": last_point, "current_point": current_point, "next_point": next_point}
   
-generate_market_mood_forecast(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
+##################################################
+##################################################
 
 market_mood_forecast = generate_market_mood_forecast(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
+
+##################################################
+##################################################
 
 cycle_direction = market_mood_forecast["cycle_direction"]
 quadrant_emotional_values = market_mood_forecast["quadrant_emotional_values"]
 forecast_moods = market_mood_forecast["forecast_moods"]
 sorted_frequencies = market_mood_forecast["sorted_frequencies"]
+last_frequency = market_mood_forecast["last_frequency"]
+current_frequency = market_mood_forecast["current_frequency"]
+next_frequency = market_mood_forecast["next_frequency"]
 avg_high_mood = market_mood_forecast["avg_high_mood"]
 avg_low_mood = market_mood_forecast["avg_low_mood"]
 weighted_high_mood = market_mood_forecast["weighted_high_mood"]
@@ -837,17 +877,23 @@ min_node = market_mood_forecast["min_node"]
 max_node = market_mood_forecast["max_node"]
 mood_reversal_forecast = market_mood_forecast["mood_reversal_forecast"]
 market_mood = market_mood_forecast["market_mood"]
-
+last_point = market_mood_forecast["last_point"]
 current_point = market_mood_forecast["current_point"] 
 next_point = market_mood_forecast["next_point"]
 
+##################################################
+##################################################
+
+print(f"Last point: {last_point}") 
 print(f"Current point: {current_point}")
 print(f"Next point: {next_point}")
-
 print("Cycle direction:", cycle_direction)
 print("Quadrant emotional values:", quadrant_emotional_values)
 print("Forecast moods:", forecast_moods)
-print("Sorted frequencies:", sorted_frequencies)
+print("Sorted frequencies:", sorted_frequencies)           
+print(f"Last frequency: {last_frequency}")
+print(f"Current frequency: {current_frequency}")
+print(f"Next frequency: {next_frequency}")
 print("Average high mood:", avg_high_mood)
 print("Average low mood:", avg_low_mood)
 print("Weighted high mood:", weighted_high_mood)
@@ -1205,6 +1251,9 @@ def main():
             quadrant_emotional_values = market_mood_forecast["quadrant_emotional_values"]
             forecast_moods = market_mood_forecast["forecast_moods"]
             sorted_frequencies = market_mood_forecast["sorted_frequencies"]
+            last_frequency = market_mood_forecast["last_frequency"]
+            current_frequency = market_mood_forecast["current_frequency"]
+            next_frequency = market_mood_forecast["next_frequency"]
             avg_high_mood = market_mood_forecast["avg_high_mood"]
             avg_low_mood = market_mood_forecast["avg_low_mood"]
             weighted_high_mood = market_mood_forecast["weighted_high_mood"]
@@ -1214,15 +1263,20 @@ def main():
             max_node = market_mood_forecast["max_node"]
             mood_reversal_forecast = market_mood_forecast["mood_reversal_forecast"]
             market_mood = market_mood_forecast["market_mood"]
+            last_point = market_mood_forecast["last_point"]
             current_point = market_mood_forecast["current_point"] 
             next_point = market_mood_forecast["next_point"]
 
+            print(f"Last point: {last_point}")
             print(f"Current point: {current_point}")
             print(f"Next point: {next_point}")
             print("Cycle direction:", cycle_direction)
             print("Quadrant emotional values:", quadrant_emotional_values)
             print("Forecast moods:", forecast_moods)
             print("Sorted frequencies:", sorted_frequencies)
+            print("Last frequency:", last_frequency)
+            print("Current frequency:", current_frequency)
+            print("Next frequency:", next_frequency)
             print("Average high mood:", avg_high_mood)
             print("Average low mood:", avg_low_mood)
             print("Weighted high mood:", weighted_high_mood)
