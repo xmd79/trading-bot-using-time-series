@@ -1319,25 +1319,6 @@ def main():
             ##################################################
             ##################################################
 
-            def get_next_minute_target(closes, n_components):
-                # Calculate FFT of closing prices
-                fft = fftpack.fft(closes)
-                frequencies = fftpack.fftfreq(len(closes))
-
-                # Sort frequencies by magnitude and keep only the top n_components
-                idx = np.argsort(np.abs(fft))[::-1][:n_components]
-                top_frequencies = frequencies[idx]
-
-                # Filter out the top frequencies and reconstruct the signal
-                filtered_fft = np.zeros_like(fft)
-                filtered_fft[idx] = fft[idx]
-                filtered_signal = np.real(fftpack.ifft(filtered_fft))
-
-                # Calculate the target price as the next value after the last closing price
-                target_price = filtered_signal[-1]
-
-                return target_price
-
             # Example usage of fft function
             closes1 = get_closes("1m")
             closes2 = get_closes("3m")
@@ -1380,37 +1361,6 @@ def main():
             ##################################################
             ##################################################
 
-            def get_next_minute_targets(closes, n_components):
-                # Calculate FFT of closing prices
-                fft = fftpack.fft(closes)
-                frequencies = fftpack.fftfreq(len(closes))
-
-                # Sort frequencies by magnitude and keep only the top n_components
-                idx = np.argsort(np.abs(fft))[::-1][:n_components]
-                top_frequencies = frequencies[idx]
-
-                # Filter out the top frequencies and reconstruct the signal
-                filtered_fft = np.zeros_like(fft)
-                filtered_fft[idx] = fft[idx]
-                filtered_signal = np.real(fftpack.ifft(filtered_fft))
-
-                # Calculate the target price as the next value after the last closing price
-                target_price = filtered_signal[-1]
-    
-                # Calculate the stop loss and target levels
-                entry_price = closes[-1]
-                stop_loss = entry_price - 3*np.std(closes)
-                target1 = target_price + np.std(closes)
-                target2 = target_price + 2*np.std(closes)
-                target3 = target_price + 3*np.std(closes)
-
-                return entry_price, stop_loss, target1, target2, target3
-
-
-            # Example usage
-            #closes = get_closes("1m")
-
-            n_components = 5
             targets = []
 
             for i in range(len(closes) - 1):
