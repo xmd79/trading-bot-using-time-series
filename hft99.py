@@ -2864,11 +2864,6 @@ def main():
 
             print()
 
-            particles = subatomic_map_function(close_prices, candles,  
-                                   percent_to_max_val,
-                                   percent_to_min_val)  
-
- 
             ##################################################
             ##################################################
 
