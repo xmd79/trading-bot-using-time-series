@@ -591,11 +591,16 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, 
 
     print("EM value:", em_value)
 
-    # Determine the trend direction based on the EM phase differences
-    if em_phase_q4 - em_phase_q3 > 0 and em_phase_q3 - em_phase_q2 > 0 and em_phase_q2 - em_phase_q1 > 0:
-        trend_direction = "Down"
-    elif em_phase_q4 - em_phase_q3 < 0 and em_phase_q3 - em_phase_q2 < 0 and em_phase_q2 - em_phase_q1 < 0:
+    # Define up cycle as movement from Q1 to Q4
+    up_cycle = em_phase_q2 > em_phase_q1 and em_phase_q3 > em_phase_q2 and em_phase_q4 > em_phase_q3
+
+    # Define down cycle as movement from Q4 to Q1    
+    down_cycle = em_phase_q3 < em_phase_q4 and em_phase_q2 < em_phase_q3 and em_phase_q1 < em_phase_q2
+
+    if up_cycle:
         trend_direction = "Up"
+    elif down_cycle:   
+        trend_direction = "Down"
     else:
         trend_direction = "Sideways"
 
