@@ -1000,165 +1000,58 @@ print()
 ##################################################
 ##################################################
 
-def get_next_minute_target(closes, n_components):
-    # Calculate FFT of closing prices
-    fft = fftpack.fft(closes)
-    frequencies = fftpack.fftfreq(len(closes))
-
-    # Sort frequencies by magnitude and keep only the top n_components
-    idx = np.argsort(np.abs(fft))[::-1][:n_components]
-    top_frequencies = frequencies[idx]
-
-    # Filter out the top frequencies and reconstruct the signal
-    filtered_fft = np.zeros_like(fft)
-    filtered_fft[idx] = fft[idx]
-    filtered_signal = np.real(fftpack.ifft(filtered_fft))
-
-    # Calculate the target price as the next value after the last closing price
-    target_price = filtered_signal[-1]
-
-    return target_price
-
-# Example usage
-closes = get_closes("1m")
-n_components = 5
-targets = []
-
-for i in range(len(closes) - 1):
-    # Decompose the signal up to the current minute and predict the target for the next minute
-    target = get_next_minute_target(closes[:i+1], n_components)
-    targets.append(target)
-
-# Print the predicted targets for the next minute
-print("Target for 1min tf:", targets[-1])
-
-##################################################
-##################################################
-
-# Example usage
-closes = get_closes("3m")
-n_components = 5
-targets = []
-
-for i in range(len(closes) - 1):
-    # Decompose the signal up to the current minute and predict the target for the next minute
-    target = get_next_minute_target(closes[:i+1], n_components)
-    targets.append(target)
-
-##################################################
-##################################################
-
-# Print the predicted targets for the next minute
-print("Target for 3min tf:", targets[-1])
-
-# Example usage
-closes = get_closes("5m")
-n_components = 5
-targets = []
-
-for i in range(len(closes) - 1):
-    # Decompose the signal up to the current minute and predict the target for the next minute
-    target = get_next_minute_target(closes[:i+1], n_components)
-    targets.append(target)
-
-# Print the predicted targets for the next minute
-print("Target for 5min tf:", targets[-1])
-
-print()
-
-##################################################
-##################################################
-
-def get_next_minute_targets(closes, n_components):
-    # Calculate FFT of closing prices
-    fft = fftpack.fft(closes)
-    frequencies = fftpack.fftfreq(len(closes))
-
-    # Sort frequencies by magnitude and keep only the top n_components
-    idx = np.argsort(np.abs(fft))[::-1][:n_components]
-    top_frequencies = frequencies[idx]
-
-    # Filter out the top frequencies and reconstruct the signal
-    filtered_fft = np.zeros_like(fft)
-    filtered_fft[idx] = fft[idx]
-    filtered_signal = np.real(fftpack.ifft(filtered_fft))
-
-    # Calculate the target price as the next value after the last closing price
-    target_price = filtered_signal[-1]
-    
-    # Calculate the stop loss and target levels
-    entry_price = closes[-1]
-    stop_loss = entry_price - 3*np.std(closes)
-    target1 = target_price + np.std(closes)
-    target2 = target_price + 2*np.std(closes)
-    target3 = target_price + 3*np.std(closes)
-
-    return entry_price, stop_loss, target1, target2, target3
-
-# Example usage
-closes = get_closes("1m")
-n_components = 5
-targets = []
-
-for i in range(len(closes) - 1):
-    # Decompose the signal up to the current minute and predict the target for the next minute
-    entry_price, stop_loss, target1, target2, target3 = get_next_minute_targets(closes[:i+1], n_components)
-    targets.append((entry_price, stop_loss, target1, target2, target3))
-
-# Print the predicted levels for the next minute
-print("Entry price:", targets[-1][0])
-print("Stop loss:", targets[-1][1])
-print("Target 1:", targets[-1][2])
-print("Target 2:", targets[-1][3])
-print("Target 3:", targets[-1][4])
-
-print()
-
-##################################################
-##################################################
-
 def get_target(closes, n_components, target_distance=0.5):
     # Calculate FFT of closing prices
-    fft = fftpack.fft(closes)
+    fft = fftpack.fft(closes) 
     frequencies = fftpack.fftfreq(len(closes))
-
-    # Sort frequencies by magnitude and keep only the top n_components
+    
+    # Sort frequencies by magnitude and keep only the top n_components 
     idx = np.argsort(np.abs(fft))[::-1][:n_components]
     top_frequencies = frequencies[idx]
-
+    
     # Filter out the top frequencies and reconstruct the signal
     filtered_fft = np.zeros_like(fft)
     filtered_fft[idx] = fft[idx]
     filtered_signal = np.real(fftpack.ifft(filtered_fft))
-
+    
     # Calculate the target price as the next value after the last closing price, plus a small constant
     current_close = closes[-1]
     target_price = filtered_signal[-1] + target_distance
-
+    
+    # Get the current time           
+    current_time = datetime.datetime.now()
+    
     # Calculate the market mood based on the predicted target price and the current close price
     diff = target_price - current_close
-    if diff > 0:
+    if diff > 0:           
         market_mood = "Bullish"
-    elif diff < 0:
+    elif diff < 0:                 
         market_mood = "Bearish"
-    else:
+    else:           
         market_mood = "Neutral"
+    
+    # Calculate the stop loss and target levels
+    entry_price = closes[-1]    
+    stop_loss =  entry_price - 3*np.std(closes)   
+    target1 = target_price + np.std(closes)  
+    target2 = target_price + 2*np.std(closes)  
+    target3 = target_price + 3*np.std(closes)            
+    
+    return current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, market_mood
 
-    # Get the current time
-    current_time = datetime.datetime.now()
-
-    # Print the results
-    print("Current local Time is now at: ", current_time)
-    print("Current close price is at : ", current_close)
-    print("Target price for next minutes is: ", target_price)
-    print("Market mood is: ", market_mood)
-
-    # Return the filtered signal, target price, and market mood
-    return filtered_signal, target_price, market_mood
-
-closes = get_closes("1m")
+closes = get_closes("1m")     
 n_components = 5
-filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
+
+current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
+
+print("Current local Time is now at: ", current_time)
+print("Current close price is at : ", entry_price)
+print("Target price for next minutes is: ", target_price)   
+print("Market mood is: ", market_mood)
+print("Stop loss is: ", stop_loss) 
+print("Target 1 is: ", target1)           
+print("Target 2 is: ", target2)
+print("Target 3 is: ", target3)
 
 print()
 
@@ -1319,68 +1212,19 @@ def main():
             ##################################################
             ##################################################
 
-            # Example usage of fft function
-            closes1 = get_closes("1m")
-            closes2 = get_closes("3m")
-            closes3 = get_closes("5m")
-
+            closes = get_closes("1m")     
             n_components = 5
-            targets1 = []
-            targets2 = []
-            targets3 = []
 
-            for i in range(len(closes1) - 1):
+            current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
 
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                target1 = get_next_minute_target(closes1[:i+1], n_components)
-                targets1.append(target1)
-
-            for i in range(len(closes2) - 1):
-
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                target2 = get_next_minute_target(closes2[:i+1], n_components)
-                targets2.append(target2)
-
-            for i in range(len(closes3) - 1):
-
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                target3 = get_next_minute_target(closes3[:i+1], n_components)
-                targets3.append(target3)
-
-            # Print the predicted targets for the next minute
-            print("Target for 1min tf:", targets1[-1])
-
-            # Print the predicted targets for the next minute
-            print("Target for 3min tf:", targets2[-1])
-
-            # Print the predicted targets for the next minute
-            print("Target for 5min tf:", targets3[-1])
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            targets = []
-
-            for i in range(len(closes) - 1):
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                entry_price, stop_loss, target1, target2, target3 = get_next_minute_targets(closes[:i+1], n_components)
-                targets.append((entry_price, stop_loss, target1, target2, target3))
-
-            # Print the predicted levels for the next minute
-            print("Entry price:", targets[-1][0])
-            print("Stop loss:", targets[-1][1])
-            print("Target 1:", targets[-1][2])
-            print("Target 2:", targets[-1][3])
-            print("Target 3:", targets[-1][4])
-
-            print()
-            
-            ##################################################
-            ##################################################
-
-            filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
+            print("Current local Time is now at: ", current_time)
+            print("Current close price is at : ", entry_price)
+            print("Target price for next minutes is: ", target_price)   
+            print("Market mood is: ", market_mood)
+            print("Stop loss is: ", stop_loss) 
+            print("Target 1 is: ", target1)           
+            print("Target 2 is: ", target2)
+            print("Target 3 is: ", target3)
 
             print()
 
