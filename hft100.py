@@ -2663,6 +2663,7 @@ def subatomic_map_function(close_prices, candles, particle_freqs):
         particles[particle]["Frequency"] = get_rf_band(freq)
         
     return particles
+    print()
 
 # Example usage
 particle_freqs = {
@@ -2681,35 +2682,74 @@ particle_freqs = {
     "Higgs Boson": 1.186e+25
     }
 
-
 # Define particles
 particles = {
     "Electron": {
         "Properties": "Negatively charged, low mass, spin 1/2",
         "Transitions": ["Electron to photon", "Electron to neutrino"],
-        "Frequency": "THz or Tremendously high frequency"
+        "Frequency": particle_freqs["Electron"]
     },
     "Proton": {
         "Properties": "Positively charged, similar mass to neutron, spin 1/2",
         "Transitions": ["Proton to neutron", "Proton to antineutrino"],
-        "Frequency": "THz or Tremendously high frequency"
+        "Frequency": particle_freqs["Proton"]
     },
     "Neutron": {
         "Properties": "No net charge, similar mass to proton, spin 1/2",
         "Transitions": ["Neutron to proton", "Neutron to antineutrino"],
-        "Frequency": "THz or Tremendously high frequency"
+        "Frequency": particle_freqs["Neutron"]
     },
     "Photon": {
         "Properties": "Zero mass, spin 1",
         "Transitions": ["Photon to electron-positron pair"],
-        "Frequency": "THz or Tremendously high frequency"
+        "Frequency": particle_freqs["Photon"]
     },
     "Quark": {
         "Properties": "Fractional charges and spins, confined in hadrons",
-        "Transitions": ["Quark to hadron"]
+        "Transitions": ["Quark to hadron"],
+        "Frequency": particle_freqs["Quark"]
+    },
+    "Muon": {
+        "Properties": "Negatively charged, heavier than electron, spin 1/2",
+        "Transitions": ["Muon to electron and neutrinos"],
+        "Frequency": particle_freqs["Muon"]
+    },
+    "Tau": {
+        "Properties": "Negatively charged, heavier than muon, spin 1/2",
+        "Transitions": ["Tau to electron and neutrinos"],
+        "Frequency": particle_freqs["Tau"]
+    },
+    "Neutrino": {
+        "Properties": "Very low mass, spin 1/2, weakly interacting",
+        "Transitions": ["Neutrino oscillations"],
+        "Frequency": particle_freqs["Neutrino"]
+    },
+    "Antineutrino": {
+        "Properties": "Same properties as neutrino, opposite charge",
+        "Transitions": ["Antineutrino oscillations"],
+        "Frequency": particle_freqs["Antineutrino"]
+    },
+    "W Boson": {
+        "Properties": "Massive, charged, mediates weak force",
+        "Transitions": ["W Boson to quarks"],
+        "Frequency": particle_freqs["W Boson"]
+    },
+    "Z Boson": {
+        "Properties": "Massive, neutral, mediates weak force",
+        "Transitions": ["Z Boson to quarks"],
+        "Frequency": particle_freqs["Z Boson"]
+    },
+    "Gluon": {
+        "Properties": "Massless, spin 1, mediates strong force",
+        "Transitions": ["Gluon to quarks and gluons"],
+        "Frequency": particle_freqs["Gluon"]
+    },
+    "Higgs Boson": {
+        "Properties": "Scalar particle, mediates Higgs field",
+        "Transitions": ["Higgs Boson to fermions and bosons"],
+        "Frequency": particle_freqs["Higgs Boson"]
     }
 }
-
 
 particles = subatomic_map_function(close_prices, candles, particle_freqs)
 
@@ -2880,6 +2920,48 @@ print()
 
 ##################################################
 ##################################################
+
+def subatomic_function(emotional_amplitudes, emotional_phases, frequency_values):
+    # Define variables for the 147 258 369 pattern algorithm
+    triangle_length = 1 / math.sqrt(5)
+    circle_radius = triangle_length / math.sqrt(3)
+    angles = [0, 2 * math.pi / 3, 4 * math.pi / 3]
+
+    # Create a dictionary of subatomic particles with their associated properties
+    particles = {'Electron': {'Momentum': 'Left Gamma', 'Properties': 'Negatively charged, low mass, spin 1/2', 'Transitions': 'Electron transitions between energy levels', 'Frequencies': 'Correspond to energy differences between levels', 'RF band': 'W band (75 - 110 GHz)'}, 'Proton': {'Momentum': 'Apex Delta', 'Properties': 'Positively charged, similar mass to neutron, spin 1/2', 'Transitions': 'Proton/neutron spin flip transitions', 'Frequencies': 'Radiofrequency range', 'RF band': 'C band (5.85 - 8.2 GHz)'}, 'Neutron': {'Properties': 'No net charge, similar mass to proton, spin 1/2', 'Transitions': 'Neutron spin flip transitions and electron capture', 'Frequencies': 'Radiofrequencies and gamma rays', 'RF band': 'Ku band (12.4 - 18 GHz)'}, 'Photon': {'Properties': 'Zero mass, spin 1', 'Transitions': 'Emitted from electron, proton and neutron transitions'} , 'Quark': {'Properties': 'Fractional charges and spins, confined in hadrons', 'Transitions': 'Quark interactions within hadrons'}, 'Muon': {'Properties': 'Negatively charged, heavier than electron, spin 1/2', 'Transitions': 'Muon decay', 'Frequencies': 'Radiofrequencies'}, 'Tau': {'Properties': 'Negatively charged, heavier than muon, spin 1/2', 'Transitions': 'Tau decay', 'Frequencies': 'Radiofrequencies'}, 'Neutrino': {'Properties': 'Very low mass, spin 1/2, weakly interacting', 'Transitions': 'Weak interactions', 'Frequencies': 'Very high frequencies'}, 'Antineutrino': {'Properties': 'Same properties as neutrino, opposite charge', 'Transitions': 'Weak interactions', 'Frequencies': 'Very high frequencies'}, 'W Boson': {'Properties': 'Massive, charged, mediates weak force', 'Transitions': 'Mediates weak force interactions', 'Frequencies': 'Very high frequencies'}, 'Z Boson': {'Properties': 'Massive, neutral, mediates weak force', 'Transitions': 'Mediates weak force interactions', 'Frequencies': 'Very high frequencies'}, 'Gluon': {'Properties': 'Massless, spin 1, mediates strong force', 'Transitions': 'Quark-antiquark interactions', 'Frequencies': 'RF frequencies'}, 'Higgs Boson': {'Properties': 'Scalar particle, mediates Higgs field', 'Transitions': 'Higgs field interactions', 'Frequencies': 'RF frequencies'}}
+
+    # Loop through each particle in the dictionary
+    for particle in particles:
+        # Calculate the particle's corresponding frequency, momentum energy, intensity, and distance between reversals
+        frequency = frequency_values[particle]
+        momentum = particles[particle]['Momentum'] if 'Momentum' in particles[particle] else 'N/A'
+        energy = emotional_amplitudes[particle] * frequency_values[particle]
+        intensity = emotional_amplitudes[particle] * emotional_phases[particle]
+        distance = circle_radius * math.sin((angles[emotional_phases[particle] % 3] + angles[(emotional_phases[particle] + 1) % 3]) / 2)
+
+        # Print out all the detailed calculations and outputs for each particle
+        print("Particle:", particle)
+        print("Momentum:", momentum)
+        print("Properties:", particles[particle]['Properties'])
+        print("Transitions:", particles[particle]['Transitions'])
+        if 'Frequencies' in particles[particle]:
+            print("Frequencies:", particles[particle]['Frequencies'])
+        else:
+            print("Frequencies: N/A")
+        print("RF band:", particles[particle]['RF band'] if 'RF band' in particles[particle] else 'N/A')
+        print("Frequency:", frequency)
+        print("Momentum Energy:", energy)
+        print("Intensity:", intensity)
+        print("Distance from current particle between reversals:", distance)
+        print()
+
+# Sample inputs
+emotional_amplitudes = {'Electron': 0.5, 'Proton': 0.8, 'Neutron': 0.6, 'Photon': 1.0, 'Quark': 0.7, 'Muon': 0.9, 'Tau': 0.4, 'Neutrino': 0.3, 'Antineutrino': 0.2, 'W Boson': 0.6, 'Z Boson': 0.8, 'Gluon': 0.5, 'Higgs Boson': 0.3}
+emotional_phases = {'Electron': 0, 'Proton': 2, 'Neutron': 1, 'Photon': 0, 'Quark': 2, 'Muon': 1, 'Tau': 0, 'Neutrino': 1, 'Antineutrino': 2, 'W Boson': 0, 'Z Boson': 1, 'Gluon': 2, 'Higgs Boson': 0}
+frequency_values = {'Electron': 2.41799 * 10 ** 14, 'Proton': 1.303 * 10 ** 10, 'Neutron': 9.661 * 10 ** 6, 'Photon': 0, 'Quark': 0, 'Muon': 6.8 * 10 ** 6, 'Tau': 1.777 * 10 ** 8, 'Neutrino': 1.7 * 10 ** 15, 'Antineutrino': 1.7 * 10 ** 15, 'W Boson': 2.085 * 10 ** 23, 'Z Boson': 9.118 * 10 ** 23, 'Gluon': 3 * 10 ** 26, 'Higgs Boson': 1.2 * 10 ** 15}
+
+# Execute the function
+subatomic_function(emotional_amplitudes, emotional_phases, frequency_values)
 
 print()
 
