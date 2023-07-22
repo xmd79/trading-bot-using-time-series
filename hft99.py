@@ -2593,22 +2593,30 @@ def get_rf_band(frequency):
         return "Frequency out of range"
 
 
-
-def subatomic_map_function(close_prices, candles, electron_freq, proton_freq, neutron_freq, photon_freq, quark_freq, percent_to_max_val=5.0, percent_to_min_val=5.0):
+def subatomic_map_function(close_prices, candles, particle_freqs):
     # Check input data format
-    if not isinstance(percent_to_max_val, float) or not isinstance(percent_to_min_val, float):
-        raise TypeError("Percentage values must be of type 'float'.")
+    for freq in particle_freqs.values():
+        if not isinstance(freq, float):
+            raise TypeError("All frequency values must be of type 'float'.")
 
     # Call the original functions 
-    results1 = reversals_unit_circle(close_prices, candles, percent_to_max_val, percent_to_min_val)  
-    results2 = metatron_reversals_unit_circle(results1["quadrant_emotional_values"], close_prices, candles, percent_to_max_val, percent_to_min_val)
+    results1 = reversals_unit_circle(close_prices, candles, percent_to_max_val=5.0, percent_to_min_val=5.0)  
+    results2 = metatron_reversals_unit_circle(results1["quadrant_emotional_values"], close_prices, candles, percent_to_max_val=5.0, percent_to_min_val=5.0)
   
     # Build subatomic particle map
     particles = {"Electron": {}, 
                  "Proton":{},
                  "Neutron":{},
                  "Photon": {},
-                 "Quark": {}}
+                 "Quark": {},
+                 "Muon": {},
+                 "Tau": {},
+                 "Neutrino": {},
+                 "Antineutrino": {},
+                 "W Boson": {},
+                 "Z Boson": {},
+                 "Gluon": {},
+                 "Higgs Boson": {}}
                    
     # Map momentum for each particle               
     particles["Electron"]["Momentum"] = results1["min_node"]  
@@ -2618,58 +2626,71 @@ def subatomic_map_function(close_prices, candles, electron_freq, proton_freq, ne
     particles["Electron"]["Properties"] = "Negatively charged, low mass, spin 1/2"
     particles["Proton"]["Properties"] = "Positively charged, similar mass to neutron, spin 1/2"
     particles["Neutron"]["Properties"] = "No net charge, similar mass to proton, spin 1/2"
-    particles["Photon"]["Properties"] = "Massless, spin 1"
+    particles["Photon"]["Properties"] = "Zero mass, spin 1"
     particles["Quark"]["Properties"] = "Fractional charges and spins, confined in hadrons"
-  
+    particles["Muon"]["Properties"] = "Negatively charged, heavier than electron, spin 1/2"
+    particles["Tau"]["Properties"] = "Negatively charged, heavier than muon, spin 1/2"
+    particles["Neutrino"]["Properties"] = "Very low mass, spin 1/2, weakly interacting"
+    particles["Antineutrino"]["Properties"] = "Same properties as neutrino, opposite charge"
+    particles["W Boson"]["Properties"] = "Massive, charged, mediates weak force"
+    particles["Z Boson"]["Properties"] = "Massive, neutral, mediates weak force"
+    particles["Gluon"]["Properties"] = "Massless, spin 1, mediates strong force"
+    particles["Higgs Boson"]["Properties"] = "Scalar particle, mediates Higgs field"
+
     # Map transitions and frequencies for each particle
     particles["Electron"]["Transitions"] = "Electron transitions between energy levels"
     particles["Proton"]["Transitions"]  = "Proton/neutron spin flip transitions"
     particles["Neutron"]["Transitions"] = "Neutron spin flip transitions and electron capture"
     particles["Photon"]["Transitions"] = "Emitted from electron, proton and neutron transitions"
-    particles["Quark"]["Transitions"] = "Quark interactions within hadrons"  
+    particles["Quark"]["Transitions"] = "Quark interactions within hadrons"
+    particles["Muon"]["Transitions"] = "Muon decay"
+    particles["Tau"]["Transitions"] = "Tau decay"
+    particles["Neutrino"]["Transitions"] = "Weak interactions"
+    particles["Antineutrino"]["Transitions"] = "Weak interactions"
+    particles["W Boson"]["Transitions"] = "Mediates weak force interactions"
+    particles["Z Boson"]["Transitions"] = "Mediates weak force interactions"
+    particles["Gluon"]["Transitions"] = "Quark-antiquark interactions"
+    particles["Higgs Boson"]["Transitions"] = "Higgs field interactions"
   
     particles["Electron"]["Frequencies"] = "Correspond to energy differences between levels"
     particles["Proton"]["Frequencies"] = "Radiofrequency range"
     particles["Neutron"]["Frequencies"] = "Radiofrequencies and gamma rays"
-    particles["Photon"]["Frequencies"] = "Reflect particle transitions and emotional states"
-    particles["Quark"]["Frequencies"] = "Indirectly contribute to hadron frequencies"
+    particles["Muon"]["Frequencies"] = "Radiofrequencies"
+    particles["Tau"]["Frequencies"] = "Radiofrequencies"
+    particles["Neutrino"]["Frequencies"] = "Very high frequencies"
+    particles["Antineutrino"]["Frequencies"] = "Very high frequencies"
+    particles["W Boson"]["Frequencies"] = "Very high frequencies"
+    particles["Z Boson"]["Frequencies"] = "Very high frequencies"
+    particles["Gluon"]["Frequencies"] = "RF frequencies"
+    particles["Higgs Boson"]["Frequencies"] = "RF frequencies"
         
-    # Map RF frequencies for each particle
-    particles["Electron"]["RF band"] = get_rf_band(electron_freq)  
-    particles["Proton"]["RF band"] = get_rf_band(proton_freq)  
-    particles["Neutron"]["RF band"] = get_rf_band(neutron_freq)
-    particles["Photon"]["RF band"] = get_rf_band(photon_freq)
-    particles["Quark"]["RF band"] = get_rf_band(quark_freq)
+    # Map RF frequencies for each particle (only for electrons, protons, and neutrons)
+    particles["Electron"]["RF band"] = get_rf_band(particle_freqs["Electron"])  
+    particles["Proton"]["RF band"] = get_rf_band(particle_freqs["Proton"])  
+    particles["Neutron"]["RF band"] = get_rf_band(particle_freqs["Neutron"])
     
     return particles
-                     
-    # Return the particle map                    
-    return particles
+
+# Example usage
+particle_freqs = {"Electron": 100.0, 
+                  "Proton": 5.0, 
+                  "Neutron": 20.0, 
+                  "Photon": 0.0, 
+                  "Quark": 0.0, 
+                  "Muon": 0.0, 
+                  "Tau": 0.0, 
+                  "Neutrino": 0.0, 
+                  "Antineutrino": 0.0, 
+                  "W Boson": 0.0, 
+                  "Z Boson": 0.0, 
+                  "Gluon": 0.0, 
+                  "Higgs Boson": 0.0}
+
+particles = subatomic_map_function(close_prices, candles, particle_freqs)
 
 print()
 
-##################################################
-##################################################
-
-# Typical frequencies for:
-electron_freq = 100   # Electron transitions  
-proton_freq = 5      # Proton spin flip transitions   
-neutron_freq = 20    # Neutron spin flip transitions
-photon_freq = 300    # Photon emissions
-quark_freq = 2       # Within hadrons
-
-particles = subatomic_map_function(close_prices, candles, electron_freq, proton_freq, neutron_freq, photon_freq, quark_freq, percent_to_max_val=5.0,percent_to_min_val=5.0)
-   
-particles["Electron"]["RF band"] = get_rf_band(electron_freq)
-particles["Proton"]["RF band"] = get_rf_band(proton_freq)
-particles["Neutron"]["RF band"] = get_rf_band(neutron_freq)
-particles["Photon"]["RF band"] = get_rf_band(photon_freq)
-particles["Quark"]["RF band"] = get_rf_band(quark_freq)
-
-print()
-
-# Prints full particle map
-print(particles)
+print(particles)         
 
 print()
 
@@ -2684,7 +2705,7 @@ print(proton_properties)
 
 neutron_transitions = particles["Neutron"]["Transitions"]                 
 print(neutron_transitions)
-# "Neutron spin flip transitions and electron capture"          
+# "Neutron spin flip transitions and electron capture" 
 
 print()
 
@@ -2693,251 +2714,49 @@ print()
 
 print()
 
-
-print("Init main() loop: ")
-
-##################################################
-##################################################
-
-def main():
-
-    # Define timeframes
-    timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
-    TRADE_SYMBOL = "BTCUSDT"
-
-    ##################################################
-    ##################################################
-
-    while True:
-        
-        # Get fresh closes for the current timeframe
-        closes = get_closes('1m')
-       
-        # Get close price as <class 'float'> type
-        close = get_close('1m')
-        
-        # Get fresh candles  
-        candles = get_candles(TRADE_SYMBOL, timeframes)
-                
-        # Update candle_map with fresh data
-        for candle in candles:
-            timeframe = candle["timeframe"]  
-            candle_map.setdefault(timeframe, []).append(candle)
-                
-        try:     
-            # Calculate fresh sine wave  
-            close_prices = np.array(closes)
-            sine, leadsine = talib.HT_SINE(close_prices)
-                
-            # Call scale_to_sine() function   
-            # dist_from_close_to_min, dist_from_close_to_max = scale_to_sine('1m')
-
-            for timeframe in timeframes:
-                dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
-
-                # Print results        
-                print(f"On {timeframe} Close price value on sine is now at: {current_sine})")
-                print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
-                print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
-
-            print()
-
-            momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max = generate_momentum_sinewave(timeframes)
-        
-            print()
-
-            sine_wave[-1], dist_from_close_to_min, dist_from_close_to_max, current_quadrant, em_amp, em_phase, trend_direction, price_range_percent, momentum, sine_wave_max, sine_wave_min = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5) 
-
-            print()
-
-            print("Current close on sine value now at: ", current_sine)
-            print("Distance as percentages from close to min: ", dist_from_close_to_min, "%")
-            print("Distance as percentages from close to max: ", dist_from_close_to_max, "%")
-            print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
-
-            print()
-
-            cycle_direction, quadrant_emotional_values, forecast_moods, sorted_frequencies, avg_high_mood, avg_low_mood, weighted_high_mood, weighted_low_mood, mapped_quadrants, min_node, max_node, mood_reversal_forecast, market_mood, current_point, next_point = generate_market_mood_forecast(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
-
-            print()
-
-            quadrant_emotional_values, forecast_moods, min_node, max_node, avg_moods, weighted_moods, forecast_direction, mood_reversal_forecast, market_mood = reversals_unit_circle(close_prices, candles)
-
-            print()
-
-            octant_coordinates, forecast_moods, min_node, max_node, avg_moods, weighted_moods, forecast_direction, mood_reversal_forecast, market_mood = metatron_reversals_unit_circle(quadrant_emotional_values, close_prices, candles, percent_to_max_val, percent_to_min_val)
-
-            print()
-
-            mood = get_mtf_rsi_market_mood()
-            print("MTF rsi mood: ", mood)
-
-            mtf_market_mood = get_mtf_market_mood()
-            print("MTF RSI and MOM market mood: ", mtf_market_mood)
-
-            print()
-
-            # Define the current time and close price
-            current_time = datetime.datetime.now()
-            current_close = closes[-1]
-
-            print("Current local Time is now at: ", current_time)
-            print("Current close price is at : ", current_close)
-
-            print()
-
-            for timeframe in timeframes:
-                momentum = get_momentum(timeframe)
-                print(f"Momentum for {timeframe}: {momentum}")
-
-            print()
-
-            # Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
-            min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-
-            print("Momentum signal:", momentum_signal)
-
-            print()
-
-            print("Minimum threshold:", min_threshold)
-            print("Maximum threshold:", max_threshold)
-            print("Average MTF:", avg_mtf)
-
-            print()
-
-            # Example usage of fft function
-            closes1 = get_closes("1m")
-            closes2 = get_closes("3m")
-            closes3 = get_closes("5m")
-
-            n_components = 5
-            targets1 = []
-            targets2 = []
-            targets3 = []
-
-            for i in range(len(closes1) - 1):
-
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                target1 = get_next_minute_target(closes1[:i+1], n_components)
-                targets1.append(target1)
-
-            for i in range(len(closes2) - 1):
-
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                target2 = get_next_minute_target(closes2[:i+1], n_components)
-                targets2.append(target2)
-
-            for i in range(len(closes3) - 1):
-
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                target3 = get_next_minute_target(closes3[:i+1], n_components)
-                targets3.append(target3)
-
-            # Print the predicted targets for the next minute
-            print("Target for 1min tf:", targets1[-1])
-
-            # Print the predicted targets for the next minute
-            print("Target for 3min tf:", targets2[-1])
-
-            # Print the predicted targets for the next minute
-            print("Target for 5min tf:", targets3[-1])
-
-            print()
-
-            # Example usage
-            #closes = get_closes("1m")
-
-            n_components = 5
-            targets = []
-
-            for i in range(len(closes) - 1):
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                entry_price, stop_loss, target1, target2, target3 = get_next_minute_targets(closes[:i+1], n_components)
-                targets.append((entry_price, stop_loss, target1, target2, target3))
-
-            # Print the predicted levels for the next minute
-            print("Entry price:", targets[-1][0])
-            print("Stop loss:", targets[-1][1])
-            print("Target 1:", targets[-1][2])
-            print("Target 2:", targets[-1][3])
-            print("Target 3:", targets[-1][4])
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Typical frequencies for:
-            electron_freq = 100   # Electron transitions  
-            proton_freq = 5      # Proton spin flip transitions   
-            neutron_freq = 20    # Neutron spin flip transitions
-            photon_freq = 300    # Photon emissions
-            quark_freq = 2       # Within hadrons
-
-            particles = subatomic_map_function(close_prices, candles, electron_freq, proton_freq, neutron_freq, photon_freq, quark_freq, percent_to_max_val=5.0,percent_to_min_val=5.0)
-
-            particles["Electron"]["RF band"] = get_rf_band(electron_freq)
-            particles["Proton"]["RF band"] = get_rf_band(proton_freq)
-            particles["Neutron"]["RF band"] = get_rf_band(neutron_freq)
-            particles["Photon"]["RF band"] = get_rf_band(photon_freq)
-            particles["Quark"]["RF band"] = get_rf_band(quark_freq)
-
-            print()
-
-            # Prints full particle map
-            print(particles)
-
-            print()
-
-            # Access particle details   
-            electron_momentum = particles["Electron"]["Momentum"]
-            print(electron_momentum)
-            # "min_node: Delta Quadrant Electron"
-
-            proton_properties = particles["Proton"]["Properties"]       
-            print(proton_properties)                         
-            # "Positively charged, similar mass to neutron, spin 1/2"
-
-            neutron_transitions = particles["Neutron"]["Transitions"]                 
-            print(neutron_transitions)
-            # "Neutron spin flip transitions and electron capture"          
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            print()
-
-            # Update the candle map with the latest candles
-            for timeframe in candle_map.keys():
-                if len(candle_map[timeframe]) > 0:
-                    latest_candle = get_latest_candle('BTCUSDT', timeframe, candle_map[timeframe][-1]['time'])
-                    candle_map[timeframe].append(latest_candle)
-                else:
-                    candles = get_candles('BTCUSDT', [timeframe])
-                    candle_map[timeframe] = candles
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            time.sleep(5)
-
-        time.sleep(5)
+import math
+
+def subatomic_function(emotional_amplitudes, emotional_phases, frequency_values):
+    # Define variables for the 147 258 369 pattern algorithm
+    triangle_length = 1 / math.sqrt(5)
+    circle_radius = triangle_length / math.sqrt(3)
+    angles = [0, 2 * math.pi / 3, 4 * math.pi / 3]
+
+    # Create a dictionary of subatomic particles with their associated properties
+    particles = {'Electron': {'Momentum': 'Left Gamma', 'Properties': 'Negatively charged, low mass, spin 1/2', 'Transitions': 'Electron transitions between energy levels', 'Frequencies': 'Correspond to energy differences between levels', 'RF band': 'W band (75 - 110 GHz)'}, 'Proton': {'Momentum': 'Apex Delta', 'Properties': 'Positively charged, similar mass to neutron, spin 1/2', 'Transitions': 'Proton/neutron spin flip transitions', 'Frequencies': 'Radiofrequency range', 'RF band': 'C band (5.85 - 8.2 GHz)'}, 'Neutron': {'Properties': 'No net charge, similar mass to proton, spin 1/2', 'Transitions': 'Neutron spin flip transitions and electron capture', 'Frequencies': 'Radiofrequencies and gamma rays', 'RF band': 'Ku band (12.4 - 18 GHz)'}, 'Photon': {'Properties': 'Zero mass, spin 1', 'Transitions': 'Emitted from electron, proton and neutron transitions'} , 'Quark': {'Properties': 'Fractional charges and spins, confined in hadrons', 'Transitions': 'Quark interactions within hadrons'}, 'Muon': {'Properties': 'Negatively charged, heavier than electron, spin 1/2', 'Transitions': 'Muon decay', 'Frequencies': 'Radiofrequencies'}, 'Tau': {'Properties': 'Negatively charged, heavier than muon, spin 1/2', 'Transitions': 'Tau decay', 'Frequencies': 'Radiofrequencies'}, 'Neutrino': {'Properties': 'Very low mass, spin 1/2, weakly interacting', 'Transitions': 'Weak interactions', 'Frequencies': 'Very high frequencies'}, 'Antineutrino': {'Properties': 'Same properties as neutrino, opposite charge', 'Transitions': 'Weak interactions', 'Frequencies': 'Very high frequencies'}, 'W Boson': {'Properties': 'Massive, charged, mediates weak force', 'Transitions': 'Mediates weak force interactions', 'Frequencies': 'Very high frequencies'}, 'Z Boson': {'Properties': 'Massive, neutral, mediates weak force', 'Transitions': 'Mediates weak force interactions', 'Frequencies': 'Very high frequencies'}, 'Gluon': {'Properties': 'Massless, spin 1, mediates strong force', 'Transitions': 'Quark-antiquark interactions', 'Frequencies': 'RF frequencies'}, 'Higgs Boson': {'Properties': 'Scalar particle, mediates Higgs field', 'Transitions': 'Higgs field interactions', 'Frequencies': 'RF frequencies'}}
+
+    # Loop through each particle in the dictionary
+    for particle in particles:
+        # Calculate the particle's corresponding frequency, momentum energy, intensity, and distance between reversals
+        frequency = frequency_values[particle]
+        momentum = particles[particle]['Momentum'] if 'Momentum' in particles[particle] else 'N/A'
+        energy = emotional_amplitudes[particle] * frequency_values[particle]
+        intensity = emotional_amplitudes[particle] * emotional_phases[particle]
+        distance = circle_radius * math.sin((angles[emotional_phases[particle] % 3] + angles[(emotional_phases[particle] + 1) % 3]) / 2)
+
+        # Print out all the detailed calculations and outputs for each particle
+        print("Particle:", particle)
+        print("Momentum:", momentum)
+        print("Properties:", particles[particle]['Properties'])
+        print("Transitions:", particles[particle]['Transitions'])
+        if 'Frequencies' in particles[particle]:
+            print("Frequencies:", particles[particle]['Frequencies'])
+        else:
+            print("Frequencies: N/A")
+        print("RF band:", particles[particle]['RF band'] if 'RF band' in particles[particle] else 'N/A')
+        print("Frequency:", frequency)
+        print("Momentum Energy:", energy)
+        print("Intensity:", intensity)
+        print("Distance from current particle between reversals:", distance)
         print()
 
-        ##################################################
-        ##################################################
+# Sample inputs
+emotional_amplitudes = {'Electron': 0.5, 'Proton': 0.8, 'Neutron': 0.6, 'Photon': 1.0, 'Quark': 0.7, 'Muon': 0.9, 'Tau': 0.4, 'Neutrino': 0.3, 'Antineutrino': 0.2, 'W Boson': 0.6, 'Z Boson': 0.8, 'Gluon': 0.5, 'Higgs Boson': 0.3}
+emotional_phases = {'Electron': 0, 'Proton': 2, 'Neutron': 1, 'Photon': 0, 'Quark': 2, 'Muon': 1, 'Tau': 0, 'Neutrino': 1, 'Antineutrino': 2, 'W Boson': 0, 'Z Boson': 1, 'Gluon': 2, 'Higgs Boson': 0}
+frequency_values = {'Electron': 2.41799 * 10 ** 14, 'Proton': 1.303 * 10 ** 10, 'Neutron': 9.661 * 10 ** 6, 'Photon': 0, 'Quark': 0, 'Muon': 6.8 * 10 ** 6, 'Tau': 1.777 * 10 ** 8, 'Neutrino': 1.7 * 10 ** 15, 'Antineutrino': 1.7 * 10 ** 15, 'W Boson': 2.085 * 10 ** 23, 'Z Boson': 9.118 * 10 ** 23, 'Gluon': 3 * 10 ** 26, 'Higgs Boson': 1.2 * 10 ** 15}
 
-print()
+# Execute the function
+subatomic_function(emotional_amplitudes, emotional_phases, frequency_values)
 
-##################################################
-##################################################
 
-print()
 
-##################################################
-##################################################
-
-# Run the main function
-if __name__ == '__main__':
-    main()
