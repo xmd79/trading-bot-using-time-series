@@ -2880,7 +2880,7 @@ def main():
             quark_freq = 2       # Within hadrons
 
             particles = subatomic_map_function(close_prices, candles, electron_freq, proton_freq, neutron_freq, photon_freq, quark_freq, percent_to_max_val=5.0,percent_to_min_val=5.0)
-   
+
             particles["Electron"]["RF band"] = get_rf_band(electron_freq)
             particles["Proton"]["RF band"] = get_rf_band(proton_freq)
             particles["Neutron"]["RF band"] = get_rf_band(neutron_freq)
