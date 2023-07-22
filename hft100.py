@@ -2965,7 +2965,94 @@ subatomic_function(emotional_amplitudes, emotional_phases, frequency_values)
 
 print()
 
+##################################################
+##################################################
 
+def generate_golden_tone(duration, amplitude, sample_rate, quadrant_emotional_values, close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
+    
+    """Generate and output a tone with a frequency related to the golden ratio."""
+    phi = (1 + math.sqrt(5)) / 2
+    frequency = 440 * phi
+
+    time_array = np.arange(0, duration, 1/sample_rate)
+    tone = amplitude * np.sin(2 * np.pi * frequency * time_array)
+
+    spectrum = np.fft.fft(tone)
+    freqs = np.fft.fftfreq(len(tone)) * sample_rate
+
+    # Energy decomposition
+    max_energy = amplitude ** 2
+    mean_energy = np.mean(tone ** 2) 
+    std_energy = np.std(tone ** 2)
+    deviation = std_energy / mean_energy * 100
+    
+    print(f"Maximum energy: {max_energy}")    
+    print(f"Mean energy: {mean_energy}")
+    print(f"Standard deviation of energy: {std_energy}")    
+    print(f"Energy deviation ({deviation:0.2f}% of mean)")
+  
+    # Band energies
+    band_energies = {}
+    for i in range(10):
+        start = i * len(tone) // 10
+        end = (i+1) * len(tone) // 10
+        band = tone[start:end]
+        band_energies[i+1] = np.sum(band ** 2)
+        
+    print("\nBand energies:")      
+    for i in band_energies:
+        print(f"Band {i}: {band_energies[i]:0.3f}")
+
+
+    print(f"Generated {duration} second tone at {frequency} Hz with amplitude {amplitude}")
+
+    max_freq = np.argmax(np.abs(spectrum))
+    print(f"Dominant frequency: {freqs[max_freq]} Hz")
+    
+    # Call functions to analyze market data
+    reversals_results = reversals_unit_circle(close_prices, candles, percent_to_max_val, percent_to_min_val)
+    metatron_results = metatron_reversals_unit_circle(quadrant_emotional_values, close_prices, candles, 
+                                                        percent_to_max_val, percent_to_min_val)
+    forecast_direction, mood_reversal, market_mood = analyze_reversals(close_prices, candles,
+                                                              percent_to_max_val, percent_to_min_val)
+   
+    # Adjust tone based on market analysis
+    if forecast_direction == "Base":
+        amplitude *= 0.9 # Reduce amplitude for downtrend   
+    if mood_reversal:       
+        frequency *= 1.1 # Increase frequency for possible reversal
+    
+    # Calculate band energies for each quadrant    
+    band_energies = {}    
+    for quad in reversals_results["quadrant_emotional_values"]:
+        band = tone[start:end]
+        band_energies[quad] = np.sum(band ** 2)
+        
+    # Weight band energies by emotional phase     
+    weighted_band_energies = {}        
+    for quad, energy in band_energies.items():
+        phase = reversals_results['quadrant_emotional_values'][quad]['phase']  
+        weighted_band_energies[quad] = energy * (1 + phase/360) 
+        
+    # Return tone, market analysis results and energy decompositions    
+    return tone, reversals_results, metatron_results,forecast_direction, mood_reversal, market_mood, weighted_band_energies 
+   
+# Example usage:
+duration = 5 # seconds
+amplitude = 1
+sample_rate = 44100
+
+# Call the function 
+tone, results, metatron_results, direction, reversal, mood, weighted_energies = generate_golden_tone(duration, amplitude, sample_rate, quadrant_emotional_values, close_prices, candles, percent_to_max_val=5, percent_to_min_val=5)
+
+# Use returned values...
+print(f"Forecast direction: {direction}")    
+print(f"Weighted energy in Left quadrant: {weighted_energies['Left']}")
+print("tone: ", tone)
+print("results: ", results)
+print("metatron_results: ", metatron_results)
+print("reversal: ", reversal)
+print("mood: ", mood)
 
 print()
 
