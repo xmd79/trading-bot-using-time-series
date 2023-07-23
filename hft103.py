@@ -1699,10 +1699,10 @@ print()
 ##################################################
 ##################################################
 
-def get_target(closes, n_components, target_distance=0.01):
+def get_target(closes, n_components, target_distance=0.001):
     # Calculate FFT of closing prices
     fft = fftpack.fft(closes) 
-    frequencies = fftpack.fftfreq(len(closes))
+    frequencies = fftpack.fftfreq(len(closes), d=0.25)
     
     # Sort frequencies by magnitude and keep only the top n_components 
     idx = np.argsort(np.abs(fft))[::-1][:n_components]
@@ -1734,10 +1734,10 @@ def get_target(closes, n_components, target_distance=0.01):
     
     # Calculate the stop loss and target levels
     entry_price = closes[-1]    
-    stop_loss =  entry_price - 3*np.std(closes)   
-    target1 = target_price + np.std(closes)  
-    target2 = target_price + 2*np.std(closes)  
-    target3 = target_price + 3*np.std(closes)            
+    stop_loss =  entry_price - 2*np.std(closes)   
+    target1 = target_price + 0.5*np.std(closes)  
+    target2 = target_price + np.std(closes)  
+    target3 = target_price + 1.5*np.std(closes)            
     
     return current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, faster_target, market_mood
 
@@ -1765,7 +1765,6 @@ print()
 print("Target 1 is: ", target1)           
 print("Target 2 is: ", target2)
 print("Target 3 is: ", target3)
-
 
 print()
 
@@ -1993,6 +1992,14 @@ def main():
 
             print()
 
+            symbol = 'BTCUSDT'
+            klines = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE)
+            closes = [float(kline[4]) for kline in klines]
+            current_close = closes[-1]
+            print(current_close)
+
+            print()
+
             ##################################################
             ##################################################
 
@@ -2014,3 +2021,4 @@ print()
 # Run the main function
 if __name__ == '__main__':
     main()
+
