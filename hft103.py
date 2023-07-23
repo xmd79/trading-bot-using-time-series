@@ -1777,248 +1777,82 @@ print()
 
 ##################################################
 ##################################################
-
-def main():
-
-    ##################################################
-    ##################################################
-
-    # Define timeframes
-    timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
-    TRADE_SYMBOL = "BTCUSDT"
-
-    ##################################################
-    ##################################################
-
-    while True:
-
-        ##################################################
-        ##################################################
-        
-        # Get fresh closes for the current timeframe
-        closes = get_closes('1m')
-       
-        # Get close price as <class 'float'> type
-        close = get_close('1m')
-        
-        # Get fresh candles  
-        candles = get_candles(TRADE_SYMBOL, timeframes)
-                
-        # Update candle_map with fresh data
-        for candle in candles:
-            timeframe = candle["timeframe"]  
-            candle_map.setdefault(timeframe, []).append(candle)
-                
-        ##################################################
-        ##################################################
-
-        try:     
-            ##################################################
-            ##################################################
-
-            # Calculate fresh sine wave  
-            close_prices = np.array(closes)
-            sine, leadsine = talib.HT_SINE(close_prices)
-                
-            # Call scale_to_sine() function   
-            #dist_from_close_to_min, dist_from_close_to_max = scale_to_sine('1m')
-
-            #for timeframe in timeframes:
-                #dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
-
-                # Print results        
-                #print(f"On {timeframe} Close price value on sine is now at: {current_sine})")
-                #print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
-                #print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
-
-            ##################################################
-            ##################################################
-
-            print()
-
-            momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max = generate_momentum_sinewave(timeframes)
-        
-            print()
-
-            print("Current close on sine value now at: ", current_sine)
-            print("Distance as percentages from close to min: ", dist_from_close_to_min, "%")
-            print("Distance as percentages from close to max: ", dist_from_close_to_max, "%")
-            print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
-            print("Mood on 1min timeframe is now at: ", market_mood[-12])
-
-            print()
-
-
-            ##################################################
-            ##################################################
-
-            sine_wave = generate_new_momentum_sinewave(close_prices, candles,  
-                                               percent_to_max_val=5, 
-                                               percent_to_min_val=5)      
-
-            sine_wave_max = sine_wave["max"]   
-            sine_wave_min = sine_wave["min"]
-
-            # Call the function
-            results = generate_new_momentum_sinewave(
-                close_prices, 
-                candles,  
-                percent_to_max_val=5,  
-                percent_to_min_val=5
-                )
-  
-            # Unpack the returned values    
-            current_close = results["current_close"]  
-            dist_from_close_to_min = results["dist_from_close_to_min"]  
-            dist_from_close_to_max = results["dist_from_close_to_max"]
-            current_quadrant = results["current_quadrant"]
-            em_amp = results["em_amplitude"]
-            em_phase = results["em_phase"]  
-            price_range_percent = results["price_range_percent"] 
-            momentum = results["momentum"]
-            sine_wave_min = results["min"]
-            sine_wave_max = results["max"]
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            current_em_amp, current_em_phase, cycle_direction, current_momentum, forecast_mood, freq_index_range_min, freq_index_range_max, freq_range, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
-
-            print("Print now  octa_metatron_cube reversals circuit details: ")
-            print()
-
-            #print("Frequencies:")
-            #for freq in frequencies:  
-                #try:
-                    #print(f"Frequency: {freq['freq']}  Hz") 
-                    #print(f"Mood: {freq['mood']}")
-                    #print(f"EM Value: {freq['em_value']}")
-                #except KeyError:
-                    #print("No frequency data available.")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Define the current time and close price
-            current_time = datetime.datetime.now()
-            current_close = closes[-1]
-
-            print("Current local Time is now at: ", current_time)
-            print("Current close price is at : ", current_close)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Print the variables from generate_new_momentum_sinewave() fct
-            print(f"Current close on Sine wave: {current_close}")
-            print(f"Distance from close to min: {dist_from_close_to_min}") 
-            print(f"Distance from close to max: {dist_from_close_to_max}")
-            print(f"Current_quadrant now at: {current_quadrant}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            print(f"Current EM Amplitude: {current_em_amp}")
-            print(f"Current EM Phase: {current_em_phase}")
-            print(f"Current Momentum: {current_momentum}")
-            print(f"freq_index_range_min: {freq_index_range_min}")
-            print(f"freq_index_range_max: {freq_index_range_max}")
-            print(f"freq_range: {freq_range}")
-            print(f"Forecast Mood: {forecast_mood}")
-            print(f"Cycle_direction: {cycle_direction}")
-            print(f"Current Point: {current_point}")
-            print(f"Next Point: {next_point}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            for timeframe in timeframes:
-                momentum = get_momentum(timeframe)
-                print(f"Momentum for {timeframe}: {momentum}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
-            min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-
-            print("Momentum signal:", momentum_signal)
-            print()
-
-            print("Minimum threshold:", min_threshold)
-            print("Maximum threshold:", max_threshold)
-            print("Average MTF:", avg_mtf)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            closes = get_closes("1m")     
-            n_components = 5
-
-            current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, fastest_target, market_mood = get_target(closes, n_components, target_distance=5)
-
-            print("Current close price is at : ", current_close)
-
-            print()
-
-            print("Fastest target is: ", fastest_target)
-            print("Fast target is: ", target_price)
-            print("Market mood is: ", market_mood)
-
-            print()
-
-            print("Entry price is: ", entry_price)
-            print("Stop loss is: ", stop_loss)
- 
-            print()
-
-            print("Target 1 is: ", target1)           
-            print("Target 2 is: ", target2)
-            print("Target 3 is: ", target3)
-
-            print()
-
-            symbol = 'BTCUSDT'
-            klines = client.get_klines(symbol=symbol, interval=client.KLINE_INTERVAL_1MINUTE)
-            closes = [float(kline[4]) for kline in klines]
-            current_close = closes[-1]
-            print(current_close)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            time.sleep(5)
-
-        time.sleep(5)
-        print()
-
-        ##################################################
-        ##################################################
-
-print()
-
-##################################################
-##################################################
-
-# Run the main function
-if __name__ == '__main__':
-    main()
-
+import numpy
+import math
+
+beta = 16
+n = 1024
+delta = 0.3
+alpha = 0.25
+L = 10
+sigma = 0.002
+a = 0
+b = 0
+B = 16
+
+
+def phi(x):
+    return numpy.arctan(x)
+
+def compute_P(sigma, a, b, n):
+    P = [0] * n
+    for i in range(n):
+        P[i] = numpy.cos(2 * numpy.pi * sigma * ((i + a) % n) / n + b)
+    return P
+
+def GB(alpha, delta, x):
+    n = len(x)
+    G = [0] * n
+    for k in range(n):
+        G[k] = alpha ** k * delta ** (n - k) * x[k]
+    return G
+
+def HASHTOBINS(x, zb, sigma, a, b, B, delta, alpha):
+    n = len(x)
+    y = GB(alpha, delta, compute_P(sigma, a, b, n))
+    P = [compute_P(sigma, 0, zb[i], n) for i in range(beta)]
+    y_prime = [y[k] - P[k % B][k] for k in range(n)]
+    ub = [y_prime[k % B] / B for k in range(n)]
+    return ub
+
+def NOISELESSSPARSEFFT(x, k, sigma, a, b, B):
+    zb = [0.0] * beta
+    k_prime = beta * math.ceil(k / beta)
+    for t in range(int(numpy.log2(k))):
+        zb_prime = list(zb)
+        zb_prime[:len(zb)] = [zb_prime[i] + NOISELESSSPARSEFFTINNER(x, k_prime, zb, sigma, a, b, B)[i] for i in range(len(zb_prime))]
+        zb = [zb_prime[i] if i < len(zb_prime) else 0.0 for i in range(len(zb))]
+        for i in range(beta):
+            if abs(zb[i]) >= L:
+                zb[i] = 0.0
+    return zb
+
+def NOISELESSSPARSEFFTINNER(x, k, zb, sigma, a, b, B):
+    n = len(x)
+    y = [0.0] * n
+    for i in range(n):
+        if i < k:
+            y[i] = x[i]
+        else:
+            y[i] = y[i - k]
+    y_hat = numpy.fft.fft(y)
+    y_prime_hat = [y_hat[i] if i < (n // 2 + 1) else numpy.conj(y_hat[n - i]) for i in range(n)]
+    y_prime = numpy.fft.ifft(y_prime_hat)
+    ub = HASHTOBINS(x, zb, sigma, a, b, B, delta, alpha)
+    z = [y_prime[i] - ub[i] for i in range(n)]
+    return z[:k]
+
+# Preprocess close prices to compute log returns
+
+log_returns = [numpy.log(closes[i] / closes[i-1]) for i in range(1, len(closes))]
+
+# Compute NSFT of log returns
+k = 64
+x = log_returns[:k]
+zb = [0.0] * beta
+zb_prime = list(zb)
+zb_prime[:len(zb)] = NOISELESSSPARSEFFTINNER(x, k, zb, sigma, a, b, B)
+zb = [zb_prime[i] if i < len(zb_prime) else 0.0 for i in range(len(zb))]
+ub = HASHTOBINS(x, zb, sigma, a, b, B, delta, alpha)
+
+print(zb)
