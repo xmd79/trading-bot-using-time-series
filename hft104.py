@@ -1856,3 +1856,45 @@ zb = [zb_prime[i] if i < len(zb_prime) else 0.0 for i in range(len(zb))]
 ub = HASHTOBINS(x, zb, sigma, a, b, B, delta, alpha)
 
 print(zb)
+
+print()
+
+# Inverse transform frequencies to get time domain signal 
+y = numpy.fft.ifft(zb)
+
+# Cumulative sum of log returns to get price changes  
+price_changes = numpy.cumsum(y) 
+
+# Create empty list to store price forecasts 
+price_forecast = []
+
+# Define forecast horizon  
+forecast_horizon = 50 
+
+# Initialize cumulative price   
+cum_price = 0
+
+# Define forecast factor
+forecast_factor = 1.01
+
+# Loop over time steps to extrapolate and forecast future prices
+for t in range(len(price_changes) + forecast_horizon):
+    
+    # If within data, use actual price change
+    if t < len(price_changes):
+        cur_price = price_changes[t]
+    
+    # Otherwise forecast price change based on pattern                
+    else: 
+        cur_price = price_changes[-1] * forecast_factor
+        
+    # Add price change to running total          
+    cum_price += cur_price
+        
+    # Store forecast in list
+    price_forecast.append(cum_price)
+        
+# Exponentiate log returns to get price levels       
+price_levels = [numpy.exp(p) for p in price_forecast]
+
+print(price_levels)
