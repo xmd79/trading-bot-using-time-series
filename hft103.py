@@ -630,10 +630,12 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, 
         "trend_direction": trend_direction,
         "price_range_percent": price_range_percent,
         "momentum": momentum,
-        "max": sine_wave_max,
-        "min": sine_wave_min
+        "min": sine_wave_min,
+        "max": sine_wave_max
     }
    
+
+
 #sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5)
 #print(sine_wave)
 
@@ -713,9 +715,6 @@ def octa_metatron_cube(close_prices, candles,
 
     freq_range = 25
     
-    print(em_phase)
-    print(em_amp) 
-
     current_quadrant_amplitude = em_amp
     current_quadrant_phase= em_amp
 
@@ -750,25 +749,25 @@ def octa_metatron_cube(close_prices, candles,
         if current_quadrant == 1: 
             # Most negative frequencies in Q1
             em_value = em_amp_q1 * math.sin(em_phase_q1 * frequency) 
-            print(em_value)
+            #print(em_value)
 
        # Calculate EM value based on frequency   
         elif current_quadrant == 2: 
             # Most negative frequencies in Q1
             em_value = em_amp_q2 * math.sin(em_phase_q2 * frequency) 
-            print(em_value)
+            #print(em_value)
 
        # Calculate EM value based on frequency   
         elif current_quadrant == 3: 
             # Most negative frequencies in Q1
             em_value = em_amp_q3 * math.sin(em_phase_q3 * frequency) 
-            print(em_value)
+            #print(em_value)
 
        # Calculate EM value based on frequency   
         elif current_quadrant == 4: 
             # Most negative frequencies in Q1
             em_value = em_amp_q4 * math.sin(em_phase_q4 * frequency) 
-            print(em_value)
+            #print(em_value)
 
         frequencies.append({
             'number': i,
@@ -850,6 +849,8 @@ def octa_metatron_cube(close_prices, candles,
     #Assign current EM amplitude and phase
     em_amp = current_em_amp
     em_phase = current_em_phase
+    
+    print()
 
     if percent_to_min_val < 20:
         print("Bullish momentum in trend")
@@ -882,6 +883,8 @@ def octa_metatron_cube(close_prices, candles,
         elif current_quadrant == 4:
             # In quadrant 4, distance from 75% to max of range
             print("Bearish momentum in Q4")
+
+    print()
 
     # Calculate quadrature phase shift based on current quadrant  
     if current_quadrant == 1:  
@@ -922,6 +925,8 @@ def octa_metatron_cube(close_prices, candles,
             next_quadrant = 3
             cycle_direction = "DOWN"
 
+    print()
+
     # Calculate quadrature phase                       
     if next_quadrant == 1:     
         next_quadrature_phase = em_phase_q1            
@@ -944,6 +949,8 @@ def octa_metatron_cube(close_prices, candles,
     else:  
         # Down cycle from Q4 to Q1 
         print("Down cycle now")
+
+    print()
 
     if current_quadrant == 1:
         # Quadrant 1
@@ -1007,8 +1014,8 @@ def octa_metatron_cube(close_prices, candles,
     print("Quadrant is in: " + cycle_direction + " cycle")  
  
         
-    for freq in frequencies:               
-        print(freq['number'], freq['em_value'], freq['mood'])    
+    #for freq in frequencies:               
+        #print(freq['number'], freq['em_value'], freq['mood'])    
 
         
     # Calculate frequency spectrum index range based on most negative and positive frequencies
@@ -1152,12 +1159,16 @@ def octa_metatron_cube(close_prices, candles,
     print(f"Highest 3 frequencies: {highest_3_mood}")        
     print(f"Lowest 3 frequencies: {lowest_3_mood}")
 
+    print()
+
     if highest_3_mood > 0:
         print(f"Cycle mood is negative")
     elif highest_3_mood < 0:      
         print(f"Cycle mood is positive") 
     else:
         print("Cycle mood is neutral")
+
+    print()
 
     if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':        
         if mood_map[frequencies[0]['mood']] < 0:
@@ -1171,6 +1182,10 @@ def octa_metatron_cube(close_prices, candles,
     else:
         print(f"Frequency spectrum index range: neutral")
         print(f"Freq. range is neutral") 
+
+    freq_index_range_min = frequencies[0]['mood']
+    freq_index_range_max = frequencies[-1]['mood'] 
+    freq_range =  total_mood
 
     print()
 
@@ -1541,19 +1556,20 @@ def octa_metatron_cube(close_prices, candles,
         current_em_amp,  
         current_em_phase,
         current_momentum,    
-        forecast_mood,     
-        current_point,      
+        forecast_mood, 
+        freq_index_range_min,
+        freq_index_range_max,
+        freq_range,    
+        current_point,
         next_point,       
         forecast,       
         frequencies 
     )
 
-
 print()
 
-current_em_amp, current_em_phase, current_momentum, forecast_mood, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
+current_em_amp, current_em_phase, current_momentum, forecast_mood, freq_index_range_min, freq_index_range_max, freq_range, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
 
-print("Print now  octa_metatron_cube: ")
 print()
 
 print(f"Current EM Amplitude: {current_em_amp}")
@@ -1564,16 +1580,14 @@ print(f"Current Point: {current_point}")
 print(f"Next Point: {next_point}")
 print(f"Forecast: {forecast}")
 
-print("Frequencies:")
-for freq in frequencies:  
-    try:
-        print(f"Frequency: {freq['freq']}  Hz") 
-        print(f"Mood: {freq['mood']}")
-        print(f"EM Value: {freq['em_value']}")
-    except KeyError:
-        print("No frequency data available.")
-
-
+#print("Frequencies:")
+#for freq in frequencies:  
+    #try:
+       #print(f"Frequency: {freq['freq']}  Hz") 
+        #print(f"Mood: {freq['mood']}")
+        #print(f"EM Value: {freq['em_value']}")
+    #except KeyError:
+        #print("No frequency data available.")
 
 print()
 
@@ -1804,6 +1818,7 @@ def main():
 
             print()
 
+
             ##################################################
             ##################################################
 
@@ -1813,20 +1828,46 @@ def main():
 
             sine_wave_max = sine_wave["max"]   
             sine_wave_min = sine_wave["min"]
- 
-            current_em_amp, current_em_phase, current_momentum, forecast_mood, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
+
+            # Call the function
+            results = generate_new_momentum_sinewave(
+                close_prices, 
+                candles,  
+                percent_to_max_val=5,  
+                percent_to_min_val=5
+                )
+  
+            # Unpack the returned values    
+            current_close = results["current_close"]  
+            dist_from_close_to_min = results["dist_from_close_to_min"]  
+            dist_from_close_to_max = results["dist_from_close_to_max"]
+            current_quadrant = results["current_quadrant"]
+            em_amp = results["em_amplitude"]
+            em_phase = results["em_phase"]  
+            trend_direction = results["trend_direction"]  
+            price_range_percent = results["price_range_percent"] 
+            momentum = results["momentum"]
+            sine_wave_min = results["min"]
+            sine_wave_max = results["max"]
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            current_em_amp, current_em_phase, current_momentum, forecast_mood, freq_index_range_min, freq_index_range_max, freq_range, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
 
             print("Print now  octa_metatron_cube reversals circuit details: ")
             print()
 
-            print("Frequencies:")
-            for freq in frequencies:  
-                try:
-                    print(f"Frequency: {freq['freq']}  Hz") 
-                    print(f"Mood: {freq['mood']}")
-                    print(f"EM Value: {freq['em_value']}")
-                except KeyError:
-                    print("No frequency data available.")
+            #print("Frequencies:")
+            #for freq in frequencies:  
+                #try:
+                    #print(f"Frequency: {freq['freq']}  Hz") 
+                    #print(f"Mood: {freq['mood']}")
+                    #print(f"EM Value: {freq['em_value']}")
+                #except KeyError:
+                    #print("No frequency data available.")
 
             print()
 
@@ -1839,6 +1880,33 @@ def main():
 
             print("Current local Time is now at: ", current_time)
             print("Current close price is at : ", current_close)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Print the variables from generate_new_momentum_sinewave() fct
+            print(f"Current close on Sine wave: {current_close}")
+            print(f"Distance from close to min: {dist_from_close_to_min}") 
+            print(f"Distance from close to max: {dist_from_close_to_max}")
+            print(f"Current_quadrant now at: {current_quadrant}")
+            print(f"Trend direction: {trend_direction}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            print(f"Current EM Amplitude: {current_em_amp}")
+            print(f"Current EM Phase: {current_em_phase}")
+            print(f"Current Momentum: {current_momentum}")
+            print(f"freq_index_range_min: {freq_index_range_min}")
+            print(f"freq_index_range_max: {freq_index_range_max}")
+            print(f"freq_range: {freq_range}")
+            print(f"Forecast Mood: {forecast_mood}")
+            print(f"Current Point: {current_point}")
+            print(f"Next Point: {next_point}")
 
             print()
 
@@ -1864,19 +1932,6 @@ def main():
             n_components = 5
 
             current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
-
-            print(f"Current EM Amplitude: {current_em_amp}")
-            print(f"Current EM Phase: {current_em_phase}")
-            print(f"Current Momentum: {current_momentum}")  
-            print(f"Forecast Mood: {forecast_mood}")
-            print(f"Current Point: {current_point}")
-            print(f"Next Point: {next_point}")
-            print(f"Forecast: {forecast}")
-
-            print()
-
-            print("Current local Time is now at: ", current_time)
-            print("Current close price is at : ", entry_price)
 
             print()
 
