@@ -1291,6 +1291,8 @@ def octa_metatron_cube(close_prices, candles,
     stationary_circuit.append('Base')
     stationary_circuit.append('Right')
 
+    up_circuit = True
+
     # Loop through each quadrant cycle        
     for quadrant in [1,2,3,4]:
     
@@ -1300,16 +1302,37 @@ def octa_metatron_cube(close_prices, candles,
         point = quadrant_map[quadrant]    
     
         #print(f"Current point: {point}")
-    
-        # Get next point based on circuit        
-        if point == 'Apex':
-            next_point = 'Left'
-        elif point == 'Left':
-            next_point = 'Base'         
-        elif point == 'Base':
-            next_point = 'Right'
-        elif point == 'Right':
-            next_point = 'Apex'
+
+        last_point = 'Apex' 
+        next_point = 'Left'
+
+        # Get next point based on circuit
+        
+        if up_circuit:
+            if point == 'Apex':
+                next_point = 'Left' 
+                last_point = 'Left'  
+            
+            elif point == 'Left':
+                next_point = 'Base'
+            
+            elif point == 'Base':
+                next_point = 'Right'  
+            
+        else: # Down circuit   
+            if point =='Right':    
+                next_point = 'Base'       
+                last_point = 'Base'
+            
+            elif point == 'Base':       
+                next_point = 'Left'  
+            
+            elif point == 'Left':
+                next_point = 'Apex' 
+                last_point = 'Apex'
+            
+        # Toggle circuit           
+        up_circuit = not up_circuit
 
         #print(f"Next point: {next_point}")       
     
