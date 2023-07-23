@@ -1319,13 +1319,24 @@ def octa_metatron_cube(close_prices, candles,
     
         # Get next point based on circuit        
         if point == 'Apex':
-            next_point = 'Left'
-        elif point == 'Left':
-            next_point = 'Base'         
-        elif point == 'Base':
-            next_point = 'Right'
-        elif point == 'Right':
-            next_point = 'Apex'
+            # Special logic for Apex         
+            if quadrant == 1:
+                next_point = 'Left'        
+            elif quadrant == 2:  
+                next_point = 'Base'
+            elif quadrant == 3:      
+                next_point = 'Right'
+            else:                  
+                next_point = 'Apex'      
+            
+        else:  
+            # Regular logic for other points     
+            if point == 'Left':
+                next_point = 'Base'         
+            elif point == 'Base':
+                next_point = 'Right'
+            elif point == 'Right':   
+                next_point = 'Apex'
         
         #print(f"Next point: {next_point}")       
     
