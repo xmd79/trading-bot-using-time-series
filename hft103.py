@@ -591,21 +591,6 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, 
 
     print("EM value:", em_value)
 
-    # Define up cycle as movement from Q1 to Q4
-    up_cycle = em_phase_q2 > em_phase_q1 and em_phase_q3 > em_phase_q2 and em_phase_q4 > em_phase_q3
-
-    # Define down cycle as movement from Q4 to Q1    
-    down_cycle = em_phase_q3 < em_phase_q4 and em_phase_q2 < em_phase_q3 and em_phase_q1 < em_phase_q2
-
-    if up_cycle:
-        trend_direction = "Up"
-    elif down_cycle:   
-        trend_direction = "Down"
-    else:
-        trend_direction = "Sideways"
-
-    print("Trend direction:", trend_direction)
-
     # Calculate the percentage of the price range
     price_range = candles[-1]["high"] - candles[-1]["low"]
     price_range_percent = (close_prices[-1] - candles[-1]["low"]) / price_range * 100
@@ -627,7 +612,6 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, 
         "current_quadrant": current_quadrant,
         "em_amplitude": em_amp,
         "em_phase": em_phase,
-        "trend_direction": trend_direction,
         "price_range_percent": price_range_percent,
         "momentum": momentum,
         "min": sine_wave_min,
@@ -1555,6 +1539,7 @@ def octa_metatron_cube(close_prices, candles,
     return (
         current_em_amp,  
         current_em_phase,
+        cycle_direction,
         current_momentum,    
         forecast_mood, 
         freq_index_range_min,
@@ -1568,7 +1553,7 @@ def octa_metatron_cube(close_prices, candles,
 
 print()
 
-current_em_amp, current_em_phase, current_momentum, forecast_mood, freq_index_range_min, freq_index_range_max, freq_range, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
+current_em_amp, current_em_phase, cycle_direction, current_momentum, forecast_mood, freq_index_range_min, freq_index_range_max, freq_range, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
 
 print()
 
@@ -1579,6 +1564,8 @@ print(f"Forecast Mood: {forecast_mood}")
 print(f"Current Point: {current_point}")
 print(f"Next Point: {next_point}")
 print(f"Forecast: {forecast}")
+print(f"Cycle_direction: {cycle_direction}")
+
 
 #print("Frequencies:")
 #for freq in frequencies:  
@@ -1859,7 +1846,6 @@ def main():
             current_quadrant = results["current_quadrant"]
             em_amp = results["em_amplitude"]
             em_phase = results["em_phase"]  
-            trend_direction = results["trend_direction"]  
             price_range_percent = results["price_range_percent"] 
             momentum = results["momentum"]
             sine_wave_min = results["min"]
@@ -1870,7 +1856,7 @@ def main():
             ##################################################
             ##################################################
 
-            current_em_amp, current_em_phase, current_momentum, forecast_mood, freq_index_range_min, freq_index_range_max, freq_range, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
+            current_em_amp, current_em_phase, cycle_direction, current_momentum, forecast_mood, freq_index_range_min, freq_index_range_max, freq_range, current_point, next_point, forecast, frequencies = octa_metatron_cube(close_prices, candles)
 
             print("Print now  octa_metatron_cube reversals circuit details: ")
             print()
@@ -1906,7 +1892,6 @@ def main():
             print(f"Distance from close to min: {dist_from_close_to_min}") 
             print(f"Distance from close to max: {dist_from_close_to_max}")
             print(f"Current_quadrant now at: {current_quadrant}")
-            print(f"Trend direction: {trend_direction}")
 
             print()
 
@@ -1920,6 +1905,7 @@ def main():
             print(f"freq_index_range_max: {freq_index_range_max}")
             print(f"freq_range: {freq_range}")
             print(f"Forecast Mood: {forecast_mood}")
+            print(f"Cycle_direction: {cycle_direction}")
             print(f"Current Point: {current_point}")
             print(f"Next Point: {next_point}")
 
@@ -1946,7 +1932,7 @@ def main():
             closes = get_closes("1m")     
             n_components = 5
 
-            current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, fastest_target, market_mood = get_target(closes, n_components, target_distance=56)
+            current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, fastest_target, market_mood = get_target(closes, n_components, target_distance=5)
 
             print("Current close price is at : ", current_close)
 
