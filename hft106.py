@@ -113,7 +113,7 @@ timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12
 ##################################################
 ##################################################
 
-# Get current price as string
+# Get current price as <class 'float'>
 
 def get_price(symbol):
     try:
