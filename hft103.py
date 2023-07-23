@@ -1313,59 +1313,19 @@ def octa_metatron_cube(close_prices, candles,
         #print(f"Quadrant {quadrant}")
             
         # Get triangle point from quadrant map               
-        point = quadrant_map[quadrant]  
-
-        # Initialize circuit variable
-        if point == 'Apex':
-            circuit = 'Apex-Left-Base-Right'
-        else:
-            circuit = 'Right-Base-Left-Apex'
-
+        point = quadrant_map[quadrant]    
+    
         #print(f"Current point: {point}")
-
+    
         # Get next point based on circuit        
         if point == 'Apex':
-            # Special logic for Apex
-            if circuit == 'Apex-Left-Base-Right':
-                if quadrant == 1:
-                    next_point = 'Left'
-                elif quadrant == 2:
-                    next_point = 'Base'
-                elif quadrant == 3:
-                    next_point = 'Right'
-                else:
-                    next_point = 'Apex'
-            else:
-                if quadrant == 3:
-                    next_point = 'Left'
-                elif quadrant == 2:
-                    next_point = 'Base'
-                elif quadrant == 1:
-                    next_point = 'Right'
-                else:
-                    next_point = 'Apex'
-        else:
-            # Regular logic for other points
-            if point == 'Left':
-                if circuit == 'Apex-Left-Base-Right':
-                    next_point = 'Base'
-                else:
-                    next_point = 'Right'
-            elif point == 'Base':
-                next_point = 'Right' if circuit == 'Apex-Left-Base-Right' else 'Left'
-            elif point == 'Right':
-                if circuit == 'Apex-Left-Base-Right':
-                    next_point = 'Apex'
-                else:
-                    next_point = 'Left'
-            else:
-                next_point = 'Apex' # set to default if invalid point is given
-
-        # Check if circuit is complete and update circuit variable
-        if point == 'Right' and next_point == 'Apex':
-            circuit = 'Right-Base-Left-Apex'
-        elif point == 'Apex' and next_point == 'Left':
-            circuit = 'Apex-Left-Base-Right'
+            next_point = 'Left'
+        elif point == 'Left':
+            next_point = 'Base'         
+        elif point == 'Base':
+            next_point = 'Right'
+        elif point == 'Right':
+            next_point = 'Apex'
 
         #print(f"Next point: {next_point}")       
     
