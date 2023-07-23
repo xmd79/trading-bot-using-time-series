@@ -106,9 +106,14 @@ TRADE_SYMBOL = "BTCUSDT"
 ##################################################
 ##################################################
 
-# Define timeframes and get candles:
+# Define timeframes
 
 timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
+
+##################################################
+##################################################
+
+# Get current price as string
 
 def get_price(symbol):
     try:
