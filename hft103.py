@@ -1694,7 +1694,7 @@ print()
 ##################################################
 ##################################################
 
-def get_target(closes, n_components, target_distance=0.5):
+def get_target(closes, n_components, target_distance=56):
     # Calculate FFT of closing prices
     fft = fftpack.fft(closes) 
     frequencies = fftpack.fftfreq(len(closes))
@@ -1719,10 +1719,13 @@ def get_target(closes, n_components, target_distance=0.5):
     diff = target_price - current_close
     if diff > 0:           
         market_mood = "Bullish"
+        faster_target = current_close - target_distance
     elif diff < 0:                 
         market_mood = "Bearish"
+        faster_target = current_close + target_distance
     else:           
         market_mood = "Neutral"
+        faster_target = current_close + target_distance
     
     # Calculate the stop loss and target levels
     entry_price = closes[-1]    
@@ -1731,21 +1734,33 @@ def get_target(closes, n_components, target_distance=0.5):
     target2 = target_price + 2*np.std(closes)  
     target3 = target_price + 3*np.std(closes)            
     
-    return current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, market_mood
+    return current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, faster_target, market_mood
 
 closes = get_closes("1m")     
 n_components = 5
 
-current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
+current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, fastest_target, market_mood = get_target(closes, n_components, target_distance=56)
 
 print("Current local Time is now at: ", current_time)
-print("Current close price is at : ", entry_price)
-print("Target price for next minutes is: ", target_price)   
 print("Market mood is: ", market_mood)
-print("Stop loss is: ", stop_loss) 
+
+print()
+
+
+print("Fastest target is: ", fastest_target)
+print("Target price for next minutes is: ", target_price)   
+
+print()
+
+print("Entry price is at : ", entry_price)
+print("Stop loss is: ", stop_loss)
+
+print() 
+
 print("Target 1 is: ", target1)           
 print("Target 2 is: ", target2)
 print("Target 3 is: ", target3)
+
 
 print()
 
@@ -1942,10 +1957,13 @@ def main():
             closes = get_closes("1m")     
             n_components = 5
 
-            current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
+            current_time, entry_price, stop_loss, target1, target2, target3, filtered_signal, target_price, fastest_target, market_mood = get_target(closes, n_components, target_distance=56)
+
+            print("Current close price is at : ", current_close)
 
             print()
 
+            print("Fastest target is: ", fastest_target)
             print("Target price for next minutes is: ", target_price)
             print("Market mood is: ", market_mood)
 
