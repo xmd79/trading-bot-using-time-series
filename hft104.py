@@ -1818,13 +1818,18 @@ def HASHTOBINS(x, zb, sigma, a, b, B, delta, alpha):
 def NOISELESSSPARSEFFT(x, k, sigma, a, b, B):
     zb = [0.0] * beta
     k_prime = beta * math.ceil(k / beta)
-    for t in range(int(numpy.log2(k))):
-        zb_prime = list(zb)
-        zb_prime[:len(zb)] = [zb_prime[i] + NOISELESSSPARSEFFTINNER(x, k_prime, zb, sigma, a, b, B)[i] for i in range(len(zb_prime))]
-        zb = [zb_prime[i] if i < len(zb_prime) else 0.0 for i in range(len(zb))]
-        for i in range(beta):
-            if abs(zb[i]) >= L:
-                zb[i] = 0.0
+
+    t = 0   
+    if k > 0:
+        t = int(numpy.log2(k))
+
+        for t in range(int(numpy.log2(k))):
+            zb_prime = list(zb)
+            zb_prime[:len(zb)] = [zb_prime[i] + NOISELESSSPARSEFFTINNER(x, k_prime, zb, sigma, a, b, B)[i] for i in range(len(zb_prime))]
+            zb = [zb_prime[i] if i < len(zb_prime) else 0.0 for i in range(len(zb))]
+            for i in range(beta):
+                if abs(zb[i]) >= L:
+                    zb[i] = 0.0
     return zb
 
 def NOISELESSSPARSEFFTINNER(x, k, zb, sigma, a, b, B):
@@ -1898,3 +1903,72 @@ for t in range(len(price_changes) + forecast_horizon):
 price_levels = [numpy.exp(p) for p in price_forecast]
 
 print(price_levels)
+
+print()
+
+# Base price - initial price value  
+base_price = closes[0]
+
+# Standard price forecasts
+std_price_forecast = [level / base_price for level in price_levels]
+
+print(std_price_forecast)
+
+print()
+
+# Take natural log of price levels 
+float_forecast = [numpy.log(level) for level in price_levels]
+
+# Exponentiate to get prices relative to base price  
+std_price_forecast = [numpy.exp(f) for f in float_forecast]
+
+print(std_price_forecast)
+
+float_forecast = [x.real for x in price_levels]
+print(float_forecast)
+
+print()
+
+# Base price - initial price value  
+base_price = closes[0]
+
+# Forecast factor
+forecast_factor = 1.01   
+
+# Exponentiate float forecasts to get price levels
+price_levels = [f * base_price for f in float_forecast]
+
+# Calculate cumulative sum of price changes   
+cum_price = 0
+price_changes = []
+
+for level in price_levels:
+    cum_price += level - price_levels[-1]    
+    price_changes.append(cum_price)
+
+# Filter out non-positive values 
+price_changes = [p for p in price_changes if p > 0]
+
+# Take natural log of price changes to get log returns
+log_returns = [numpy.log(p) for p in price_changes]
+
+#print(log_returns)
+
+# Compute NSFT of log returns    
+k = len(log_returns)
+x = log_returns[:k]
+zb = NOISELESSSPARSEFFT(x, k, sigma, a, b, B)
+
+# Inverse transform frequencies to get zb back
+y = numpy.fft.ifft(zb)  
+y = list(numpy.fft.ifft(zb))
+
+# Forecast future log returns based on pattern
+for t in range(forecast_horizon):
+    y.append(y[-1] * forecast_factor)
+
+# Exponentiate forecast log returns   
+price_forecast = [numpy.exp(p) for p in y]
+
+print(price_forecast)
+
