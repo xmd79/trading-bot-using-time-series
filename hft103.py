@@ -1314,10 +1314,16 @@ def octa_metatron_cube(close_prices, candles,
                 last_point = 'Left'  
             
             elif point == 'Left':
-                next_point = 'Base'
+                if last_point == 'Apex':      
+                    next_point = 'Base'    
+                else:      
+                    next_point = 'Apex'
             
             elif point == 'Base':
-                next_point = 'Right'  
+                if last_point == 'Left':      
+                    next_point = 'Right'    
+                else:      
+                    next_point = 'Left' 
             
         else: # Down circuit   
             if point =='Right':    
@@ -1931,6 +1937,15 @@ def main():
             print(f"Cycle_direction: {cycle_direction}")
             print(f"Current Point: {current_point}")
             print(f"Next Point: {next_point}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            for timeframe in timeframes:
+                momentum = get_momentum(timeframe)
+                print(f"Momentum for {timeframe}: {momentum}")
 
             print()
 
