@@ -1079,13 +1079,13 @@ def main():
                 if current_quadrant == 1: 
                     if dist_from_close_to_min <= 15:
                         if momentum > 0:
-                            if price < avg_mtf and price < fastest_target and price < target_price and price < target1 and market_mood == "Bullish":
+                            if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish":
                                 trigger_long = True
             
                 elif current_quadrant == 4: 
                     if dist_from_close_to_max <= 15:
                         if momentum > 0:
-                            if price > avg_mtf and price > fastest_target and price > target_price and price > target1 and market_mood == "Bullish":
+                            if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bullish":
                                 trigger_long = True  
              
                 if trigger_long:          
