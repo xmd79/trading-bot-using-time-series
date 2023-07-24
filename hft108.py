@@ -894,7 +894,7 @@ def main():
             print("Current close on sine value now at: ", current_sine)
             print("Distance as percentages from close to min: ", dist_from_close_to_min, "%")
             print("Distance as percentages from close to max: ", dist_from_close_to_max, "%")
-            print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
+            #print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
             print("Mood on 1min timeframe is now at: ", market_mood[-12])
 
             print()
@@ -969,11 +969,9 @@ def main():
             ##################################################
             ##################################################
 
-            for timeframe in timeframes:
-                momentum = get_momentum(timeframe)
-                print(f"Momentum for {timeframe}: {momentum}")
-
-            print()
+            timeframe = '1m'
+            momentum = get_momentum(timeframe)
+            print("Momentum on 1min tf is at: ", momentum)
 
             ##################################################
             ##################################################
@@ -981,7 +979,7 @@ def main():
             # Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
             min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
 
-            print("Momentum signal:", momentum_signal)
+            print("Momentum sinewave signal:", momentum_signal)
             print()
 
             print("Minimum threshold:", min_threshold)
@@ -1015,18 +1013,44 @@ def main():
             print("Target 2 is: ", target2)
             print("Target 3 is: ", target3)
 
+            price = float(price)
+ 
+            ##################################################
+            ##################################################
+
+            # Initialize variables
+            trigger_long = False 
+            trigger_short = False
+
+            with open("signals.txt", "a") as f:   
+                # Get data and calculate indicators here...
+         
+                if current_quadrant == 1: 
+                    if dist_from_close_to_min <= 15:
+                        if momentum > 0:
+                            if price < avg_mtf and price < fastest_target and price < target_price and price < target1 and market_mood == "Bullish":
+                                trigger_long = True
+            
+                elif current_quadrant == 4: 
+                    if dist_from_close_to_max <= 15:
+                        if momentum > 0:
+                            if price > avg_mtf and price > fastest_target and price > target_price and price > target1 and market_mood == "Bullish":
+                                trigger_long = True  
+             
+                if trigger_long:          
+                    print("LONG signal!")  
+                    f.write("LONG signal! %s\n" % datetime.now())  
+                    trigger_long = False
+         
+                if trigger_short:
+                    print("SHORT signal!")
+                    f.write("SHORT signal! %s\n" % datetime.now())
+                    trigger_short = False
+
+                ##################################################
+                ##################################################
+
             print()
-
-            ##################################################
-            ##################################################
-
-            # Build trading signals trigger map
-
-            if current_quadrant == 1 and dist_from_close_to_min <= 10 and momentum['1m'] > 0 and price < avg_mtf and price < fastest_target and price < target_price and price < target1 and market_mood == "Bullish":
-                print("Entry LONG signal detected")
-
-            elif current_quadrant == 4 and dist_from_close_to_max <= 10 and momentum['1m'] < 0 and price > avg_mtf and price > fastest_target and price > target_price and price > target1 and market_mood == "Bearish": 
-                print("Entry SHORT signal detected")
 
             ##################################################
             ##################################################
