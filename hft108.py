@@ -1022,9 +1022,11 @@ def main():
             trigger_long = False 
             trigger_short = False
 
+            current_time = datetime.datetime.utcnow() + timedelta(hours=3)
+
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
-         
+                timestamp = current_time.strftime("%d %H %M %S")
                 if current_quadrant == 1: 
                     if dist_from_close_to_min <= 15:
                         if momentum > 0:
@@ -1039,12 +1041,12 @@ def main():
              
                 if trigger_long:          
                     print("LONG signal!")  
-                    f.write("LONG signal! %s\n" % datetime.now())  
+                    f.write(f"{timestamp} LONG\n") 
                     trigger_long = False
          
                 if trigger_short:
                     print("SHORT signal!")
-                    f.write("SHORT signal! %s\n" % datetime.now())
+                    f.write(f"{timestamp} SHORT\n")
                     trigger_short = False
 
                 ##################################################
