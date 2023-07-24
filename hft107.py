@@ -370,6 +370,8 @@ def generate_momentum_sinewave(timeframes):
     min_val = min(close_prices_between_min_and_max)
     max_val = max(close_prices_between_min_and_max)
 
+    print()
+
     print("The lowest value in the array is:", min_val)
     print("The highest value in the array is:", max_val)
 
