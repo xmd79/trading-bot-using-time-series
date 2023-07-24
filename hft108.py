@@ -1020,7 +1020,16 @@ def main():
             ##################################################
             ##################################################
 
-            print()
+            # Build trading signals trigger map
+
+            if current_quadrant == 1 and dist_from_close_to_min <= 10 and momentum['1m'] > 0 and price < avg_mtf and price < fastest_target and price < target_price and price < target1 and market_mood == "Bullish":
+                print("Entry LONG signal detected")
+
+            elif current_quadrant == 4 and dist_from_close_to_max <= 10 and momentum['1m'] < 0 and price > avg_mtf and price > fastest_target and price > target_price and price > target1 and market_mood == "Bearish": 
+                print("Entry SHORT signal detected")
+
+            ##################################################
+            ##################################################
 
         except Exception as e:
             print(f"An error occurred: {e}")
