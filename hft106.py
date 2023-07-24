@@ -137,15 +137,62 @@ price = get_price("BTCUSDT")
 
 print(price)
 
+print()
+
 ##################################################
 ##################################################
 
+# Define function to retrieve candles from Binance API
+def get_candles(symbol, timeframes):
+    candles = []
+    for timeframe in timeframes:
+        limit = 10000  # default limit
+        tf_value = int(timeframe[:-1])  # extract numeric value of timeframe
+        if tf_value >= 4:  # check if timeframe is 4h or above
+            limit = 20000  # increase limit for 4h timeframe and above
+        klines = client.get_klines(
+            symbol=symbol,
+            interval=timeframe,
+            limit=limit
+        )
+        # Convert klines to candle dict
+        for k in klines:
+            candle = {
+                "time": k[0] / 1000,
+                "open": float(k[1]),
+                "high": float(k[2]),
+                "low": float(k[3]),
+                "close": float(k[4]),
+                "volume": float(k[5]),
+                "timeframe": timeframe
+            }
+            candles.append(candle)
+    return candles
 
+# Get candles  
+candles = get_candles(TRADE_SYMBOL, timeframes) 
 
+# Organize candles by timeframe        
+candle_map = {}  
+for candle in candles:
+    timeframe = candle["timeframe"]  
+    candle_map.setdefault(timeframe, []).append(candle)
 
+# Get entire list of close prices as <class 'list'> type
+def get_closes(timeframe):
+    closes = []
+    candles = candle_map[timeframe]
 
+    for c in candles:
+        close = c['close']
+        if not np.isnan(close):
+            closes.append(close)
 
+    # Append current price to the list of closing prices
+    current_price = get_price(TRADE_SYMBOL)
+    closes.append(current_price)
 
+    return closes
 
-
-
+closes = get_closes('1m')
+print(closes)
