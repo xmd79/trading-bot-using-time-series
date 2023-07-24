@@ -834,17 +834,26 @@ print("Market mood is: ", market_mood)
 
 print()
 
+print("Current close price is at : ", current_close)
+
+print()
+
+print("Fast target 1 is: ", fast_target4)
+print("Fast target 2 is: ", fast_target3)
+print("Fast target 3 is: ", fast_target2)
+print("Fast target 4 is: ", fast_target1)
+
+print()
+
 print("Fastest target is: ", fastest_target)
-print("Fast target 1 is: ", fast_target1)
-print("Fast target 2 is: ", fast_target2)
-print("Fast target 3 is: ", fast_target3)
-print("Fast target 4 is: ", fast_target4)
+
+print()
+
 print("Target 1 is: ", target1)
 print("Target 2 is: ", target2)
 print("Target 3 is: ", target3)
 print("Target 4 is: ", target4)
 print("Target 5 is: ", target5)
-print()
 
 ##################################################
 
@@ -982,8 +991,8 @@ def main():
             current_time = datetime.datetime.now()
             current_close = price
 
-            print("Current local Time is now at: ", current_time)
-            print("Current close price is at : ", current_close)
+            #print("Current local Time is now at: ", current_time)
+            #print("Current close price is at : ", current_close)
 
             print()
 
