@@ -1102,9 +1102,9 @@ def main():
                     if pct_diff <= 10:
 
                         if dist_from_close_to_max <= 15:
-                        if momentum < 0:
-                            if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish":
-                                trigger_short = True  
+                            if momentum < 0:
+                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish":
+                                    trigger_short = True  
              
                     if price >= max_threshold:
                         trigger_short = True
