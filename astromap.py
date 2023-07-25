@@ -262,6 +262,8 @@ observer = {
 }
 vedic_houses = get_vedic_houses(current_time, observer)
 
+print()
+
 # Compute fixed_body position
 fixed_body.compute(current_time)
 
