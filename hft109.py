@@ -745,7 +745,6 @@ def get_closes_last_n_minutes(interval, n):
 
 print()
 
-
 ##################################################
 ##################################################
 
@@ -855,9 +854,11 @@ print("Target 3 is: ", target3)
 print("Target 4 is: ", target4)
 print("Target 5 is: ", target5)
 
-##################################################
-
 print()
+
+
+##################################################
+##################################################
 
 ##################################################
 ##################################################
@@ -1086,18 +1087,18 @@ def main():
             
                 elif current_quadrant == 4: 
                     if dist_from_close_to_max <= 15:
-                        if momentum > 0:
+                        if momentum < 0:
                             if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bullish":
                                 trigger_long = True  
              
                 if trigger_long:          
                     print("LONG signal!")  
-                    f.write(f"{timestamp} LONG\n") 
+                    f.write(f"{timestamp} LONG {price}\n") 
                     trigger_long = False
          
                 if trigger_short:
                     print("SHORT signal!")
-                    f.write(f"{timestamp} SHORT\n")
+                    f.write(f"{timestamp} SHORT {price}\n")
                     trigger_short = False
 
                 ##################################################
@@ -1126,3 +1127,4 @@ print()
 # Run the main function
 if __name__ == '__main__':
     main()
+
