@@ -110,11 +110,134 @@ def get_astro_map_data(current_time):
     
     return astro_map_data
 
-# Example usage
-current_time = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+def get_vedic_houses(date, observer):
+    # Convert datetime to ephem date
+    date_ephem = ephem.Date(date)
+
+    # Set up ephem observer object
+    obs = ephem.Observer()
+    obs.lon = str(observer['longitude'])
+    obs.lat = str(observer['latitude'])
+    obs.date = date_ephem
+
+    # Calculate the sidereal time at the observer's location
+    sidereal_time = float(obs.sidereal_time())
+
+    # Calculate the ascendant degree
+    asc_deg = obs.radec_of(date_ephem, 0)[0] * 180 / ephem.pi
+
+    # Calculate the MC degree
+    mc_deg = (sidereal_time - asc_deg + 180) % 360
+
+    # Calculate the house cusps
+    house_cusps = []
+    for i in range(1, 13):
+        cusp_deg = (i * 30 - asc_deg) % 360
+        cusp_sign = get_vedic_sign(cusp_deg)
+        house_cusps.append((i, cusp_sign))
+
+    house_cusps_dict = {house: sign for house, sign in house_cusps}
+    return house_cusps_dict
+
+
+def get_vedic_sign(deg):
+    deg = (deg + 360) % 360
+    if deg >= 0 and deg < 30:
+        return 'Aries'
+    elif deg >= 30 and deg < 60:
+        return 'Taurus'
+    elif deg >= 60 and deg < 90:
+        return 'Gemini'
+    elif deg >= 90 and deg < 120:
+        return 'Cancer'
+    elif deg >= 120 and deg < 150:
+        return 'Leo'
+    elif deg >= 150 and deg < 180:
+        return 'Virgo'
+    elif deg >= 180 and deg < 210:
+        return 'Libra'
+    elif deg >= 210 and deg < 240:
+        return 'Scorpio'
+    elif deg >= 240 and deg < 270:
+        return 'Sagittarius'
+    elif deg >= 270 and deg < 300:
+        return 'Capricorn'
+    elif deg >= 300 and deg < 330:
+        return 'Aquarius'
+    elif deg >= 330 and deg < 360:
+        return 'Pisces'
+
+# Define list of stars
+stars = [
+    ('Polaris', '02:31:49.09', '+89:15:50.8'),
+    ('Vega', '18:36:56.34', '+38:47:01.3'),
+    ('Betelgeuse', '05:55:10.31', '+07:24:25.4'),
+    ('Rigel', '05:14:32.28', '-08:12:05.9'),
+    ('Achernar', '01:37:42.84', '-57:14:12.3'),
+    ('Hadar', '14:03:49.40', '-60:22:22.3'),
+    ('Altair', '19:50:46.99', '+08:52:05.9'),
+    ('Deneb', '20:41:25.91', '+45:16:49.2')
+]
+
+def get_star_positions(date, observer):
+    # Set up ephem observer object
+    obs = ephem.Observer()
+    obs.lon = str(observer['longitude'])
+    obs.lat = str(observer['latitude'])
+    obs.date = ephem.Date(date)
+
+    # Get positions of stars in list
+    star_positions = []
+    for star in stars:
+        # Set up ephem star object
+        fixed_body = ephem.FixedBody()
+        fixed_body._ra = star[1]  # Set right ascension
+        fixed_body._dec = star[2]  # Set declination
+
+        # Calculate position of star for current date/time and observer location
+        fixed_body.compute(obs)
+
+        # Convert right ascension and declination to degrees
+        ra_deg = math.degrees(fixed_body.ra)
+        dec_deg = math.degrees(fixed_body.dec)
+
+        # Append star name and position to list
+        star_positions.append((star[0], ra_deg, dec_deg))
+
+    return star_positions
+
+# Set up the current time
+current_time = datetime.datetime.utcnow()
+
+# Get the moon data
 moon_data = get_moon_phase_momentum(current_time)
 
-# Print out the moon phase and momentum data
+# Print the moon data
+print('Moon phase:', moon_data['moon_phase'])
+print('Moon age:', moon_data['moon_age'])
+print('Moon sign:', moon_data['moon_sign'])
+print('Moon right ascension:', moon_data['moon_ra'])
+print('Moon declination:', moon_data['moon_dec'])
+print('Moon distance from Earth (km):', moon_data['moon_distance_km'])
+print('Moon angular diameter:', moon_data['moon_angular_diameter'])
+print('Moon speed (km/hr):', moon_data['moon_speed_km_hr'])
+print('Moon energy level:', moon_data['moon_energy'])
+print('Ascendant sign:', moon_data['astro_map']['ascendant'])
+print('Midheaven sign:', moon_data['astro_map']['midheaven'])
+print('Sun sign:', moon_data['astro_map']['sun']['sign'])
+print('Sun degree:', moon_data['astro_map']['sun']['degree'])
+print('Moon sign:', moon_data['astro_map']['moon']['sign'])
+print('Moon degree:', moon_data['astro_map']['moon']['degree'])
+
+print()
+  
+# Define current_time with UTC+3 offset   
+current_time = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+
+# Call the function to populate moon_data 
+moon_data = get_moon_phase_momentum(current_time)
+
+# Now we can access moon_data  
 print("Moon Phase: {:.2f}%".format(moon_data['moon_phase']))
 print("Moon Age: {} days".format(moon_data['moon_age']))
 print("Moon Sign: {}".format(moon_data['moon_sign']))
@@ -124,13 +247,38 @@ print("Moon Speed: {:.2f} km/hr".format(moon_data['moon_speed_km_hr']))
 print("Moon Energy Level: {:.2f}%".format(moon_data['moon_energy']))
 print("Moon Astrological Map: {}".format(moon_data['astro_map']))
 
-# Print out the astrological map data
-print("\nAstrological Map:")
-print("Ascendant: {}".format(moon_data['astro_map']['ascendant']))
-print("Midheaven: {}".format(moon_data['astro_map']['midheaven']))
-print("Sun Sign: {}".format(moon_data['astro_map']['sun']['sign']))
-print("Sun Degree: {:.2f} degrees".format(moon_data['astro_map']['sun']['degree']))
-print("Moon Sign: {}".format(moon_data['astro_map']['moon']['sign']))
-print("Moon Degree: {:.2f} degrees".format(moon_data['astro_map']['moon']['degree']))
+
+# Calculate fixed_body
+obs = ephem.Observer()
+# Set observer info
+fixed_body = ephem.FixedBody()  
+fixed_body._ra = obs.sidereal_time()
+fixed_body._dec = obs.lat
+
+# Call get_vedic_houses(), passing fixed_body 
+observer = {
+    'longitude': '-118.248405',
+    'latitude': '34.052187'
+}
+vedic_houses = get_vedic_houses(current_time, observer)
+
+# Compute fixed_body position
+fixed_body.compute(current_time)
+
+# Print results 
+for house, sign in vedic_houses.items():
+    print(f"House {house}: {sign}")
+
+# Print results
+for house in range(1,13):
+    sign = vedic_houses[house]
+    print(f"Vedic House {house}: {sign}")
+
+print()
+
+print("Full Results:")
+for house, sign in vedic_houses.items():
+    degree = math.degrees(fixed_body.ra)  
+    print(f"House {house} - {sign} at {degree:.2f} degrees") 
 
 print()
