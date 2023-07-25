@@ -1080,17 +1080,35 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
                 if current_quadrant == 1: 
-                    if dist_from_close_to_min <= 15:
-                        if momentum > 0:
-                            if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish":
-                                trigger_long = True
-            
+
+                    # Add percentage difference condition           
+                    pct_diff = (min_threshold - price) / min_threshold * 100
+
+                    if pct_diff <= 10:
+
+                        if dist_from_close_to_min <= 15:
+                            if momentum > 0:
+                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish":
+                                    trigger_long = True
+
+                        if price <= min_threshold:
+                            trigger_long = True
+
                 elif current_quadrant == 4: 
-                    if dist_from_close_to_max <= 15:
+
+                    # Add percentage difference condition         
+                    pct_diff = (price - max_threshold) / max_threshold * 100 
+
+                    if pct_diff <= 10:
+
+                        if dist_from_close_to_max <= 15:
                         if momentum < 0:
                             if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish":
                                 trigger_short = True  
              
+                    if price >= max_threshold:
+                        trigger_short = True
+
                 if trigger_long:          
                     print("LONG signal!")  
                     f.write(f"{timestamp} LONG {price}\n") 
