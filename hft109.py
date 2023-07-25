@@ -1089,7 +1089,7 @@ def main():
                     if dist_from_close_to_max <= 15:
                         if momentum < 0:
                             if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish":
-                                trigger_long = True  
+                                trigger_short = True  
              
                 if trigger_long:          
                     print("LONG signal!")  
