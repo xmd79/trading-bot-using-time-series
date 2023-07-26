@@ -873,6 +873,11 @@ def get_current_price():
 # Get the current price
 price = get_current_price()
 
+print()
+
+##################################################
+##################################################
+
 def radar(sample_rate, amplitude):
     """
     Generates a radar plot and returns the most dominant signal and its strength based on the Fisher transform values.
@@ -931,6 +936,179 @@ def radar(sample_rate, amplitude):
     return dominant_signal, tone
 
 #dominant_signal, tone = radar(sample_rate=44100, amplitude=1)
+
+print()
+
+##################################################
+##################################################
+
+def get_support_resistance_levels(close):
+    # Convert close list to numpy array
+    close_prices = np.array(close)
+
+    # Calculate EMA50 and EMA200
+    ema50 = talib.EMA(close_prices, timeperiod=50)
+    ema200 = talib.EMA(close_prices, timeperiod=200)
+
+    # Check if ema50 and ema200 have at least one element
+    if len(ema50) == 0 or len(ema200) == 0:
+        return []
+
+    # Get the last element of ema50 and ema200
+    ema50 = ema50[-1]
+    ema200 = ema200[-1]
+
+    # Calculate Phi Ratio levels
+    range_ = ema200 - ema50
+    phi_levels = [ema50, ema50 + range_/1.618, ema50 + range_]
+
+    # Calculate Gann Square levels
+    current_price = close_prices[-1]
+    high_points = [current_price, ema200, max(phi_levels)]
+    low_points = [min(phi_levels), ema50, current_price]
+
+    gann_levels = []
+    for i in range(1, min(4, len(high_points))):
+        for j in range(1, min(4, len(low_points))):
+            gann_level = ((high_points[i-1] - low_points[j-1]) * 0.25 * (i + j)) + low_points[j-1]
+            gann_levels.append(gann_level)
+
+    # Combine levels and sort
+    levels = phi_levels + gann_levels
+    levels.sort()
+
+    return levels
+
+print()
+
+# Get the support and resistance levels
+levels = get_support_resistance_levels(close_prices)
+
+support_levels, resistance_levels = [], []
+
+for level in levels:
+    if level < close_prices[-1]:
+        support_levels.append(level)
+    else:
+        resistance_levels.append(level)
+
+# Determine the market mood
+if len(levels) > 0:
+    support_levels = []
+    resistance_levels = []
+    for level in levels:
+        if level < close_prices[-1]:
+            support_levels.append(level)
+        else:
+            resistance_levels.append(level)
+
+    if len(support_levels) > 0 and len(resistance_levels) > 0:
+        market_mood = "Neutral"
+    elif len(support_levels) > 0:
+        market_mood = "Bullish"
+    elif len(resistance_levels) > 0:
+        market_mood = "Bearish"
+    else:
+        market_mood = "Undefined"
+
+    # Calculate support and resistance ranges
+    if len(support_levels) > 0:
+        support_range = max(support_levels) - min(support_levels)
+        print("Support range: {:.2f}".format(support_range))
+    else:
+        print("Support range: None")
+
+    if len(resistance_levels) > 0:
+        resistance_range = max(resistance_levels) - min(resistance_levels)
+        print("Resistance range: {:.2f}".format(resistance_range))
+    else:
+        print("Resistance range: None")
+
+    # Print the levels and market mood
+    print("Potential support levels:")
+    if len(support_levels) > 0:
+        for level in support_levels:
+            print("  - {:.2f}".format(level))
+    else:
+        print("  None found.")
+
+    print("Potential resistance levels:")
+    if len(resistance_levels) > 0:
+        for level in resistance_levels:
+            print("  - {:.2f}".format(level))
+    else:
+        print("  None found.")
+
+    incoming_bullish_reversal = None
+    incoming_bearish_reversal = None
+
+    if market_mood == "Neutral":
+        print("Market mood: {}".format(market_mood))
+        if len(support_levels) > 0:
+            support = max(support_levels)
+            support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
+        else:
+            support = None
+            support_percentage = None
+
+        if len(resistance_levels) > 0:
+            top = min(resistance_levels)
+            top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
+        else:
+            top = None
+            top_percentage = None
+
+        print("Best dip: {:.2f}% (Support level: {:.2f})".format(support_percentage, support))
+
+        if support_percentage >= 3.0:
+            incoming_bullish_reversal = True
+
+    elif market_mood == "Bullish":
+        print("Market mood: {}".format(market_mood))
+        if len(resistance_levels) > 0:
+            top = min(resistance_levels)
+            top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
+        else:
+            top = None
+            top_percentage = None
+
+        if top is not None:
+            print("Best breakout: {:.2f}% (Resistance level: {:.2f})".format(top_percentage, top))
+        else:
+            print("Best breakout: None")
+
+        if top_percentage is not None and top_percentage >= 3.0:
+            incoming_bullish_reversal = True
+
+    elif market_mood == "Bearish":
+        print("Market mood: {}".format(market_mood))
+        if len(support_levels) > 0:
+            support = max(support_levels)
+            support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
+        else:
+            support = None
+            support_percentage = None
+
+        if support is not None:
+            print("Best bounce: {:.2f}% (Support level: {:.2f})".format(support_percentage, support))
+        else:
+            print("Best bounce: None")
+
+        if if support_percentage is not None and support_percentage >= 3.0:
+            incoming_bearish_reversal = True
+
+    else:
+        print("Market mood: {}".format(market_mood))
+
+    # Print incoming reversal signals
+    if incoming_bullish_reversal:
+        print("Incoming bullish reversal signal!")
+
+    if incoming_bearish_reversal:
+        print("Incoming bearish reversal signal!")
+
+
+print()
 
 ##################################################
 ##################################################
@@ -1172,6 +1350,134 @@ def main():
 
             print()
 
+            # Get the support and resistance levels
+            levels = get_support_resistance_levels(close_prices)
+
+            support_levels, resistance_levels = [], []
+
+            for level in levels:
+                if level < close_prices[-1]:
+                    support_levels.append(level)
+                else:
+                    resistance_levels.append(level)
+
+            # Determine the market mood
+            if len(levels) > 0:
+                support_levels = []
+                resistance_levels = []
+                for level in levels:
+                    if level < close_prices[-1]:
+                        support_levels.append(level)
+                    else:
+                        resistance_levels.append(level)
+
+            if len(support_levels) > 0 and len(resistance_levels) > 0:
+                market_mood = "Neutral"
+            elif len(support_levels) > 0:
+                market_mood = "Bullish"
+            elif len(resistance_levels) > 0:
+                market_mood = "Bearish"
+            else:
+                market_mood = "Undefined"
+
+            # Calculate support and resistance ranges
+            if len(support_levels) > 0:
+                support_range = max(support_levels) - min(support_levels)
+                print("Support range: {:.2f}".format(support_range))
+            else:
+                print("Support range: None")
+
+            if len(resistance_levels) > 0:
+                resistance_range = max(resistance_levels) - min(resistance_levels)
+                print("Resistance range: {:.2f}".format(resistance_range))
+            else:
+                print("Resistance range: None")
+
+            # Print the levels and market mood
+            print("Potential support levels:")
+            if len(support_levels) > 0:
+                for level in support_levels:
+                    print("  - {:.2f}".format(level))
+            else:
+                print("  None found.")
+
+            print("Potential resistance levels:")
+            if len(resistance_levels) > 0:
+                for level in resistance_levels:
+                    print("  - {:.2f}".format(level))
+            else:
+                print("  None found.")
+
+            incoming_bullish_reversal = None
+            incoming_bearish_reversal = None
+
+            if market_mood == "Neutral":
+                print("Market mood: {}".format(market_mood))
+                if len(support_levels) > 0:
+                    support = max(support_levels)
+                    support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
+                else:
+                    support = None
+                    support_percentage = None
+
+                if len(resistance_levels) > 0:
+                    top = min(resistance_levels)
+                    top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
+                else:
+                    top = None
+                    top_percentage = None
+
+                print("Best dip: {:.2f}% (Support level: {:.2f})".format(support_percentage, support))
+
+                if support_percentage >= 3.0:
+                    incoming_bullish_reversal = True
+
+            elif market_mood == "Bullish":
+                print("Market mood: {}".format(market_mood))
+                if len(resistance_levels) > 0:
+                    top = min(resistance_levels)
+                    top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
+                else:
+                    top = None
+                    top_percentage = None
+
+                if top is not None:
+                    print("Best breakout: {:.2f}% (Resistance level: {:.2f})".format(top_percentage, top))
+                else:
+                    print("Best breakout: None")
+
+                if if top_percentage is not None and top_percentage >= 3.0:
+                    incoming_bullish_reversal = True
+
+            elif market_mood == "Bearish":
+                print("Market mood: {}".format(market_mood))
+                if len(support_levels) > 0:
+                    support = max(support_levels)
+                    support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
+                else:
+                    support = None
+                    support_percentage = None
+
+                if support is not None:
+                    print("Best bounce: {:.2f}% (Support level: {:.2f})".format(support_percentage, support))
+                else:
+                    print("Best bounce: None")
+
+                if support_percentage is not None and support_percentage >= 3.0:
+                    incoming_bearish_reversal = True
+
+            else:
+                print("Market mood: {}".format(market_mood))
+
+            # Print incoming reversal signals
+            if incoming_bullish_reversal:
+                print("Incoming bullish reversal signal!")
+
+            if incoming_bearish_reversal:
+                print("Incoming bearish reversal signal!")
+
+            print()
+
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
@@ -1239,3 +1545,4 @@ print()
 # Run the main function
 if __name__ == '__main__':
     main()
+
