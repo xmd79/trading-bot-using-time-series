@@ -870,20 +870,32 @@ def get_current_price():
     price = float(data["price"])
     return price
 
-def radar(price):
+# Get the current price
+price = get_current_price()
+
+def radar(sample_rate, amplitude):
     """
     Generates a radar plot and returns the most dominant signal and its strength based on the Fisher transform values.
     
     Args:
-    - price: The price value to use for the radar plot.
+    - sample_rate: The sample rate for the tone.
+    - amplitude: The amplitude for the tone.
     
     Returns:
     - A tuple containing the most dominant signal and its strength.
     """
     
+    # Get current price from Binance
+    price = get_current_price()
+    
     # Define data for the radar plot
+    phi = (1 + math.sqrt(5)) / 2
+    frequency = 440 * phi
+    time_array = np.arange(0, 5, 1/sample_rate)
+    tone = amplitude * np.sin(2 * np.pi * frequency * time_array)
     r = [price, 0.9, 0.1, 0.5, 0.0]
     theta = np.linspace(0, 2*np.pi, len(r), endpoint=False)
+    theta += (2*np.pi*phi*time_array[:len(theta)]) % (2*np.pi)
 
     # Apply Fisher transform 
     correlations = [0.9, 0.1, -0.5, 0.0]
@@ -907,12 +919,18 @@ def radar(price):
     # Find most dominant signal
     dominant_signal = max(signals, key=lambda x: x[1])
 
-    return dominant_signal
+    # Adjust tone based on market analysis
+    if dominant_signal[0] == 'Buy':
+        amplitude *= 1.1 # Increase amplitude for Buy signal
+    elif dominant_signal[0] == 'Sell':
+        amplitude *= 0.9 # Reduce amplitude for Sell signal
+    
+    # Generate tone with adjusted amplitude
+    tone = amplitude * np.sin(2 * np.pi * frequency * time_array)
 
-# Get the current price
-price = get_current_price()
+    return dominant_signal, tone
 
-#radar(price)
+#dominant_signal, tone = radar(sample_rate=44100, amplitude=1)
 
 ##################################################
 ##################################################
@@ -1122,10 +1140,12 @@ def main():
 
             print()
 
-            print(price)
+            dominant_signal, tone = radar(sample_rate=44100, amplitude=1)
 
-            dominant_signal = radar(price)
             print(dominant_signal)
+            print(tone)
+
+            print()
 
             price = float(price)
 
