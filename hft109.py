@@ -1160,11 +1160,15 @@ def main():
 
             current_time = datetime.datetime.utcnow() + timedelta(hours=3)
 
-            pct_diff_to_max = (price - max_threshold) / max_threshold * 100 
-            pct_diff_to_min = (min_threshold - price) / min_threshold * 100
+            range_threshold = max_threshold - min_threshold
+            dist_from_min = price - min_threshold
+            dist_from_max = max_threshold - price
 
-            print("diff_to_max", pct_diff_to_max)
-            print("diff_to_min", pct_diff_to_max)
+            pct_diff_to_min = (dist_from_min / range_threshold) * 100
+            pct_diff_to_max = (dist_from_max / range_threshold) * 100
+
+            print("Percentage difference to min threshold:", pct_diff_to_min)
+            print("Percentage difference to max threshold:", pct_diff_to_max)
 
             print()
 
