@@ -1122,7 +1122,7 @@ def main():
             print()
 
             dominant_signal = radar(price)
-            print(signals)
+            print(dominant_signal)
 
             print()
 
