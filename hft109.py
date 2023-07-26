@@ -860,6 +860,60 @@ print()
 ##################################################
 ##################################################
 
+def get_current_price():
+    url = "https://fapi.binance.com/fapi/v1/ticker/price"
+    params = {
+        "symbol": "BTCUSDT" 
+    }
+    response = requests.get(url, params=params)
+    data = response.json()
+    price = float(data["price"])
+    return price
+
+def radar(price):
+    """
+    Generates a radar plot and returns the most dominant signal and its strength based on the Fisher transform values.
+    
+    Args:
+    - price: The price value to use for the radar plot.
+    
+    Returns:
+    - A tuple containing the most dominant signal and its strength.
+    """
+    
+    # Define data for the radar plot
+    r = [price, 0.9, 0.1, 0.5, 0.0]
+    theta = np.linspace(0, 2*np.pi, len(r), endpoint=False)
+
+    # Apply Fisher transform 
+    correlations = [0.9, 0.1, -0.5, 0.0]
+    z = list(map(lambda x: np.arctanh(x), correlations))
+    min_rev = np.tanh(min(z))
+    max_rev = np.tanh(max(z))
+
+    # Calculate positions on radar
+    positions_on_radar = [0 if corr == 0 else z for corr, z in zip(correlations, z)]
+
+    # Calculate signals
+    signals = []
+    for corr, pos in zip(correlations, positions_on_radar):
+        if corr > 0 and pos > 0:
+            signals.append(('Buy', pos))
+        elif corr < 0 and pos < 0:
+            signals.append(('Sell', abs(pos)))
+        else:
+            signals.append(('Neutral', 0))
+
+    # Find most dominant signal
+    dominant_signal = max(signals, key=lambda x: x[1])
+
+    return dominant_signal
+
+# Get the current price
+price = get_current_price()
+
+#radar(price)
+
 ##################################################
 ##################################################
 
@@ -1067,6 +1121,12 @@ def main():
 
             print()
 
+            dominant_signal = radar(price)
+            print(signals)
+
+            print()
+
+
             ##################################################
             ##################################################
 
@@ -1095,10 +1155,10 @@ def main():
                     # Add percentage difference condition           
                     pct_diff = (min_threshold - price) / min_threshold * 100
 
-                    if pct_diff <= 10:
+                    if pct_diff <= 25:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
-                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish":
+                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish" and dominant_signal == "Buy":
                                     trigger_long = True
 
 
@@ -1107,10 +1167,10 @@ def main():
                     # Add percentage difference condition         
                     pct_diff = (price - max_threshold) / max_threshold * 100 
 
-                    if pct_diff <= 10:
+                    if pct_diff <= 25:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
-                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish":
+                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish" and dominant_signal == "Sell":
                                     trigger_short = True  
 
                 if trigger_long:          
