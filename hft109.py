@@ -1164,7 +1164,7 @@ def main():
             pct_diff_to_min = (min_threshold - price) / min_threshold * 100
 
             print("diff_to_max", pct_diff_to_max)
-            print("diff_to_min", diff_to_max)
+            print("diff_to_min", pct_diff_to_max)
 
             print()
 
