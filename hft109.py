@@ -1187,7 +1187,7 @@ def main():
                 if current_quadrant == 1: 
 
                     # Add percentage difference condition from close to min           
-                    if pct_diff_to_min <= 5:
+                    if pct_diff_to_min <= 25:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
                                 if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish":
@@ -1197,7 +1197,7 @@ def main():
                 elif current_quadrant == 4: 
 
                     # Add percentage difference condition from close to max        
-                    if pct_diff_to_max <= 5:
+                    if pct_diff_to_max <= 25:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
                                 if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish":
