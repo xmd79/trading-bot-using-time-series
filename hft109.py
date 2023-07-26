@@ -1127,17 +1127,9 @@ def main():
             dominant_signal = radar(price)
             print(dominant_signal)
 
-
-
             price = float(price)
 
             print()
-
-            dominant_signal = radar(price)
-            print(dominant_signal)
-
-            print()
-
 
             ##################################################
             ##################################################
