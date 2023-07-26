@@ -1446,7 +1446,7 @@ def main():
                 else:
                     print("Best breakout: None")
 
-                if if top_percentage is not None and top_percentage >= 3.0:
+                if top_percentage is not None and top_percentage >= 3.0:
                     incoming_bullish_reversal = True
 
             elif market_mood == "Bearish":
