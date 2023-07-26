@@ -1136,11 +1136,12 @@ def main():
 
             current_time = datetime.datetime.utcnow() + timedelta(hours=3)
 
+            pct_diff_to_max = (price - max_threshold) / max_threshold * 100 
+            pct_diff_to_min = (min_threshold - price) / min_threshold * 100
+
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
-
-                pct_diff = None
 
                 if price <= min_threshold:
                     if momentum > 0:
@@ -1152,10 +1153,8 @@ def main():
 
                 if current_quadrant == 1: 
 
-                    # Add percentage difference condition           
-                    pct_diff = (min_threshold - price) / min_threshold * 100
-
-                    if pct_diff <= 25:
+                    # Add percentage difference condition from close to min           
+                    if pct_diff_to_min <= 35:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
                                 if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish" and dominant_signal[0] == "Buy":
@@ -1164,10 +1163,8 @@ def main():
 
                 elif current_quadrant == 4: 
 
-                    # Add percentage difference condition         
-                    pct_diff = (price - max_threshold) / max_threshold * 100 
-
-                    if pct_diff <= 25:
+                    # Add percentage difference condition from close to max        
+                    if pct_diff_to_max <= 65:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
                                 if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish" and dominant_signal[0] == "Sell":
