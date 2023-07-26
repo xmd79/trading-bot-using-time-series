@@ -1158,7 +1158,7 @@ def main():
                     if pct_diff <= 25:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
-                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish" and dominant_signal == "Buy":
+                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish" and dominant_signal[0] == "Buy":
                                     trigger_long = True
 
 
@@ -1170,7 +1170,7 @@ def main():
                     if pct_diff <= 25:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
-                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish" and dominant_signal == "Sell":
+                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish" and dominant_signal[0] == "Sell":
                                     trigger_short = True  
 
                 if trigger_long:          
