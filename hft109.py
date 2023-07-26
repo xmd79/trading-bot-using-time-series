@@ -1117,6 +1117,18 @@ def main():
             print("Target 4 is: ", target4)
             print("Target 5 is: ", target5)
 
+            # Get the current price
+            price = get_current_price()
+
+            print()
+
+            print(price)
+
+            dominant_signal = radar(price)
+            print(dominant_signal)
+
+
+
             price = float(price)
 
             print()
