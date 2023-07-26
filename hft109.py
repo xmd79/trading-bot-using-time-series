@@ -1094,7 +1094,7 @@ if len(levels) > 0:
         else:
             print("Best bounce: None")
 
-        if if support_percentage is not None and support_percentage >= 3.0:
+        if support_percentage is not None and support_percentage >= 3.0:
             incoming_bearish_reversal = True
 
     else:
