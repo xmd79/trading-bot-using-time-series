@@ -878,70 +878,6 @@ print()
 ##################################################
 ##################################################
 
-def radar(sample_rate, amplitude):
-    """
-    Generates a radar plot and returns the most dominant signal and its strength based on the Fisher transform values.
-    
-    Args:
-    - sample_rate: The sample rate for the tone.
-    - amplitude: The amplitude for the tone.
-    
-    Returns:
-    - A tuple containing the most dominant signal and its strength.
-    """
-    
-    # Get current price from Binance
-    price = get_current_price()
-    
-    # Define data for the radar plot
-    phi = (1 + math.sqrt(5)) / 2
-    frequency = 440 * phi
-    time_array = np.arange(0, 5, 1/sample_rate)
-    tone = amplitude * np.sin(2 * np.pi * frequency * time_array)
-    r = [price, 0.9, 0.1, 0.5, 0.0]
-    theta = np.linspace(0, 2*np.pi, len(r), endpoint=False)
-    theta += (2*np.pi*phi*time_array[:len(theta)]) % (2*np.pi)
-
-    # Apply Fisher transform 
-    correlations = [0.9, 0.1, -0.5, 0.0]
-    z = list(map(lambda x: np.arctanh(x), correlations))
-    min_rev = np.tanh(min(z))
-    max_rev = np.tanh(max(z))
-
-    # Calculate positions on radar
-    positions_on_radar = [0 if corr == 0 else z for corr, z in zip(correlations, z)]
-
-    # Calculate signals
-    signals = []
-    for corr, pos in zip(correlations, positions_on_radar):
-        if corr > 0 and pos > 0:
-            signals.append(('Buy', pos))
-        elif corr < 0 and pos < 0:
-            signals.append(('Sell', abs(pos)))
-        else:
-            signals.append(('Neutral', 0))
-
-    # Find most dominant signal
-    dominant_signal = max(signals, key=lambda x: x[1])
-
-    # Adjust tone based on market analysis
-    if dominant_signal[0] == 'Buy':
-        amplitude *= 1.1 # Increase amplitude for Buy signal
-    elif dominant_signal[0] == 'Sell':
-        amplitude *= 0.9 # Reduce amplitude for Sell signal
-    
-    # Generate tone with adjusted amplitude
-    tone = amplitude * np.sin(2 * np.pi * frequency * time_array)
-
-    return dominant_signal, tone
-
-#dominant_signal, tone = radar(sample_rate=44100, amplitude=1)
-
-print()
-
-##################################################
-##################################################
-
 def get_support_resistance_levels(close):
     # Convert close list to numpy array
     close_prices = np.array(close)
@@ -1315,13 +1251,6 @@ def main():
 
             # Get the current price
             price = get_current_price()
-
-            print()
-
-            dominant_signal, tone = radar(sample_rate=44100, amplitude=1)
-
-            print(dominant_signal)
-            print(tone)
 
             print()
 
