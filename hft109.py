@@ -1003,13 +1003,13 @@ if len(levels) > 0:
             resistance_levels.append(level)
 
     if len(support_levels) > 0 and len(resistance_levels) > 0:
-        market_mood = "Neutral"
+        market_mood_sr = "Neutral"
     elif len(support_levels) > 0:
-        market_mood = "Bullish"
+        market_mood_sr = "Bullish"
     elif len(resistance_levels) > 0:
-        market_mood = "Bearish"
+        market_mood_sr = "Bearish"
     else:
-        market_mood = "Undefined"
+        market_mood_sr = "Undefined"
 
     # Calculate support and resistance ranges
     if len(support_levels) > 0:
@@ -1042,8 +1042,8 @@ if len(levels) > 0:
     incoming_bullish_reversal = None
     incoming_bearish_reversal = None
 
-    if market_mood == "Neutral":
-        print("Market mood: {}".format(market_mood))
+    if market_mood_sr == "Neutral":
+        print("Market mood: {}".format(market_mood_sr))
         if len(support_levels) > 0:
             support = max(support_levels)
             support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
@@ -1063,8 +1063,8 @@ if len(levels) > 0:
         if support_percentage >= 3.0:
             incoming_bullish_reversal = True
 
-    elif market_mood == "Bullish":
-        print("Market mood: {}".format(market_mood))
+    elif market_mood_sr == "Bullish":
+        print("Market mood: {}".format(market_mood_sr))
         if len(resistance_levels) > 0:
             top = min(resistance_levels)
             top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
@@ -1080,8 +1080,8 @@ if len(levels) > 0:
         if top_percentage is not None and top_percentage >= 3.0:
             incoming_bullish_reversal = True
 
-    elif market_mood == "Bearish":
-        print("Market mood: {}".format(market_mood))
+    elif market_mood_sr == "Bearish":
+        print("Market mood: {}".format(market_mood_sr))
         if len(support_levels) > 0:
             support = max(support_levels)
             support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
@@ -1098,7 +1098,7 @@ if len(levels) > 0:
             incoming_bearish_reversal = True
 
     else:
-        print("Market mood: {}".format(market_mood))
+        print("Market mood: {}".format(market_mood_sr))
 
     # Print incoming reversal signals
     if incoming_bullish_reversal:
@@ -1372,13 +1372,13 @@ def main():
                         resistance_levels.append(level)
 
             if len(support_levels) > 0 and len(resistance_levels) > 0:
-                market_mood = "Neutral"
+                market_mood_sr = "Neutral"
             elif len(support_levels) > 0:
-                market_mood = "Bullish"
+                market_mood_sr = "Bullish"
             elif len(resistance_levels) > 0:
-                market_mood = "Bearish"
+                market_mood_sr = "Bearish"
             else:
-                market_mood = "Undefined"
+                market_mood_sr = "Undefined"
 
             # Calculate support and resistance ranges
             if len(support_levels) > 0:
@@ -1411,8 +1411,8 @@ def main():
             incoming_bullish_reversal = None
             incoming_bearish_reversal = None
 
-            if market_mood == "Neutral":
-                print("Market mood: {}".format(market_mood))
+            if market_mood_sr == "Neutral":
+                print("Market mood: {}".format(market_mood_sr))
                 if len(support_levels) > 0:
                     support = max(support_levels)
                     support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
@@ -1432,8 +1432,8 @@ def main():
                 if support_percentage >= 3.0:
                     incoming_bullish_reversal = True
 
-            elif market_mood == "Bullish":
-                print("Market mood: {}".format(market_mood))
+            elif market_mood_sr == "Bullish":
+                print("Market mood: {}".format(market_mood_sr))
                 if len(resistance_levels) > 0:
                     top = min(resistance_levels)
                     top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
@@ -1449,8 +1449,8 @@ def main():
                 if top_percentage is not None and top_percentage >= 3.0:
                     incoming_bullish_reversal = True
 
-            elif market_mood == "Bearish":
-                print("Market mood: {}".format(market_mood))
+            elif market_mood_sr == "Bearish":
+                print("Market mood: {}".format(market_mood_sr))
                 if len(support_levels) > 0:
                     support = max(support_levels)
                     support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
@@ -1467,7 +1467,7 @@ def main():
                     incoming_bearish_reversal = True
 
             else:
-                print("Market mood: {}".format(market_mood))
+                print("Market mood: {}".format(market_mood_sr))
 
             # Print incoming reversal signals
             if incoming_bullish_reversal:
@@ -1493,20 +1493,20 @@ def main():
                 if current_quadrant == 1: 
 
                     # Add percentage difference condition from close to min           
-                    if pct_diff_to_min <= 25:
+                    if pct_diff_to_min <= 5:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
-                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish":
+                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish" and market_mood_sr == "Bullish":
                                     trigger_long = True
 
 
                 elif current_quadrant == 4: 
 
                     # Add percentage difference condition from close to max        
-                    if pct_diff_to_max <= 25:
+                    if pct_diff_to_max <= 5:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
-                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish":
+                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish" and market_mood_sr == "Bearish":
                                     trigger_short = True  
 
                 if trigger_long:          
