@@ -1987,7 +1987,7 @@ def main():
                     if price < price1 and price < price2 and price < price3:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
-                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish" and and very_fast_cycle_mood == "Bullish":
+                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish":
                                     trigger_long = True
 
 
@@ -1997,7 +1997,7 @@ def main():
                     if price > price1 and price > price2 and price > price3:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
-                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and and very_fast_cycle_mood == "Bearish":
+                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
                                     trigger_short = True  
 
                 if market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish":
