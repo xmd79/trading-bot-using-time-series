@@ -1049,6 +1049,374 @@ print()
 ##################################################
 ##################################################
 
+from scipy.signal import argrelextrema
+
+import talib
+import numpy as np
+from scipy.signal import argrelextrema
+
+def calculate_reversals(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
+    """
+    Calculate new reversal lows and highs and incoming direction based on the reciprocal Fibonacci constant for different time cycles.
+    """
+  
+    # Get min/max close    
+    min_close = np.nanmin(close_prices)
+    max_close = np.nanmax(close_prices)
+    
+    # Convert close_prices to numpy array
+    close_prices = np.array(close_prices)
+    
+    # Calculate HT_SINE
+    sine, leadsine = talib.HT_SINE(close_prices)
+    sine = -sine
+
+    # Calculate momentum
+    momentum = talib.MOM(close_prices, timeperiod=period)
+    
+    # Get min/max momentum    
+    min_momentum = np.nanmin(momentum)   
+    max_momentum = np.nanmax(momentum)
+    
+    # Calculate custom percentages 
+    min_percentage_custom = minimum_percentage / 100  
+    max_percentage_custom = maximum_percentage / 100
+
+    # Calculate thresholds       
+    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
+    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
+
+    # Calculate range of prices within a certain distance from the current close price
+    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
+
+    # Filter close prices
+    with np.errstate(invalid='ignore'):
+        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
+        filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
+        
+    # Calculate avg    
+    avg_mtf = np.nanmean(filtered_close)
+
+    # Get current momentum       
+    current_momentum = momentum[-1]
+
+    # Calculate % to min/max momentum    
+    with np.errstate(invalid='ignore', divide='ignore'):
+        percent_to_min_momentum = ((max_momentum - current_momentum) /   
+                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
+
+        percent_to_max_momentum = ((current_momentum - min_momentum) / 
+                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
+ 
+    # Calculate combined percentages              
+    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
+    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
+      
+    # Combined momentum signal     
+    momentum_signal = percent_to_max_combined - percent_to_min_combined
+    
+    # Calculate incoming direction
+    incoming_direction = "Unknown"
+    if momentum_signal > 0:
+        incoming_direction = "Up"
+    elif momentum_signal < 0:
+        incoming_direction = "Down"
+        
+    # Calculate new reversal lows and highs
+    highs = argrelextrema(leadsine, np.greater, order=period)[0]
+    lows = argrelextrema(leadsine, np.less, order=period)[0]
+    
+    # Determine market mood based on reciprocal Fibonacci constant for different cycles
+    very_fast_cycle = 3
+    medium_cycle = 5
+    slow_cycle = 8
+    very_slow_cycle = 13
+    
+    #rfib_const = 0.03833  # Reciprocal Fibonacci constant
+    rfib_const = 3.3598856662
+
+    very_fast_cycle_mood = "Unknown"
+    medium_cycle_mood = "Unknown"
+    slow_cycle_mood = "Unknown"
+    very_slow_cycle_mood = "Unknown"
+    
+    if len(lows) > 0 and len(highs) > 0:
+        last_low = lows[-1]
+        last_high = highs[-1]
+        
+        # Calculate cycles based on last reversal low and high
+        very_fast_cycle_length = last_high - last_low
+        medium_cycle_length = very_fast_cycle_length * rfib_const ** medium_cycle
+        slow_cycle_length = very_fast_cycle_length * rfib_const ** slow_cycle
+        very_slow_cycle_length = very_fast_cycle_length * rfib_const ** very_slow_cycle
+        
+        # Check if current price is below or above the last reversal low or high
+        if np.all(close_prices < last_low):
+            very_fast_cycle_mood = "Bearish"
+            medium_cycle_mood = "Bearish"
+            slow_cycle_mood = "Bearish"
+            very_slow_cycle_mood = "Bearish"
+            print("Current price is below the last reversal low.")
+        elif np.all(close_prices > last_high):
+            very_fast_cycle_mood = "Bullish"
+            medium_cycle_mood = "Bullish"
+            slow_cycle_mood = "Bullish"
+            very_slow_cycle_mood = "Bullish"
+            print("Current price is above the last reversal high.")
+        else:
+            # Calculate cycles based on current price
+            very_fast_cycle_length = np.abs(avg_mtf - close_prices[-1])
+            medium_cycle_length = very_fast_cycle_length * rfib_const ** medium_cycle
+            slow_cycle_length = very_fast_cycle_length * rfib_const ** slow_cycle
+            very_slow_cycle_length = very_fast_cycle_length * rfib_const ** very_slow_cycle
+            
+            # Calculate mood for different cycles
+            if close_prices[-1] < avg_mtf:
+                very_fast_cycle_mood = "Bearish"
+                medium_cycle_mood = "Bullish"
+                slow_cycle_mood = "Bearish"
+                very_slow_cycle_mood = "Bullish"
+                print("Current price is below the average filtered close price.")
+            else:
+                very_fast_cycle_mood = "Bullish"
+                medium_cycle_mood = "Bearish"
+                slow_cycle_mood = "Bullish"
+                very_slow_cycle_mood = "Bearish"
+                print("Current price is above the average filtered close price.")
+    
+    # Create dictionary to store all the calculated values
+    results = {
+        "min_close": min_close,
+        "max_close": max_close,
+        "sine": sine[-1],
+        "leadsine": leadsine[-1],
+        "momentum": momentum[-1],
+        "min_momentum": min_momentum,
+        "max_momentum": max_momentum,
+        "min_percentage_custom": min_percentage_custom,
+        "max_percentage_custom": max_percentage_custom,
+        "min_threshold": min_threshold,
+        "max_threshold": max_threshold,
+        "filtered_close": filtered_close[-1],
+        "avg_mtf": avg_mtf,
+        "current_momentum": current_momentum,
+        "percent_to_min_momentum": percent_to_min_momentum,
+        "percent_to_max_momentum": percent_to_max_momentum,
+        "percent_to_min_combined": percent_to_min_combined,
+        "percent_to_max_combined": percent_to_max_combined,
+        "momentum_signal": momentum_signal,
+        "incoming_direction": incoming_direction,
+        "highs": highs[-1],
+        "lows": lows[-1],
+        "very_fast_cycle_mood": very_fast_cycle_mood,
+        "medium_cycle_mood": medium_cycle_mood,
+        "slow_cycle_mood": slow_cycle_mood,
+        "very_slow_cycle_mood": very_slow_cycle_mood,
+        "very_fast_cycle_length": very_fast_cycle_length,
+        "medium_cycle_length": medium_cycle_length,
+        "slow_cycle_length": slow_cycle_length,
+        "very_slow_cycle_length": very_slow_cycle_length,
+    }
+    
+    # Print all the calculated values
+    for key, value in results.items():
+        print(f"{key}: {value}")
+        
+    return results
+    
+# convert close_prices to numpy array of type float64
+close_prices = np.array(close_prices, dtype=np.float64)
+
+# Call the function with default parameters
+results = calculate_reversals(close_prices)
+
+# Print the last element of each array, if it exists
+if isinstance(results["min_close"], np.ndarray):
+    print("min_close:", results["min_close"][-1] if results["min_close"].size > 0 else None)
+if isinstance(results["max_close"], np.ndarray):
+    print("max_close:", results["max_close"][-1] if results["max_close"].size > 0 else None)
+if isinstance(results["sine"], np.ndarray):
+    print("sine:", results["sine"][-1] if results["sine"].size > 0 else None)
+if isinstance(results["leadsine"], np.ndarray):
+    print("leadsine:", results["leadsine"][-1] if results["leadsine"].size > 0 else None)
+if isinstance(results["momentum"], np.ndarray):
+    print("momentum:", results["momentum"][-1] if results["momentum"].size > 0 else None)
+if isinstance(results["min_momentum"], np.ndarray):
+    print("min_momentum:", results["min_momentum"][-1] if results["min_momentum"].size > 0 else None)
+if isinstance(results["max_momentum"], np.ndarray):
+    print("max_momentum:", results["max_momentum"][-1] if results["max_momentum"].size > 0 else None)
+if isinstance(results["min_percentage_custom"], np.ndarray):
+    print("min_percentage_custom:", results["min_percentage_custom"][-1] if results["min_percentage_custom"].size > 0 else None)
+if isinstance(results["max_percentage_custom"], np.ndarray):
+    print("max_percentage_custom:", results["max_percentage_custom"][-1] if results["max_percentage_custom"].size > 0 else None)
+if isinstance(results["min_threshold"], np.ndarray):
+    print("min_threshold:", results["min_threshold"][-1] if results["min_threshold"].size > 0 else None)
+if isinstance(results["max_threshold"], np.ndarray):
+    print("max_threshold:", results["max_threshold"][-1] if results["max_threshold"].size > 0 else None)
+if isinstance(results["filtered_close"], np.ndarray):
+    print("filtered_close:", results["filtered_close"][-1] if results["filtered_close"].size > 0 else None)
+if isinstance(results["avg_mtf"], np.ndarray):
+    print("avg_mtf:", results["avg_mtf"][-1] if results["avg_mtf"].size > 0 else None)
+if isinstance(results["current_momentum"], np.ndarray):
+    print("current_momentum:", results["current_momentum"][-1] if results["current_momentum"].size > 0 else None)
+if isinstance(results["percent_to_min_momentum"], np.ndarray):
+    print("percent_to_min_momentum:", results["percent_to_min_momentum"][-1] if results["percent_to_min_momentum"].size > 0 else None)
+if isinstance(results["percent_to_max_momentum"], np.ndarray):
+    print("percent_to_max_momentum:", results["percent_to_max_momentum"][-1] if results["percent_to_max_momentum"].size > 0 else None)
+if isinstance(results["percent_to_min_combined"], np.ndarray):
+    print("percent_to_min_combined:", results["percent_to_min_combined"][-1] if results["percent_to_min_combined"].size > 0 else None)
+if isinstance(results["percent_to_max_combined"], np.ndarray):
+    print("percent_to_max_combined:", results["percent_to_max_combined"][-1] if results["percent_to_max_combined"].size > 0 else None)
+if isinstance(results["momentum_signal"], np.ndarray):
+    print("momentum_signal:", results["momentum_signal"][-1] if results["momentum_signal"].size > 0 else None)
+if isinstance(results["incoming_direction"], np.ndarray):
+    print("incoming_direction:", results["incoming_direction"][-1] if results["incoming_direction"].size > 0 else None)
+if isinstance(results["highs"], np.ndarray):
+    print("highs:", results["highs"][-1] if results["highs"].size > 0 else None)
+if isinstance(results["lows"], np.ndarray):
+    print("lows:", results["lows"][-1] if results["lows"].size > 0 else None)
+if isinstance(results["very_fast_cycle_mood"], np.ndarray):
+    print("very_fast_cycle_mood:", results["very_fast_cycle_mood"][-1] if results["very_fast_cycle_mood"].size > 0 else None)
+if isinstance(results["medium_cycle_mood"], np.ndarray):
+    print("medium_cycle_mood:", results["medium_cycle_mood"][-1] if results["medium_cycle_mood"].size > 0 else None)
+if isinstance(results["slow_cycle_mood"], np.ndarray):
+    print("slow_cycle_mood:", results["slow_cycle_mood"][-1] if results["slow_cycle_mood"].size > 0 else None)
+if isinstance(results["very_slow_cycle_mood"], np.ndarray):
+    print("very_slow_cycle_mood:", results["very_slow_cycle_mood"][-1] if results["very_slow_cycle_mood"].size > 0 else None)
+if isinstance(results["very_fast_cycle_length"], np.ndarray):
+    print("very_fast_cycle_length:", results["very_fast_cycle_length"][-1] if results["very_fast_cycle_length"].size > 0 else None)
+if isinstance(results["medium_cycle_length"], np.ndarray):
+    print("medium_cycle_length:", results["medium_cycle_length"][-1] if results["medium_cycle_length"].size > 0 else None)
+if isinstance(results["slow_cycle_length"], np.ndarray):
+    print("slow_cycle_length:", results["slow_cycle_length"][-1] if results["slow_cycle_length"].size > 0 else None)
+if isinstance(results["very_slow_cycle_length"], np.ndarray):
+    print("very_slow_cycle_length:", results["very_slow_cycle_length"][-1] if results["very_slow_cycle_length"].size > 0 else None)
+
+# Calculate very fast cycle length 
+very_fast_cycle_length = np.abs(avg_mtf - close_prices[-1])   
+
+# Calculate next 3 prices based on cycle length and current price        
+price1 = close_prices[-1] + very_fast_cycle_length    
+price2 = close_prices[-1] + 2 * very_fast_cycle_length   
+price3 = close_prices[-1] + 3 * very_fast_cycle_length
+
+# Print the next 3 forecast prices
+print(f"Next 3 forecast prices: {price1}, {price2}, {price3}")
+
+# Get current momentum
+current_momentum = results["momentum"]
+
+# Calculate very fast cycle momentum
+very_fast_cycle_momentum = 0.75 * current_momentum
+
+# Calculate medium cycle momentum  
+medium_cycle_momentum = 0.5 * current_momentum
+
+# Calculate slow cycle momentum
+slow_cycle_momentum = 0.25 * current_momentum
+
+# Print next 3 momentum forecast cycles    
+print(f"Next 3 momentum forecasts: {very_fast_cycle_momentum}, {medium_cycle_momentum}, {slow_cycle_momentum}")
+
+
+# Calculate very fast cycle momentum        
+very_fast_cycle_momentum = 0.75 * current_momentum
+
+# Determine very fast cycle mood based on momentum        
+if very_fast_cycle_momentum < 0:
+    very_fast_cycle_mood = "Bearish"
+else:
+    very_fast_cycle_mood = "Bullish"  
+
+# Calculate medium cycle momentum       
+medium_cycle_momentum = 0.5 * current_momentum
+
+# Determine medium cycle mood        
+if medium_cycle_momentum < 0:
+    medium_cycle_mood = "Bearish"    
+else:
+    medium_cycle_mood = "Bullish" 
+
+# Calculate slow cycle momentum    
+slow_cycle_momentum = 0.25 * current_momentum
+
+# Determine slow cycle mood
+if slow_cycle_momentum < 0:
+    slow_cycle_mood = "Bearish"      
+else:      
+    slow_cycle_mood = "Bullish"  
+
+# Print market mood forecasts
+print(f"Momentum market mood forecasts: {very_fast_cycle_mood}, {medium_cycle_mood}, {slow_cycle_mood}")
+
+# Compare current momentum to different cycle lengths
+if current_momentum > results['very_fast_cycle_length']:
+    print("Current momentum is greater than very fast cycle length.")
+elif current_momentum < results['very_fast_cycle_length']:
+    print("Current momentum is less than very fast cycle length.")
+else:
+    print("Current momentum is equal to very fast cycle length.")
+
+if current_momentum > results['medium_cycle_length']:
+    print("Current momentum is greater than medium cycle length.")
+elif current_momentum < results['medium_cycle_length']:
+    print("Current momentum is less than medium cycle length.")
+else:
+    print("Current momentum is equal to medium cycle length.")
+
+if current_momentum > results['slow_cycle_length']:
+    print("Current momentum is greater than slow cycle length.")
+elif current_momentum < results['slow_cycle_length']:
+    print("Current momentum is less than slow cycle length.")
+else:
+    print("Current momentum is equal to slow cycle length.")
+
+if current_momentum > results['very_slow_cycle_length']:
+    print("Current momentum is greater than very slow cycle length.")
+elif current_momentum < results['very_slow_cycle_length']:
+    print("Current momentum is less than very slow cycle length.")
+else:
+    print("Current momentum is equal to very slow cycle length.")
+
+# Compare current price to different cycle lengths
+if np.all(close_prices < results['very_fast_cycle_length']):
+    print("Current price is below very fast cycle length.")
+elif np.all(close_prices > results['very_fast_cycle_length']):
+    print("Current price is above very fast cycle length.")
+else:
+    print("Current price is at very fast cycle length.")
+
+if np.all(close_prices < results['medium_cycle_length']):
+    print("Current price is below medium cycle length.")
+elif np.all(close_prices > results['medium_cycle_length']):
+    print("Current price is above medium cycle length.")
+else:
+    print("Current price is at medium cycle length.")
+
+if np.all(close_prices < results['slow_cycle_length']):
+    print("Current price is below slow cycle length.")
+elif np.all(close_prices > results['slow_cycle_length']):
+    print("Current price is above slow cycle length.")
+else:
+    print("Current price is at slow cycle length.")
+
+if np.all(close_prices < results['very_slow_cycle_length']):
+    print("Current price is below very slow cycle length.")
+elif np.all(close_prices > results['very_slow_cycle_length']):
+    print("Current price is above very slow cycle length.")
+else:
+    print("Current price is at very slow cycle length.")
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -1407,22 +1775,204 @@ def main():
 
             print()
 
+            # convert close_prices to numpy array of type float64
+            close_prices = np.array(close_prices, dtype=np.float64)
+
+            # Call the function with default parameters
+            results = calculate_reversals(close_prices)
+
+            # Print the last element of each array, if it exists
+            if isinstance(results["min_close"], np.ndarray):
+                print("min_close:", results["min_close"][-1] if results["min_close"].size > 0 else None)
+            if isinstance(results["max_close"], np.ndarray):
+                print("max_close:", results["max_close"][-1] if results["max_close"].size > 0 else None)
+            if isinstance(results["sine"], np.ndarray):
+                print("sine:", results["sine"][-1] if results["sine"].size > 0 else None)
+            if isinstance(results["leadsine"], np.ndarray):
+                print("leadsine:", results["leadsine"][-1] if results["leadsine"].size > 0 else None)
+            if isinstance(results["momentum"], np.ndarray):
+                print("momentum:", results["momentum"][-1] if results["momentum"].size > 0 else None)
+            if isinstance(results["min_momentum"], np.ndarray):
+                print("min_momentum:", results["min_momentum"][-1] if results["min_momentum"].size > 0 else None)
+            if isinstance(results["max_momentum"], np.ndarray):
+                print("max_momentum:", results["max_momentum"][-1] if results["max_momentum"].size > 0 else None)
+            if isinstance(results["min_percentage_custom"], np.ndarray):
+                print("min_percentage_custom:", results["min_percentage_custom"][-1] if results["min_percentage_custom"].size > 0 else None)
+            if isinstance(results["max_percentage_custom"], np.ndarray):
+                print("max_percentage_custom:", results["max_percentage_custom"][-1] if results["max_percentage_custom"].size > 0 else None)
+            if isinstance(results["min_threshold"], np.ndarray):
+                print("min_threshold:", results["min_threshold"][-1] if results["min_threshold"].size > 0 else None)
+            if isinstance(results["max_threshold"], np.ndarray):
+                print("max_threshold:", results["max_threshold"][-1] if results["max_threshold"].size > 0 else None)
+            if isinstance(results["filtered_close"], np.ndarray):
+                print("filtered_close:", results["filtered_close"][-1] if results["filtered_close"].size > 0 else None)
+            if isinstance(results["avg_mtf"], np.ndarray):
+                print("avg_mtf:", results["avg_mtf"][-1] if results["avg_mtf"].size > 0 else None)
+            if isinstance(results["current_momentum"], np.ndarray):
+                print("current_momentum:", results["current_momentum"][-1] if results["current_momentum"].size > 0 else None)
+            if isinstance(results["percent_to_min_momentum"], np.ndarray):
+                print("percent_to_min_momentum:", results["percent_to_min_momentum"][-1] if results["percent_to_min_momentum"].size > 0 else None)
+            if isinstance(results["percent_to_max_momentum"], np.ndarray):
+                print("percent_to_max_momentum:", results["percent_to_max_momentum"][-1] if results["percent_to_max_momentum"].size > 0 else None)
+            if isinstance(results["percent_to_min_combined"], np.ndarray):
+                print("percent_to_min_combined:", results["percent_to_min_combined"][-1] if results["percent_to_min_combined"].size > 0 else None)
+            if isinstance(results["percent_to_max_combined"], np.ndarray):
+                print("percent_to_max_combined:", results["percent_to_max_combined"][-1] if results["percent_to_max_combined"].size > 0 else None)
+            if isinstance(results["momentum_signal"], np.ndarray):
+                print("momentum_signal:", results["momentum_signal"][-1] if results["momentum_signal"].size > 0 else None)
+            if isinstance(results["incoming_direction"], np.ndarray):
+                print("incoming_direction:", results["incoming_direction"][-1] if results["incoming_direction"].size > 0 else None)
+            if isinstance(results["highs"], np.ndarray):
+                print("highs:", results["highs"][-1] if results["highs"].size > 0 else None)
+            if isinstance(results["lows"], np.ndarray):
+                print("lows:", results["lows"][-1] if results["lows"].size > 0 else None)
+            if isinstance(results["very_fast_cycle_mood"], np.ndarray):
+                print("very_fast_cycle_mood:", results["very_fast_cycle_mood"][-1] if results["very_fast_cycle_mood"].size > 0 else None)
+            if isinstance(results["medium_cycle_mood"], np.ndarray):
+                print("medium_cycle_mood:", results["medium_cycle_mood"][-1] if results["medium_cycle_mood"].size > 0 else None)
+            if isinstance(results["slow_cycle_mood"], np.ndarray):
+                print("slow_cycle_mood:", results["slow_cycle_mood"][-1] if results["slow_cycle_mood"].size > 0 else None)
+            if isinstance(results["very_slow_cycle_mood"], np.ndarray):
+                print("very_slow_cycle_mood:", results["very_slow_cycle_mood"][-1] if results["very_slow_cycle_mood"].size > 0 else None)
+            if isinstance(results["very_fast_cycle_length"], np.ndarray):
+                print("very_fast_cycle_length:", results["very_fast_cycle_length"][-1] if results["very_fast_cycle_length"].size > 0 else None)
+            if isinstance(results["medium_cycle_length"], np.ndarray):
+                print("medium_cycle_length:", results["medium_cycle_length"][-1] if results["medium_cycle_length"].size > 0 else None)
+            if isinstance(results["slow_cycle_length"], np.ndarray):
+                print("slow_cycle_length:", results["slow_cycle_length"][-1] if results["slow_cycle_length"].size > 0 else None)
+            if isinstance(results["very_slow_cycle_length"], np.ndarray):
+                print("very_slow_cycle_length:", results["very_slow_cycle_length"][-1] if results["very_slow_cycle_length"].size > 0 else None)
+
+            # Calculate very fast cycle length 
+            very_fast_cycle_length = np.abs(avg_mtf - close_prices[-1])   
+
+            # Calculate next 3 prices based on cycle length and current price        
+            price1 = close_prices[-1] + very_fast_cycle_length    
+            price2 = close_prices[-1] + 2 * very_fast_cycle_length   
+            price3 = close_prices[-1] + 3 * very_fast_cycle_length
+
+            # Print the next 3 forecast prices
+            print(f"Next 3 forecast prices: {price1}, {price2}, {price3}")
+
+            # Get current momentum
+            current_momentum = results["momentum"]
+
+            # Calculate very fast cycle momentum
+            very_fast_cycle_momentum = 0.75 * current_momentum
+
+            # Calculate medium cycle momentum  
+            medium_cycle_momentum = 0.5 * current_momentum
+
+            # Calculate slow cycle momentum
+            slow_cycle_momentum = 0.25 * current_momentum
+
+            # Print next 3 momentum forecast cycles    
+            print(f"Next 3 momentum forecasts: {very_fast_cycle_momentum}, {medium_cycle_momentum}, {slow_cycle_momentum}")
+
+            # Calculate very fast cycle momentum        
+            very_fast_cycle_momentum = 0.75 * current_momentum
+
+            # Determine very fast cycle mood based on momentum        
+            if very_fast_cycle_momentum < 0:
+                very_fast_cycle_mood = "Bearish"
+            else:
+                very_fast_cycle_mood = "Bullish"  
+
+            # Calculate medium cycle momentum       
+            medium_cycle_momentum = 0.5 * current_momentum
+
+            # Determine medium cycle mood        
+            if medium_cycle_momentum < 0:
+                medium_cycle_mood = "Bearish"    
+            else:
+                medium_cycle_mood = "Bullish" 
+
+            # Calculate slow cycle momentum    
+            slow_cycle_momentum = 0.25 * current_momentum
+
+            # Determine slow cycle mood
+            if slow_cycle_momentum < 0:
+                slow_cycle_mood = "Bearish"      
+            else:      
+                slow_cycle_mood = "Bullish"  
+
+            # Print market mood forecasts
+            print(f"Momentum market mood forecasts: {very_fast_cycle_mood}, {medium_cycle_mood}, {slow_cycle_mood}")
+
+            # Compare current momentum to different cycle lengths
+            if current_momentum > results['very_fast_cycle_length']:
+                print("Current momentum is greater than very fast cycle length.")
+            elif current_momentum < results['very_fast_cycle_length']:
+                print("Current momentum is less than very fast cycle length.")
+            else:
+                print("Current momentum is equal to very fast cycle length.")
+
+            if current_momentum > results['medium_cycle_length']:
+                print("Current momentum is greater than medium cycle length.")
+            elif current_momentum < results['medium_cycle_length']:
+                print("Current momentum is less than medium cycle length.")
+            else:
+                print("Current momentum is equal to medium cycle length.")
+
+            if current_momentum > results['slow_cycle_length']:
+                print("Current momentum is greater than slow cycle length.")
+            elif current_momentum < results['slow_cycle_length']:
+                print("Current momentum is less than slow cycle length.")
+            else:
+                print("Current momentum is equal to slow cycle length.")
+
+            if current_momentum > results['very_slow_cycle_length']:
+                print("Current momentum is greater than very slow cycle length.")
+            elif current_momentum < results['very_slow_cycle_length']:
+                print("Current momentum is less than very slow cycle length.")
+            else:
+                print("Current momentum is equal to very slow cycle length.")
+
+            # Compare current price to different cycle lengths
+            if np.all(close_prices < results['very_fast_cycle_length']):
+                print("Current price is below very fast cycle length.")
+            elif np.all(close_prices > results['very_fast_cycle_length']):
+                print("Current price is above very fast cycle length.")
+            else:
+                print("Current price is at very fast cycle length.")
+
+            if np.all(close_prices < results['medium_cycle_length']):
+                print("Current price is below medium cycle length.")
+            elif np.all(close_prices > results['medium_cycle_length']):
+                print("Current price is above medium cycle length.")
+            else:
+                print("Current price is at medium cycle length.")
+
+            if np.all(close_prices < results['slow_cycle_length']):
+                print("Current price is below slow cycle length.")
+            elif np.all(close_prices > results['slow_cycle_length']):
+                print("Current price is above slow cycle length.")
+            else:
+                print("Current price is at slow cycle length.")
+
+            if np.all(close_prices < results['very_slow_cycle_length']):
+                print("Current price is below very slow cycle length.")
+            elif np.all(close_prices > results['very_slow_cycle_length']):
+                print("Current price is above very slow cycle length.")
+            else:
+                print("Current price is at very slow cycle length.")
+
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price <= min_threshold:
+                if price <= min_threshold and price < price1 and price < price2 and price < price3:
                     if momentum > 0:
                         trigger_long = True
 
-                elif price >= max_threshold:
+                elif price >= max_threshold and price > price1 and price > price2 and price > price3:
                     if momentum < 0:
                         trigger_short = True
 
                 if current_quadrant == 1: 
 
                     # Add percentage difference condition from close to min           
-                    if pct_diff_to_min <= 5:
+                    if price < price1 and price < price2 and price < price3:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
                                 if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish":
@@ -1432,7 +1982,7 @@ def main():
                 elif current_quadrant == 4: 
 
                     # Add percentage difference condition from close to max        
-                    if pct_diff_to_max <= 5:
+                    if price > price1 and price > price2 and price > price3:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
                                 if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish":
@@ -1474,4 +2024,3 @@ print()
 # Run the main function
 if __name__ == '__main__':
     main()
-
