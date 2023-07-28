@@ -2003,19 +2003,19 @@ def main():
                                 if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
                                     trigger_short = True  
 
-                if market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish":
+                if market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish" and price < price1 and price < price2 and price < price3:
                     if momentum > 0:
                         trigger_long = True
 
-                elif market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
+                elif market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish" and price > price1 and price > price2 and price > price3:
                     if momentum < 0:
                         trigger_short = True  
               
-                if very_fast_cycle_mood == "Bullish" and very_fast_cycle_mood == "Bullish":
+                if very_fast_cycle_mood == "Bullish" and very_fast_cycle_mood == "Bullish" and price < price1 and price < price2 and price < price3:
                     if momentum > 0:
                         trigger_long = True
 
-                elif very_fast_cycle_mood == "Bearish" and very_fast_cycle_mood == "Bearish":
+                elif very_fast_cycle_mood == "Bearish" and very_fast_cycle_mood == "Bearish" and price > price1 and price > price2 and price > price3:
                     if momentum < 0:
                         trigger_short = True 
 
