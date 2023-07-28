@@ -1964,6 +1964,11 @@ def main():
             price2 = float(price2)
             price3 = float(price3)
 
+            # Convert avg_mtf, fastest_target and target1 to Python float
+            avg_mtf = float(avg_mtf)
+            fastest_target = float(fastest_target)
+            target1 = float(target1)
+
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
