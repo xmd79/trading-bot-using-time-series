@@ -2004,7 +2004,13 @@ def main():
                     trigger_long = True
 
                 elif market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
-                    trigger_short = True                
+                    trigger_short = True  
+              
+                if very_fast_cycle_mood == "Bullish":
+                    trigger_long = True
+
+                elif very_fast_cycle_mood == "Bearish":
+                    trigger_short = True 
 
                 if trigger_long:          
                     print("LONG signal!")  
