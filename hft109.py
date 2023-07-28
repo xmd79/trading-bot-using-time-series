@@ -2004,12 +2004,12 @@ def main():
                     trigger_long = True
 
                 elif market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
-                    trigger_long = True                
+                    trigger_short = True                
 
                 if trigger_long:          
                     print("LONG signal!")  
                     f.write(f"{timestamp} LONG {price}\n") 
-                    trigger_short = False
+                    trigger_long = False
          
                 if trigger_short:
                     print("SHORT signal!")
