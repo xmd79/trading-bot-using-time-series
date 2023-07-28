@@ -1957,6 +1957,13 @@ def main():
             else:
                 print("Current price is at very slow cycle length.")
 
+            print()
+
+            # Convert price1 price2 and price3 to Python float
+            price1 = float(price1)
+            price2 = float(price2)
+            price3 = float(price3)
+
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
