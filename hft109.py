@@ -2000,10 +2000,16 @@ def main():
                                 if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish":
                                     trigger_short = True  
 
+                if market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish":
+                    trigger_long = True
+
+                elif market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
+                    trigger_long = True                
+
                 if trigger_long:          
                     print("LONG signal!")  
                     f.write(f"{timestamp} LONG {price}\n") 
-                    trigger_long = False
+                    trigger_short = False
          
                 if trigger_short:
                     print("SHORT signal!")
