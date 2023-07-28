@@ -1969,6 +1969,9 @@ def main():
             fastest_target = float(fastest_target)
             target1 = float(target1)
 
+            very_fast_cycle_mood = results["very_fast_cycle_mood"]
+            print(very_fast_cycle_mood)
+
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
@@ -2008,11 +2011,11 @@ def main():
                     if momentum < 0:
                         trigger_short = True  
               
-                if very_fast_cycle_mood == "Bullish":
+                if very_fast_cycle_mood == "Bullish" and very_fast_cycle_mood == "Bullish":
                     if momentum > 0:
                         trigger_long = True
 
-                elif very_fast_cycle_mood == "Bearish":
+                elif very_fast_cycle_mood == "Bearish" and very_fast_cycle_mood == "Bearish":
                     if momentum < 0:
                         trigger_short = True 
 
