@@ -1974,7 +1974,7 @@ def main():
                 timestamp = current_time.strftime("%d %H %M %S")
 
                 if price <= min_threshold and price < price1 and price < price2 and price < price3 and very_fast_cycle_mood == "Bullish":
-                    if momentum > 0:
+                    if momentum > 0: 
                         trigger_long = True
 
                 elif price >= max_threshold and price > price1 and price > price2 and price > price3 and very_fast_cycle_mood == "Bearish":
@@ -2001,16 +2001,20 @@ def main():
                                     trigger_short = True  
 
                 if market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish":
-                    trigger_long = True
+                    if momentum > 0:
+                        trigger_long = True
 
                 elif market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
-                    trigger_short = True  
+                    if momentum < 0:
+                        trigger_short = True  
               
                 if very_fast_cycle_mood == "Bullish":
-                    trigger_long = True
+                    if momentum > 0:
+                        trigger_long = True
 
                 elif very_fast_cycle_mood == "Bearish":
-                    trigger_short = True 
+                    if momentum < 0:
+                        trigger_short = True 
 
                 if trigger_long:          
                     print("LONG signal!")  
