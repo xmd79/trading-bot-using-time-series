@@ -1574,6 +1574,325 @@ print()
 ##################################################
 ##################################################
 
+def generate_market_mood_forecast(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
+    # Call generate_new_momentum_sinewave to get the sine wave and other features
+    sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=percent_to_max_val, percent_to_min_val=percent_to_min_val)
+
+    current_quadrant = sine_wave["current_quadrant"]
+    em_phase_q1 = sine_wave["em_phase"]
+    em_phase_q2 = em_phase_q1 + math.pi/2
+    em_phase_q3 = em_phase_q1 + math.pi
+    em_phase_q4 = em_phase_q1 + 3*math.pi/2
+
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177
+
+    # Calculate the Brun constant from the phi ratio and sqrt(5)
+    brun_constant = math.sqrt(PHI * math.sqrt(5))
+
+    # Define PI constant with 15 decimals
+    PI = 3.1415926535897932384626433832795028842
+
+    # Calculate sacred frequency
+    sacred_freq = (432 * PHI ** 2) / 360
+
+    # Calculate Alpha and Omega ratios
+    alpha_ratio = PHI / PI
+    omega_ratio = PI / PHI
+
+    # Calculate Alpha and Omega spiral angle rates
+    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
+    # Calculate quadrature phase shift based on current quadrant
+    if current_quadrant == 1:
+        # Up cycle from Q1 to Q4
+        quadrature_phase = em_phase_q1
+        em_phase = alpha_spiral
+    elif current_quadrant == 2:
+        quadrature_phase = em_phase_q2
+        em_phase = omega_spiral
+    elif current_quadrant == 3:
+        quadrature_phase = em_phase_q3
+        em_phase = omega_spiral
+    else:
+        quadrature_phase = em_phase_q4
+        em_phase = alpha_spiral
+
+    cycle_direction = "UP"
+    next_quadrant = 1
+
+    if current_quadrant == 1:
+        next_quadrant = 2
+        cycle_direction = "UP"
+
+    elif current_quadrant == 2:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+        elif cycle_direction == "DOWN":
+            next_quadrant = 1
+
+    elif current_quadrant == 3:
+        if cycle_direction == "UP":
+            next_quadrant = 4
+        elif cycle_direction == "DOWN":
+            next_quadrant = 2
+
+    elif current_quadrant == 4:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+            cycle_direction = "DOWN"
+
+    current_point = ""
+    last_point = ""
+    next_point = ""
+
+    if current_quadrant == 1:
+        current_point = "Apex"
+    elif current_quadrant == 2:
+        current_point = "Left"
+    elif current_quadrant == 3:
+        current_point = "Base"
+    elif current_quadrant == 4:
+        current_point = "Right"
+
+    if next_quadrant == 1:
+        next_point = "Apex"
+    elif next_quadrant == 2:
+        next_point = "Left"
+    elif next_quadrant == 3:
+        next_point = "Base"
+    elif next_quadrant == 4:
+        next_point = "Right"
+
+    if cycle_direction == "UP":
+        if current_point == "Apex":
+            last_point = "Left"
+        elif current_point == "Left":
+            last_point = "Apex"
+        elif current_point == "Base":
+            last_point = "Left"
+        elif current_point == "Right":
+            last_point = "Base"
+
+    elif cycle_direction == "DOWN":
+        if current_point == "Right":
+            last_point = "Base"
+        elif current_point == "Base":
+            last_point = "Right"
+        elif current_point == "Left":
+            last_point = "Base"
+        elif current_point == "Apex":
+            last_point = "Left"
+
+    # Calculate quadrature phase
+    if next_quadrant == 1:
+        next_quadrature_phase = em_phase_q1
+    elif next_quadrant == 2:
+        next_quadrature_phase = em_phase_q2
+    elif next_quadrant == 3:
+        next_quadrature_phase = em_phase_q3
+    else:
+        next_quadrature_phase = em_phase_q4
+
+    # Calculate EM value
+    em_value = sine_wave["em_amplitude"] * math.sin(em_phase)
+
+    # Calculate quadrature phase shift from current to next quadrant
+    quadrature = next_quadrature_phase - quadrature_phase
+
+    if quadrature > 0:
+        cycle_direction = "UP"
+    else:
+        cycle_direction = "DOWN"
+
+    # Define the frequency bands and their corresponding emotional values
+    frequency_bands = {"Delta": -0.5, "Theta": -0.25, "Alpha": 0, "Beta": 0.25,"Gamma": 0.5}
+
+    # Calculate the frequency band based on the EM value
+    frequency_band = None
+    for band, value in frequency_bands.items():
+        if value <= em_value < value + 0.25:
+            frequency_band = band
+            break
+
+    # Define the market mood based on the frequency band
+    market_mood = None
+    if frequency_band == "Delta":
+        market_mood = "Depressed"
+    elif frequency_band == "Theta":
+        market_mood = "Anxious"
+    elif frequency_band == "Alpha":
+        market_mood = "Calm"
+    elif frequency_band == "Beta":
+        market_mood = "Excited"
+    elif frequency_band == "Gamma":
+        market_mood = "Manic"
+
+    # Create the forecast dictionary with all the relevant values
+    forecast = {"current_quadrant": current_quadrant,
+                "last_point": last_point,
+                "current_point": current_point,
+                "next_quadrant": next_quadrant,
+                "next_point": next_point,
+                "cycle_direction": cycle_direction,
+                "em_value": em_value,
+                "quadrature": quadrature,
+                "frequency_band": frequency_band,
+                "market_mood": market_mood}
+
+    return forecast
+  
+# Call generate_market_mood_forecast to get the forecast
+forecast = generate_market_mood_forecast(close_prices, candles, percent_to_max_val = 5, percent_to_min_val = 5)
+
+# Print out the resulting forecast
+print("Last Point:", forecast["last_point"])
+print("Current Quadrant:", forecast["current_quadrant"])
+print("Current Point:", forecast["current_point"])
+print("Next Quadrant:", forecast["next_quadrant"])
+print("Next Point:", forecast["next_point"])
+print("Cycle Direction:", forecast["cycle_direction"])
+print("EM Value:", forecast["em_value"])
+print("Quadrature:", forecast["quadrature"])
+print("Frequency Band:", forecast["frequency_band"])
+print("Market Mood:", forecast["market_mood"])
+
+print()
+
+##################################################
+##################################################
+
+def get_rf_band(frequency):
+    if frequency >= 0.000050000000 and frequency < 0.000300000000:
+        return "MYR band (50 kHz - 300 kHz)"  
+    if frequency >= 0.000000000001 and frequency < 0.000300000000:
+        return "ELF band (3Hz - 300Hz)"
+    if frequency >= 0.000300000000 and frequency < 0.001000000000:      
+        return "UHF band (300 MHz - 3 GHz)"
+    if frequency >= 0.001000000000 and frequency < 0.003000000000:   
+        return  "VHF band (30MHz - 300MHz)"      
+    if frequency >= 0.003000000000 and frequency < 0.030000000000:
+        return "HF band (3MHz - 30MHz)"        
+    if frequency >= 0.030000000000 and frequency < 0.300000000000:
+        return "V band (40 - 75 GHz)"
+    if frequency >= 0.300000000000 and frequency < 3.000000000000:      
+        return "C band (4 - 8 GHz)"
+    if frequency >= 3.000000000000 and frequency < 8.000000000000:         
+        return "X band (8 - 12 GHz)"        
+    if frequency >= 8.000000000000 and frequency < 12.400000000000:
+        return "K band (12.4 - 18 GHz)"
+    if frequency >= 12.400000000000 and frequency < 18.000000000000:  
+        return "Ku band (18 - 26.5 GHz)"
+    if frequency >= 18.000000000000 and frequency < 26.5e9:
+        return "Ka band (26.5 - 40 GHz)"
+    if frequency >= 26.5e9 and frequency < 40.000000000000:
+        return "V band (40 - 75 GHz)"
+    if frequency >= 40.000000000000 and frequency < 75.000000000000:        
+        return "E band (60 - 90 GHz)"
+    if frequency >= 75.000000000000 and frequency < 110.000000000000:
+        return "W band  (75 -110 GHz)"
+    if frequency >= 110.000000000000 and frequency < 300.000000000000:  
+        return "D band (110 - 170 GHz)"
+    if frequency >= 300.000000000000 and frequency < 10e12:
+        return "THz band (300 GHz - 10 THz)"  
+    if frequency >= 10e12 and frequency < 30e12:  
+        return "Millimeter wave band (30 GHz - 300 GHz)"
+    if frequency >= 30e12 and frequency < 3e14: 
+        return "Submillimeter wave band (300 GHz - 3 THz)"        
+    if frequency >= 3e14 and frequency < 30e14:   
+        return "Far-infrared band (3 THz - 30 THz)"         
+    if frequency >= 30e14 and frequency < 40e14:
+        return "Infrared band (30 THz - 400 THz)"
+
+frequency = []  
+
+frequency.append(0.000000000001)         
+get_rf_band(frequency[-1]) # ELF      
+frequency.append(0.000300000000)   
+get_rf_band(frequency[-1])  # UHF   
+frequency.append(0.015000000000)           
+get_rf_band(frequency[-1]) # HF
+frequency.append(0.0600000000)               
+get_rf_band(frequency[-1])   # V 
+frequency.append(5.500000000)         
+get_rf_band(frequency[-1]) # C   
+frequency.append(15.0000000000)
+get_rf_band(frequency[-1])  # K    
+frequency.append(22.0000000000000)  
+get_rf_band(frequency[-1]) # Ku
+frequency.append(31.00000000000)           
+get_rf_band(frequency[-1]) # Ka
+frequency.append(90.0000000000000)
+get_rf_band(frequency[-1]) # E 
+frequency.append(100.000000000000)          
+get_rf_band(frequency[-1]) # W
+frequency.append(130.00000000000)    
+get_rf_band(frequency[-1]) # D
+frequency.append(225.000000000000)
+get_rf_band(frequency[-1])# Millimeter  
+frequency.append(11000.00000000000)
+get_rf_band(frequency[-1]) #Submillimeter
+frequency.append(11000000.0000000000)           
+get_rf_band(frequency[-1])# Far-infrared   
+frequency.append(1900000000.00000000000)  
+get_rf_band(frequency[-1])# Infrared
+
+def get_frequency_components(close_prices):
+    # Remove any NaN values
+    close_prices = close_prices[~np.isnan(close_prices)]
+    
+    # Compute the Fourier transform of the signal
+    fft_data = np.fft.fft(close_prices)
+    
+    # Compute the power spectrum of the signal
+    power_spectrum = np.abs(fft_data) ** 2
+    
+    # Compute the frequencies corresponding to each element of the power spectrum
+    time_step = 1.0 / 60  # assuming 1-min data
+    frequencies = np.fft.fftfreq(close_prices.size, time_step)
+    
+    # Find the indices of the highest and lowest three frequencies
+    indices = np.argsort(power_spectrum)
+    lowest_indices = indices[:3]
+    highest_indices = indices[-3:]
+    
+    # Get the corresponding frequencies for the highest and lowest indices
+    lowest_frequencies = frequencies[lowest_indices]
+    highest_frequencies = frequencies[highest_indices]
+    
+    # Map the frequencies to their corresponding RF bands
+    lowest_bands = [get_rf_band(f) for f in lowest_frequencies]
+    highest_bands = [get_rf_band(f) for f in highest_frequencies]
+    
+    # Return the frequencies and their corresponding RF bands
+    return {
+        'power_spectrum': power_spectrum,
+        'frequencies': frequencies,
+        'lowest_frequencies': lowest_frequencies,
+        'lowest_bands': lowest_bands,
+        'highest_frequencies': highest_frequencies,
+        'highest_bands': highest_bands
+    }
+
+# Call the function to get the frequency components
+components = get_frequency_components(close_prices)
+
+# Print out the results
+print("Power Spectrum: ", components['power_spectrum'])
+print("Frequencies: ", components['frequencies'])
+print("Lowest frequencies: ", components['lowest_frequencies'])
+print("Lowest frequency bands: ", components['lowest_bands'])
+print("Highest frequencies: ", components['highest_frequencies'])
+print("Highest frequency bands: ", components['highest_bands'])
+
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2132,6 +2451,40 @@ def main():
             print("Next reversal bottom:", results_sr["next_reversal_bottom"])
             print("Support level:", results_sr["support_level"])
             print("Resistance level:", results_sr["resistance_level"])
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Call generate_market_mood_forecast to get the forecast
+            forecast = generate_market_mood_forecast(close_prices, candles, percent_to_max_val = 5, percent_to_min_val = 5)
+
+            # Print out the resulting forecast
+            print("Last Point:", forecast["last_point"])
+            print("Current Quadrant:", forecast["current_quadrant"])
+            print("Current Point:", forecast["current_point"])
+            print("Next Quadrant:", forecast["next_quadrant"])
+            print("Next Point:", forecast["next_point"])
+            print("Cycle Direction:", forecast["cycle_direction"])
+            print("EM Value:", forecast["em_value"])
+            print("Quadrature:", forecast["quadrature"])
+            print("Frequency Band:", forecast["frequency_band"])
+            print("Market Mood:", forecast["market_mood"])
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Call the function to get the frequency components
+            components = get_frequency_components(close_prices)
+
+            # Print out the results
+            print("Lowest frequencies:", components['lowest_frequencies'])
+            print("Lowest frequency bands:", components['lowest_bands'])
+            print("Highest frequencies:", components['highest_frequencies'])
+            print("Highest frequency bands:", components['highest_bands'])
 
             print()
 
