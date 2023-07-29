@@ -1699,17 +1699,17 @@ def get_frequency_components(close_prices):
 
 def get_market_mood(freq):
     if freq > 0.4:
-       return "DIP reversal"  # Highest frequencies indicate a DIP reversal trend        
+       return "TOP Reversal"  # Highest frequencies indicate a DIP reversal trend        
     elif 0.15 <= freq <= 0.4:
-       return "Accumulation" # Mid frequencies indicate accumulation phase      
+       return "Distrubution" # Mid frequencies indicate accumulation phase      
     elif 0.03 <= freq <= 0.05: 
-       return "Pump" # Higher low frequencies indicate pump and dump trend
+       return "Downtred" # Higher low frequencies indicate pump and dump trend
     elif 0.01 <= freq <= 0.03:
-       return "Reversal TOP" # Lower low frequencies indicate reversal from top
+       return "DIP Reversal" # Lower low frequencies indicate reversal from top
     elif 0.003 <= freq <= 0.01:
-       return "Distribution" # Very low frequencies indicate distribution phase    
+       return "Accumulation" # Very low frequencies indicate distribution phase    
     else:   
-       return "Downtrend" # Ultra low frequencies indicate downtrend
+       return "Uptrend" # Ultra low frequencies indicate downtrend
 
 components = get_frequency_components(close_prices)
 
@@ -2309,17 +2309,20 @@ def main():
 
             components = get_frequency_components(close_prices)
 
-            high_avg = np.mean(components['highest_frequencies'])        
-            high_mood = get_market_mood(high_avg)
-            print(f"Forecast for fast cycle: {high_mood}")
+            # Calculate the average frequency for each cycle range
+            large_cycle_avg = np.mean(components['lowest_frequencies'])
+            medium_cycle_avg = components['mid_frequency']
+            fast_cycle_avg = np.mean(components['highest_frequencies'])
 
-            mid_avg = components['mid_frequency']
-            mid_mood = get_market_mood(mid_avg)                  
-            print(f"Forecast for medium cycle: {mid_mood}")
+            # Calculate the market mood for each cycle range
+            large_cycle_mood = get_market_mood(large_cycle_avg)
+            medium_cycle_mood = get_market_mood(medium_cycle_avg)
+            fast_cycle_mood = get_market_mood(fast_cycle_avg)
 
-            low_avg  = np.mean(components['lowest_frequencies'])  
-            low_mood = get_market_mood(low_avg)       
-            print(f"Forecast for large cycle: {low_mood}") 
+            # Print out the results
+            print(f"Forecast for large cycle: {large_cycle_mood}")
+            print(f"Forecast for medium cycle: {medium_cycle_mood}")
+            print(f"Forecast for fast cycle: {fast_cycle_mood}")
 
             print()
 
