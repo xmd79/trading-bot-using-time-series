@@ -2292,7 +2292,7 @@ def main():
             target1 = float(target1)
 
             very_fast_cycle_mood = results["very_fast_cycle_mood"]
-            print(very_fast_cycle_mood)
+            #print(very_fast_cycle_mood)
 
             print()
 
@@ -2307,7 +2307,7 @@ def main():
                 if current_quadrant == 1: 
 
                     # Add percentage difference condition from close to min           
-                    if price < price1 and price < price2 and price < price3 and forecast["current_point"] == "Apex":
+                    if price < price1 and price < price2 and price < price3:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
                                 if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish":
@@ -2317,7 +2317,7 @@ def main():
                 elif current_quadrant == 4: 
 
                     # Add percentage difference condition from close to max        
-                    if price > price1 and price > price2 and price > price3 and forecast["current_point"] == "Right":
+                    if price > price1 and price > price2 and price > price3:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
                                 if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
