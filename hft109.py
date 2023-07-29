@@ -171,52 +171,20 @@ def get_latest_candle(symbol, interval, start_time=None):
 ##################################################
 ##################################################
 
-##################################################
-##################################################
-
-# Get current price as <class 'float'>
-
-def get_price(symbol):
-    try:
-        url = "https://fapi.binance.com/fapi/v1/ticker/price"
-        params = {
-            "symbol": symbol 
-            }
-        response = requests.get(url, params=params)
-        data = response.json()
-        if "price" in data:
-            price = float(data["price"])
-        else:
-            raise KeyError("price key not found in API response")
-        return price      
-    except (BinanceAPIException, KeyError) as e:
-        print(f"Error fetching price for {symbol}: {e}")
-        return 0
-
-price = get_price("BTCUSDT")
-
-print(price)
-
-print()
-
-##################################################
-##################################################
-
-# Get entire list of close prices as <class 'list'> type
 def get_close(timeframe):
-    closes = []
+    # Get candles for this specific timeframe
     candles = candle_map[timeframe]
+    
+    # Get close of last candle    
+    close = candles[-1]['close']
+    
+    return close
 
-    for c in candles:
-        close = c['close']
-        if not np.isnan(close):
-            closes.append(close)
 
-    # Append current price to the list of closing prices
-    current_price = get_price(TRADE_SYMBOL)
-    closes.append(current_price)
+##################################################
+##################################################
 
-    return closes
+# Get close price as <class 'float'> type
 
 close = get_close('1m')
 #print(close)
@@ -247,7 +215,7 @@ closes = get_closes('1m')
 # Scale current close price to sine wave       
 def scale_to_sine(timeframe):  
   
-    close_prices = np.array(get_close(timeframe))
+    close_prices = np.array(get_closes(timeframe))
   
     # Get last close price 
     current_close = close_prices[-1]      
@@ -291,8 +259,171 @@ def scale_to_sine(timeframe):
     return dist_from_close_to_min, dist_from_close_to_max, current_sine
 
 # Call function           
-for timeframe in timeframes:        
-    scale_to_sine(timeframe)
+#for timeframe in timeframes:        
+    #scale_to_sine(timeframe)
+
+print()
+
+
+##################################################
+##################################################
+
+def get_closes_last_n_minutes(interval, n):
+    """Generate mock closing prices for the last n minutes"""
+    closes = []
+    for i in range(n):
+        closes.append(random.uniform(0, 100))
+    return closes
+
+print()
+
+##################################################
+##################################################
+
+def get_multi_timeframe_rsi():
+    """Calculate RSI from multiple timeframes and average"""
+    rsis = []
+    
+    for timeframe in ['1m', '3m', '5m', '15m', '1h']:
+        
+       # Get candle data               
+       candles = candle_map[timeframe][-100:]  
+        
+       # Calculate RSI
+       rsi = talib.RSI(np.array([c["close"] for c in candles]), timeperiod=21)
+       rsis.append(rsi[-1])
+       
+    # Average RSIs        
+    avg_rsi = sum(rsis) / len(rsis)
+        
+    return avg_rsi
+
+def get_tsi():
+    """Calculate TSI"""
+    closes = np.array([c["close"] for c in candle_map['1d'][-200:]])
+    macd, macdsignal, macdhist = talib.MACD(closes, fastperiod=25, slowperiod=50, signalperiod=10)
+    ema1 = talib.EMA(macd, timeperiod=13)
+    ema2 = talib.EMA(ema1, timeperiod=21)
+    tsi = ema2[-1]
+    return tsi
+
+def get_bollinger_bands():
+    """Calculate Bollinger Bands"""
+    closes = np.array([c["close"] for c in candle_map['1h'][-100:]])
+    upperband, middleband, lowerband = talib.BBANDS(closes, timeperiod=20)
+    return upperband[-1], middleband[-1], lowerband[-1]
+
+def get_mtf_rsi_market_mood():
+    rsi = get_multi_timeframe_rsi()
+    tsi = get_tsi()
+    ub, mb, lb = get_bollinger_bands()
+    closes = get_closes_last_n_minutes("15m", 50)
+
+    # Define the thresholds for dip and top reversals
+    dip_threshold = lb
+    top_threshold = ub
+
+    # Check if the close price is in the dip reversal area
+    if closes[-1] <= dip_threshold and closes[-2] > dip_threshold:
+        mood = "dip up reversal"
+    # Check if the close price is in the top reversal area
+    elif closes[-1] >= top_threshold and closes[-2] < top_threshold:
+        mood = "top down reversal"
+    # Check if the close price is in the accumulation area
+    elif closes[-1] > dip_threshold and closes[-1] < mb:
+        mood = "accumulation"
+    # Check if the close price is in the distribution area
+    elif closes[-1] < top_threshold and closes[-1] > mb:
+        mood = "distribution"
+    # Check if the market is in a downtrend
+    elif rsi < 50 and tsi < 0:
+        mood = "downtrend"
+    # Check if the market is in an uptrend
+    elif rsi > 50 and tsi > 0:
+        mood = "uptrend"
+    # Check if the market is neutral with a bullish tendency
+    elif rsi >= 50 and tsi >= 0:
+        mood = "neutral with bullish tendency"
+    # Check if the market is neutral with a bearish tendency
+    elif rsi < 50 and tsi >= 0:
+        mood = "neutral with bearish tendency"
+    else:
+        mood = "neutral"
+
+    return mood
+
+mood = get_mtf_rsi_market_mood()
+print("MTF rsi mood: ", mood)
+
+print()
+
+##################################################
+##################################################
+
+def get_multi_timeframe_momentum():
+    """Calculate momentum from multiple timeframes and average"""
+    momentums = []
+    
+    for timeframe in timeframes:
+        
+        # Get candle data               
+        candles = candle_map[timeframe][-100:]  
+        
+        # Calculate momentum using talib MOM
+        momentum = talib.MOM(np.array([c["close"] for c in candles]), timeperiod=14)
+        momentums.append(momentum[-1])
+       
+    # Average momentums        
+    avg_momentum = sum(momentums) / len(momentums)
+        
+    return avg_momentum
+
+print()
+
+##################################################
+##################################################
+
+def get_mtf_market_mood():
+    rsi_mood = get_mtf_rsi_market_mood()
+    momentum = get_multi_timeframe_momentum()
+
+    # Define the thresholds for momentum signals
+    small_range_threshold = 5
+    medium_range_threshold = 10
+
+    # Define the indicators   
+    indicator1 = momentum  
+    indicator2 = 0
+
+    # Check if the momentum signal is in the small range
+    if abs(indicator1) < small_range_threshold:
+        mood = "small range"
+    # Check if the momentum signal is in the medium range
+    elif abs(indicator1) < medium_range_threshold:
+        mood = "medium range"
+    # Check if the market is in a downtrend
+    elif indicator1 < indicator2:
+        mood = "MTF trend downtrend"
+    # Check if the market is in an uptrend
+    elif indicator1 > indicator2:
+        mood = "MTF trend uptrend"
+    else:
+        mood = "MTF trend neutral"
+
+    # Combine the RSI mood and momentum mood
+    if rsi_mood == "dip up reversal" or rsi_mood == "uptrend":
+        mood += " momentum bullish"
+    elif rsi_mood == "top down reversal" or rsi_mood == "downtrend":
+        mood += " momentum bearish"
+    else:
+        mood += " momentum neutral"
+
+    return mood
+
+print()
+
+mtf_market_mood = get_mtf_market_mood()
+print("MTF RSI and MOM market mood: ", mtf_market_mood)
 
 print()
 
@@ -311,6 +442,71 @@ def get_momentum(timeframe):
 for timeframe in timeframes:
     momentum = get_momentum(timeframe)
     print(f"Momentum for {timeframe}: {momentum}")
+
+print()
+
+##################################################
+##################################################
+
+# timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
+
+overall_ranges = [
+    ['1m', '5m'],
+    ['3m', '15m'],
+    ['5m', '30m'],
+    ['15m', '1h'],
+    ['30m', '2h'],
+    ['1h', '4h'],
+    ['2h', '6h'],
+    ['6h', '12h'],
+    ['8h', '1d'],
+]
+
+def collect_results():
+    results = []
+    
+    for timeframes_for_range in overall_ranges:
+        dist_min_sum = 0
+        dist_max_sum = 0
+        for timeframe in timeframes_for_range:
+            # Call existing function 
+            dist_to_min, dist_to_max, current_sine = scale_to_sine(timeframe)  
+        
+            # Add distances to running sum
+            dist_min_sum += dist_to_min
+            dist_max_sum += dist_to_max
+        
+        # Calculate average distances for this range
+        num_timeframes = len(timeframes_for_range)
+        dist_min_avg = dist_min_sum / num_timeframes
+        dist_max_avg = dist_max_sum / num_timeframes
+        
+        # Append result tuple
+        results.append((dist_min_avg, dist_max_avg))
+        
+    # Calculate overall percentages      
+    overall_dist_min = sum([r[0] for r in results]) / len(results)    
+    overall_dist_max = sum([r[1] for r in results]) / len(results)
+    
+    return overall_dist_min, overall_dist_max, results
+
+# Call function      
+overall_dist_min, overall_dist_max, results = collect_results()
+print()
+
+print("Overall distances:")
+print(f"  To minimum: {overall_dist_min:.2f}%")  
+print(f"  To maximum: {overall_dist_max:.2f}%")
+
+print()
+
+for i in range(len(overall_ranges)):
+    timeframes_for_range = overall_ranges[i]
+    dist_min_avg, dist_max_avg = results[i]
+    print(f"Overall range {i+1} ({', '.join(timeframes_for_range)}):")
+    print(f"  To minimum: {dist_min_avg:.2f}%")  
+    print(f"  To maximum: {dist_max_avg:.2f}%")
+    print()
 
 print()
 
@@ -609,6 +805,16 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, 
 
     print("EM value:", em_value)
 
+    # Determine the trend direction based on the EM phase differences
+    if em_phase_q4 - em_phase_q3 > 0 and em_phase_q3 - em_phase_q2 > 0 and em_phase_q2 - em_phase_q1 > 0:
+        trend_direction = "Down"
+    elif em_phase_q4 - em_phase_q3 < 0 and em_phase_q3 - em_phase_q2 < 0 and em_phase_q2 - em_phase_q1 < 0:
+        trend_direction = "Up"
+    else:
+        trend_direction = "Sideways"
+
+    print("Trend direction:", trend_direction)
+
     # Calculate the percentage of the price range
     price_range = candles[-1]["high"] - candles[-1]["low"]
     price_range_percent = (close_prices[-1] - candles[-1]["low"]) / price_range * 100
@@ -630,17 +836,1448 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, 
         "current_quadrant": current_quadrant,
         "em_amplitude": em_amp,
         "em_phase": em_phase,
+        "trend_direction": trend_direction,
         "price_range_percent": price_range_percent,
         "momentum": momentum,
-        "min": sine_wave_min,
-        "max": sine_wave_max
+        "max": sine_wave_max,
+        "min": sine_wave_min
     }
    
-
-
 #sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5)
 #print(sine_wave)
 
+print()
+
+##################################################
+##################################################
+
+def generate_market_mood_forecast(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
+    # Call generate_new_momentum_sinewave to get the sine wave and other features
+    sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=percent_to_max_val, percent_to_min_val=percent_to_min_val)
+
+    current_quadrant = sine_wave["current_quadrant"]
+    em_phase_q1 = sine_wave["em_phase"]
+    em_phase_q2 = em_phase_q1 + math.pi/2
+    em_phase_q3 = em_phase_q1 + math.pi
+    em_phase_q4 = em_phase_q1 + 3*math.pi/2
+
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177
+
+    # Calculate the Brun constant from the phi ratio and sqrt(5)
+    brun_constant = math.sqrt(PHI * math.sqrt(5))
+
+    # Define PI constant with 15 decimals
+    PI = 3.1415926535897932384626433832795028842
+
+    # Calculate sacred frequency
+    sacred_freq = (432 * PHI ** 2) / 360
+
+    # Calculate Alpha and Omega ratios
+    alpha_ratio = PHI / PI
+    omega_ratio = PI / PHI
+
+    # Calculate Alpha and Omega spiral angle rates
+    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
+    # Calculate quadrature phase shift based on current quadrant
+    if current_quadrant == 1:
+        # Up cycle from Q1 to Q4
+        quadrature_phase = em_phase_q1
+        em_phase = alpha_spiral
+    elif current_quadrant == 2:
+        quadrature_phase = em_phase_q2
+        em_phase = omega_spiral
+    elif current_quadrant == 3:
+        quadrature_phase = em_phase_q3
+        em_phase = omega_spiral
+    else:
+        quadrature_phase = em_phase_q4
+        em_phase = alpha_spiral
+
+    cycle_direction = "UP"
+    next_quadrant = 1
+
+    if current_quadrant == 1:
+        next_quadrant = 2
+        cycle_direction = "UP"
+
+    elif current_quadrant == 2:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+        elif cycle_direction == "DOWN":
+            next_quadrant = 1
+
+    elif current_quadrant == 3:
+        if cycle_direction == "UP":
+            next_quadrant = 4
+        elif cycle_direction == "DOWN":
+            next_quadrant = 2
+
+    elif current_quadrant == 4:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+            cycle_direction = "DOWN"
+
+    current_point = ""
+    if current_quadrant == 1:
+        current_point = "Apex"  
+    if current_quadrant == 2:  
+        current_point = "Left"       
+    if current_quadrant == 3:
+        current_point = "Base"        
+    if current_quadrant == 4:
+        current_point = "Right"  
+            
+    next_point = ""        
+    if next_quadrant == 1:
+        next_point = "Apex"   
+    if next_quadrant == 2:
+         next_point = "Left"          
+    if next_quadrant == 3:
+        next_point = "Base"       
+    if next_quadrant == 4:
+        next_point = "Right"
+
+    # Calculate quadrature phase
+    if next_quadrant == 1:
+        next_quadrature_phase = em_phase_q1
+    elif next_quadrant == 2:
+        next_quadrature_phase = em_phase_q2
+    elif next_quadrant == 3:
+        next_quadrature_phase = em_phase_q3
+    else:
+        next_quadrature_phase = em_phase_q4
+
+    # Calculate EM value
+    em_value = sine_wave["em_amplitude"] * math.sin(em_phase)
+
+    # Calculate quadrature phase shift from current to next quadrant
+    quadrature = next_quadrature_phase - quadrature_phase
+
+    if quadrature > 0:
+        cycle_direction = "UP"
+    else:
+        cycle_direction = "DOWN"
+
+    # Define the frequency bands and their corresponding emotional values
+    frequency_bands = {"Delta": -0.5, "Theta": -0.25, "Alpha": 0, "Beta": 0.25, "Gamma": 0.5}
+
+    # Calculate the emotional value of each frequency band using phi
+    emotional_values = {band: frequency_bands[band] * PHI for band in frequency_bands}
+
+    # Divide the frequency spectrum into 4 quadrants based on Metatron's Cube geometry
+    quadrant_amplitudes = {"Apex": 1, "Left": 0.5, "Base": 0, "Right": 0.5}
+    quadrant_phases = {"Apex": 0, "Left": math.pi/2, "Base": math.pi, "Right": 3*math.pi/2}
+
+    # Calculate emotional amplitude and phase values for each quadrant
+    quadrant_emotional_values = {}
+    for quadrant in quadrant_amplitudes:
+        amplitude = quadrant_amplitudes[quadrant]
+        phase = quadrant_phases[quadrant]
+        quadrant_emotional_values[quadrant] = {"amplitude": amplitude, "phase": phase}
+
+    # Calculate the forecast mood for the next 1 hour based on the phi value of each frequency band and mapping that to an emotional state
+    forecast_moods = {}
+    for band in emotional_values:
+        emotional_value = emotional_values[band]
+        phi_value = PHI ** (emotional_value / brun_constant)
+        forecast_moods[band] = math.cos(phi_value + em_value)
+
+    # Sort the frequencies from most negative to most positive based on their emotional value
+    sorted_frequencies = sorted(forecast_moods, key=lambda x: forecast_moods[x])
+
+    # Calculate average moods for the highest 3 and lowest 3 frequencies to determine the overall trend
+    high_moods = [forecast_moods[band] for band in sorted_frequencies[-3:]]
+    low_moods = [forecast_moods[band] for band in sorted_frequencies[:3]]
+    avg_high_mood = sum(high_moods) / len(high_moods)
+    avg_low_mood = sum(low_moods) / len(low_moods)
+
+    # Calculate weighted averages of the top n and bottom n frequencies to get a more nuanced forecast
+    n = 2
+    weighted_high_mood = sum([forecast_moods[band] * (n - i) for i, band in enumerate(sorted_frequencies[-n:])]) / sum(range(1, n+1))
+    weighted_low_mood = sum([forecast_moods[band] * (n - i) for i, band in enumerate(sorted_frequencies[:n])]) / sum(range(1, n+1))
+
+    # Map the 4 quadrants to the 4 points of Metatron's Cube (Apex, Left, Base, Right)
+    mapped_quadrants = {}
+    for quadrant in quadrant_emotional_values:
+        amplitude = quadrant_emotional_values[quadrant]["amplitude"]
+        phase = quadrant_emotional_values[quadrant]["phase"]
+        mapped_quadrants[quadrant] = amplitude * math.sin(em_value + phase)
+
+    # Identify the minimum and maximum frequency nodes to determine reversal points
+    min_node = sorted_frequencies[0]
+    max_node = sorted_frequencies[-1]
+
+    # Based on the minimum and maximum nodes, calculate forecasts for when mood reversals may occur
+    if forecast_moods[min_node] < avg_low_mood and forecast_moods[max_node] > avg_high_mood:
+        mood_reversal_forecast = "Mood reversal expected in the short term"
+    elif forecast_moods[min_node] < weighted_low_mood and forecast_moods[max_node] > weighted_high_mood:
+        mood_reversal_forecast = "Mood may reverse soon"
+    else:
+        mood_reversal_forecast = "No mood reversal expected in the near term"
+
+    # Determine an overall market mood based on the highest and lowest 3 frequencies - positive, negative or neutral
+    if avg_high_mood > 0 and avg_low_mood > 0:
+        market_mood = "Positive"
+    elif avg_high_mood < 0 and avg_low_mood < 0:
+        market_mood = "Negative"
+    else:
+        market_mood = "Neutral"
+
+    # Return the market mood forecast
+    return {"cycle_direction": cycle_direction, "quadrant_emotional_values": quadrant_emotional_values, "forecast_moods": forecast_moods, "sorted_frequencies": sorted_frequencies, "avg_high_mood": avg_high_mood, "avg_low_mood": avg_low_mood, "weighted_high_mood": weighted_high_mood, "weighted_low_mood": weighted_low_mood, "mapped_quadrants": mapped_quadrants, "min_node": min_node, "max_node": max_node, "mood_reversal_forecast": mood_reversal_forecast, "market_mood": market_mood, "current_point": current_point, "next_point": next_point}
+  
+generate_market_mood_forecast(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
+
+market_mood_forecast = generate_market_mood_forecast(close_prices, candles, percent_to_max_val=50, percent_to_min_val=50)
+
+cycle_direction = market_mood_forecast["cycle_direction"]
+quadrant_emotional_values = market_mood_forecast["quadrant_emotional_values"]
+forecast_moods = market_mood_forecast["forecast_moods"]
+sorted_frequencies = market_mood_forecast["sorted_frequencies"]
+avg_high_mood = market_mood_forecast["avg_high_mood"]
+avg_low_mood = market_mood_forecast["avg_low_mood"]
+weighted_high_mood = market_mood_forecast["weighted_high_mood"]
+weighted_low_mood = market_mood_forecast["weighted_low_mood"]
+mapped_quadrants = market_mood_forecast["mapped_quadrants"]
+min_node = market_mood_forecast["min_node"]
+max_node = market_mood_forecast["max_node"]
+mood_reversal_forecast = market_mood_forecast["mood_reversal_forecast"]
+market_mood = market_mood_forecast["market_mood"]
+
+current_point = market_mood_forecast["current_point"] 
+next_point = market_mood_forecast["next_point"]
+
+print(f"Current point: {current_point}")
+print(f"Next point: {next_point}")
+
+print("Cycle direction:", cycle_direction)
+print("Quadrant emotional values:", quadrant_emotional_values)
+print("Forecast moods:", forecast_moods)
+print("Sorted frequencies:", sorted_frequencies)
+print("Average high mood:", avg_high_mood)
+print("Average low mood:", avg_low_mood)
+print("Weighted high mood:", weighted_high_mood)
+print("Weighted low mood:", weighted_low_mood)
+print("Mapped quadrants:", mapped_quadrants)
+print("Minimum node:", min_node)
+print("Maximum node:", max_node)
+print("Mood reversal forecast:", mood_reversal_forecast)
+print("Market mood:", market_mood)
+
+print()
+
+##################################################
+##################################################
+
+def reversals_unit_circle(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
+    # Call generate_new_momentum_sinewave to get the sine wave and other features
+    sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=percent_to_max_val, percent_to_min_val=percent_to_min_val)
+
+    # Get the current quadrant and EM phase of the sine wave
+    current_quadrant = sine_wave["current_quadrant"]
+    em_phase = sine_wave["em_phase"]
+
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177
+
+    # Define PI constant with 15 decimals
+    PI = 3.1415926535897932384626433832795028842
+
+    # Define the frequency bands and their corresponding emotional values
+    frequency_bands = {"Delta": -0.5, "Theta": -0.25, "Alpha": 0, "Beta": 0.25, "Gamma": 0.5}
+
+    # Calculate the emotional value of each frequency band using phi
+    emotional_values = {band: frequency_bands[band] * PHI for band in frequency_bands}
+
+    # Divide the unit circle into 4 quadrants based on Metatron's Cube geometry
+    quadrants = {"Apex": 0, "Left": math.pi/2, "Base": math.pi, "Right": 3*math.pi/2}
+
+    # Map the emotional values to the corresponding quadrants and calculate the emotional amplitude and phase values
+    quadrant_emotional_values = {}
+    for quadrant in quadrants:
+        quadrant_phase = quadrants[quadrant]
+        emotional_value = emotional_values["Gamma"] * math.sin(em_phase + quadrant_phase)
+        quadrant_amplitude = (emotional_value + PHI) / (2 * PHI)
+        quadrant_emotional_values[quadrant] = {"amplitude": quadrant_amplitude, "phase": quadrant_phase}
+
+    # Calculate the forecast mood for each quadrant based on the phi value of each frequency band and mapping that to an emotional state
+    forecast_moods = {}
+    for quadrant in quadrant_emotional_values:
+        quadrant_amplitude = quadrant_emotional_values[quadrant]["amplitude"]
+        quadrant_phase = quadrant_emotional_values[quadrant]["phase"]
+        quadrant_em_value = emotional_values["Gamma"] * math.sin(em_phase + quadrant_phase)
+        quadrant_forecast_moods = {}
+        for band in emotional_values:
+            emotional_value = emotional_values[band]
+            phi_value = PHI ** (emotional_value / math.sqrt(PHI * math.sqrt(5)))
+            quadrant_forecast_moods[band] = quadrant_amplitude * math.cos(phi_value + quadrant_em_value)
+        forecast_moods[quadrant] = quadrant_forecast_moods
+
+    # Calculate the average moods for the highest and lowest 3 frequencies in each quadrant to determine the overall trend
+    avg_moods = {}
+    for quadrant in forecast_moods:
+        quadrant_forecast_moods = forecast_moods[quadrant]
+        sorted_frequencies = sorted(quadrant_forecast_moods, key=lambda x: quadrant_forecast_moods[x])
+        high_moods = [quadrant_forecast_moods[band] for band in sorted_frequencies[-3:]]
+        low_moods = [quadrant_forecast_moods[band] for band in sorted_frequencies[:3]]
+        avg_high_mood = sum(high_moods) / len(high_moods)
+        avg_low_mood = sum(low_moods) / len(low_moods)
+        avg_moods[quadrant] = {"avg_high_mood": avg_high_mood, "avg_low_mood": avg_low_mood}
+
+    # Identify the minimum and maximum frequency nodes to determine reversal points
+    min_node = None
+    max_node = None
+    min_mood = 1
+    max_mood = -1
+    for quadrant in forecast_moods:
+        quadrant_forecast_moods = forecast_moods[quadrant]
+        for band in quadrant_forecast_moods:
+            mood = quadrant_forecast_moods[band]
+            if mood < min_mood:
+                min_mood = mood
+                min_node = quadrant + " " + band
+            if mood > max_mood:
+                max_mood = mood
+                max_node = quadrant + " " + band
+
+    #Print the minimum and maximum frequency nodes and their corresponding moods
+    print("Minimum frequency node: {}, Mood: {}".format(min_node, min_mood))
+    print("Maximum frequency node: {}, Mood: {}".format(max_node, max_mood))
+
+    # Calculate the weighted average moods for the highest and lowest 3 frequencies in each quadrant to get a more nuanced forecast
+    weighted_moods = {}
+    for quadrant in forecast_moods:
+        quadrant_forecast_moods = forecast_moods[quadrant]
+        sorted_frequencies = sorted(quadrant_forecast_moods, key=lambda x: quadrant_forecast_moods[x])
+        high_weights = [quadrant_forecast_moods[band] / sum(quadrant_forecast_moods.values()) for band in sorted_frequencies[-3:]]
+        low_weights = [quadrant_forecast_moods[band] / sum(quadrant_forecast_moods.values()) for band in sorted_frequencies[:3]]
+        weighted_high_mood = sum([high_weights[i] * high_moods[i] for i in range(len(high_moods))])
+        weighted_low_mood = sum([low_weights[i] * low_moods[i] for i in range(len(low_moods))])
+        weighted_moods[quadrant] = {"weighted_high_mood": weighted_high_mood, "weighted_low_mood": weighted_low_mood}
+
+    # Determine the forecast direction based on the quadrant with the highest average mood
+    sorted_avg_moods = sorted(avg_moods, key=lambda x: avg_moods[x]["avg_high_mood"]+avg_moods[x]["avg_low_mood"], reverse=True)
+    forecast_direction = sorted_avg_moods[0]
+
+    # Determine the mood reversal forecast based on the minimum and maximum frequency nodes
+    mood_reversal_forecast = None
+    if min_mood < 0 and max_mood > 0:
+        if sorted_frequencies.index(min_node.split()[-1]) < sorted_frequencies.index(max_node.split()[-1]):
+            mood_reversal_forecast = "Positive mood reversal expected in the near term"
+        else:
+            mood_reversal_forecast = "Negative mood reversal expected in the near term"
+
+    # Determine the overall market mood based on the highest and lowest 3 frequencies in each quadrant
+    sorted_weighted_moods = sorted(weighted_moods, key=lambda x: weighted_moods[x]["weighted_high_mood"]+weighted_moods[x]["weighted_low_mood"], reverse=True)
+    market_mood = None
+    if weighted_moods[sorted_weighted_moods[0]]["weighted_high_mood"] > weighted_moods[sorted_weighted_moods[-1]]["weighted_low_mood"]:
+        market_mood = "Positive"
+    elif weighted_moods[sorted_weighted_moods[-1]]["weighted_low_mood"] > weighted_moods[sorted_weighted_moods[0]]["weighted_high_mood"]:
+        market_mood = "Negative"
+    else:
+        market_mood = "Neutral"
+
+    # Print the forecast results
+    print("Forecast Direction: {}".format(forecast_direction))
+    for quadrant in quadrant_emotional_values:
+        print("\n{} Quadrant".format(quadrant))
+        print("Emotional Amplitude: {}".format(quadrant_emotional_values[quadrant]["amplitude"]))
+        print("Emotional Phase: {}".format(quadrant_emotional_values[quadrant]["phase"]))
+        for band in frequency_bands:
+            print("{}: {}".format(band, forecast_moods[quadrant][band]))
+        print("Average High Mood: {}".format(avg_moods[quadrant]["avg_high_mood"]))
+        print("Average Low Mood: {}".format(avg_moods[quadrant]["avg_low_mood"]))
+        print("Weighted High Mood: {}".format(weighted_moods[quadrant]["weighted_high_mood"]))
+        print("Weighted Low Mood: {}".format(weighted_moods[quadrant]["weighted_low_mood"]))
+    print("\nMood Reversal Forecast: {}".format(mood_reversal_forecast))
+    print("Market Mood: {}".format(market_mood))
+
+    return {
+        "quadrant_emotional_values": quadrant_emotional_values,
+        "forecast_moods": forecast_moods,
+        "min_node": min_node,
+        "max_node": max_node,
+        "avg_moods": avg_moods,
+        "weighted_moods": weighted_moods,
+        "forecast_direction": forecast_direction,
+        "mood_reversal_forecast": mood_reversal_forecast, 
+        "market_mood": market_mood  
+    }
+
+results = reversals_unit_circle(close_prices, candles)
+
+quadrant_emotional_values, forecast_moods, min_node, max_node, avg_moods, weighted_moods, forecast_direction, mood_reversal_forecast, market_mood = results.values()
+
+# Now you have all the results as separate variables  
+print(quadrant_emotional_values, forecast_moods, min_node, max_node, avg_moods, weighted_moods, forecast_direction, mood_reversal_forecast, market_mood)
+
+##################################################
+##################################################
+
+def generate_market_mood_forecast_gr(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
+    """
+    Generates a market mood forecast based on the given inputs.
+
+    Args:
+    close_prices (list): A list of close prices.
+    candles (list): A list of candlestick data.
+    percent_to_max_val (float): The percent to maximum value for the sine wave.
+    percent_to_min_val (float): The percent to minimum value for the sine wave.
+
+    Returns:
+    A dictionary containing the market mood forecast and various mood and market forecasts.
+    """
+
+    # Define constants and ratios
+    pi = 3.14159
+    max_val = max(close_prices)
+    min_val = min(close_prices)
+    total_range = max_val - min_val
+    time_dilation = 1.0 / len(close_prices)
+    quadrants = ["I", "II", "III", "IV"]
+
+    # Determine frequency bands
+    frequencies = {}
+    for i in range(1, 5):
+        frequencies[i] = 1 / (total_range / (i * pi))
+    sorted_frequencies = sorted(frequencies, key=frequencies.get)
+    min_node = sorted_frequencies[0]
+    max_node = sorted_frequencies[-1]
+
+    # Calculate emotional values for frequency bands
+    forecast_moods = {}
+    for band in frequencies:
+        phase = 2 * pi * (band / 4)
+        val = percent_to_max_val * abs(math.sin(phase)) + percent_to_min_val
+        forecast_moods[band] = val
+
+    # Apply time dilation to frequency bands
+    dilated_forecast_moods = {}
+    for band in forecast_moods:
+        dilated_forecast_moods[band] = forecast_moods[band] * time_dilation
+
+    # Calculate average moods for dilated frequencies
+    num_frequencies = 2
+    dilated_high_moods = []
+    dilated_low_moods = []
+
+    if dilated_forecast_moods:
+        dilated_high_moods = [dilated_forecast_moods[band] for band in sorted_frequencies[-num_frequencies:]]
+        dilated_low_moods = [dilated_forecast_moods[band] for band in sorted_frequencies[:num_frequencies]]
+
+    dilated_avg_high_mood = sum(dilated_high_moods) / len(dilated_high_moods) if dilated_high_moods else 0
+    dilated_avg_low_mood = sum(dilated_low_moods) / len(dilated_low_moods) if dilated_low_moods else 0
+
+    # Calculate weighted averages for dilated frequencies
+    weights = [num_frequencies - i for i in range(num_frequencies)]
+    dilated_weighted_high_mood = 0
+    dilated_weighted_low_mood = 0
+
+    if dilated_forecast_moods:
+        dilated_high_freqs = list(dilated_forecast_moods.keys())[-num_frequencies:]
+        dilated_high_moods = [dilated_forecast_moods[freq] for freq in dilated_high_freqs]
+
+        for i in range(num_frequencies):
+            dilated_weighted_high_mood += weights[i] * dilated_high_moods[i]
+
+        dilated_weighted_high_mood /= sum(weights)
+
+        dilated_low_freqs = list(dilated_forecast_moods.keys())[:num_frequencies]
+        dilated_low_moods = [dilated_forecast_moods[freq] for freq in dilated_low_freqs]
+
+        for i in range(num_frequencies):
+            dilated_weighted_low_mood += weights[i] * dilated_low_moods[i]
+
+        dilated_weighted_low_mood /= sum(weights)
+
+    # Determine reversal forecast based on dilated frequencies
+    dilated_mood_reversal_forecast = ""
+
+    if dilated_forecast_moods and dilated_forecast_moods[min_node] < dilated_avg_low_mood and dilated_forecast_moods[max_node] > dilated_avg_high_mood:
+        dilated_mood_reversal_forecast = "Mood reversal possible"
+
+    # Determine market mood based on dilated average moods
+    dilated_market_mood = ""
+
+    if dilated_avg_high_mood > 0 and dilated_avg_low_mood > 0:
+        dilated_market_mood = "Positive" if dilated_avg_high_mood > dilated_avg_low_mood else "Negative"
+
+    # Create dictionary of mood and market forecasts
+    forecast_dict = {
+        "dilated_mood_reversal_forecast": dilated_mood_reversal_forecast,
+        "dilated_market_mood": dilated_market_mood,
+        "dilated_avg_high_mood": dilated_avg_high_mood,
+        "dilated_avg_low_mood": dilated_avg_low_mood,
+        "dilated_weighted_high_mood": dilated_weighted_high_mood,
+        "dilated_weighted_low_mood": dilated_weighted_low_mood
+    }
+
+    # Determine quadrant based on current price position
+    current_price = close_prices[-1]
+    quadrant = ""
+    if current_price > max_val - (total_range / 2):
+        if current_price > max_val - (total_range / 4):
+            quadrant = quadrants[0]
+        else:
+            quadrant = quadrants[1]
+    else:
+        if current_price < min_val + (total_range / 4):
+            quadrant = quadrants[2]
+        else:
+            quadrant = quadrants[3]
+
+    # Add quadrant to forecast dictionary
+    forecast_dict["quadrant"] = quadrant
+
+    return forecast_dict
+
+forecast = generate_market_mood_forecast_gr(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5)
+
+print(forecast)
+
+print()
+
+##################################################
+##################################################
+
+def octa_metatron_cube(close_prices, candles,  
+                       percent_to_max_val=5,  
+                       percent_to_min_val=5):
+
+    sine_wave = generate_new_momentum_sinewave(close_prices, candles,  
+                               percent_to_max_val, 
+                               percent_to_min_val)  
+  
+    current_quadrant = sine_wave["current_quadrant"]
+    current_value = sine_wave["current_close"]
+    current_quadrant = 0
+
+    sine_wave_max = sine_wave["max"]    
+    sine_wave_min = sine_wave["min"] 
+
+    if sine_wave["current_quadrant"] == 1:
+         print("In quadrant 1!")
+    elif sine_wave["current_quadrant"] == 2:  
+         print("In quadrant 2!")            
+    elif sine_wave["current_quadrant"] == 3:               
+         print("In quadrant 3!")           
+    elif sine_wave["current_quadrant"] == 4:                 
+         print("In quadrant 4!")
+    
+    print()
+
+    print("Close price map on sine now at: ", sine_wave)
+
+    print()
+
+    print("Min at:", sine_wave_min)
+    print("Max at: ", sine_wave_max)
+
+    print() 
+ 
+    # Get the current quadrant and EM phase of the sine wave
+    current_quadrant = sine_wave["current_quadrant"]
+    em_phase = sine_wave["em_phase"]
+    em_amp = sine_wave["em_amplitude"]
+
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177  
+   
+    # Calculate the Brun constant from the phi ratio and sqrt(5)
+    brun_constant = math.sqrt(PHI * math.sqrt(5))
+
+    # Define PI constant with 15 decimals    
+    PI = 3.1415926535897932384626433832795028842
+   
+    # Define e constant with 15 decimals   
+    e =  2.718281828459045235360287471352662498  
+
+    # Calculate sacred frequency
+    sacred_freq = (432 * PHI ** 2) / 360
+    
+    # Calculate Alpha and Omega ratios   
+    alpha_ratio = PHI / PI       
+    omega_ratio = PI / PHI
+          
+    # Calculate Alpha and Omega spiral angle rates     
+    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
+    start_value = 0.0 
+
+    frequencies = []
+    frequencies_next = []
+    forecast = []
+
+    freq_range = 25
+    
+    print(em_phase)
+    print(em_amp) 
+
+    current_quadrant_amplitude = em_amp
+    current_quadrant_phase= em_amp
+
+    print()
+  
+    #Calculate X:Y ratio from golden ratio     
+    ratio = 2 * (PHI - 1)  
+
+    # Calculate EM phases based on dividing whole range by X:Y ratio  
+    em_phase_q1 = 0  
+    em_phase_q2= PI * ratio / 2 
+    em_phase_q3 = PI * ratio           
+    em_phase_q4 = PI * ratio * 1.5  
+
+    # Determine the trend direction based on the EM phase differences
+    em_phase_diff_q1_q2 = em_phase_q2 - em_phase_q1
+    em_phase_diff_q2_q3 = em_phase_q3 - em_phase_q2
+    em_phase_diff_q3_q4 = em_phase_q4 - em_phase_q3
+    em_phase_diff_q4_q1 = 2*math.pi - (em_phase_q4 - em_phase_q1)
+
+    # Assign EM amplitudes based on X:Y ratio
+    em_amp_q1 = (sine_wave_max - sine_wave_min) * ratio / 4
+    em_amp_q2 = (sine_wave_max - sine_wave_min) * ratio / 4
+    em_amp_q3 = (sine_wave_max - sine_wave_min) * ratio / 4
+    em_amp_q4 = (sine_wave_max - sine_wave_min) * ratio / 4
+
+    for i in range(freq_range):
+        frequency = i * sacred_freq      
+        #em_value = current_quadrant_amplitude * math.sin(current_quadrant_phase * frequency)
+
+       # Calculate EM value based on frequency   
+        if current_quadrant == 1: 
+            # Most negative frequencies in Q1
+            em_value = em_amp_q1 * math.sin(em_phase_q1 * frequency) 
+            print(em_value)
+
+       # Calculate EM value based on frequency   
+        elif current_quadrant == 2: 
+            # Most negative frequencies in Q1
+            em_value = em_amp_q2 * math.sin(em_phase_q2 * frequency) 
+            print(em_value)
+
+       # Calculate EM value based on frequency   
+        elif current_quadrant == 3: 
+            # Most negative frequencies in Q1
+            em_value = em_amp_q3 * math.sin(em_phase_q3 * frequency) 
+            print(em_value)
+
+       # Calculate EM value based on frequency   
+        elif current_quadrant == 4: 
+            # Most negative frequencies in Q1
+            em_value = em_amp_q4 * math.sin(em_phase_q4 * frequency) 
+            print(em_value)
+
+        frequencies.append({
+            'number': i,
+            'frequency': frequency,  
+            'em_amp': 0,
+            'em_phase': 0,         
+            'em_value': 0,
+            'phi': PHI,    
+            'pi': PI,
+            'e': e, 
+            'mood': 'neutral'      
+        }) 
+
+    for freq in frequencies:
+        forecast.append(freq)  
+                
+    for freq in frequencies:
+
+        # Get PHI raised to the frequency number         
+        phi_power = PHI ** freq['number'] 
+
+        if phi_power < 1.05:
+            freq['mood'] = 'extremely positive'
+        elif phi_power < 1.2:       
+            freq['mood'] = 'strongly positive'
+        elif phi_power < 1.35:       
+            freq['mood'] = 'positive'    
+        elif phi_power < 1.5:       
+            freq['mood'] = 'slightly positive'
+        elif phi_power < 2:          
+            freq['mood'] = 'neutral'              
+        elif phi_power < 2.5:     
+            freq['mood'] = 'slightly negative'      
+        elif phi_power < 3.5:     
+            freq['mood'] = 'negative'
+        elif phi_power < 4.5:     
+            freq['mood'] = 'strongly negative'   
+        else:                     
+            freq['mood'] = 'extremely negative'
+
+        forecast.append(freq)    # Define current_quadrant variable
+
+    #Calculate midpoints of each quadrant
+    mid_q1 = sine_wave_min + em_amp_q1 / 2
+    mid_q2 = mid_q1 + em_amp_q1
+    mid_q3 = mid_q2 + em_amp_q2
+    mid_q4 = float(sine_wave['max'])
+
+    #Compare current sine wave value to determine quadrant
+    if current_value <= mid_q1:
+        current_quadrant = 1
+        current_em_amp = em_amp_q1
+        current_em_phase = em_phase_q1
+
+    elif current_value <= mid_q2:
+        current_quadrant = 2
+        current_em_amp = em_amp_q2
+        current_em_phase = em_phase_q2
+
+    elif current_value <= mid_q3:
+        current_quadrant = 3
+        current_em_amp = em_amp_q3
+        current_em_phase = em_phase_q3
+
+    elif current_value <= mid_q4:
+        current_quadrant = 4
+        current_em_amp = em_amp_q4
+        current_em_phase = em_phase_q4
+
+    else:
+        # Assign a default value
+        current_em_amp = 0 
+        current_em_phase = 0
+
+    #Assign current EM amplitude and phase
+    em_amp = current_em_amp
+    em_phase = current_em_phase
+
+    if percent_to_min_val < 20:
+        print("Bullish momentum in trend")
+
+        if current_quadrant == 1:
+            # In quadrant 1, distance from min to 25% of range
+            print("Bullish momentum in Q1")
+        elif current_quadrant == 2:
+            # In quadrant 2, distance from 25% to 50% of range
+            print("Bullish momentum in Q2")
+        elif current_quadrant == 3:
+            # In quadrant 3, distance from 50% to 75% of range
+            print("Bullish momentum in Q3")
+        elif current_quadrant == 4:
+            # In quadrant 4, distance from 75% to max of range
+            print("Bullish momentum in Q4")
+
+    elif percent_to_max_val < 20:
+        print("Bearish momentum in trend")
+
+        if current_quadrant == 1:
+            # In quadrant 1, distance from min to 25% of range
+            print("Bearish momentum in Q1")
+        elif current_quadrant == 2:
+            # In quadrant 2, distance from 25% to 50% of range
+            print("Bearish momentum in Q2")
+        elif current_quadrant == 3:
+            # In quadrant 3, distance from 50% to 75% of range
+            print("Bearish momentum in Q3")
+        elif current_quadrant == 4:
+            # In quadrant 4, distance from 75% to max of range
+            print("Bearish momentum in Q4")
+
+    # Calculate quadrature phase shift based on current quadrant  
+    if current_quadrant == 1:  
+        # Up cycle from Q1 to Q4   
+        quadrature_phase = em_phase_q1
+        em_phase = alpha_spiral
+    elif current_quadrant == 2:
+        quadrature_phase = em_phase_q2
+        em_phase = omega_spiral          
+    elif current_quadrant  == 3:      
+        quadrature_phase = em_phase_q3
+        em_phase = omega_spiral      
+    else:          
+        quadrature_phase = em_phase_q4
+        em_phase = alpha_spiral 
+
+    cycle_direction = "UP"
+    next_quadrant = 1
+
+    if current_quadrant == 1:
+        next_quadrant = 2
+        cycle_direction = "UP"
+
+    elif current_quadrant == 2:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+        elif cycle_direction == "DOWN":
+            next_quadrant = 1
+
+    elif current_quadrant == 3:
+        if cycle_direction == "UP":
+            next_quadrant = 4
+        elif cycle_direction == "DOWN":
+            next_quadrant = 2
+
+    elif current_quadrant == 4:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+            cycle_direction = "DOWN"
+
+    # Calculate quadrature phase                       
+    if next_quadrant == 1:     
+        next_quadrature_phase = em_phase_q1            
+    elif next_quadrant == 2:        
+        next_quadrature_phase = em_phase_q2          
+    elif next_quadrant == 3:                 
+        next_quadrature_phase = em_phase_q3             
+    else:              
+        next_quadrature_phase = em_phase_q4
+
+    # Calculate EM value
+    em_value = em_amp * math.sin(em_phase)  
+
+    # Calculate quadrature phase shift from current to next quadrant      
+    quadrature = next_quadrature_phase - quadrature_phase
+
+    if quadrature > 0:
+        # Up cycle from Q1 to Q4  
+        print("Up cycle now")  
+    else:  
+        # Down cycle from Q4 to Q1 
+        print("Down cycle now")
+
+    if current_quadrant == 1:
+        # Quadrant 1
+                
+        if freq['number'] <= 10:
+            # Most negative frequencies
+            freq['em_amp'] = em_amp_q1
+            freq['em_phase'] = em_phase_q1                 
+            freq['mood'] = 'extremely negative'  
+
+        elif freq['number'] >= 20:              
+            freq['em_amp'] = em_amp_q1
+            freq['em_phase'] = em_phase_q1  
+            freq['mood'] = 'extremely positive'
+
+    elif current_quadrant == 2:
+        # Quadrant 2
+                
+        if freq['number'] > 10 and freq['number'] <= 15:                 
+            freq['em_amp'] = em_amp_q2
+            freq['em_phase'] = em_phase_q2
+            freq['mood'] = 'strongly negative'
+                        
+        elif freq['number'] > 15 and freq['number'] <= 20:                 
+            freq['em_amp'] = em_amp_q2
+            freq['em_phase'] = em_phase_q2
+            freq['mood'] = 'strongly positive'
+
+    elif current_quadrant == 3: 
+        # Quadrant 3
+            
+        if freq['number'] > 15 and freq['number'] < 20:            
+            freq['em_amp'] = em_amp_q3                  
+            freq['em_phase'] = em_phase_q3
+            freq['mood'] = 'negative'              
+           
+
+        elif freq['number'] > 10 and freq['number'] < 15:            
+            freq['em_amp'] = em_amp_q3                  
+            freq['em_phase'] = em_phase_q3
+            freq['mood'] = 'positive'
+ 
+    else:      
+        # Quadrant 4 
+            
+        if freq['number'] >= 20:                    
+            freq['em_amp'] = em_amp_q4
+            freq['em_phase'] = em_phase_q4  
+            freq['mood'] = 'partial negative'       
+
+        elif freq['number'] <= 10:                    
+            freq['em_amp'] = em_amp_q4
+            freq['em_phase'] = em_phase_q4  
+            freq['mood'] = 'partial positive'
+
+    freq['em_value'] = freq['em_amp'] * math.sin(freq['em_phase'])
+        
+    # Sort frequencies from most negative to most positive       
+    frequencies.sort(key=lambda x: x['em_value'])   
+        
+    print("Quadrant is in: " + cycle_direction + " cycle")  
+ 
+        
+    for freq in frequencies:               
+        print(freq['number'], freq['em_value'], freq['mood'])    
+        
+    # Calculate frequency spectrum index range based on most negative and positive frequencies
+    mood_map = {
+        'extremely negative': -4,  
+        'strongly negative': -3,  
+        'negative': -2,        
+        'partial negative': -1,           
+        'neutral': 0,
+        'partial positive': 1, 
+        'positive': 2,       
+        'strongly positive': 3,    
+        'extremely positive': 4   
+        }
+
+    if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':   
+        total_mood = frequencies[0]['mood'] + " and " +  frequencies[-1]['mood']
+    else:
+        total_mood = 'neutral'
+
+    print()
+
+    # Update the frequencies for the next quadrant     
+    if next_quadrant == 1:       
+        # Update frequencies for next quadrant (Q1)               
+        for freq in frequencies_next:       
+            freq['em_amp'] = em_amp_q1       
+            freq['em_phase'] = em_phase_q1
+             
+    elif next_quadrant == 2:
+        # Update frequencies for Q2        
+        for freq in frequencies_next:                 
+            freq['em_amp'] = em_amp_q2   
+            freq['em_phase'] = em_phase_q2 
+
+    elif next_quadrant == 3:
+        # Update frequencies for Q3        
+        for freq in frequencies_next:                 
+            freq['em_amp'] = em_amp_q3   
+            freq['em_phase'] = em_phase_q3
+
+    elif next_quadrant == 4:
+        # Update frequencies for Q4        
+        for freq in frequencies_next:                 
+            freq['em_amp'] = em_amp_q4   
+            freq['em_phase'] = em_phase_q4
+
+    quadrant_1_amplitude = random.uniform(0.4, 0.6)  
+    quadrant_1_phase = random.uniform(0.1, 0.3)
+
+    quadrant_2_amplitude = random.uniform(0.8, 1.2)   
+    quadrant_2_phase = random.uniform(0.4, 0.6)
+
+    quadrant_3_amplitude = random.uniform(0.6, 1.0)        
+    quadrant_3_phase = random.uniform(0.6, 0.8)
+
+    quadrant_4_amplitude = random.uniform(1.0, 1.4)       
+    quadrant_4_phase = random.uniform(0.8, 1.0)
+
+    lowest_frequency = float('inf')
+    highest_frequency = 0
+
+    min_quadrant = None  
+    max_quadrant = None
+
+    if current_quadrant == 1:
+        frequency_amplitude = quadrant_1_amplitude  
+        frequency_phase = quadrant_1_phase  
+        current_frequency = frequency_amplitude * frequency_phase
+
+    elif current_quadrant == 2:        
+        frequency_amplitude = quadrant_2_amplitude   
+        frequency_phase = quadrant_2_phase 
+        current_frequency = frequency_amplitude * frequency_phase
+
+    elif current_quadrant == 3:        
+        frequency_amplitude = quadrant_3_amplitude
+        frequency_phase = quadrant_3_phase
+        current_frequency = frequency_amplitude * frequency_phase
+  
+    elif current_quadrant == 4:        
+        frequency_amplitude = quadrant_4_amplitude       
+        frequency_phase = quadrant_4_phase
+        current_frequency = frequency_amplitude * frequency_phase
+
+    if current_frequency == lowest_frequency:
+        min_node = {'frequency': current_frequency, 'quadrant': current_quadrant}
+
+    if current_frequency == highest_frequency:      
+        max_node = {'frequency': current_frequency, 'quadrant': current_quadrant}
+
+    # Get next quadrant phi 
+    next_phi = PHI ** freq['number'] 
+
+    # Map moods based on inverse phi power         
+    if next_phi < 1.2:
+        freq['mood'] = 'extremely positive' 
+    elif next_phi < 1.4:
+        freq['mood'] = 'positive'
+
+    highest_3 = frequencies[:3]
+    lowest_3 = frequencies[-3:]
+
+    mood_map = {
+        'extremely negative': -4,  
+        'strongly negative': -3,  
+        'negative': -2,        
+        'partial negative': -1,           
+        'neutral': 0,
+        'partial positive': 1, 
+        'positive': 2,       
+        'strongly positive': 3,    
+        'extremely positive': 4   
+         }
+
+    highest_3_mood_values = []
+    for freq in highest_3:   
+        if freq['mood'] == 'neutral':
+            highest_3_mood_values.append(0)   
+        else:
+            highest_3_mood_values.append(mood_map[freq['mood']])
+
+    lowest_3_mood_values = []        
+    for freq in lowest_3:   
+        if freq['mood'] == 'neutral':
+            lowest_3_mood_values.append(0)        
+        else:
+            lowest_3_mood_values.append(mood_map[freq['mood']])      
+
+    highest_3_mood_values = [mood_map[freq['mood']] for freq in highest_3]
+    highest_3_mood = statistics.mean(highest_3_mood_values)
+
+    lowest_3_mood_values = [mood_map[freq['mood']] for freq in lowest_3]
+    lowest_3_mood = statistics.mean(lowest_3_mood_values)
+
+    print(f"Current quadrant: {current_quadrant}")
+    print(f"Next quadrant: {next_quadrant}")
+    print(f"Highest 3 frequencies: {highest_3_mood}")        
+    print(f"Lowest 3 frequencies: {lowest_3_mood}")
+
+    if highest_3_mood > 0:
+        print(f"Cycle mood is negative")
+    elif highest_3_mood < 0:      
+        print(f"Cycle mood is positive") 
+    else:
+        print("Cycle mood is neutral")
+
+    if frequencies[0]['mood'] != 'neutral' and frequencies[-1]['mood'] != 'neutral':        
+        if mood_map[frequencies[0]['mood']] < 0:
+            total_mood = f"{frequencies[0]['mood']} and  {frequencies[-1]['mood']}"
+            print(f"Frequency spectrum index range: {total_mood} ")
+            print(f"Freq. range is negative")
+        else:    
+            total_mood = f"{frequencies[0]['mood']} and {frequencies[-1]['mood']}"
+            print(f"Frequency spectrum index range: {total_mood}") 
+            print(f"Freq. range is positive")   
+    else:
+        print(f"Frequency spectrum index range: neutral")
+        print(f"Freq. range is neutral") 
+
+    print()
+
+    # Sort forecast from most negative to most positive       
+    forecast.sort(key=lambda f: mood_map[f['mood']])  
+    
+    # Get average mood of highest/lowest 3 frequencies 
+    highest_3 = forecast[:3]
+    highest_3_mood = 0
+   
+    for freq in highest_3:
+        mood_val  = mood_map[freq['mood']] 
+        highest_3_mood += mood_val
+        highest_3_mood = highest_3_mood / len(highest_3)
+
+    lowest_3 = forecast[-3:]
+    lowest_3_mood = 0
+
+    for freq in lowest_3:
+        mood_val  = mood_map[freq['mood']]
+        lowest_3_mood += mood_val  
+        lowest_3_mood = lowest_3_mood / len(lowest_3)
+
+    for freq in forecast:
+        freq['magnitude'] = np.abs(freq['em_value'])
+
+    n = 10
+
+    def calculate_weighted_avg(weights, values):
+        total = 0 
+        total_weight = 0
+    
+        for w, v in zip(weights, values):
+            magnitude = w 
+            mood = v
+            total += magnitude * mood
+            total_weight += magnitude
+        
+            if total_weight == 0:
+                return 0
+
+            return total / total_weight
+
+    # Calculate weighted averages  
+    top_n_weights = [freq['magnitude'] for freq in forecast[:n]]
+    top_n_moods = [mood_map[freq['mood']] for freq in forecast[:n]]
+    top_n_weighted_avg = calculate_weighted_avg(top_n_weights, top_n_moods)
+
+    bottom_n_weights = [freq['magnitude'] for freq in forecast[-n:]]  
+    bottom_n_moods = [mood_map[freq['mood']] for freq in forecast[-n:]]
+    bottom_n_weighted_avg = calculate_weighted_avg(bottom_n_weights, bottom_n_moods)
+
+    overall_mood = top_n_weighted_avg - bottom_n_weighted_avg
+
+    if overall_mood > 2:
+        print("Strongly bullish mood")
+    elif overall_mood > 1:       
+        print("Bullish mood")
+    elif overall_mood > 0:
+        print("Mildly bullish mood")     
+    elif overall_mood == 0:
+        print("Neutral mood")          
+    elif overall_mood > -1:        
+        print("Mildly Bearish mood")      
+    elif overall_mood > -2:       
+        print("Bearish mood")  
+    else:
+        print("Strongly bearish mood")
+
+    if overall_mood < -3:
+        print("Extremely bearish")  
+    elif overall_mood < -2:           
+        print("Strongly bearish")
+    elif overall_mood < -1:       
+        print("Bearish")           
+    elif overall_mood == 0:
+        print("Neutral")
+    elif overall_mood > 1:        
+        print("Bullish")      
+    elif overall_mood > 2:        
+        print("Strongly Bullish")            
+    else:
+        print("Extremely bullish")
+
+    # Define stationary circuit variables
+    stationary_circuit = []
+
+    # Map quadrants to triangle points of Metatron's Cube
+    quadrant_map = {
+        1: 'Apex',
+        2: 'Left',  
+        3: 'Base',
+        4: 'Right' 
+        }
+
+    # Add triangle points to circuit
+    stationary_circuit.append('Apex')
+    stationary_circuit.append('Left')     
+    stationary_circuit.append('Base')
+    stationary_circuit.append('Right')
+
+    # Loop through each quadrant cycle        
+    for quadrant in [1,2,3,4]:
+    
+        #print(f"Quadrant {quadrant}")
+            
+        # Get triangle point from quadrant map               
+        point = quadrant_map[quadrant]    
+    
+        #print(f"Current point: {point}")
+    
+        # Get next point based on circuit        
+        if point == 'Apex':
+            next_point = 'Left'
+        elif point == 'Left':
+            next_point = 'Base'         
+        elif point == 'Base':
+            next_point = 'Right'
+        elif point == 'Right':
+            next_point = 'Apex'
+        
+        #print(f"Next point: {next_point}")       
+    
+        # Get frequency and mood forecast
+        frequency = frequencies[quadrant]['frequency']
+        mood = frequencies[quadrant]['mood']
+    
+        #print(f"Frequency: {frequency} Hz - Mood: {mood}")
+    
+    if current_frequency > lowest_frequency:
+        lowest_frequency = current_frequency    
+    if current_frequency < highest_frequency:     
+        highest_frequency = current_frequency
+
+    # Define min and max nodal points based on frequencies
+    min_node = { 
+        'frequency': lowest_frequency,  
+        'quadrant': min_quadrant   
+        }
+
+    max_node = {
+        'frequency': highest_frequency,
+        'quadrant': max_quadrant         
+        }
+
+    if current_frequency < lowest_frequency:
+        lowest_frequency = current_frequency    
+        quadrant = current_quadrant   
+
+    min_node = {'frequency': lowest_frequency, 'quadrant': quadrant}  
+
+    if current_frequency > highest_frequency:      
+        highest_frequency = current_frequency   
+        max_quadrant = current_quadrant   
+
+    max_node = {'frequency': highest_frequency, 'quadrant': max_quadrant}
+
+    # Loop through each quadrant cycle        
+    for quadrant in [1,2,3,4]:
+    
+        # Check if current quadrant is a min or max node
+        if quadrant == min_node['quadrant']:
+            print(f"Node reached at frequency {min_node['frequency']} Hz")
+        
+        elif quadrant == max_node['quadrant']:
+            print(f"Node reached at frequency {max_node['frequency']} Hz")
+
+    print()
+
+    # Calculate forecast mood based on frequencies and nodal points
+    forecast = {
+        'mood' : None,
+        'min_reversal' : {
+            'time': None,
+            'quadrant': None
+            },  
+        'max_reversal' : {
+            'time': None,     
+            'quadrant': None      
+            }       
+        }
+
+    if lowest_3_mood < 0:
+        forecast['mood'] = 'positive'
+    elif highest_3_mood > 0:      
+        forecast['mood'] = 'negative'
+    else:
+        forecast['mood'] = 'neutral'
+
+    # Calculate time to min nodal point reversal
+    freq = min_node['frequency']  
+    period = 1/freq   
+    min_time = period/4    
+    forecast['min_reversal']['time'] = min_time
+    forecast['min_reversal']['quadrant'] = min_node['quadrant']
+
+    # Calculate time to max nodal point reversal    
+    freq = max_node['frequency']         
+    period = 1/freq   
+    max_time = period/4  
+                        
+    forecast['max_reversal']['time'] = max_time
+    forecast['max_reversal']['quadrant'] = max_node['quadrant']
+
+    # Print forecast   
+    print(forecast)
+
+    # Print overall mood  
+    print(f"Overall market mood: {forecast['mood']}")
+
+    print()
+
+    # Define octahedron points mapped to Metatron's Cube
+    octahedron = [
+        {'point': 'Apex',       'frequency': None, 'mood': None},
+        {'point': 'Left',       'frequency': None, 'mood': None},
+        {'point': 'Base',       'frequency': None, 'mood': None},
+        {'point': 'Right',      'frequency': None, 'mood': None},
+        {'point': 'Phi',        'frequency': None, 'mood': None},  
+        {'point': 'Pi',         'frequency': None, 'mood': None},
+        {'point': 'e',          'frequency': None, 'mood': None},
+        {'point': 'Origin',     'frequency': None, 'mood': None}    
+        ]
+ 
+
+    # Update octahedron points with frequencies and moods
+    for point in octahedron:
+        if point['point'] == quadrant_map[current_quadrant]:
+            point['frequency'] = current_frequency
+            point['mood'] = frequencies[current_quadrant]['mood']
+
+    valid_points = [p for p in octahedron if p['frequency'] is not None] 
+
+    # Find minimum and maximum frequency points   
+    min_point = min(valid_points, key=lambda p: p['frequency'])   
+    max_point = max(valid_points, key=lambda p: p['frequency'])
+
+    # Calculate reversal predictions from min and max points
+    forecast = {
+        'min_reversal': {
+            'time': None,
+            'point': None
+            },
+        'max_reversal': {
+            'time': None,
+            'point': None   
+            }
+        }
+
+    freq = min_point['frequency']
+    period = 1/freq
+    forecast['min_reversal']['time'] = period/4               
+    forecast['min_reversal']['point'] = min_point['point']
+
+    freq = max_point['frequency']
+    period = 1/freq                             
+    forecast['max_reversal']['time'] = period/4               
+    forecast['max_reversal']['point'] = max_point['point']
+
+    # Prints                    
+    print(f"Apex: {octahedron[0]['frequency']}")    
+    print(f"Left: {octahedron[1]['frequency']}")      
+    print(f"Base: {octahedron[2]['frequency']}")
+    print(f"Right: {octahedron[3]['frequency']}")
+    print(f"Phi: {octahedron[4]['frequency']}")
+    print(f"Pi: {octahedron[5]['frequency']}")
+    print(f"e: {octahedron[6]['frequency']}")
+    print(f"Origin: {octahedron[7]['frequency']}")
+
+    print("Current point is at: ", forecast[f'min_reversal']['point'] if forecast[f'min_reversal']['point'] == point else forecast[f'max_reversal']['point']) 
+
+    # Extract current quadrant and EM phase
+    current_quadrant = sine_wave["current_quadrant"]   
+    em_phase = sine_wave["em_phase"]
+
+    mood_to_corr = {
+        'extremely negative': -0.9,   
+        'strongly negative': -0.7,
+        'negative': -0.5,       
+        'partial negative': -0.3,           
+        'neutral': 0,
+        'partial positive': 0.3,  
+        'positive': 0.5,       
+        'strongly positive': 0.7,    
+        'extremely positive': 0.9   
+        }
+
+    momentum_map = {      
+        'extremely negative': -5,   
+        'strongly negative': -4,     
+        'negative': -3,       
+        'partial negative': -2,           
+        'neutral': 0,
+        'partial positive': 2,   
+        'positive': 3,       
+        'strongly positive': 4,    
+        'extremely positive': 5  
+        }
+
+    current_momentum = 0
+
+    for freq in frequencies:
+
+        corr = mood_to_corr[freq['mood']]
+        z = np.arctanh(corr) 
+        freq['z'] = z
+        freq['pos'] = 0 if corr == 0 else z
+
+        # Get momentum score       
+        momentum = momentum_map[freq['mood']]
+      
+        # Calculate weighted momentum score      
+        weighted_momentum = momentum * freq['magnitude']         
+  
+        current_momentum += weighted_momentum
+                        
+    frequencies.sort(key=lambda f: f['z'])
+
+    # Calculate average momentum      
+    current_momentum /= len(frequencies)
+
+    # Forecast mood 
+    if current_momentum < -2:
+        forecast_mood = 'bearish'
+    elif current_momentum < 0:
+        forecast_mood = 'slightly bearish'    
+    elif current_momentum == 0:        
+        forecast_mood = 'neutral'
+    elif current_momentum > 0:        
+        forecast_mood = 'slightly bullish'
+    elif current_momentum > 2:
+        forecast_mood = 'bullish'
+
+    print(f"Current momentum: {current_momentum}")     
+    print(f"Trend forecast: {forecast_mood}")    
+
+    print()
+
+    em_amp = []  
+    em_phase = []
+
+    em_amp.append(current_em_amp)
+    em_phase.append(current_em_phase)
+
+
+
+    return em_amp, em_phase, current_momentum, forecast_mood, point, next_point
+
+sine_wave = generate_new_momentum_sinewave(close_prices, candles,  
+                                           percent_to_max_val=5, 
+                                           percent_to_min_val=5)      
+
+sine_wave_max = sine_wave["max"]   
+sine_wave_min = sine_wave["min"]
+
+octa_metatron_cube(close_prices, candles)  
+print(octa_metatron_cube(close_prices, candles))
+
+print()
+
+##################################################
+##################################################
+
+def get_octant_coordinates(emotional_values):
+    if isinstance(emotional_values, dict):
+        emotional_values = [emotional_values.get(key, {}).get('phase', 0) for key in ['Apex', 'Left', 'Base', 'Right']]
+    octant_coordinates = []
+    for emotional_value in emotional_values:
+        if isinstance(emotional_value, (int, float)):
+            x = math.cos(emotional_value * math.pi / 180)
+            y = math.sin(emotional_value * math.pi / 180)
+            octant_coordinates.append((x, y))
+    return octant_coordinates
+
+def metatron_reversals_unit_circle(quadrant_emotional_values, close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
+    close_prices = np.array(close_prices) # Convert close_prices to a numpy.ndarray
+    results = reversals_unit_circle(close_prices, candles, percent_to_max_val, percent_to_min_val)
+    forecast_moods = results['forecast_moods']
+    min_node = results['min_node']
+    max_node = results['max_node']
+    avg_moods = results['avg_moods']
+    weighted_moods = results['weighted_moods']
+    forecast_direction = results['forecast_direction']
+    mood_reversal_forecast = results['mood_reversal_forecast']
+    market_mood = results['market_mood']
+
+    octant_coordinates = get_octant_coordinates(quadrant_emotional_values)
+    output = {
+        "octant_coordinates": octant_coordinates,
+        "forecast_moods": forecast_moods,
+        "min_node": min_node,
+        "max_node": max_node,
+        "avg_moods": avg_moods,
+        "weighted_moods": weighted_moods,
+        "forecast_direction": forecast_direction,
+        "mood_reversal_forecast": mood_reversal_forecast,
+        "market_mood": market_mood
+    }
+    return output
+
+print()
+
+quadrant_emotional_values = {
+    'Apex': {'amplitude': 0.75, 'phase': 0},
+    'Left': {'amplitude': 0.5, 'phase': 1.5707963267948966},
+    'Base': {'amplitude': 0.25, 'phase': 3.141592653589793},
+    'Right': {'amplitude': 0.49999999999999994, 'phase': 4.71238898038469}
+}
+
+percent_to_max_val = 5
+percent_to_min_val = 5
+
+print("quadrant_emotional_values: ", quadrant_emotional_values)
+  
 print()
 
 ##################################################
@@ -732,1161 +2369,168 @@ print("Current close price is at : ", current_close)
 
 print()
 
-
 ##################################################
 ##################################################
 
-def get_closes_last_n_minutes(interval, n):
-    """Generate mock closing prices for the last n minutes"""
-    closes = []
-    for i in range(n):
-        closes.append(random.uniform(0, 100))
-    return closes
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-import scipy.fftpack as fftpack
-import datetime
-
-def get_target(closes, n_components, target_distance=0.01):
+def get_next_minute_target(closes, n_components):
     # Calculate FFT of closing prices
-    fft = fftpack.fft(closes) 
+    fft = fftpack.fft(closes)
     frequencies = fftpack.fftfreq(len(closes))
-    
-    # Sort frequencies by magnitude and keep only the top n_components 
+
+    # Sort frequencies by magnitude and keep only the top n_components
     idx = np.argsort(np.abs(fft))[::-1][:n_components]
     top_frequencies = frequencies[idx]
-    
+
     # Filter out the top frequencies and reconstruct the signal
     filtered_fft = np.zeros_like(fft)
     filtered_fft[idx] = fft[idx]
     filtered_signal = np.real(fftpack.ifft(filtered_fft))
+
+    # Calculate the target price as the next value after the last closing price
+    target_price = filtered_signal[-1]
+
+    return target_price
+
+# Example usage
+closes = get_closes("1m")
+n_components = 5
+targets = []
+
+for i in range(len(closes) - 1):
+    # Decompose the signal up to the current minute and predict the target for the next minute
+    target = get_next_minute_target(closes[:i+1], n_components)
+    targets.append(target)
+
+# Print the predicted targets for the next minute
+print("Target for 1min tf:", targets[-1])
+
+##################################################
+##################################################
+
+# Example usage
+closes = get_closes("3m")
+n_components = 5
+targets = []
+
+for i in range(len(closes) - 1):
+    # Decompose the signal up to the current minute and predict the target for the next minute
+    target = get_next_minute_target(closes[:i+1], n_components)
+    targets.append(target)
+
+##################################################
+##################################################
+
+# Print the predicted targets for the next minute
+print("Target for 3min tf:", targets[-1])
+
+# Example usage
+closes = get_closes("5m")
+n_components = 5
+targets = []
+
+for i in range(len(closes) - 1):
+    # Decompose the signal up to the current minute and predict the target for the next minute
+    target = get_next_minute_target(closes[:i+1], n_components)
+    targets.append(target)
+
+# Print the predicted targets for the next minute
+print("Target for 5min tf:", targets[-1])
+
+print()
+
+##################################################
+##################################################
+
+def get_next_minute_targets(closes, n_components):
+    # Calculate FFT of closing prices
+    fft = fftpack.fft(closes)
+    frequencies = fftpack.fftfreq(len(closes))
+
+    # Sort frequencies by magnitude and keep only the top n_components
+    idx = np.argsort(np.abs(fft))[::-1][:n_components]
+    top_frequencies = frequencies[idx]
+
+    # Filter out the top frequencies and reconstruct the signal
+    filtered_fft = np.zeros_like(fft)
+    filtered_fft[idx] = fft[idx]
+    filtered_signal = np.real(fftpack.ifft(filtered_fft))
+
+    # Calculate the target price as the next value after the last closing price
+    target_price = filtered_signal[-1]
     
+    # Calculate the stop loss and target levels
+    entry_price = closes[-1]
+    stop_loss = entry_price - 3*np.std(closes)
+    target1 = target_price + np.std(closes)
+    target2 = target_price + 2*np.std(closes)
+    target3 = target_price + 3*np.std(closes)
+
+    return entry_price, stop_loss, target1, target2, target3
+
+# Example usage
+closes = get_closes("1m")
+n_components = 5
+targets = []
+
+for i in range(len(closes) - 1):
+    # Decompose the signal up to the current minute and predict the target for the next minute
+    entry_price, stop_loss, target1, target2, target3 = get_next_minute_targets(closes[:i+1], n_components)
+    targets.append((entry_price, stop_loss, target1, target2, target3))
+
+# Print the predicted levels for the next minute
+print("Entry price:", targets[-1][0])
+print("Stop loss:", targets[-1][1])
+print("Target 1:", targets[-1][2])
+print("Target 2:", targets[-1][3])
+print("Target 3:", targets[-1][4])
+
+print()
+
+##################################################
+##################################################
+
+def get_target(closes, n_components, target_distance=0.5):
+    # Calculate FFT of closing prices
+    fft = fftpack.fft(closes)
+    frequencies = fftpack.fftfreq(len(closes))
+
+    # Sort frequencies by magnitude and keep only the top n_components
+    idx = np.argsort(np.abs(fft))[::-1][:n_components]
+    top_frequencies = frequencies[idx]
+
+    # Filter out the top frequencies and reconstruct the signal
+    filtered_fft = np.zeros_like(fft)
+    filtered_fft[idx] = fft[idx]
+    filtered_signal = np.real(fftpack.ifft(filtered_fft))
+
     # Calculate the target price as the next value after the last closing price, plus a small constant
     current_close = closes[-1]
     target_price = filtered_signal[-1] + target_distance
-    
-    # Get the current time           
-    current_time = datetime.datetime.now()
-    
+
     # Calculate the market mood based on the predicted target price and the current close price
     diff = target_price - current_close
-    if diff > 0:           
+    if diff > 0:
         market_mood = "Bullish"
-        fastest_target = current_close + target_distance/2
-        fast_target1 = current_close + target_distance/4
-        fast_target2 = current_close + target_distance/8
-        fast_target3 = current_close + target_distance/16
-        fast_target4 = current_close + target_distance/32
-        target1 = target_price + np.std(closes)/16
-        target2 = target_price + np.std(closes)/8
-        target3 = target_price + np.std(closes)/4
-        target4 = target_price + np.std(closes)/2
-        target5 = target_price + np.std(closes)
-    elif diff < 0:                 
+    elif diff < 0:
         market_mood = "Bearish"
-        fastest_target = current_close - target_distance/2
-        fast_target1 = current_close - target_distance/4
-        fast_target2 = current_close - target_distance/8
-        fast_target3 = current_close - target_distance/16
-        fast_target4 = current_close - target_distance/32
-        target1 = target_price - np.std(closes)/16
-        target2 = target_price - np.std(closes)/8
-        target3 = target_price - np.std(closes)/4
-        target4 = target_price - np.std(closes)/2
-        target5 = target_price - np.std(closes)
-    else:           
+    else:
         market_mood = "Neutral"
-        fastest_target = current_close + target_distance/2
-        fast_target1 = current_close - target_distance/4
-        fast_target2 = current_close + target_distance/8
-        fast_target3 = current_close - target_distance/16
-        fast_target4 = current_close + target_distance/32
-        target1 = target_price + np.std(closes)/16
-        target2 = target_price - np.std(closes)/8
-        target3 = target_price + np.std(closes)/4
-        target4 = target_price - np.std(closes)/2
-        target5 = target_price + np.std(closes)
-    
-    # Calculate the stop loss and target levels
-    entry_price = closes[-1]    
-    stop_loss =  entry_price - 3*np.std(closes)   
-    target6 = target_price + np.std(closes)
-    target7 = target_price + 2*np.std(closes)
-    target8 = target_price + 3*np.std(closes)
-    target9 = target_price + 4*np.std(closes)
-    target10 = target_price + 5*np.std(closes)
-    
-    return current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood
 
-closes = get_closes("1m")     
+    # Get the current time
+    current_time = datetime.datetime.now()
+
+    # Print the results
+    print("Current local Time is now at: ", current_time)
+    print("Current close price is at : ", current_close)
+    print("Target price for next minutes is: ", target_price)
+    print("Market mood is: ", market_mood)
+
+    # Return the filtered signal, target price, and market mood
+    return filtered_signal, target_price, market_mood
+
+closes = get_closes("1m")
 n_components = 5
-
-current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
-
-print("Current local Time is now at: ", current_time)
-print("Market mood is: ", market_mood)
-
-print()
-
-print("Current close price is at : ", current_close)
-
-print()
-
-print("Fast target 1 is: ", fast_target4)
-print("Fast target 2 is: ", fast_target3)
-print("Fast target 3 is: ", fast_target2)
-print("Fast target 4 is: ", fast_target1)
-
-print()
-
-print("Fastest target is: ", fastest_target)
-
-print()
-
-print("Target 1 is: ", target1)
-print("Target 2 is: ", target2)
-print("Target 3 is: ", target3)
-print("Target 4 is: ", target4)
-print("Target 5 is: ", target5)
-
-print()
-
-
-##################################################
-##################################################
-
-def get_current_price():
-    url = "https://fapi.binance.com/fapi/v1/ticker/price"
-    params = {
-        "symbol": "BTCUSDT" 
-    }
-    response = requests.get(url, params=params)
-    data = response.json()
-    price = float(data["price"])
-    return price
-
-# Get the current price
-price = get_current_price()
-
-print()
-
-##################################################
-##################################################
-
-def get_support_resistance_levels(close):
-    # Convert close list to numpy array
-    close_prices = np.array(close)
-
-    # Calculate EMA50 and EMA200
-    ema50 = talib.EMA(close_prices, timeperiod=50)
-    ema200 = talib.EMA(close_prices, timeperiod=200)
-
-    # Check if ema50 and ema200 have at least one element
-    if len(ema50) == 0 or len(ema200) == 0:
-        return []
-
-    # Get the last element of ema50 and ema200
-    ema50 = ema50[-1]
-    ema200 = ema200[-1]
-
-    # Calculate Phi Ratio levels
-    range_ = ema200 - ema50
-    phi_levels = [ema50, ema50 + range_/1.618, ema50 + range_]
-
-    # Calculate Gann Square levels
-    current_price = close_prices[-1]
-    high_points = [current_price, ema200, max(phi_levels)]
-    low_points = [min(phi_levels), ema50, current_price]
-
-    gann_levels = []
-    for i in range(1, min(4, len(high_points))):
-        for j in range(1, min(4, len(low_points))):
-            gann_level = ((high_points[i-1] - low_points[j-1]) * 0.25 * (i + j)) + low_points[j-1]
-            gann_levels.append(gann_level)
-
-    # Combine levels and sort
-    levels = phi_levels + gann_levels
-    levels.sort()
-
-    return levels
-
-print()
-
-# Get the support and resistance levels
-levels = get_support_resistance_levels(close_prices)
-
-support_levels, resistance_levels = [], []
-
-for level in levels:
-    if level < close_prices[-1]:
-        support_levels.append(level)
-    else:
-        resistance_levels.append(level)
-
-# Determine the market mood
-if len(levels) > 0:
-    support_levels = []
-    resistance_levels = []
-    for level in levels:
-        if level < close_prices[-1]:
-            support_levels.append(level)
-        else:
-            resistance_levels.append(level)
-
-    if len(support_levels) > 0 and len(resistance_levels) > 0:
-        market_mood_sr = "Neutral"
-    elif len(support_levels) > 0:
-        market_mood_sr = "Bullish"
-    elif len(resistance_levels) > 0:
-        market_mood_sr = "Bearish"
-    else:
-        market_mood_sr = "Undefined"
-
-    # Calculate support and resistance ranges
-    if len(support_levels) > 0:
-        support_range = max(support_levels) - min(support_levels)
-        print("Support range: {:.2f}".format(support_range))
-    else:
-        print("Support range: None")
-
-    if len(resistance_levels) > 0:
-        resistance_range = max(resistance_levels) - min(resistance_levels)
-        print("Resistance range: {:.2f}".format(resistance_range))
-    else:
-        print("Resistance range: None")
-
-    # Print the levels and market mood
-    print("Potential support levels:")
-    if len(support_levels) > 0:
-        for level in support_levels:
-            print("  - {:.2f}".format(level))
-    else:
-        print("  None found.")
-
-    print("Potential resistance levels:")
-    if len(resistance_levels) > 0:
-        for level in resistance_levels:
-            print("  - {:.2f}".format(level))
-    else:
-        print("  None found.")
-
-    incoming_bullish_reversal = None
-    incoming_bearish_reversal = None
-
-    if market_mood_sr == "Neutral":
-        print("Market mood: {}".format(market_mood_sr))
-        if len(support_levels) > 0:
-            support = max(support_levels)
-            support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
-        else:
-            support = None
-            support_percentage = None
-
-        if len(resistance_levels) > 0:
-            top = min(resistance_levels)
-            top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
-        else:
-            top = None
-            top_percentage = None
-
-        print("Best dip: {:.2f}% (Support level: {:.2f})".format(support_percentage, support))
-
-        if support_percentage >= 3.0:
-            incoming_bullish_reversal = True
-
-    elif market_mood_sr == "Bullish":
-        print("Market mood: {}".format(market_mood_sr))
-        if len(resistance_levels) > 0:
-            top = min(resistance_levels)
-            top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
-        else:
-            top = None
-            top_percentage = None
-
-        if top is not None:
-            print("Best breakout: {:.2f}% (Resistance level: {:.2f})".format(top_percentage, top))
-        else:
-            print("Best breakout: None")
-
-        if top_percentage is not None and top_percentage >= 3.0:
-            incoming_bullish_reversal = True
-
-    elif market_mood_sr == "Bearish":
-        print("Market mood: {}".format(market_mood_sr))
-        if len(support_levels) > 0:
-            support = max(support_levels)
-            support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
-        else:
-            support = None
-            support_percentage = None
-
-        if support is not None:
-            print("Best bounce: {:.2f}% (Support level: {:.2f})".format(support_percentage, support))
-        else:
-            print("Best bounce: None")
-
-        if support_percentage is not None and support_percentage >= 3.0:
-            incoming_bearish_reversal = True
-
-    else:
-        print("Market mood: {}".format(market_mood_sr))
-
-    # Print incoming reversal signals
-    if incoming_bullish_reversal:
-        print("Incoming bullish reversal signal!")
-
-    if incoming_bearish_reversal:
-        print("Incoming bearish reversal signal!")
-
-
-print()
-
-##################################################
-##################################################
-
-from scipy.signal import argrelextrema
-
-import talib
-import numpy as np
-from scipy.signal import argrelextrema
-
-def calculate_reversals(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
-    """
-    Calculate new reversal lows and highs and incoming direction based on the reciprocal Fibonacci constant for different time cycles.
-    """
-  
-    # Get min/max close    
-    min_close = np.nanmin(close_prices)
-    max_close = np.nanmax(close_prices)
-    
-    # Convert close_prices to numpy array
-    close_prices = np.array(close_prices)
-    
-    # Calculate HT_SINE
-    sine, leadsine = talib.HT_SINE(close_prices)
-    sine = -sine
-
-    # Calculate momentum
-    momentum = talib.MOM(close_prices, timeperiod=period)
-    
-    # Get min/max momentum    
-    min_momentum = np.nanmin(momentum)   
-    max_momentum = np.nanmax(momentum)
-    
-    # Calculate custom percentages 
-    min_percentage_custom = minimum_percentage / 100  
-    max_percentage_custom = maximum_percentage / 100
-
-    # Calculate thresholds       
-    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
-    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
-
-    # Calculate range of prices within a certain distance from the current close price
-    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
-
-    # Filter close prices
-    with np.errstate(invalid='ignore'):
-        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
-        filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
-        
-    # Calculate avg    
-    avg_mtf = np.nanmean(filtered_close)
-
-    # Get current momentum       
-    current_momentum = momentum[-1]
-
-    # Calculate % to min/max momentum    
-    with np.errstate(invalid='ignore', divide='ignore'):
-        percent_to_min_momentum = ((max_momentum - current_momentum) /   
-                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
-
-        percent_to_max_momentum = ((current_momentum - min_momentum) / 
-                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
- 
-    # Calculate combined percentages              
-    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
-    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
-      
-    # Combined momentum signal     
-    momentum_signal = percent_to_max_combined - percent_to_min_combined
-    
-    # Calculate incoming direction
-    incoming_direction = "Unknown"
-    if momentum_signal > 0:
-        incoming_direction = "Up"
-    elif momentum_signal < 0:
-        incoming_direction = "Down"
-        
-    # Calculate new reversal lows and highs
-    highs = argrelextrema(leadsine, np.greater, order=period)[0]
-    lows = argrelextrema(leadsine, np.less, order=period)[0]
-    
-    # Determine market mood based on reciprocal Fibonacci constant for different cycles
-    very_fast_cycle = 3
-    medium_cycle = 5
-    slow_cycle = 8
-    very_slow_cycle = 13
-    
-    #rfib_const = 0.03833  # Reciprocal Fibonacci constant
-    rfib_const = 3.3598856662
-
-    very_fast_cycle_mood = "Unknown"
-    medium_cycle_mood = "Unknown"
-    slow_cycle_mood = "Unknown"
-    very_slow_cycle_mood = "Unknown"
-    
-    if len(lows) > 0 and len(highs) > 0:
-        last_low = lows[-1]
-        last_high = highs[-1]
-        
-        # Calculate cycles based on last reversal low and high
-        very_fast_cycle_length = last_high - last_low
-        medium_cycle_length = very_fast_cycle_length * rfib_const ** medium_cycle
-        slow_cycle_length = very_fast_cycle_length * rfib_const ** slow_cycle
-        very_slow_cycle_length = very_fast_cycle_length * rfib_const ** very_slow_cycle
-        
-        # Check if current price is below or above the last reversal low or high
-        if np.all(close_prices < last_low):
-            very_fast_cycle_mood = "Bearish"
-            medium_cycle_mood = "Bearish"
-            slow_cycle_mood = "Bearish"
-            very_slow_cycle_mood = "Bearish"
-            print("Current price is below the last reversal low.")
-        elif np.all(close_prices > last_high):
-            very_fast_cycle_mood = "Bullish"
-            medium_cycle_mood = "Bullish"
-            slow_cycle_mood = "Bullish"
-            very_slow_cycle_mood = "Bullish"
-            print("Current price is above the last reversal high.")
-        else:
-            # Calculate cycles based on current price
-            very_fast_cycle_length = np.abs(avg_mtf - close_prices[-1])
-            medium_cycle_length = very_fast_cycle_length * rfib_const ** medium_cycle
-            slow_cycle_length = very_fast_cycle_length * rfib_const ** slow_cycle
-            very_slow_cycle_length = very_fast_cycle_length * rfib_const ** very_slow_cycle
-            
-            # Calculate mood for different cycles
-            if close_prices[-1] < avg_mtf:
-                very_fast_cycle_mood = "Bearish"
-                medium_cycle_mood = "Bullish"
-                slow_cycle_mood = "Bearish"
-                very_slow_cycle_mood = "Bullish"
-                print("Current price is below the average filtered close price.")
-            else:
-                very_fast_cycle_mood = "Bullish"
-                medium_cycle_mood = "Bearish"
-                slow_cycle_mood = "Bullish"
-                very_slow_cycle_mood = "Bearish"
-                print("Current price is above the average filtered close price.")
-    
-    # Create dictionary to store all the calculated values
-    results = {
-        "min_close": min_close,
-        "max_close": max_close,
-        "sine": sine[-1],
-        "leadsine": leadsine[-1],
-        "momentum": momentum[-1],
-        "min_momentum": min_momentum,
-        "max_momentum": max_momentum,
-        "min_percentage_custom": min_percentage_custom,
-        "max_percentage_custom": max_percentage_custom,
-        "min_threshold": min_threshold,
-        "max_threshold": max_threshold,
-        "filtered_close": filtered_close[-1],
-        "avg_mtf": avg_mtf,
-        "current_momentum": current_momentum,
-        "percent_to_min_momentum": percent_to_min_momentum,
-        "percent_to_max_momentum": percent_to_max_momentum,
-        "percent_to_min_combined": percent_to_min_combined,
-        "percent_to_max_combined": percent_to_max_combined,
-        "momentum_signal": momentum_signal,
-        "incoming_direction": incoming_direction,
-        "highs": highs[-1],
-        "lows": lows[-1],
-        "very_fast_cycle_mood": very_fast_cycle_mood,
-        "medium_cycle_mood": medium_cycle_mood,
-        "slow_cycle_mood": slow_cycle_mood,
-        "very_slow_cycle_mood": very_slow_cycle_mood,
-        "very_fast_cycle_length": very_fast_cycle_length,
-        "medium_cycle_length": medium_cycle_length,
-        "slow_cycle_length": slow_cycle_length,
-        "very_slow_cycle_length": very_slow_cycle_length,
-    }
-    
-    # Print all the calculated values
-    for key, value in results.items():
-        print(f"{key}: {value}")
-        
-    return results
-    
-# convert close_prices to numpy array of type float64
-close_prices = np.array(close_prices, dtype=np.float64)
-
-# Call the function with default parameters
-results = calculate_reversals(close_prices)
-
-# Print the last element of each array, if it exists
-if isinstance(results["min_close"], np.ndarray):
-    print("min_close:", results["min_close"][-1] if results["min_close"].size > 0 else None)
-if isinstance(results["max_close"], np.ndarray):
-    print("max_close:", results["max_close"][-1] if results["max_close"].size > 0 else None)
-if isinstance(results["sine"], np.ndarray):
-    print("sine:", results["sine"][-1] if results["sine"].size > 0 else None)
-if isinstance(results["leadsine"], np.ndarray):
-    print("leadsine:", results["leadsine"][-1] if results["leadsine"].size > 0 else None)
-if isinstance(results["momentum"], np.ndarray):
-    print("momentum:", results["momentum"][-1] if results["momentum"].size > 0 else None)
-if isinstance(results["min_momentum"], np.ndarray):
-    print("min_momentum:", results["min_momentum"][-1] if results["min_momentum"].size > 0 else None)
-if isinstance(results["max_momentum"], np.ndarray):
-    print("max_momentum:", results["max_momentum"][-1] if results["max_momentum"].size > 0 else None)
-if isinstance(results["min_percentage_custom"], np.ndarray):
-    print("min_percentage_custom:", results["min_percentage_custom"][-1] if results["min_percentage_custom"].size > 0 else None)
-if isinstance(results["max_percentage_custom"], np.ndarray):
-    print("max_percentage_custom:", results["max_percentage_custom"][-1] if results["max_percentage_custom"].size > 0 else None)
-if isinstance(results["min_threshold"], np.ndarray):
-    print("min_threshold:", results["min_threshold"][-1] if results["min_threshold"].size > 0 else None)
-if isinstance(results["max_threshold"], np.ndarray):
-    print("max_threshold:", results["max_threshold"][-1] if results["max_threshold"].size > 0 else None)
-if isinstance(results["filtered_close"], np.ndarray):
-    print("filtered_close:", results["filtered_close"][-1] if results["filtered_close"].size > 0 else None)
-if isinstance(results["avg_mtf"], np.ndarray):
-    print("avg_mtf:", results["avg_mtf"][-1] if results["avg_mtf"].size > 0 else None)
-if isinstance(results["current_momentum"], np.ndarray):
-    print("current_momentum:", results["current_momentum"][-1] if results["current_momentum"].size > 0 else None)
-if isinstance(results["percent_to_min_momentum"], np.ndarray):
-    print("percent_to_min_momentum:", results["percent_to_min_momentum"][-1] if results["percent_to_min_momentum"].size > 0 else None)
-if isinstance(results["percent_to_max_momentum"], np.ndarray):
-    print("percent_to_max_momentum:", results["percent_to_max_momentum"][-1] if results["percent_to_max_momentum"].size > 0 else None)
-if isinstance(results["percent_to_min_combined"], np.ndarray):
-    print("percent_to_min_combined:", results["percent_to_min_combined"][-1] if results["percent_to_min_combined"].size > 0 else None)
-if isinstance(results["percent_to_max_combined"], np.ndarray):
-    print("percent_to_max_combined:", results["percent_to_max_combined"][-1] if results["percent_to_max_combined"].size > 0 else None)
-if isinstance(results["momentum_signal"], np.ndarray):
-    print("momentum_signal:", results["momentum_signal"][-1] if results["momentum_signal"].size > 0 else None)
-if isinstance(results["incoming_direction"], np.ndarray):
-    print("incoming_direction:", results["incoming_direction"][-1] if results["incoming_direction"].size > 0 else None)
-if isinstance(results["highs"], np.ndarray):
-    print("highs:", results["highs"][-1] if results["highs"].size > 0 else None)
-if isinstance(results["lows"], np.ndarray):
-    print("lows:", results["lows"][-1] if results["lows"].size > 0 else None)
-if isinstance(results["very_fast_cycle_mood"], np.ndarray):
-    print("very_fast_cycle_mood:", results["very_fast_cycle_mood"][-1] if results["very_fast_cycle_mood"].size > 0 else None)
-if isinstance(results["medium_cycle_mood"], np.ndarray):
-    print("medium_cycle_mood:", results["medium_cycle_mood"][-1] if results["medium_cycle_mood"].size > 0 else None)
-if isinstance(results["slow_cycle_mood"], np.ndarray):
-    print("slow_cycle_mood:", results["slow_cycle_mood"][-1] if results["slow_cycle_mood"].size > 0 else None)
-if isinstance(results["very_slow_cycle_mood"], np.ndarray):
-    print("very_slow_cycle_mood:", results["very_slow_cycle_mood"][-1] if results["very_slow_cycle_mood"].size > 0 else None)
-if isinstance(results["very_fast_cycle_length"], np.ndarray):
-    print("very_fast_cycle_length:", results["very_fast_cycle_length"][-1] if results["very_fast_cycle_length"].size > 0 else None)
-if isinstance(results["medium_cycle_length"], np.ndarray):
-    print("medium_cycle_length:", results["medium_cycle_length"][-1] if results["medium_cycle_length"].size > 0 else None)
-if isinstance(results["slow_cycle_length"], np.ndarray):
-    print("slow_cycle_length:", results["slow_cycle_length"][-1] if results["slow_cycle_length"].size > 0 else None)
-if isinstance(results["very_slow_cycle_length"], np.ndarray):
-    print("very_slow_cycle_length:", results["very_slow_cycle_length"][-1] if results["very_slow_cycle_length"].size > 0 else None)
-
-# Calculate very fast cycle length 
-very_fast_cycle_length = np.abs(avg_mtf - close_prices[-1])   
-
-# Calculate next 3 prices based on cycle length and current price        
-price1 = close_prices[-1] + very_fast_cycle_length    
-price2 = close_prices[-1] + 2 * very_fast_cycle_length   
-price3 = close_prices[-1] + 3 * very_fast_cycle_length
-
-# Print the next 3 forecast prices
-print(f"Next 3 forecast prices: {price1}, {price2}, {price3}")
-
-# Get current momentum
-current_momentum = results["momentum"]
-
-# Calculate very fast cycle momentum
-very_fast_cycle_momentum = 0.75 * current_momentum
-
-# Calculate medium cycle momentum  
-medium_cycle_momentum = 0.5 * current_momentum
-
-# Calculate slow cycle momentum
-slow_cycle_momentum = 0.25 * current_momentum
-
-# Print next 3 momentum forecast cycles    
-print(f"Next 3 momentum forecasts: {very_fast_cycle_momentum}, {medium_cycle_momentum}, {slow_cycle_momentum}")
-
-
-# Calculate very fast cycle momentum        
-very_fast_cycle_momentum = 0.75 * current_momentum
-
-# Determine very fast cycle mood based on momentum        
-if very_fast_cycle_momentum < 0:
-    very_fast_cycle_mood = "Bearish"
-else:
-    very_fast_cycle_mood = "Bullish"  
-
-# Calculate medium cycle momentum       
-medium_cycle_momentum = 0.5 * current_momentum
-
-# Determine medium cycle mood        
-if medium_cycle_momentum < 0:
-    medium_cycle_mood = "Bearish"    
-else:
-    medium_cycle_mood = "Bullish" 
-
-# Calculate slow cycle momentum    
-slow_cycle_momentum = 0.25 * current_momentum
-
-# Determine slow cycle mood
-if slow_cycle_momentum < 0:
-    slow_cycle_mood = "Bearish"      
-else:      
-    slow_cycle_mood = "Bullish"  
-
-# Print market mood forecasts
-print(f"Momentum market mood forecasts: {very_fast_cycle_mood}, {medium_cycle_mood}, {slow_cycle_mood}")
-
-# Compare current momentum to different cycle lengths
-if current_momentum > results['very_fast_cycle_length']:
-    print("Current momentum is greater than very fast cycle length.")
-elif current_momentum < results['very_fast_cycle_length']:
-    print("Current momentum is less than very fast cycle length.")
-else:
-    print("Current momentum is equal to very fast cycle length.")
-
-if current_momentum > results['medium_cycle_length']:
-    print("Current momentum is greater than medium cycle length.")
-elif current_momentum < results['medium_cycle_length']:
-    print("Current momentum is less than medium cycle length.")
-else:
-    print("Current momentum is equal to medium cycle length.")
-
-if current_momentum > results['slow_cycle_length']:
-    print("Current momentum is greater than slow cycle length.")
-elif current_momentum < results['slow_cycle_length']:
-    print("Current momentum is less than slow cycle length.")
-else:
-    print("Current momentum is equal to slow cycle length.")
-
-if current_momentum > results['very_slow_cycle_length']:
-    print("Current momentum is greater than very slow cycle length.")
-elif current_momentum < results['very_slow_cycle_length']:
-    print("Current momentum is less than very slow cycle length.")
-else:
-    print("Current momentum is equal to very slow cycle length.")
-
-# Compare current price to different cycle lengths
-if np.all(close_prices < results['very_fast_cycle_length']):
-    print("Current price is below very fast cycle length.")
-elif np.all(close_prices > results['very_fast_cycle_length']):
-    print("Current price is above very fast cycle length.")
-else:
-    print("Current price is at very fast cycle length.")
-
-if np.all(close_prices < results['medium_cycle_length']):
-    print("Current price is below medium cycle length.")
-elif np.all(close_prices > results['medium_cycle_length']):
-    print("Current price is above medium cycle length.")
-else:
-    print("Current price is at medium cycle length.")
-
-if np.all(close_prices < results['slow_cycle_length']):
-    print("Current price is below slow cycle length.")
-elif np.all(close_prices > results['slow_cycle_length']):
-    print("Current price is above slow cycle length.")
-else:
-    print("Current price is at slow cycle length.")
-
-if np.all(close_prices < results['very_slow_cycle_length']):
-    print("Current price is below very slow cycle length.")
-elif np.all(close_prices > results['very_slow_cycle_length']):
-    print("Current price is above very slow cycle length.")
-else:
-    print("Current price is at very slow cycle length.")
-
-print()
-
-##################################################
-##################################################
-
-def golden_func(n):
-    return n * (1 + np.sqrt(5)) / 2
-
-def golden_deriv(x):
-    return (np.sqrt(5 * x**2 + 4) + x) / 2
-
-def predict_market(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
-    """
-    Predict market mood and reversal key points, and output support and resistance levels.
-    """
-  
-    # Get min/max close    
-    min_close = np.nanmin(close_prices)
-    max_close = np.nanmax(close_prices)
-    
-    # Convert close_prices to numpy array
-    close_prices = np.nan_to_num(close_prices, nan=0)
-    
-    # Calculate momentum
-    momentum = talib.MOM(close_prices, timeperiod=period)
-    momentum = momentum[np.isfinite(momentum)]
-
-    # Get min/max momentum    
-    min_momentum = np.nanmin(momentum)   
-    max_momentum = np.nanmax(momentum)
-    
-    # Calculate custom percentages 
-    min_percentage_custom = minimum_percentage / 100  
-    max_percentage_custom = maximum_percentage / 100
-    
-    # Calculate thresholds       
-    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
-    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
-
-    # Calculate range of prices within a certain distance from the current close price
-    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
-
-    # Filter close prices
-    filtered_close = np.clip(close_prices, min_threshold, max_threshold)
-        
-    # Calculate avg    
-    avg_mtf = np.nanmean(filtered_close)
-
-    # Get current momentum       
-    current_momentum = momentum[-1]
-    
-    # Calculate the Reciprocal Fibonacci constant
-    rfc = 3.359885666243177553172011302918927179688905133732
-    
-    # Calculate inverse powers of phi
-    inv_powers_of_phi = [np.power((1 / golden_func(i)), 2) for i in range(1, 8)]
-    
-    # Calculate % to min/max momentum    
-    if min_momentum != max_momentum:
-        percent_to_min_momentum = ((max_momentum - current_momentum) / (max_momentum - min_momentum)) * 100               
-        percent_to_max_momentum = ((current_momentum - min_momentum) / (max_momentum - min_momentum)) * 100
-    else:
-        percent_to_min_momentum = np.nan
-        percent_to_max_momentum = np.nan
- 
-    # Calculate combined percentages              
-    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
-    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
-      
-    # Combined momentum signal     
-    momentum_signal = percent_to_max_combined - percent_to_min_combined
-    
-    # Determine market mood
-    if momentum_signal > 0:
-        market_mood = "Bullish"
-    elif momentum_signal < 0:
-        market_mood = "Bearish"
-    else:
-        market_mood = "Neutral"
-    
-    # Calculate Square of 9 levels
-    num_levels = 16
-    levels = [i**2 for i in range(num_levels)]
-    levels_close = [level + close_prices[-1] for level in levels]
-    levels_min = [level + min_threshold for level in levels]
-    levels_max = [level + max_threshold for level in levels]
-    
-    # Set default values for reversal key points
-    current_reversal_top = np.nan
-    current_reversal_bottom = np.nan
-    last_reversal_top = np.nan
-    last_reversal_bottom = np.nan
-    next_reversal_top = np.nan
-    next_reversal_bottom = np.nan
-    
-    current_reversal_top = np.nanmax(levels_close)
-    current_reversal_bottom = np.nanmin(levels_close)
-    last_reversal_top = np.nanmax(levels_close)
-    last_reversal_bottom = np.nanmin(levels_close)
-    next_reversal_top = np.nanmax(levels_close)
-    next_reversal_bottom = np.nanmin(levels_close)
-
-
-    # Determine current, last, and next reversal key points
-    for i in range(1, num_levels):
-        if not np.isnan(levels_close[i]) and not np.isnan(levels_close[i-1]):
-
-            # Check if current reversal key point is found
-            if np.isnan(current_reversal_top) and np.isnan(current_reversal_bottom) and ((levels_close[i-1] <= avg_mtf <= levels_close[i]) or 
-                                               (levels_close[i] <= avg_mtf <= levels_close[i-1])):
-                if market_mood == "Bullish":
-                    current_reversal_top = (levels_close[i-1] + levels_close[i]) / 2
-                elif market_mood == "Bearish":
-                    current_reversal_bottom = (levels_close[i-1] + levels_close[i]) / 2
-
-            # Check if last reversal key point isfound
-            elif np.isnan(last_reversal_top) and np.isnan(last_reversal_bottom) and ((levels_close[i-1] <= avg_mtf <= levels_close[i]) or 
-                                                         (levels_close[i] <= avg_mtf <= levels_close[i-1])):
-                if market_mood == "Bullish":
-                    last_reversal_top = (levels_close[i-1] + levels_close[i]) / 2
-                elif market_mood == "Bearish":
-                    last_reversal_bottom = (levels_close[i-1] + levels_close[i]) / 2
-
-            # Check if next reversal key point is found
-            elif np.isnan(next_reversal_top) and np.isnan(next_reversal_bottom) and ((levels_close[i-1] <= avg_mtf <= levels_close[i]) or 
-                                                         (levels_close[i] <= avg_mtf <= levels_close[i-1])):
-                if market_mood == "Bullish":
-                    next_reversal_top = (levels_close[i-1] + levels_close[i]) / 2
-                elif market_mood == "Bearish":
-                    next_reversal_bottom = (levels_close[i-1] + levels_close[i]) / 2
-                    
-    # Calculate support and resistance levels
-    support_level = np.nanmin(filtered_close)
-    resistance_level = np.nanmax(filtered_close)
-    
-    # Return results
-    return {
-        "market_mood": market_mood,
-        "current_reversal_top": current_reversal_top,
-        "current_reversal_bottom": current_reversal_bottom,
-        "last_reversal_top": last_reversal_top,
-        "last_reversal_bottom": last_reversal_bottom,
-        "next_reversal_top": next_reversal_top,
-        "next_reversal_bottom": next_reversal_bottom,
-        "support_level": support_level,
-        "resistance_level": resistance_level
-    }
-
-# Call the predict_market function
-results = predict_market(close_prices)
-
-# Print results
-print("Market mood:", results["market_mood"])
-print("Current reversal top:", results["current_reversal_top"])
-print("Current reversal bottom:", results["current_reversal_bottom"])
-print("Last reversal top:", results["last_reversal_top"])
-print("Last reversal bottom:", results["last_reversal_bottom"])
-print("Next reversal top:", results["next_reversal_top"])
-print("Next reversal bottom:", results["next_reversal_bottom"])
-print("Support level:", results["support_level"])
-print("Resistance level:", results["resistance_level"])
-
-print()
-
-##################################################
-##################################################
-
-def generate_market_mood_forecast(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5):
-    # Call generate_new_momentum_sinewave to get the sine wave and other features
-    sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=percent_to_max_val, percent_to_min_val=percent_to_min_val)
-
-    current_quadrant = sine_wave["current_quadrant"]
-    em_phase_q1 = sine_wave["em_phase"]
-    em_phase_q2 = em_phase_q1 + math.pi/2
-    em_phase_q3 = em_phase_q1 + math.pi
-    em_phase_q4 = em_phase_q1 + 3*math.pi/2
-
-    # Define PHI constant with 15 decimals
-    PHI = 1.6180339887498948482045868343656381177
-
-    # Calculate the Brun constant from the phi ratio and sqrt(5)
-    brun_constant = math.sqrt(PHI * math.sqrt(5))
-
-    # Define PI constant with 15 decimals
-    PI = 3.1415926535897932384626433832795028842
-
-    # Calculate sacred frequency
-    sacred_freq = (432 * PHI ** 2) / 360
-
-    # Calculate Alpha and Omega ratios
-    alpha_ratio = PHI / PI
-    omega_ratio = PI / PHI
-
-    # Calculate Alpha and Omega spiral angle rates
-    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
-    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
-
-    # Calculate quadrature phase shift based on current quadrant
-    if current_quadrant == 1:
-        # Up cycle from Q1 to Q4
-        quadrature_phase = em_phase_q1
-        em_phase = alpha_spiral
-    elif current_quadrant == 2:
-        quadrature_phase = em_phase_q2
-        em_phase = omega_spiral
-    elif current_quadrant == 3:
-        quadrature_phase = em_phase_q3
-        em_phase = omega_spiral
-    else:
-        quadrature_phase = em_phase_q4
-        em_phase = alpha_spiral
-
-    cycle_direction = "UP"
-    next_quadrant = 1
-
-    if current_quadrant == 1:
-        next_quadrant = 2
-        cycle_direction = "UP"
-
-    elif current_quadrant == 2:
-        if cycle_direction == "UP":
-            next_quadrant = 3
-        elif cycle_direction == "DOWN":
-            next_quadrant = 1
-
-    elif current_quadrant == 3:
-        if cycle_direction == "UP":
-            next_quadrant = 4
-        elif cycle_direction == "DOWN":
-            next_quadrant = 2
-
-    elif current_quadrant == 4:
-        if cycle_direction == "UP":
-            next_quadrant = 3
-            cycle_direction = "DOWN"
-
-    current_point = ""
-    last_point = ""
-    next_point = ""
-
-    if current_quadrant == 1:
-        current_point = "Apex"
-    elif current_quadrant == 2:
-        current_point = "Left"
-    elif current_quadrant == 3:
-        current_point = "Base"
-    elif current_quadrant == 4:
-        current_point = "Right"
-
-    if next_quadrant == 1:
-        next_point = "Apex"
-    elif next_quadrant == 2:
-        next_point = "Left"
-    elif next_quadrant == 3:
-        next_point = "Base"
-    elif next_quadrant == 4:
-        next_point = "Right"
-
-    if cycle_direction == "UP":
-        if current_point == "Apex":
-            last_point = "Left"
-        elif current_point == "Left":
-            last_point = "Apex"
-        elif current_point == "Base":
-            last_point = "Left"
-        elif current_point == "Right":
-            last_point = "Base"
-
-    elif cycle_direction == "DOWN":
-        if current_point == "Right":
-            last_point = "Base"
-        elif current_point == "Base":
-            last_point = "Right"
-        elif current_point == "Left":
-            last_point = "Base"
-        elif current_point == "Apex":
-            last_point = "Left"
-
-    # Calculate quadrature phase
-    if next_quadrant == 1:
-        next_quadrature_phase = em_phase_q1
-    elif next_quadrant == 2:
-        next_quadrature_phase = em_phase_q2
-    elif next_quadrant == 3:
-        next_quadrature_phase = em_phase_q3
-    else:
-        next_quadrature_phase = em_phase_q4
-
-    # Calculate EM value
-    em_value = sine_wave["em_amplitude"] * math.sin(em_phase)
-
-    # Calculate quadrature phase shift from current to next quadrant
-    quadrature = next_quadrature_phase - quadrature_phase
-
-    if quadrature > 0:
-        cycle_direction = "UP"
-    else:
-        cycle_direction = "DOWN"
-
-    # Define the frequency bands and their corresponding emotional values
-    frequency_bands = {"Delta": -0.5, "Theta": -0.25, "Alpha": 0, "Beta": 0.25,"Gamma": 0.5}
-
-    # Calculate the frequency band based on the EM value
-    frequency_band = None
-    for band, value in frequency_bands.items():
-        if value <= em_value < value + 0.25:
-            frequency_band = band
-            break
-
-    # Define the market mood based on the frequency band
-    market_mood = None
-    if frequency_band == "Delta":
-        market_mood = "Depressed"
-    elif frequency_band == "Theta":
-        market_mood = "Anxious"
-    elif frequency_band == "Alpha":
-        market_mood = "Calm"
-    elif frequency_band == "Beta":
-        market_mood = "Excited"
-    elif frequency_band == "Gamma":
-        market_mood = "Manic"
-
-    # Create the forecast dictionary with all the relevant values
-    forecast = {"current_quadrant": current_quadrant,
-                "last_point": last_point,
-                "current_point": current_point,
-                "next_quadrant": next_quadrant,
-                "next_point": next_point,
-                "cycle_direction": cycle_direction,
-                "em_value": em_value,
-                "quadrature": quadrature,
-                "frequency_band": frequency_band,
-                "market_mood": market_mood}
-
-    return forecast
-  
-# Call generate_market_mood_forecast to get the forecast
-forecast = generate_market_mood_forecast(close_prices, candles, percent_to_max_val = 5, percent_to_min_val = 5)
-
-# Print out the resulting forecast
-print("Last Point:", forecast["last_point"])
-print("Current Quadrant:", forecast["current_quadrant"])
-print("Current Point:", forecast["current_point"])
-print("Next Quadrant:", forecast["next_quadrant"])
-print("Next Point:", forecast["next_point"])
-print("Cycle Direction:", forecast["cycle_direction"])
-print("EM Value:", forecast["em_value"])
-print("Quadrature:", forecast["quadrature"])
-print("Frequency Band:", forecast["frequency_band"])
-print("Market Mood:", forecast["market_mood"])
-
-print()
-
-##################################################
-##################################################
-
-def get_rf_band(frequency):
-    if frequency >= 0.000050000000 and frequency < 0.000300000000:
-        return "MYR band (50 kHz - 300 kHz)"  
-    if frequency >= 0.000000000001 and frequency < 0.000300000000:
-        return "ELF band (3Hz - 300Hz)"
-    if frequency >= 0.000300000000 and frequency < 0.001000000000:      
-        return "UHF band (300 MHz - 3 GHz)"
-    if frequency >= 0.001000000000 and frequency < 0.003000000000:   
-        return  "VHF band (30MHz - 300MHz)"      
-    if frequency >= 0.003000000000 and frequency < 0.030000000000:
-        return "HF band (3MHz - 30MHz)"        
-    if frequency >= 0.030000000000 and frequency < 0.300000000000:
-        return "V band (40 - 75 GHz)"
-    if frequency >= 0.300000000000 and frequency < 3.000000000000:      
-        return "C band (4 - 8 GHz)"
-    if frequency >= 3.000000000000 and frequency < 8.000000000000:         
-        return "X band (8 - 12 GHz)"        
-    if frequency >= 8.000000000000 and frequency < 12.400000000000:
-        return "K band (12.4 - 18 GHz)"
-    if frequency >= 12.400000000000 and frequency < 18.000000000000:  
-        return "Ku band (18 - 26.5 GHz)"
-    if frequency >= 18.000000000000 and frequency < 26.5e9:
-        return "Ka band (26.5 - 40 GHz)"
-    if frequency >= 26.5e9 and frequency < 40.000000000000:
-        return "V band (40 - 75 GHz)"
-    if frequency >= 40.000000000000 and frequency < 75.000000000000:        
-        return "E band (60 - 90 GHz)"
-    if frequency >= 75.000000000000 and frequency < 110.000000000000:
-        return "W band  (75 -110 GHz)"
-    if frequency >= 110.000000000000 and frequency < 300.000000000000:  
-        return "D band (110 - 170 GHz)"
-    if frequency >= 300.000000000000 and frequency < 10e12:
-        return "THz band (300 GHz - 10 THz)"  
-    if frequency >= 10e12 and frequency < 30e12:  
-        return "Millimeter wave band (30 GHz - 300 GHz)"
-    if frequency >= 30e12 and frequency < 3e14: 
-        return "Submillimeter wave band (300 GHz - 3 THz)"        
-    if frequency >= 3e14 and frequency < 30e14:   
-        return "Far-infrared band (3 THz - 30 THz)"         
-    if frequency >= 30e14 and frequency < 40e14:
-        return "Infrared band (30 THz - 400 THz)"
-
-frequency = []  
-
-frequency.append(0.000000000001)         
-get_rf_band(frequency[-1]) # ELF      
-frequency.append(0.000300000000)   
-get_rf_band(frequency[-1])  # UHF   
-frequency.append(0.015000000000)           
-get_rf_band(frequency[-1]) # HF
-frequency.append(0.0600000000)               
-get_rf_band(frequency[-1])   # V 
-frequency.append(5.500000000)         
-get_rf_band(frequency[-1]) # C   
-frequency.append(15.0000000000)
-get_rf_band(frequency[-1])  # K    
-frequency.append(22.0000000000000)  
-get_rf_band(frequency[-1]) # Ku
-frequency.append(31.00000000000)           
-get_rf_band(frequency[-1]) # Ka
-frequency.append(90.0000000000000)
-get_rf_band(frequency[-1]) # E 
-frequency.append(100.000000000000)          
-get_rf_band(frequency[-1]) # W
-frequency.append(130.00000000000)    
-get_rf_band(frequency[-1]) # D
-frequency.append(225.000000000000)
-get_rf_band(frequency[-1])# Millimeter  
-frequency.append(11000.00000000000)
-get_rf_band(frequency[-1]) #Submillimeter
-frequency.append(11000000.0000000000)           
-get_rf_band(frequency[-1])# Far-infrared   
-frequency.append(1900000000.00000000000)  
-get_rf_band(frequency[-1])# Infrared
-
-def get_frequency_components(close_prices):
-    # Remove any NaN values
-    close_prices = close_prices[~np.isnan(close_prices)]
-    
-    # Compute the Fourier transform of the signal
-    fft_data = np.fft.fft(close_prices)
-    
-    # Compute the power spectrum of the signal
-    power_spectrum = np.abs(fft_data) ** 2
-    
-    # Compute the frequencies corresponding to each element of the power spectrum
-    time_step = 1.0 / 60  # assuming 1-min data
-    frequencies = np.fft.fftfreq(close_prices.size, time_step)
-    
-    # Find the indices of the highest and lowest three frequencies
-    indices = np.argsort(power_spectrum)
-    lowest_indices = indices[:3]
-    highest_indices = indices[-3:]
-    
-    # Get the corresponding frequencies for the highest and lowest indices
-    lowest_frequencies = frequencies[lowest_indices]
-    highest_frequencies = frequencies[highest_indices]
-    
-    # Map the frequencies to their corresponding RF bands
-    lowest_bands = [get_rf_band(f) for f in lowest_frequencies]
-    highest_bands = [get_rf_band(f) for f in highest_frequencies]
-    
-    # Return the frequencies and their corresponding RF bands
-    return {
-        'power_spectrum': power_spectrum,
-        'frequencies': frequencies,
-        'lowest_frequencies': lowest_frequencies,
-        'lowest_bands': lowest_bands,
-        'highest_frequencies': highest_frequencies,
-        'highest_bands': highest_bands
-    }
-
-# Call the function to get the frequency components
-components = get_frequency_components(close_prices)
-
-# Print out the results
-print("Power Spectrum: ", components['power_spectrum'])
-print("Frequencies: ", components['frequencies'])
-print("Lowest frequencies: ", components['lowest_frequencies'])
-print("Lowest frequency bands: ", components['lowest_bands'])
-print("Highest frequencies: ", components['highest_frequencies'])
-print("Highest frequency bands: ", components['highest_bands'])
-
-
+filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
 
 print()
 
@@ -1902,9 +2546,6 @@ print()
 
 def main():
 
-    ##################################################
-    ##################################################
-
     # Define timeframes
     timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
     TRADE_SYMBOL = "BTCUSDT"
@@ -1913,9 +2554,6 @@ def main():
     ##################################################
 
     while True:
-
-        ##################################################
-        ##################################################
         
         # Get fresh closes for the current timeframe
         closes = get_closes('1m')
@@ -1931,13 +2569,7 @@ def main():
             timeframe = candle["timeframe"]  
             candle_map.setdefault(timeframe, []).append(candle)
                 
-        ##################################################
-        ##################################################
-
         try:     
-            ##################################################
-            ##################################################
-
             # Calculate fresh sine wave  
             close_prices = np.array(closes)
             sine, leadsine = talib.HT_SINE(close_prices)
@@ -1953,104 +2585,40 @@ def main():
                 #print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
                 #print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
 
-            ##################################################
-            ##################################################
-
             print()
 
             momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max = generate_momentum_sinewave(timeframes)
         
             print()
 
+            mood = get_mtf_rsi_market_mood()
+            print("MTF rsi mood: ", mood)
+
+            mtf_market_mood = get_mtf_market_mood()
+            print("MTF RSI and MOM market mood: ", mtf_market_mood)
+
+            print()
+
             print("Current close on sine value now at: ", current_sine)
             print("Distance as percentages from close to min: ", dist_from_close_to_min, "%")
             print("Distance as percentages from close to max: ", dist_from_close_to_max, "%")
-            #print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
+            print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
             print("Mood on 1min timeframe is now at: ", market_mood[-12])
 
             print()
 
-
-            ##################################################
-            ##################################################
-
-            sine_wave = generate_new_momentum_sinewave(close_prices, candles,  
-                                               percent_to_max_val=5, 
-                                               percent_to_min_val=5)      
-
-            sine_wave_max = sine_wave["max"]   
-            sine_wave_min = sine_wave["min"]
-
-            # Call the function
-            results = generate_new_momentum_sinewave(
-                close_prices, 
-                candles,  
-                percent_to_max_val=5,  
-                percent_to_min_val=5
-                )
-  
-            # Unpack the returned values    
-            current_close = results["current_close"]  
-            dist_from_close_to_min = results["dist_from_close_to_min"]  
-            dist_from_close_to_max = results["dist_from_close_to_max"]
-            current_quadrant = results["current_quadrant"]
-            em_amp = results["em_amplitude"]
-            em_phase = results["em_phase"]  
-            price_range_percent = results["price_range_percent"] 
-            momentum = results["momentum"]
-            sine_wave_min = results["min"]
-            sine_wave_max = results["max"]
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            url = "https://fapi.binance.com/fapi/v1/ticker/price"
-
-            params = {
-                "symbol": "BTCUSDT" 
-                }
-
-            response = requests.get(url, params=params)
-            data = response.json()
-
-            price = data["price"]
-            #print(f"Current BTCUSDT price: {price}")
-
             # Define the current time and close price
             current_time = datetime.datetime.now()
-            current_close = price
+            current_close = closes[-1]
 
-            #print("Current local Time is now at: ", current_time)
-            #print("Current close price is at : ", current_close)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Print the variables from generate_new_momentum_sinewave()
-            print(f"Distance from close to min: {dist_from_close_to_min}") 
-            print(f"Distance from close to max: {dist_from_close_to_max}")
-            print(f"Current_quadrant now at: {current_quadrant}")
+            print("Current local Time is now at: ", current_time)
+            print("Current close price is at : ", current_close)
 
             print()
-
-            ##################################################
-            ##################################################
-
-            timeframe = '1m'
-            momentum = get_momentum(timeframe)
-            print("Momentum on 1min tf is at: ", momentum)
-
-            ##################################################
-            ##################################################
-
             # Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
             min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
 
-            print("Momentum sinewave signal:", momentum_signal)
+            print("Momentum signal:", momentum_signal)
             print()
 
             print("Minimum threshold:", min_threshold)
@@ -2059,520 +2627,66 @@ def main():
 
             print()
 
-            ##################################################
-            ##################################################
+            # Example usage of fft function
+            closes1 = get_closes("1m")
+            closes2 = get_closes("3m")
+            closes3 = get_closes("5m")
 
-            closes = get_closes("1m")     
             n_components = 5
+            targets1 = []
+            targets2 = []
+            targets3 = []
 
-            current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
+            for i in range(len(closes1) - 1):
 
-            print("Current local Time is now at: ", current_time)
-            print("Market mood is: ", market_mood)
+                # Decompose the signal up to the current minute and predict the target for the next minute
+                target1 = get_next_minute_target(closes1[:i+1], n_components)
+                targets1.append(target1)
 
-            print()
+            for i in range(len(closes2) - 1):
 
-            print("Current close price is at : ", current_close)
+                # Decompose the signal up to the current minute and predict the target for the next minute
+                target2 = get_next_minute_target(closes2[:i+1], n_components)
+                targets2.append(target2)
 
-            print()
+            for i in range(len(closes3) - 1):
 
-            print("Fast target 1 is: ", fast_target4)
-            print("Fast target 2 is: ", fast_target3)
-            print("Fast target 3 is: ", fast_target2)
-            print("Fast target 4 is: ", fast_target1)
+                # Decompose the signal up to the current minute and predict the target for the next minute
+                target3 = get_next_minute_target(closes3[:i+1], n_components)
+                targets3.append(target3)
 
-            print()
+            # Print the predicted targets for the next minute
+            print("Target1:", targets1[-1])
 
-            print("Fastest target is: ", fastest_target)
+            # Print the predicted targets for the next minute
+            print("Target2:", targets2[-1])
 
-            print()
-
-            print("Target 1 is: ", target1)
-            print("Target 2 is: ", target2)
-            print("Target 3 is: ", target3)
-            print("Target 4 is: ", target4)
-            print("Target 5 is: ", target5)
-
-            # Get the current price
-            price = get_current_price()
-
-            print()
-
-            price = float(price)
+            # Print the predicted targets for the next minute
+            print("Target3:", targets3[-1])
 
             print()
 
-            ##################################################
-            ##################################################
+            # Example usage
+            #closes = get_closes("1m")
 
-            # Initialize variables
-            trigger_long = False 
-            trigger_short = False
+            n_components = 5
+            targets = []
 
-            current_time = datetime.datetime.utcnow() + timedelta(hours=3)
+            for i in range(len(closes) - 1):
+                # Decompose the signal up to the current minute and predict the target for the next minute
+                entry_price, stop_loss, target1, target2, target3 = get_next_minute_targets(closes[:i+1], n_components)
+                targets.append((entry_price, stop_loss, target1, target2, target3))
 
-            range_threshold = max_threshold - min_threshold
-            dist_from_min = price - min_threshold
-            dist_from_max = max_threshold - price
-
-            pct_diff_to_min = (dist_from_min / range_threshold) * 100
-            pct_diff_to_max = (dist_from_max / range_threshold) * 100
-
-            print("Percentage difference to min threshold:", pct_diff_to_min)
-            print("Percentage difference to max threshold:", pct_diff_to_max)
-
-            print()
-
-            # Get the support and resistance levels
-            levels = get_support_resistance_levels(close_prices)
-
-            support_levels, resistance_levels = [], []
-
-            for level in levels:
-                if level < close_prices[-1]:
-                    support_levels.append(level)
-                else:
-                    resistance_levels.append(level)
-
-            # Determine the market mood
-            if len(levels) > 0:
-                support_levels = []
-                resistance_levels = []
-                for level in levels:
-                    if level < close_prices[-1]:
-                        support_levels.append(level)
-                    else:
-                        resistance_levels.append(level)
-
-            if len(support_levels) > 0 and len(resistance_levels) > 0:
-                market_mood_sr = "Neutral"
-            elif len(support_levels) > 0:
-                market_mood_sr = "Bullish"
-            elif len(resistance_levels) > 0:
-                market_mood_sr = "Bearish"
-            else:
-                market_mood_sr = "Undefined"
-
-            # Calculate support and resistance ranges
-            if len(support_levels) > 0:
-                support_range = max(support_levels) - min(support_levels)
-                print("Support range: {:.2f}".format(support_range))
-            else:
-                print("Support range: None")
-
-            if len(resistance_levels) > 0:
-                resistance_range = max(resistance_levels) - min(resistance_levels)
-                print("Resistance range: {:.2f}".format(resistance_range))
-            else:
-                print("Resistance range: None")
-
-            # Print the levels and market mood
-            print("Potential support levels:")
-            if len(support_levels) > 0:
-                for level in support_levels:
-                    print("  - {:.2f}".format(level))
-            else:
-                print("  None found.")
-
-            print("Potential resistance levels:")
-            if len(resistance_levels) > 0:
-                for level in resistance_levels:
-                    print("  - {:.2f}".format(level))
-            else:
-                print("  None found.")
-
-            incoming_bullish_reversal = None
-            incoming_bearish_reversal = None
-
-            if market_mood_sr == "Neutral":
-                print("Market mood: {}".format(market_mood_sr))
-                if len(support_levels) > 0:
-                    support = max(support_levels)
-                    support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
-                else:
-                    support = None
-                    support_percentage = None
-
-                if len(resistance_levels) > 0:
-                    top = min(resistance_levels)
-                    top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
-                else:
-                    top = None
-                    top_percentage = None
-
-                print("Best dip: {:.2f}% (Support level: {:.2f})".format(support_percentage, support))
-
-                if support_percentage >= 3.0:
-                    incoming_bullish_reversal = True
-
-            elif market_mood_sr == "Bullish":
-                print("Market mood: {}".format(market_mood_sr))
-                if len(resistance_levels) > 0:
-                    top = min(resistance_levels)
-                    top_percentage = round(abs(top - close_prices[-1]) / close_prices[-1] * 100, 12)
-                else:
-                    top = None
-                    top_percentage = None
-
-                if top is not None:
-                    print("Best breakout: {:.2f}% (Resistance level: {:.2f})".format(top_percentage, top))
-                else:
-                    print("Best breakout: None")
-
-                if top_percentage is not None and top_percentage >= 3.0:
-                    incoming_bullish_reversal = True
-
-            elif market_mood_sr == "Bearish":
-                print("Market mood: {}".format(market_mood_sr))
-                if len(support_levels) > 0:
-                    support = max(support_levels)
-                    support_percentage = round(abs(support - close_prices[-1]) / close_prices[-1] * 100, 12)
-                else:
-                    support = None
-                    support_percentage = None
-
-                if support is not None:
-                    print("Best bounce: {:.2f}% (Support level: {:.2f})".format(support_percentage, support))
-                else:
-                    print("Best bounce: None")
-
-                if support_percentage is not None and support_percentage >= 3.0:
-                    incoming_bearish_reversal = True
-
-            else:
-                print("Market mood: {}".format(market_mood_sr))
-
-            # Print incoming reversal signals
-            if incoming_bullish_reversal:
-                print("Incoming bullish reversal signal!")
-
-            if incoming_bearish_reversal:
-                print("Incoming bearish reversal signal!")
+            # Print the predicted levels for the next minute
+            print("Entry price:", targets[-1][0])
+            print("Stop loss:", targets[-1][1])
+            print("Target 1:", targets[-1][2])
+            print("Target 2:", targets[-1][3])
+            print("Target 3:", targets[-1][4])
 
             print()
-
-            # convert close_prices to numpy array of type float64
-            close_prices = np.array(close_prices, dtype=np.float64)
-
-            # Call the function with default parameters
-            results = calculate_reversals(close_prices)
-
-            # Print the last element of each array, if it exists
-            if isinstance(results["min_close"], np.ndarray):
-                print("min_close:", results["min_close"][-1] if results["min_close"].size > 0 else None)
-            if isinstance(results["max_close"], np.ndarray):
-                print("max_close:", results["max_close"][-1] if results["max_close"].size > 0 else None)
-            if isinstance(results["sine"], np.ndarray):
-                print("sine:", results["sine"][-1] if results["sine"].size > 0 else None)
-            if isinstance(results["leadsine"], np.ndarray):
-                print("leadsine:", results["leadsine"][-1] if results["leadsine"].size > 0 else None)
-            if isinstance(results["momentum"], np.ndarray):
-                print("momentum:", results["momentum"][-1] if results["momentum"].size > 0 else None)
-            if isinstance(results["min_momentum"], np.ndarray):
-                print("min_momentum:", results["min_momentum"][-1] if results["min_momentum"].size > 0 else None)
-            if isinstance(results["max_momentum"], np.ndarray):
-                print("max_momentum:", results["max_momentum"][-1] if results["max_momentum"].size > 0 else None)
-            if isinstance(results["min_percentage_custom"], np.ndarray):
-                print("min_percentage_custom:", results["min_percentage_custom"][-1] if results["min_percentage_custom"].size > 0 else None)
-            if isinstance(results["max_percentage_custom"], np.ndarray):
-                print("max_percentage_custom:", results["max_percentage_custom"][-1] if results["max_percentage_custom"].size > 0 else None)
-            if isinstance(results["min_threshold"], np.ndarray):
-                print("min_threshold:", results["min_threshold"][-1] if results["min_threshold"].size > 0 else None)
-            if isinstance(results["max_threshold"], np.ndarray):
-                print("max_threshold:", results["max_threshold"][-1] if results["max_threshold"].size > 0 else None)
-            if isinstance(results["filtered_close"], np.ndarray):
-                print("filtered_close:", results["filtered_close"][-1] if results["filtered_close"].size > 0 else None)
-            if isinstance(results["avg_mtf"], np.ndarray):
-                print("avg_mtf:", results["avg_mtf"][-1] if results["avg_mtf"].size > 0 else None)
-            if isinstance(results["current_momentum"], np.ndarray):
-                print("current_momentum:", results["current_momentum"][-1] if results["current_momentum"].size > 0 else None)
-            if isinstance(results["percent_to_min_momentum"], np.ndarray):
-                print("percent_to_min_momentum:", results["percent_to_min_momentum"][-1] if results["percent_to_min_momentum"].size > 0 else None)
-            if isinstance(results["percent_to_max_momentum"], np.ndarray):
-                print("percent_to_max_momentum:", results["percent_to_max_momentum"][-1] if results["percent_to_max_momentum"].size > 0 else None)
-            if isinstance(results["percent_to_min_combined"], np.ndarray):
-                print("percent_to_min_combined:", results["percent_to_min_combined"][-1] if results["percent_to_min_combined"].size > 0 else None)
-            if isinstance(results["percent_to_max_combined"], np.ndarray):
-                print("percent_to_max_combined:", results["percent_to_max_combined"][-1] if results["percent_to_max_combined"].size > 0 else None)
-            if isinstance(results["momentum_signal"], np.ndarray):
-                print("momentum_signal:", results["momentum_signal"][-1] if results["momentum_signal"].size > 0 else None)
-            if isinstance(results["incoming_direction"], np.ndarray):
-                print("incoming_direction:", results["incoming_direction"][-1] if results["incoming_direction"].size > 0 else None)
-            if isinstance(results["highs"], np.ndarray):
-                print("highs:", results["highs"][-1] if results["highs"].size > 0 else None)
-            if isinstance(results["lows"], np.ndarray):
-                print("lows:", results["lows"][-1] if results["lows"].size > 0 else None)
-            if isinstance(results["very_fast_cycle_mood"], np.ndarray):
-                print("very_fast_cycle_mood:", results["very_fast_cycle_mood"][-1] if results["very_fast_cycle_mood"].size > 0 else None)
-            if isinstance(results["medium_cycle_mood"], np.ndarray):
-                print("medium_cycle_mood:", results["medium_cycle_mood"][-1] if results["medium_cycle_mood"].size > 0 else None)
-            if isinstance(results["slow_cycle_mood"], np.ndarray):
-                print("slow_cycle_mood:", results["slow_cycle_mood"][-1] if results["slow_cycle_mood"].size > 0 else None)
-            if isinstance(results["very_slow_cycle_mood"], np.ndarray):
-                print("very_slow_cycle_mood:", results["very_slow_cycle_mood"][-1] if results["very_slow_cycle_mood"].size > 0 else None)
-            if isinstance(results["very_fast_cycle_length"], np.ndarray):
-                print("very_fast_cycle_length:", results["very_fast_cycle_length"][-1] if results["very_fast_cycle_length"].size > 0 else None)
-            if isinstance(results["medium_cycle_length"], np.ndarray):
-                print("medium_cycle_length:", results["medium_cycle_length"][-1] if results["medium_cycle_length"].size > 0 else None)
-            if isinstance(results["slow_cycle_length"], np.ndarray):
-                print("slow_cycle_length:", results["slow_cycle_length"][-1] if results["slow_cycle_length"].size > 0 else None)
-            if isinstance(results["very_slow_cycle_length"], np.ndarray):
-                print("very_slow_cycle_length:", results["very_slow_cycle_length"][-1] if results["very_slow_cycle_length"].size > 0 else None)
-
-            # Calculate very fast cycle length 
-            very_fast_cycle_length = np.abs(avg_mtf - close_prices[-1])   
-
-            # Calculate next 3 prices based on cycle length and current price        
-            price1 = close_prices[-1] + very_fast_cycle_length    
-            price2 = close_prices[-1] + 2 * very_fast_cycle_length   
-            price3 = close_prices[-1] + 3 * very_fast_cycle_length
-
-            # Print the next 3 forecast prices
-            print(f"Next 3 forecast prices: {price1}, {price2}, {price3}")
-
-            # Get current momentum
-            current_momentum = results["momentum"]
-
-            # Calculate very fast cycle momentum
-            very_fast_cycle_momentum = 0.75 * current_momentum
-
-            # Calculate medium cycle momentum  
-            medium_cycle_momentum = 0.5 * current_momentum
-
-            # Calculate slow cycle momentum
-            slow_cycle_momentum = 0.25 * current_momentum
-
-            # Print next 3 momentum forecast cycles    
-            print(f"Next 3 momentum forecasts: {very_fast_cycle_momentum}, {medium_cycle_momentum}, {slow_cycle_momentum}")
-
-            # Calculate very fast cycle momentum        
-            very_fast_cycle_momentum = 0.75 * current_momentum
-
-            # Determine very fast cycle mood based on momentum        
-            if very_fast_cycle_momentum < 0:
-                very_fast_cycle_mood = "Bearish"
-            else:
-                very_fast_cycle_mood = "Bullish"  
-
-            # Calculate medium cycle momentum       
-            medium_cycle_momentum = 0.5 * current_momentum
-
-            # Determine medium cycle mood        
-            if medium_cycle_momentum < 0:
-                medium_cycle_mood = "Bearish"    
-            else:
-                medium_cycle_mood = "Bullish" 
-
-            # Calculate slow cycle momentum    
-            slow_cycle_momentum = 0.25 * current_momentum
-
-            # Determine slow cycle mood
-            if slow_cycle_momentum < 0:
-                slow_cycle_mood = "Bearish"      
-            else:      
-                slow_cycle_mood = "Bullish"  
-
-            # Print market mood forecasts
-            print(f"Momentum market mood forecasts: {very_fast_cycle_mood}, {medium_cycle_mood}, {slow_cycle_mood}")
-
-            # Compare current momentum to different cycle lengths
-            if current_momentum > results['very_fast_cycle_length']:
-                print("Current momentum is greater than very fast cycle length.")
-            elif current_momentum < results['very_fast_cycle_length']:
-                print("Current momentum is less than very fast cycle length.")
-            else:
-                print("Current momentum is equal to very fast cycle length.")
-
-            if current_momentum > results['medium_cycle_length']:
-                print("Current momentum is greater than medium cycle length.")
-            elif current_momentum < results['medium_cycle_length']:
-                print("Current momentum is less than medium cycle length.")
-            else:
-                print("Current momentum is equal to medium cycle length.")
-
-            if current_momentum > results['slow_cycle_length']:
-                print("Current momentum is greater than slow cycle length.")
-            elif current_momentum < results['slow_cycle_length']:
-                print("Current momentum is less than slow cycle length.")
-            else:
-                print("Current momentum is equal to slow cycle length.")
-
-            if current_momentum > results['very_slow_cycle_length']:
-                print("Current momentum is greater than very slow cycle length.")
-            elif current_momentum < results['very_slow_cycle_length']:
-                print("Current momentum is less than very slow cycle length.")
-            else:
-                print("Current momentum is equal to very slow cycle length.")
-
-            # Compare current price to different cycle lengths
-            if np.all(close_prices < results['very_fast_cycle_length']):
-                print("Current price is below very fast cycle length.")
-            elif np.all(close_prices > results['very_fast_cycle_length']):
-                print("Current price is above very fast cycle length.")
-            else:
-                print("Current price is at very fast cycle length.")
-
-            if np.all(close_prices < results['medium_cycle_length']):
-                print("Current price is below medium cycle length.")
-            elif np.all(close_prices > results['medium_cycle_length']):
-                print("Current price is above medium cycle length.")
-            else:
-                print("Current price is at medium cycle length.")
-
-            if np.all(close_prices < results['slow_cycle_length']):
-                print("Current price is below slow cycle length.")
-            elif np.all(close_prices > results['slow_cycle_length']):
-                print("Current price is above slow cycle length.")
-            else:
-                print("Current price is at slow cycle length.")
-
-            if np.all(close_prices < results['very_slow_cycle_length']):
-                print("Current price is below very slow cycle length.")
-            elif np.all(close_prices > results['very_slow_cycle_length']):
-                print("Current price is above very slow cycle length.")
-            else:
-                print("Current price is at very slow cycle length.")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Call the predict_market function
-            results_sr = predict_market(close_prices)
-
-            # Print results
-            print("Market mood:", results_sr["market_mood"])
-            print("Current reversal top:", results_sr["current_reversal_top"])
-            print("Current reversal bottom:", results_sr["current_reversal_bottom"])
-            print("Last reversal top:", results_sr["last_reversal_top"])
-            print("Last reversal bottom:", results_sr["last_reversal_bottom"])
-            print("Next reversal top:", results_sr["next_reversal_top"])
-            print("Next reversal bottom:", results_sr["next_reversal_bottom"])
-            print("Support level:", results_sr["support_level"])
-            print("Resistance level:", results_sr["resistance_level"])
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Call generate_market_mood_forecast to get the forecast
-            forecast = generate_market_mood_forecast(close_prices, candles, percent_to_max_val = 5, percent_to_min_val = 5)
-
-            # Print out the resulting forecast
-            print("Last Point:", forecast["last_point"])
-            print("Current Quadrant:", forecast["current_quadrant"])
-            print("Current Point:", forecast["current_point"])
-            print("Next Quadrant:", forecast["next_quadrant"])
-            print("Next Point:", forecast["next_point"])
-            print("Cycle Direction:", forecast["cycle_direction"])
-            print("EM Value:", forecast["em_value"])
-            print("Quadrature:", forecast["quadrature"])
-            print("Frequency Band:", forecast["frequency_band"])
-            print("Market Mood:", forecast["market_mood"])
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Call the function to get the frequency components
-            components = get_frequency_components(close_prices)
-
-            # Print out the results
-            print("Lowest frequencies:", components['lowest_frequencies'])
-            print("Lowest frequency bands:", components['lowest_bands'])
-            print("Highest frequencies:", components['highest_frequencies'])
-            print("Highest frequency bands:", components['highest_bands'])
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Convert price1 price2 and price3 to Python float
-            price1 = float(price1)
-            price2 = float(price2)
-            price3 = float(price3)
-
-            # Convert avg_mtf, fastest_target and target1 to Python float
-            avg_mtf = float(avg_mtf)
-            fastest_target = float(fastest_target)
-            target1 = float(target1)
-
-            very_fast_cycle_mood = results["very_fast_cycle_mood"]
-            print(very_fast_cycle_mood)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            with open("signals.txt", "a") as f:   
-                # Get data and calculate indicators here...
-                timestamp = current_time.strftime("%d %H %M %S")
-
-                if price <= min_threshold and price < price1 and price < price2 and price < price3 and very_fast_cycle_mood == "Bullish" and forecast["current_point"] == "Apex":
-                    if momentum > 0: 
-                        trigger_long = True
-
-                elif price >= max_threshold and price > price1 and price > price2 and price > price3 and very_fast_cycle_mood == "Bearish" and forecast["current_point"] == "Right":
-                    if momentum < 0:
-                        trigger_short = True
-
-                if current_quadrant == 1: 
-
-                    # Add percentage difference condition from close to min           
-                    if price < price1 and price < price2 and price < price3 and forecast["current_point"] == "Apex":
-                        if dist_from_close_to_min <= 15:
-                            if momentum > 0:
-                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish":
-                                    trigger_long = True
-
-
-                elif current_quadrant == 4: 
-
-                    # Add percentage difference condition from close to max        
-                    if price > price1 and price > price2 and price > price3 and forecast["current_point"] == "Right":
-                        if dist_from_close_to_max <= 15:
-                            if momentum < 0:
-                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
-                                    trigger_short = True  
-
-                if market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish" and price < price1 and price < price2 and price < price3 and forecast["current_point"] == "Apex":
-                    if momentum > 0:
-                        trigger_long = True
-
-                elif market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish" and price > price1 and price > price2 and price > price3 and forecast["current_point"] == "Right":
-                    if momentum < 0:
-                        trigger_short = True  
-              
-                if very_fast_cycle_mood == "Bullish" and very_fast_cycle_mood == "Bullish" and price < price1 and price < price2 and price < price3 and forecast["current_point"] == "Apex":
-                    if momentum > 0:
-                        trigger_long = True
-
-                elif very_fast_cycle_mood == "Bearish" and very_fast_cycle_mood == "Bearish" and price > price1 and price > price2 and price > price3 and forecast["current_point"] == "Right":
-                    if momentum < 0:
-                        trigger_short = True 
-
-                if trigger_long:          
-                    print("LONG signal!")  
-                    f.write(f"{timestamp} LONG {price}\n") 
-                    trigger_long = False
-         
-                if trigger_short:
-                    print("SHORT signal!")
-                    f.write(f"{timestamp} SHORT {price}\n")
-                    trigger_short = False
-
-                ##################################################
-                ##################################################
-
-            print()
-
-            ##################################################
-            ##################################################
+            
+            filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
 
         except Exception as e:
             print(f"An error occurred: {e}")
@@ -2592,3 +2706,4 @@ print()
 # Run the main function
 if __name__ == '__main__':
     main()
+
