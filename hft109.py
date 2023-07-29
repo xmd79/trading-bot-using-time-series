@@ -2179,6 +2179,7 @@ def main():
 
             # Call the predict_market function
             results_sr = predict_market(close_prices)
+            direction = results["incoming_direction"]
 
             # Print results
             print("Market mood:", results_sr["market_mood"])
@@ -2224,12 +2225,12 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish":
+                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish" and direction == "Up":
                         if dist_from_close_to_min < dist_from_close_to_max:
                             if momentum > 0:
                                 trigger_long = True
 
-                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish":
+                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish" and direction == "Down":
                         if dist_from_close_to_max < dist_from_close_to_min:
                             if momentum < 0:
                                 trigger_short = True  
