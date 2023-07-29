@@ -2226,15 +2226,13 @@ def main():
 
                 if price < avg_mtf and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish":
                         if dist_from_close_to_min < dist_from_close_to_max:
-                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                                if momentum > 0:
-                                    trigger_long = True
+                            if momentum > 0:
+                                trigger_long = True
 
                 if price > avg_mtf and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish":
                         if dist_from_close_to_max < dist_from_close_to_min:
-                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                                if momentum < 0:
-                                    trigger_short = True  
+                            if momentum < 0:
+                                trigger_short = True  
 
                 if trigger_long:          
                     print("LONG signal!")  
