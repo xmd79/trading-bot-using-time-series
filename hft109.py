@@ -1412,6 +1412,163 @@ print()
 ##################################################
 ##################################################
 
+def golden_func(n):
+    return n * (1 + np.sqrt(5)) / 2
+
+def golden_deriv(x):
+    return (np.sqrt(5 * x**2 + 4) + x) / 2
+
+def predict_market(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
+    """
+    Predict market mood and reversal key points, and output support and resistance levels.
+    """
+  
+    # Get min/max close    
+    min_close = np.nanmin(close_prices)
+    max_close = np.nanmax(close_prices)
+    
+    # Convert close_prices to numpy array
+    close_prices = np.nan_to_num(close_prices, nan=0)
+    
+    # Calculate momentum
+    momentum = talib.MOM(close_prices, timeperiod=period)
+    momentum = momentum[np.isfinite(momentum)]
+
+    # Get min/max momentum    
+    min_momentum = np.nanmin(momentum)   
+    max_momentum = np.nanmax(momentum)
+    
+    # Calculate custom percentages 
+    min_percentage_custom = minimum_percentage / 100  
+    max_percentage_custom = maximum_percentage / 100
+    
+    # Calculate thresholds       
+    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
+    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
+
+    # Calculate range of prices within a certain distance from the current close price
+    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
+
+    # Filter close prices
+    filtered_close = np.clip(close_prices, min_threshold, max_threshold)
+        
+    # Calculate avg    
+    avg_mtf = np.nanmean(filtered_close)
+
+    # Get current momentum       
+    current_momentum = momentum[-1]
+    
+    # Calculate the Reciprocal Fibonacci constant
+    rfc = 3.359885666243177553172011302918927179688905133732
+    
+    # Calculate inverse powers of phi
+    inv_powers_of_phi = [np.power((1 / golden_func(i)), 2) for i in range(1, 8)]
+    
+    # Calculate % to min/max momentum    
+    if min_momentum != max_momentum:
+        percent_to_min_momentum = ((max_momentum - current_momentum) / (max_momentum - min_momentum)) * 100               
+        percent_to_max_momentum = ((current_momentum - min_momentum) / (max_momentum - min_momentum)) * 100
+    else:
+        percent_to_min_momentum = np.nan
+        percent_to_max_momentum = np.nan
+ 
+    # Calculate combined percentages              
+    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
+    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
+      
+    # Combined momentum signal     
+    momentum_signal = percent_to_max_combined - percent_to_min_combined
+    
+    # Determine market mood
+    if momentum_signal > 0:
+        market_mood = "Bullish"
+    elif momentum_signal < 0:
+        market_mood = "Bearish"
+    else:
+        market_mood = "Neutral"
+    
+    # Calculate Square of 9 levels
+    num_levels = 16
+    levels = [i**2 for i in range(num_levels)]
+    levels_close = [level + close_prices[-1] for level in levels]
+    levels_min = [level + min_threshold for level in levels]
+    levels_max = [level + max_threshold for level in levels]
+    
+    # Set default values for reversal key points
+    current_reversal_top = np.nan
+    current_reversal_bottom = np.nan
+    last_reversal_top = np.nan
+    last_reversal_bottom = np.nan
+    next_reversal_top = np.nan
+    next_reversal_bottom = np.nan
+    
+    current_reversal_top = np.nanmax(levels_close)
+    current_reversal_bottom = np.nanmin(levels_close)
+    last_reversal_top = np.nanmax(levels_close)
+    last_reversal_bottom = np.nanmin(levels_close)
+    next_reversal_top = np.nanmax(levels_close)
+    next_reversal_bottom = np.nanmin(levels_close)
+
+
+    # Determine current, last, and next reversal key points
+    for i in range(1, num_levels):
+        if not np.isnan(levels_close[i]) and not np.isnan(levels_close[i-1]):
+
+            # Check if current reversal key point is found
+            if np.isnan(current_reversal_top) and np.isnan(current_reversal_bottom) and ((levels_close[i-1] <= avg_mtf <= levels_close[i]) or 
+                                               (levels_close[i] <= avg_mtf <= levels_close[i-1])):
+                if market_mood == "Bullish":
+                    current_reversal_top = (levels_close[i-1] + levels_close[i]) / 2
+                elif market_mood == "Bearish":
+                    current_reversal_bottom = (levels_close[i-1] + levels_close[i]) / 2
+
+            # Check if last reversal key point isfound
+            elif np.isnan(last_reversal_top) and np.isnan(last_reversal_bottom) and ((levels_close[i-1] <= avg_mtf <= levels_close[i]) or 
+                                                         (levels_close[i] <= avg_mtf <= levels_close[i-1])):
+                if market_mood == "Bullish":
+                    last_reversal_top = (levels_close[i-1] + levels_close[i]) / 2
+                elif market_mood == "Bearish":
+                    last_reversal_bottom = (levels_close[i-1] + levels_close[i]) / 2
+
+            # Check if next reversal key point is found
+            elif np.isnan(next_reversal_top) and np.isnan(next_reversal_bottom) and ((levels_close[i-1] <= avg_mtf <= levels_close[i]) or 
+                                                         (levels_close[i] <= avg_mtf <= levels_close[i-1])):
+                if market_mood == "Bullish":
+                    next_reversal_top = (levels_close[i-1] + levels_close[i]) / 2
+                elif market_mood == "Bearish":
+                    next_reversal_bottom = (levels_close[i-1] + levels_close[i]) / 2
+                    
+    # Calculate support and resistance levels
+    support_level = np.nanmin(filtered_close)
+    resistance_level = np.nanmax(filtered_close)
+    
+    # Return results
+    return {
+        "market_mood": market_mood,
+        "current_reversal_top": current_reversal_top,
+        "current_reversal_bottom": current_reversal_bottom,
+        "last_reversal_top": last_reversal_top,
+        "last_reversal_bottom": last_reversal_bottom,
+        "next_reversal_top": next_reversal_top,
+        "next_reversal_bottom": next_reversal_bottom,
+        "support_level": support_level,
+        "resistance_level": resistance_level
+    }
+
+# Call the predict_market function
+results = predict_market(close_prices)
+
+# Print results
+print("Market mood:", results["market_mood"])
+print("Current reversal top:", results["current_reversal_top"])
+print("Current reversal bottom:", results["current_reversal_bottom"])
+print("Last reversal top:", results["last_reversal_top"])
+print("Last reversal bottom:", results["last_reversal_bottom"])
+print("Next reversal top:", results["next_reversal_top"])
+print("Next reversal bottom:", results["next_reversal_bottom"])
+print("Support level:", results["support_level"])
+print("Resistance level:", results["resistance_level"])
+
 print()
 
 ##################################################
@@ -1959,6 +2116,28 @@ def main():
 
             print()
 
+            ##################################################
+            ##################################################
+
+            # Call the predict_market function
+            results_sr = predict_market(close_prices)
+
+            # Print results
+            print("Market mood:", results_sr["market_mood"])
+            print("Current reversal top:", results_sr["current_reversal_top"])
+            print("Current reversal bottom:", results_sr["current_reversal_bottom"])
+            print("Last reversal top:", results_sr["last_reversal_top"])
+            print("Last reversal bottom:", results_sr["last_reversal_bottom"])
+            print("Next reversal top:", results_sr["next_reversal_top"])
+            print("Next reversal bottom:", results_sr["next_reversal_bottom"])
+            print("Support level:", results_sr["support_level"])
+            print("Resistance level:", results_sr["resistance_level"])
+
+            print()
+
+            ##################################################
+            ##################################################
+
             # Convert price1 price2 and price3 to Python float
             price1 = float(price1)
             price2 = float(price2)
@@ -1971,6 +2150,11 @@ def main():
 
             very_fast_cycle_mood = results["very_fast_cycle_mood"]
             print(very_fast_cycle_mood)
+
+            print()
+
+            ##################################################
+            ##################################################
 
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
