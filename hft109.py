@@ -1631,6 +1631,42 @@ print()
 ##################################################
 ##################################################
 
+def get_sma(close_prices, period):
+    # Calculate the SMA
+    sma = talib.SMA(close_prices, timeperiod=period)
+
+    # Remove NaN values from the SMA array
+    sma = sma[~np.isnan(sma)]
+
+    return sma
+
+def get_trading_signal(close_prices, sma5, sma12, sma26, sma56):
+    if (close_prices[-1] < sma5[-1]) and (sma5[-1] < sma12[-1] < sma26[-1] < sma56[-1]):
+        return "Below"
+    elif (close_prices[-1] > sma5[-1]) and (sma5[-1] > sma12[-1] > sma26[-1] > sma56[-1]):
+        return "Above"
+    else:
+        return "Hold"
+
+sma5 = get_sma(close_prices, 5)
+sma12 = get_sma(close_prices, 12)
+sma26 = get_sma(close_prices, 26)
+sma56 = get_sma(close_prices, 56)
+
+trading_signal = get_trading_signal(close_prices, sma5, sma12, sma26, sma56)
+
+print("SMA5:", sma5[-1])
+print("SMA12:", sma12[-1])
+print("SMA26:", sma26[-1])
+print("SMA56:", sma56[-1])
+
+print("Trading Signal:", trading_signal)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2221,16 +2257,33 @@ def main():
             ##################################################
             ##################################################
 
+            sma12 = get_sma(close_prices, 12)
+            sma24 = get_sma(close_prices, 26)
+
+            trading_signal = get_trading_signal(close_prices, sma5, sma12, sma26, sma56)
+
+            print("SMA5:", sma5[-1])
+            print("SMA12:", sma12[-1])
+            print("SMA26:", sma26[-1])
+            print("SMA56:", sma56[-1])
+
+            print("Trading Signal:", trading_signal)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             with open("signals.txt", "a") as f:   
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish" and direction == "Up":
+                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish" and direction == "Up" and trading_signal == "Below":
                         if dist_from_close_to_min < dist_from_close_to_max:
                             if momentum > 0:
                                 trigger_long = True
 
-                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish" and direction == "Down":
+                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish" and direction == "Down" and trading_signal == "Above":
                         if dist_from_close_to_max < dist_from_close_to_min:
                             if momentum < 0:
                                 trigger_short = True  
