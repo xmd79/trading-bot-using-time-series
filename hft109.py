@@ -2299,20 +2299,17 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-           
-                if price < price1 and price < price2 and price < price3:
-                    if dist_from_close_to_min < dist_from_close_to_max:
-                        if momentum > 0:
-                            if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish" and market_mood == "Bullish":
+                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish" and market_mood == "Bullish":
+                    if price < price1 and price < price2 and price < price3:
+                        if dist_from_close_to_min < dist_from_close_to_max:
+                            if momentum > 0:
                                 trigger_long = True
 
-      
-                if price > price1 and price > price2 and price > price3:
-                    if dist_from_close_to_max < dist_from_close_to_min:
-                        if momentum < 0:
-                            if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish" and market_mood == "Bearish":
+                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish" and market_mood == "Bearish":
+                    if price > price1 and price > price2 and price > price3:
+                        if dist_from_close_to_max < dist_from_close_to_min:
+                            if momentum < 0:
                                 trigger_short = True  
-
 
                 if trigger_long:          
                     print("LONG signal!")  
