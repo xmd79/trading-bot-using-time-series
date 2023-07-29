@@ -1606,9 +1606,27 @@ def get_market_mood(tsi):
         else:
             return "Distribution"
 
-tsi = get_market_mood(close_prices)
+def get_momentum_direction(tsi):
+    # Calculate the difference between the current and previous TSI values
+    diff = tsi[-1] - tsi[-2]
 
-print(tsi)
+    if diff > 0:
+        return "Upward Momentum"
+    elif diff < 0:
+        return "Downward Momentum"
+    else:
+        return "No Momentum"
+
+# Example usage
+tsi = get_tsi(close_prices)
+market_mood_tsi = get_market_mood(tsi)
+momentum_direction = get_momentum_direction(tsi)
+
+print("TSI:", tsi[-1])
+print("Market Mood:", market_mood_tsi)
+print("Momentum Direction:", momentum_direction)
+
+print()
 
 ##################################################
 ##################################################
@@ -2171,8 +2189,13 @@ def main():
 
             print()
 
-            tsi = get_market_mood(close_prices)
-            print(tsi)
+            tsi = get_tsi(close_prices)
+            market_mood_tsi = get_market_mood(tsi)
+            momentum_direction = get_momentum_direction(tsi)
+
+            print("TSI:", tsi[-1])
+            print("Market Mood:", market_mood_tsi)
+            print("Momentum Direction:", momentum_direction)
 
             print()
 
@@ -2201,15 +2224,17 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish" and very_fast_cycle_mood == "Bullish":
+                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish":
                         if dist_from_close_to_min < dist_from_close_to_max:
-                            if momentum > 0:
-                                trigger_long = True
+                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
+                                if momentum > 0:
+                                    trigger_long = True
 
-                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish" and very_fast_cycle_mood == "Bearish":
+                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish":
                         if dist_from_close_to_max < dist_from_close_to_min:
-                            if momentum < 0:
-                                trigger_short = True  
+                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
+                                if momentum < 0:
+                                    trigger_short = True  
 
                 if trigger_long:          
                     print("LONG signal!")  
