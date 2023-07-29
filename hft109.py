@@ -2254,10 +2254,6 @@ def main():
             print("Market mood:", results_sr["market_mood"])
             print("Current reversal top:", results_sr["current_reversal_top"])
             print("Current reversal bottom:", results_sr["current_reversal_bottom"])
-            print("Last reversal top:", results_sr["last_reversal_top"])
-            print("Last reversal bottom:", results_sr["last_reversal_bottom"])
-            print("Next reversal top:", results_sr["next_reversal_top"])
-            print("Next reversal bottom:", results_sr["next_reversal_bottom"])
             print("Support level:", results_sr["support_level"])
             print("Resistance level:", results_sr["resistance_level"])
 
@@ -2292,7 +2288,7 @@ def main():
             target1 = float(target1)
 
             very_fast_cycle_mood = results["very_fast_cycle_mood"]
-            #print(very_fast_cycle_mood)
+            market_mood = results_sr["market_mood"]
 
             print()
 
@@ -2310,7 +2306,7 @@ def main():
                     if price < price1 and price < price2 and price < price3:
                         if dist_from_close_to_min <= 15:
                             if momentum > 0:
-                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish":
+                                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish" and market_mood == "Bullish":
                                     trigger_long = True
 
 
@@ -2320,7 +2316,7 @@ def main():
                     if price > price1 and price > price2 and price > price3:
                         if dist_from_close_to_max <= 15:
                             if momentum < 0:
-                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
+                                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish" and market_mood == "Bearish":
                                     trigger_short = True  
 
 
