@@ -1574,6 +1574,45 @@ print()
 ##################################################
 ##################################################
 
+def get_tsi(close_prices):
+    # Calculate the first EMA
+    ema1 = np.convolve(close_prices, np.ones(5)/5, mode='valid')
+
+    # Calculate the second EMA
+    ema2 = np.convolve(ema1, np.ones(3)/3, mode='valid')
+
+    # Calculate the TSI
+    tsi = 100 * (ema2 - np.roll(ema2, 1)) / np.roll(ema2, 1)
+
+    return tsi
+
+def get_market_mood(tsi):
+    if tsi[-1] > 25:
+        return "Uptrend (Strong)"
+    elif tsi[-1] > 0:
+        return "Uptrend (Neutral)"
+    elif tsi[-1] > -25:
+        return "Accumulation"
+    elif tsi[-1] > -50:
+        return "Dip"
+    elif tsi[-1] > -75:
+        return "Downtrend (Neutral)"
+    elif tsi[-1] > -100:
+        return "Downtrend (Weak)"
+    else:
+        # Check for a potential top
+        if (tsi[-3] < tsi[-2]) and (tsi[-2] > tsi[-1]):
+            return "Top"
+        else:
+            return "Distribution"
+
+tsi = get_market_mood(close_prices)
+
+print(tsi)
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2128,6 +2167,11 @@ def main():
             print("Current reversal bottom:", results_sr["current_reversal_bottom"])
             print("Support level:", results_sr["support_level"])
             print("Resistance level:", results_sr["resistance_level"])
+
+            print()
+
+            tsi = get_market_mood(close_prices)
+            print(tsi)
 
             print()
 
