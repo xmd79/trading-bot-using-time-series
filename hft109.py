@@ -1672,9 +1672,18 @@ def get_frequency_components(close_prices):
     lowest_frequencies = frequencies[lowest_indices]
     highest_frequencies = frequencies[highest_indices]
     
+    # Sort the power spectrum in descending order
+    sorted_indices = np.argsort(power_spectrum)[::-1]
+    sorted_spectrum = power_spectrum[sorted_indices]
+    
+    # Find the frequency corresponding to the midpoint of the sorted spectrum
+    mid_index = int(len(sorted_spectrum) / 2)
+    mid_frequency = frequencies[sorted_indices[mid_index]]
+    
     # Map the frequencies to their corresponding RF bands
     lowest_bands = [get_rf_band(f) for f in lowest_frequencies]
     highest_bands = [get_rf_band(f) for f in highest_frequencies]
+    mid_band = get_rf_band(mid_frequency)
     
     # Return the frequencies and their corresponding RF bands
     return {
@@ -1683,17 +1692,19 @@ def get_frequency_components(close_prices):
         'lowest_frequencies': lowest_frequencies,
         'lowest_bands': lowest_bands,
         'highest_frequencies': highest_frequencies,
-        'highest_bands': highest_bands
+        'highest_bands': highest_bands,
+        'mid_frequency': mid_frequency,
+        'mid_band': mid_band
     }
 
 # Call the function to get the frequency components
 components = get_frequency_components(close_prices)
 
 # Print out the results
-#print("Power Spectrum: ", components['power_spectrum'])
-#print("Frequencies: ", components['frequencies'])
 print("Lowest frequencies: ", components['lowest_frequencies'])
 print("Lowest frequency bands: ", components['lowest_bands'])
+print("Mid frequency: ", components['mid_frequency'])
+print("Mid frequency band: ", components['mid_band'])
 print("Highest frequencies: ", components['highest_frequencies'])
 print("Highest frequency bands: ", components['highest_bands'])
 
@@ -1711,23 +1722,20 @@ def get_market_mood(freq):
     else:   
        return "Downtrend" # Ultra low frequencies indicate downtrend
 
-returns = np.std(close_prices) * np.sqrt(252) # Annualized volatility
+components = get_frequency_components(close_prices)
 
-# Print lowest frequencies  
-print("Lowest 3 frequencies:")  
-for freq in components['lowest_frequencies']:
-    band = get_rf_band(freq)
-    mood = get_market_mood(freq)
-    print(f"{freq:.3f} Hz ({band}) - {mood}")
-    
-# Print highest frequencies   
-print("\nHighest 3 frequencies:")
-for freq in components['highest_frequencies']: 
-    band = get_rf_band(freq)   
-    mood = get_market_mood(freq)       
-    print(f"{freq:.3f} Hz ({band}) - {mood}")
-    
-print(f"\nAnnualized return: {returns:.2%}")
+high_avg = np.mean(components['highest_frequencies'])        
+high_mood = get_market_mood(high_avg)
+print(f"Forecast for fast cycle: {high_mood}")
+
+mid_avg = components['mid_frequency']
+mid_mood = get_market_mood(mid_avg)           
+print(f"Forecast for medium cycle: {mid_mood}")
+
+low_avg  = np.mean(components['lowest_frequencies'])  
+low_mood = get_market_mood(low_avg)       
+print(f"Forecast for large cycle: {low_mood}") 
+
 
 print()
 
@@ -2301,28 +2309,26 @@ def main():
             # Print out the results
             print("Lowest frequencies:", components['lowest_frequencies'])
             print("Lowest frequency bands:", components['lowest_bands'])
+            print("Mid frequency: ", components['mid_frequency'])
+            print("Mid frequency band: ", components['mid_band'])
             print("Highest frequencies:", components['highest_frequencies'])
             print("Highest frequency bands:", components['highest_bands'])
 
             print()
 
-            returns = np.std(close_prices) * np.sqrt(252) # Annualized volatility
+            components = get_frequency_components(close_prices)
 
-            # Print lowest frequencies  
-            print("Lowest 3 frequencies:")  
-            for freq in components['lowest_frequencies']:
-                band = get_rf_band(freq)
-                mood = get_market_mood(freq)
-                print(f"{freq:.3f} Hz ({band}) - {mood}")
-    
-            # Print highest frequencies   
-            print("\nHighest 3 frequencies:")
-            for freq in components['highest_frequencies']: 
-                band = get_rf_band(freq)   
-                mood = get_market_mood(freq)       
-                print(f"{freq:.3f} Hz ({band}) - {mood}")
-    
-            print(f"\nAnnualized return: {returns:.2%}")
+            high_avg = np.mean(components['highest_frequencies'])        
+            high_mood = get_market_mood(high_avg)
+            print(f"Forecast for fast cycle: {high_mood}")
+
+            mid_avg = components['mid_frequency']
+            mid_mood = get_market_mood(mid_avg)                  
+            print(f"Forecast for medium cycle: {mid_mood}")
+
+            low_avg  = np.mean(components['lowest_frequencies'])  
+            low_mood = get_market_mood(low_avg)       
+            print(f"Forecast for large cycle: {low_mood}") 
 
             print()
 
