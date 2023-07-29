@@ -2542,13 +2542,6 @@ def main():
             print("Cycle Direction:", forecast["cycle_direction"])
             print("Frequency Band:", forecast["frequency_band"])
             print("Market Mood:", forecast["market_mood"])
-            print("Forecast Moods: ", forecast["forecast_moods"])
-            print("Sorted Frequencies: ", forecast["sorted_frequencies"])
-            print("avg_high_mood: ", forecast["avg_high_mood"])
-            print("avg_low_mood: ", forecast["avg_low_mood"])
-            print("weighted_high_mood: ", forecast["weighted_high_mood"])
-            print("weighted_low_mood: ", forecast["weighted_low_mood"])
-            print("Mapped Quadrants: ", forecast["mapped_quadrants"])
 
             print()
 
@@ -2591,13 +2584,6 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price <= min_threshold and price < price1 and price < price2 and price < price3 and very_fast_cycle_mood == "Bullish" and forecast["current_point"] == "Apex":
-                    if momentum > 0: 
-                        trigger_long = True
-
-                elif price >= max_threshold and price > price1 and price > price2 and price > price3 and very_fast_cycle_mood == "Bearish" and forecast["current_point"] == "Right":
-                    if momentum < 0:
-                        trigger_short = True
 
                 if current_quadrant == 1: 
 
@@ -2618,21 +2604,6 @@ def main():
                                 if price > avg_mtf and price > fastest_target and price > target1 and market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish":
                                     trigger_short = True  
 
-                if market_mood_sr == "Bullish" and very_fast_cycle_mood == "Bullish" and price < price1 and price < price2 and price < price3 and forecast["current_point"] == "Apex":
-                    if momentum > 0:
-                        trigger_long = True
-
-                elif market_mood_sr == "Bearish" and very_fast_cycle_mood == "Bearish" and price > price1 and price > price2 and price > price3 and forecast["current_point"] == "Right":
-                    if momentum < 0:
-                        trigger_short = True  
-              
-                if very_fast_cycle_mood == "Bullish" and very_fast_cycle_mood == "Bullish" and price < price1 and price < price2 and price < price3 and forecast["current_point"] == "Apex":
-                    if momentum > 0:
-                        trigger_long = True
-
-                elif very_fast_cycle_mood == "Bearish" and very_fast_cycle_mood == "Bearish" and price > price1 and price > price2 and price > price3 and forecast["current_point"] == "Right":
-                    if momentum < 0:
-                        trigger_short = True 
 
                 if trigger_long:          
                     print("LONG signal!")  
