@@ -218,7 +218,7 @@ def get_close(timeframe):
 
     return closes
 
-close = get_close('5m')
+close = get_close('1m')
 #print(close)
 
 ##################################################
@@ -237,7 +237,7 @@ def get_closes(timeframe):
             
     return closes
 
-closes = get_closes('5m')
+closes = get_closes('1m')
 
 #print(closes)
 
@@ -1638,10 +1638,10 @@ def main():
         ##################################################
         
         # Get fresh closes for the current timeframe
-        closes = get_closes('5m')
+        closes = get_closes('1m')
        
         # Get close price as <class 'float'> type
-        close = get_close('5m')
+        close = get_close('1m')
         
         # Get fresh candles  
         candles = get_candles(TRADE_SYMBOL, timeframes)
@@ -1789,7 +1789,8 @@ def main():
 
             print("Current local Time is now at: ", current_time)
             print("Market mood is: ", market_mood)
-
+            market_mood_fft = market_mood
+ 
             print()
 
             print("Current close price is at : ", current_close)
@@ -2200,14 +2201,12 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fastest_target and price < target1 and market_mood == "Bullish" and market_mood_hl == "Bullish":
-                    if price < price1 and price < price2 and price < price3:
+                if price < avg_mtf and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish":
                         if dist_from_close_to_min < dist_from_close_to_max:
                             if momentum > 0:
                                 trigger_long = True
 
-                if price > avg_mtf and price > fastest_target and price > target1 and market_mood == "Bearish" and market_mood_hl == "Bearish":
-                    if price > price1 and price > price2 and price > price3:
+                if price > avg_mtf and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish":
                         if dist_from_close_to_max < dist_from_close_to_min:
                             if momentum < 0:
                                 trigger_short = True  
