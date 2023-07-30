@@ -1640,25 +1640,26 @@ def get_sma(close_prices, period):
 
     return sma
 
-def get_trading_signal(close_prices, sma5, sma12, sma26, sma56):
-    if (close_prices[-1] < sma5[-1]) and (sma5[-1] < sma12[-1] < sma26[-1] < sma56[-1]):
+def get_trading_signal(close_prices, price, sma5, sma12):
+    # Convert price to a numpy array of floats
+    price_arr = np.array([price], dtype=float)
+
+    if (price_arr < sma5[-1]) and (sma5[-1] < sma12[-1]):
         return "Below"
-    elif (close_prices[-1] > sma5[-1]) and (sma5[-1] > sma12[-1] > sma26[-1] > sma56[-1]):
+    elif (price_arr > sma5[-1]) and (sma5[-1] > sma12[-1]):
         return "Above"
     else:
         return "Hold"
 
 sma5 = get_sma(close_prices, 5)
 sma12 = get_sma(close_prices, 12)
-sma26 = get_sma(close_prices, 26)
-sma56 = get_sma(close_prices, 56)
 
-trading_signal = get_trading_signal(close_prices, sma5, sma12, sma26, sma56)
+
+trading_signal = get_trading_signal(close_prices, price, sma5, sma12)
 
 print("SMA5:", sma5[-1])
 print("SMA12:", sma12[-1])
-print("SMA26:", sma26[-1])
-print("SMA56:", sma56[-1])
+
 
 print("Trading Signal:", trading_signal)
 
@@ -2257,15 +2258,14 @@ def main():
             ##################################################
             ##################################################
 
+            sma5 = get_sma(close_prices, 5)
             sma12 = get_sma(close_prices, 12)
-            sma24 = get_sma(close_prices, 26)
 
-            trading_signal = get_trading_signal(close_prices, sma5, sma12, sma26, sma56)
+            trading_signal = get_trading_signal(close_prices, price, sma5, sma12)
 
             print("SMA5:", sma5[-1])
             print("SMA12:", sma12[-1])
-            print("SMA26:", sma26[-1])
-            print("SMA56:", sma56[-1])
+     
 
             print("Trading Signal:", trading_signal)
 
