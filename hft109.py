@@ -2253,6 +2253,9 @@ def main():
             very_fast_cycle_mood = results["very_fast_cycle_mood"]
             market_mood_hl = results_sr["market_mood"]
 
+            sup = results_sr["support_level"]
+            res = results_sr["resistance_level"]
+
             print()
 
             ##################################################
@@ -2278,12 +2281,12 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and market_mood_hl == "Bullish" and trading_signal == "Below" or trading_signal == "Hold":
+                if price < avg_mtf and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and trading_signal == "Below" or trading_signal == "Hold":
                         if dist_from_close_to_min < dist_from_close_to_max:
                             if momentum > 0:
                                 trigger_long = True
 
-                if price > avg_mtf and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and market_mood_hl == "Bearish" and trading_signal == "Above" or trading_signal == "Hold":
+                if price > avg_mtf and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and trading_signal == "Above" or trading_signal == "Hold":
                         if dist_from_close_to_max < dist_from_close_to_min:
                             if momentum < 0:
                                 trigger_short = True  
