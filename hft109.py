@@ -2407,6 +2407,11 @@ def main():
             t2 = float(t2)
             t3 = float(t3)
 
+            fast_target4 = float(fast_target4)
+            fast_target3 = float(fast_target3)
+            fast_target2 = float(fast_target2)
+            fast_target1 = float(fast_target1)
+
             print()
 
             ##################################################
@@ -2416,12 +2421,12 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and gann_sig == "Buy" and trading_signal == "Below" or trading_signal == "Hold":
+                if price < avg_mtf and price < fast_target1 and price < fast_target2 and price < fast_target3 and price < fast_target4 and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and gann_sig == "Buy" and trading_signal == "Below" or trading_signal == "Hold":
                         if dist_from_close_to_min < dist_from_close_to_max and price < t1 and price < t2 and price < t3:
                             if momentum > 0:
                                 trigger_long = True
 
-                if price > avg_mtf and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and gann_sig == "Sell" and trading_signal == "Above" or trading_signal == "Hold":
+                if price > avg_mtf and price > fast_target1 and price > fast_target2 and price > fast_target3 and price > fast_target4 and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and gann_sig == "Sell" and trading_signal == "Above" or trading_signal == "Hold":
                         if dist_from_close_to_max < dist_from_close_to_min and price > t1 and price > t2 and price > t3:
                             if momentum < 0:
                                 trigger_short = True  
