@@ -1668,6 +1668,111 @@ print()
 ##################################################
 ##################################################
 
+def make_forecasts(close_prices):
+    # Define the time periods
+    time_periods = [1, 3, 5]
+
+    # Define SMA and Gann Square functions
+    def get_sma(prices, window):
+        return np.convolve(prices, np.ones(window), 'valid') / window
+
+    def get_trading_signal(prices, price, sma5, sma12):
+        if price > sma5[-1] and price > sma12[-1]:
+            return "Buy"
+        elif price < sma5[-1] and price < sma12[-1]:
+            return "Sell"
+        else:
+            return "Hold"
+
+    def get_gann_squares(close_prices, time_periods):
+        # Calculate the Gann square levels
+        gann_levels = []
+        for i in range(1, 10):
+            gann_levels.append(close_prices[-1] + (time_periods * i))
+
+        # Generate a trading signal based on the relationship between the current price and the Gann square levels
+        price = close_prices[-1]
+        if price < gann_levels[0]:
+            return "Sell"
+        elif price > gann_levels[-1]:
+            return "Buy"
+        else:
+            return "Hold"
+
+    def get_market_mood(close_prices, time_period):
+        # Calculate the change in price over the time period
+        price_change = np.diff(close_prices[-time_period:])
+
+        # Calculate the market mood
+        market_mood = np.sign(price_change.sum())
+
+        return market_mood
+
+    def get_targets(price, gann_signal):
+        # Determine the new targets for the next 1, 3, and 5 minutes based on the trading signal
+        if gann_signal == "Buy":
+            target_1min = price * 1.001
+            target_3min = price * 1.003
+            target_5min = price * 1.005
+        elif gann_signal == "Sell":
+            target_1min = price * 0.999
+            target_3min = price * 0.997
+            target_5min = price * 0.995
+        else:
+            target_1min = price
+            target_3min = price
+            target_5min = price
+
+        return {"1min": target_1min, "3min": target_3min, "5min": target_5min}
+
+    # Calculate the SMA5 and SMA12
+    sma5 = get_sma(close_prices, 5)
+    sma12 = get_sma(close_prices, 12)
+
+    # Generate a trading signal based on the relationship between the current price and the SMA5 and SMA12 values
+    price = close_prices[-1]
+    trading_signal = get_trading_signal(close_prices, price, sma5, sma12)
+
+    # Generate a trading signal based on Gann squares for fast cycles and market mood forecasting
+    gann_signal = get_gann_squares(close_prices, time_periods=5)
+
+    # Determine the market mood for each time period
+    mood_signals = {}
+    for time_period in time_periods:
+        mood_signal = get_market_mood(close_prices, time_period)
+        mood_signals[str(time_period) + "min"] = mood_signal
+
+    # Determine the new targets for the next 1, 3, and 5 minutes based on the trading signal
+    targets = get_targets(price, gann_signal)
+
+    # Return the results
+    results = {
+        "SMA5": sma5[-1],
+        "SMA12": sma12[-1],
+        "Trading Signal": trading_signal,
+        "Gann Signal": gann_signal,
+        "Market Mood": mood_signals,
+        "Targets": targets
+    }
+
+    return results
+
+results = make_forecasts(close_prices)
+print("SMA5:", results["SMA5"])
+print("SMA12:", results["SMA12"])
+print("Trading Signal:", results["Trading Signal"])
+print("Gann Signal:", results["Gann Signal"])
+print("Market Mood:", results["Market Mood"])
+print("Targets:")
+print("1min:", results["Targets"]["1min"])
+print("3min:", results["Targets"]["3min"])
+print("5min:", results["Targets"]["5min"])
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2271,6 +2376,19 @@ def main():
      
 
             print("Trading Signal:", trading_signal)
+
+            print()
+
+            results = make_forecasts(close_prices)
+            print("SMA5:", results["SMA5"])
+            print("SMA12:", results["SMA12"])
+            print("Trading Signal:", results["Trading Signal"])
+            print("Gann Signal:", results["Gann Signal"])
+            print("Market Mood:", results["Market Mood"])
+            print("Targets:")
+            print("1min:", results["Targets"]["1min"])
+            print("3min:", results["Targets"]["3min"])
+            print("5min:", results["Targets"]["5min"])
 
             print()
 
