@@ -1693,9 +1693,9 @@ def make_forecasts(close_prices):
         # Generate a trading signal based on the relationship between the current price and the Gann square levels
         price = close_prices[-1]
         if price < gann_levels[0]:
-            return "Sell"
-        elif price > gann_levels[-1]:
             return "Buy"
+        elif price > gann_levels[-1]:
+            return "Sell"
         else:
             return "Hold"
 
@@ -2379,7 +2379,11 @@ def main():
 
             print()
 
+            ##################################################
+            ##################################################
+
             results = make_forecasts(close_prices)
+
             print("SMA5:", results["SMA5"])
             print("SMA12:", results["SMA12"])
             print("Trading Signal:", results["Trading Signal"])
@@ -2391,6 +2395,19 @@ def main():
             print("5min:", results["Targets"]["5min"])
 
             print()
+            
+            tr_sig = results["Trading Signal"]
+            gann_sig = results["Gann Signal"])
+
+            t1 =  results["Targets"]["1min"]
+            t2 =  results["Targets"]["3min"]
+            t3 =  results["Targets"]["5min"]
+
+            t1 = float(t1)
+            t2 = float(t2)
+            t3 = float(t3)
+
+            print()
 
             ##################################################
             ##################################################
@@ -2399,13 +2416,13 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and trading_signal == "Below" or trading_signal == "Hold":
-                        if dist_from_close_to_min < dist_from_close_to_max:
+                if price < avg_mtf and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and tr_sig == "Buy" and gann_sig == "Buy" and trading_signal == "Below" or trading_signal == "Hold":
+                        if dist_from_close_to_min < dist_from_close_to_max and price < t1 and price < t2 and price < t3:
                             if momentum > 0:
                                 trigger_long = True
 
-                if price > avg_mtf and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and trading_signal == "Above" or trading_signal == "Hold":
-                        if dist_from_close_to_max < dist_from_close_to_min:
+                if price > avg_mtf and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and tr_sig == "Sell" and gann_sig == "Sell" and trading_signal == "Above" or trading_signal == "Hold":
+                        if dist_from_close_to_max < dist_from_close_to_min and price > t1 and price > t2 and price > t3:
                             if momentum < 0:
                                 trigger_short = True  
 
