@@ -1693,9 +1693,9 @@ def make_forecasts(close_prices):
         # Generate a trading signal based on the relationship between the current price and the Gann square levels
         price = close_prices[-1]
         if price < gann_levels[0]:
-            return "Buy"
-        elif price > gann_levels[-1]:
             return "Sell"
+        elif price > gann_levels[-1]:
+            return "Buy"
         else:
             return "Hold"
 
