@@ -1586,6 +1586,9 @@ def get_tsi(close_prices):
 
     return tsi
 
+##################################################
+##################################################
+
 def get_market_mood(tsi):
     if tsi[-1] > 25:
         return "Uptrend (Strong)"
@@ -1605,6 +1608,9 @@ def get_market_mood(tsi):
             return "Top"
         else:
             return "Distribution"
+
+##################################################
+##################################################
 
 def get_momentum_direction(tsi):
     # Calculate the difference between the current and previous TSI values
