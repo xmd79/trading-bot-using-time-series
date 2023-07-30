@@ -2397,7 +2397,7 @@ def main():
             print()
             
             tr_sig = results["Trading Signal"]
-            gann_sig = results["Gann Signal"])
+            gann_sig = results["Gann Signal"]
 
             t1 =  results["Targets"]["1min"]
             t2 =  results["Targets"]["3min"]
