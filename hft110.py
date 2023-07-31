@@ -1476,7 +1476,7 @@ def main():
 
                 if dist_from_close_to_max < 15 and current_quadrant == 4 and price > forecast_price:
                     if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                        if momentum > 0:
+                        if momentum < 0:
                             trigger_short = True
 
                 if trigger_long:          
