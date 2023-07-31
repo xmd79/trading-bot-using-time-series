@@ -1049,31 +1049,6 @@ print()
 ##################################################
 ##################################################
 
-def gann_square(increment):
-    # Get the current price from the Binance API
-    current_price = get_current_price()
-    
-    # Set the starting price to the current price
-    start_price = current_price
-    
-    # Calculate the number of squares away from the starting square
-    n_squares = int(np.sqrt(abs(current_price)) // increment) + 1
-    
-    # Calculate the angle in radians
-    angle = np.pi / 4
-    
-    # Calculate the new price using the Square of Nine
-    x = n_squares * np.cos(angle)
-    y = n_squares * np.sin(angle)
-    new_price = start_price + np.sign(current_price) * (x + y)
-    
-    return new_price
-
-# Call the gann_square function with an increment of 10
-forecast_price = gann_square(10)
-
-# Print the forecasted price
-print("Forecasted price:", forecast_price)
 
 print()
 
@@ -1442,12 +1417,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Call the gann_square function with an increment of 10
-            forecast_price = gann_square(10)
-
-            # Print the forecasted price
-            print("Forecasted price:", forecast_price)
-
             print()
 
             ##################################################
@@ -1469,12 +1438,12 @@ def main():
                                 #if momentum < 0:
                                     #trigger_short = True  
 
-                if dist_from_close_to_min < 15 and current_quadrant == 1 and price < forecast_price:
+                if dist_from_close_to_min < 15 and current_quadrant == 1 and price < avg_mtf:
                     if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                         if momentum > 0:
                             trigger_long = True
 
-                if dist_from_close_to_max < 15 and current_quadrant == 4 and price > forecast_price:
+                if dist_from_close_to_max < 15 and current_quadrant == 4 and price > avg_mtf:
                     if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                         if momentum < 0:
                             trigger_short = True
