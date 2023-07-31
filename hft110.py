@@ -1195,7 +1195,7 @@ med_ma = results['med_ma'][-1]
 long_ma = results['long_ma'][-1]
 rsi = results['rsi'][-1]
 patterns = results['patterns']
-market_mood = results['coeffs'][-1]
+forecast_price = results['coeffs'][-1]
 trend_direction = results['trend_direction']
 
 # Print the results
@@ -1214,7 +1214,7 @@ if patterns:
     print("No potential reversal identified for the most significant chart pattern.")
 else:
     print("No chart patterns identified.")
-print("Market mood:", market_mood)
+print("Forecast price:", forecast_price)
 print("Trend direction:", trend_direction)
 
 print()
@@ -1617,7 +1617,7 @@ def main():
                 print("No potential reversal identified for the most significant chart pattern.")
             else:
                 print("No chart patterns identified.")
-            print("Market mood:", market_mood)
+            print("Forecast price:", forecast_price)
             print("Trend direction:", trend_direction)
 
             print()
