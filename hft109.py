@@ -754,8 +754,8 @@ import datetime
 
 def get_target(closes, n_components, target_distance=0.01):
     # Calculate FFT of closing prices
-    fft = fftpack.fft(closes) 
-    frequencies = fftpack.fftfreq(len(closes))
+    fft = fftpack.rfft(closes) 
+    frequencies = fftpack.rfftfreq(len(closes))
     
     # Sort frequencies by magnitude and keep only the top n_components 
     idx = np.argsort(np.abs(fft))[::-1][:n_components]
@@ -764,7 +764,7 @@ def get_target(closes, n_components, target_distance=0.01):
     # Filter out the top frequencies and reconstruct the signal
     filtered_fft = np.zeros_like(fft)
     filtered_fft[idx] = fft[idx]
-    filtered_signal = np.real(fftpack.ifft(filtered_fft))
+    filtered_signal = fftpack.irfft(filtered_fft)
     
     # Calculate the target price as the next value after the last closing price, plus a small constant
     current_close = closes[-1]
