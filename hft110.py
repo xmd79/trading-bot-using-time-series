@@ -1469,13 +1469,15 @@ def main():
                                 #if momentum < 0:
                                     #trigger_short = True  
 
-                if dist_from_close_to_min < 15 and current_quadrant == 1:
-                    if market_mood_sr == "Bullish" and momentum > 0:
-                        trigger_long = True
+                if dist_from_close_to_min < 15 and current_quadrant == 1 and price < forecast_price:
+                    if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
+                        if momentum > 0:
+                            trigger_long = True
 
-                if dist_from_close_to_max < 15 and current_quadrant == 4:
-                    if market_mood_sr == "Bearish" and momentum < 0:
-                        trigger_short = True
+                if dist_from_close_to_max < 15 and current_quadrant == 4 and price > forecast_price:
+                    if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
+                        if momentum > 0:
+                            trigger_short = True
 
                 if trigger_long:          
                     print("LONG signal!")  
