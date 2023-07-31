@@ -1574,6 +1574,41 @@ print()
 ##################################################
 ##################################################
 
+def check_support_resistance(close_prices, support_level, resistance_level):
+    """
+    Check if any value in the close_prices array is a support or resistance level.
+    Returns "Support" if a support level is found, "Resistance" if a resistance level is found,
+    or "Unknown" if neither condition is met.
+    """
+    last_price = close_prices[-1]
+    levels = {"Support": support_level, "Resistance": resistance_level}
+    closest_level = None
+    smallest_difference = float("inf")
+    for level_type, level_price in levels.items():
+        difference = abs(last_price - level_price)
+        if difference < smallest_difference:
+            closest_level = level_type
+            smallest_difference = difference
+    if closest_level == "Unknown":
+        # If neither support nor resistance level is found, return the last level in the array
+        if close_prices.index(support_level) < close_prices.index(resistance_level):
+            return "Resistance"
+        else:
+            return "Support"
+    else:
+        return closest_level
+
+# Call the check_support_resistance function
+last_level = check_support_resistance(close_prices, results["support_level"], results["resistance_level"])
+
+# Print the last level
+print("Last level:", last_level)
+
+print()
+
+##################################################
+##################################################
+
 def get_tsi(close_prices):
     # Calculate the first EMA
     ema1 = np.convolve(close_prices, np.ones(5)/5, mode='valid')
@@ -2366,6 +2401,8 @@ def main():
 
             sup = results_sr["support_level"]
             res = results_sr["resistance_level"]
+            sup = float(sup)
+            res = float(res)
 
             print()
 
@@ -2420,6 +2457,12 @@ def main():
 
             print()
 
+            # Call the check_support_resistance function
+            last_level = check_support_resistance(close_prices, results_sr["support_level"], results_sr["resistance_level"])
+
+            # Print the last level
+            print("Last level:", last_level)
+
             ##################################################
             ##################################################
 
@@ -2427,13 +2470,13 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fast_target1 and price < fast_target2 and price < fast_target3 and price < fast_target4 and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and gann_sig == "Buy" and tr_sig == "Buy" and trading_signal == "Below" or trading_signal == "Hold":
-                        if dist_from_close_to_min < dist_from_close_to_max and price < t1 and price < t2 and price < t3:
+                if price < avg_mtf and price < fast_target1 and price < fast_target2 and price < fast_target3 and price < fast_target4 and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and tr_sig == "Buy" and trading_signal == "Below" or trading_signal == "Hold":
+                        if dist_from_close_to_min < 15 and price < t1 and price < t2 and price < t3 and last_level == "Support":
                             if momentum > 0:
                                 trigger_long = True
 
-                if price > avg_mtf and price > fast_target1 and price > fast_target2 and price > fast_target3 and price > fast_target4 and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and gann_sig == "Sell" and tr_sig == "Sell" and trading_signal == "Above" or trading_signal == "Hold":
-                        if dist_from_close_to_max < dist_from_close_to_min and price > t1 and price > t2 and price > t3:
+                if price > avg_mtf and price > fast_target1 and price > fast_target2 and price > fast_target3 and price > fast_target4 and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and tr_sig == "Sell" and trading_signal == "Above" or trading_signal == "Hold":
+                        if dist_from_close_to_max < 15 and price > t1 and price > t2 and price > t3 and last_level == "Resistance":
                             if momentum < 0:
                                 trigger_short = True  
 
