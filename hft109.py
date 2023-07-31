@@ -2470,15 +2470,19 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fast_target1 < fast_target2 < fast_target3 < fast_target4 and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and tr_sig == "Buy":
-                        if dist_from_close_to_min < 15 and last_level == "Support" and current_quadrant == 1:
-                            if momentum > 0:
-                                trigger_long = True
+                if price < fast_target1 < fast_target2 < fast_target3 < fast_target4 and price < fastest_target and price < target1 < target2 < target3 < target4 < target5:
+                        if dist_from_close_to_min < 15 and current_quadrant == 1:
+                            if price < avg_mtf:
+                                if tr_sig == "Buy" or tr_sig == "Hold":
+                                    if momentum > 0:
+                                        trigger_long = True
 
-                if price > avg_mtf and price > fast_target1 > fast_target2 > fast_target3 > fast_target4 and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and tr_sig == "Sell":
-                        if dist_from_close_to_max < 15 and last_level == "Resistance" and current_quadrant == 4:
-                            if momentum < 0:
-                                trigger_short = True  
+                if price > fast_target1 > fast_target2 > fast_target3 > fast_target4 and price > fastest_target and price > target1 > target2 > target3 > target4 > target5:
+                        if dist_from_close_to_max < 15 and current_quadrant == 4:
+                            if price > avg_mtf:
+                                if tr_sig == "Sell" or tr_sig == "Hold":
+                                    if momentum < 0:
+                                        trigger_short = True  
 
                 if trigger_long:          
                     print("LONG signal!")  
