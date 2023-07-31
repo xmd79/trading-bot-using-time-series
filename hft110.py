@@ -1049,7 +1049,9 @@ print()
 ##################################################
 ##################################################
 
-def regression_channel(close, degree=1, std_devs=2, use_upper_dev=True, use_lower_dev=True):
+import numpy as np
+
+def regression_channel(close, degree=1, std_devs=2, use_upper_dev=True, use_lower_dev=True, fibo_period=30, short_ma_period=10, med_ma_period=50, long_ma_period=200):
     # Convert the list of close prices to a numpy array
     close = np.array(close)
     
@@ -1090,28 +1092,130 @@ def regression_channel(close, degree=1, std_devs=2, use_upper_dev=True, use_lowe
     # Calculate the upper and lower boundaries of the channel
     upper, lower = calc_channel(x, close, degree, std_devs, use_upper_dev, use_lower_dev)
     
-    # Find the reversal key points
-    diffs = np.diff(np.sign(np.diff(close)))
-    # Find the local maxima and minima
-    tops = (diffs < 0).nonzero()[0] + 1
-    dips = (diffs > 0).nonzero()[0] + 1
+    # Calculate the minimum and maximum prices over the fibo period
+    fibo_min = np.min(close[-fibo_period:])
+    fibo_max = np.max(close[-fibo_period:])
     
-    # Calculate the prices of the reversal key points
-    top_prices = close[tops]
-    dip_prices = close[dips]
+    # Define the Fibonacci retracement levels
+    fibo_scale = [1/1.618**n for n in range(6)]
+    fibo_levels = [fibo_min + level * (fibo_max - fibo_min) for level in fibo_scale]
     
-    # Return the regression coefficients, channel boundaries, and reversal key points and their prices
-    return coeffs, upper, lower, tops, dips, top_prices, dip_prices
+    # Calculate the dips and tops based on the Fibonacci retracement levels
+    dips = [fibo_max - ratio * (fibo_max - fibo_min) for ratio in fibo_scale]
+    tops = [fibo_min + ratio * (fibo_max - fibo_min) for ratio in fibo_scale]
 
-coeffs, upper, lower, tops, dips, top_prices, dip_prices = regression_channel(close)
+    # Calculate the prices of the dips and tops
+    dip_prices = np.interp(dips, close, x)
+    top_prices = np.interp(tops, close, x)
 
-print("Regression Coefficients: ", coeffs[-1])
-print("Upper Channel: ", upper[-1])
-print("Lower Channel: ", lower[-1])
-print("Tops: ", tops[-1])
-print("Dips: ", dips[-1])
-print("Top Prices: ", top_prices[-1])
-print("Dip Prices: ", dip_prices[-1])
+    # Calculate the short-term, medium-term, and long-term moving averages
+    short_ma = np.convolve(close, np.ones(short_ma_period)/short_ma_period, mode='valid')
+    med_ma = np.convolve(close, np.ones(med_ma_period)/med_ma_period, mode='valid')
+    long_ma = np.convolve(close, np.ones(long_ma_period)/long_ma_period, mode='valid')
+
+    # Calculate the RSI
+    delta = np.diff(close)
+    gain = delta.copy()
+    loss = delta.copy()
+    gain[delta < 0] = 0
+    loss[delta > 0] = 0
+    avg_gain = np.convolve(gain, np.ones(short_ma_period)/short_ma_period, mode='valid')
+    avg_loss = np.convolve(loss, np.ones(short_ma_period)/short_ma_period, mode='valid')
+    rs = avg_gain / np.maximum(avg_loss, 1e-6)
+    rsi = 100 - (100 / (1 + rs))
+
+    # Identify chart patterns
+    patterns = []
+
+    # Identify head and shoulder pattern
+    for i in range(2, len(close)-2):
+        left_side = close[i-2:i]
+        head = close[i]
+        right_side = close[i+1:i+3]
+
+        if left_side[0] < left_side[1] and \
+           left_side[1] < head and \
+           right_side[0] < head and \
+           right_side[0] < right_side[1]:
+            patterns.append(('head and shoulders', i))
+
+    # Identify double top pattern
+    for i in range(1, len(close)-1):
+        if close[i-1] < close[i] and \
+           close[i+1] < close[i]:
+            prev_peak = np.max(close[:i])
+            if close[i] == prev_peak:
+                patterns.append(('double top', i))
+
+    # Identify double bottom pattern
+    for i in range(1, len(close)-1):
+        if close[i-1] > close[i] and \
+           close[i+1] > close[i]:
+            prev_bottom= np.min(close[:i])
+            if close[i] == prev_bottom:
+                patterns.append(('double bottom', i))
+
+    # Identify trend direction
+    if close[-1] > long_ma[-1]:
+        trend_direction = 'up'
+    else:
+        trend_direction = 'down'
+
+    # Return the results as a dictionary
+    results = {
+        'coeffs': coeffs,
+        'upper': upper,
+        'lower': lower,
+        'fibo_levels': fibo_levels,
+        'dips': dips,
+        'tops': tops,
+        'dip_prices': dip_prices,
+        'top_prices': top_prices,
+        'short_ma': short_ma,
+        'med_ma': med_ma,
+        'long_ma': long_ma,
+        'rsi': rsi,
+        'patterns': patterns,
+        'trend_direction': trend_direction
+    }
+
+    return results
+
+# Call the regression_channel function
+results = regression_channel(close_prices)
+
+# Extract the results
+upper = results['upper'][-1]
+lower = results['lower'][-1]
+fibo_levels = results['fibo_levels']
+dip_price = results['dip_prices'][0]
+top_price = results['top_prices'][0]
+short_ma = results['short_ma'][-1]
+med_ma = results['med_ma'][-1]
+long_ma = results['long_ma'][-1]
+rsi = results['rsi'][-1]
+patterns = results['patterns']
+market_mood = results['coeffs'][-1]
+trend_direction = results['trend_direction']
+
+# Print the results
+print("Upper channel boundary:", upper)
+print("Lower channel boundary:", lower)
+print("Fibonacci retracement levels:", fibo_levels)
+print("Dip price:", dip_price)
+print("Top price:", top_price)
+print("Short-term moving average:", short_ma)
+print("Medium-term moving average:", med_ma)
+print("Long-term moving average:", long_ma)
+print("RSI:", rsi)
+if patterns:
+    most_significant_pattern = patterns[-1]
+    print("Most significant chart pattern:", most_significant_pattern[0], "at price level:", close_prices[most_significant_pattern[1]])
+    print("No potential reversal identified for the most significant chart pattern.")
+else:
+    print("No chart patterns identified.")
+print("Market mood:", market_mood)
+print("Trend direction:", trend_direction)
 
 print()
 
@@ -1480,15 +1584,41 @@ def main():
             ##################################################
             ##################################################
 
-            coeffs, upper, lower, tops, dips, top_prices, dip_prices = regression_channel(close)
+            # Call the regression_channel function
+            results = regression_channel(close_prices)
 
-            print("Regression Coefficients: ", coeffs[-1])
-            print("Upper Channel: ", upper[-1])
-            print("Lower Channel: ", lower[-1])
-            print("Tops: ", tops[-1])
-            print("Dips: ", dips[-1])
-            print("Top Prices: ", top_prices[-1])
-            print("Dip Prices: ", dip_prices[-1])
+            # Extract the results
+            upper = results['upper'][-1]
+            lower = results['lower'][-1]
+            fibo_levels = results['fibo_levels']
+            dip_price = results['dip_prices'][0]
+            top_price = results['top_prices'][0]
+            short_ma = results['short_ma'][-1]
+            med_ma = results['med_ma'][-1]
+            long_ma = results['long_ma'][-1]
+            rsi = results['rsi'][-1]
+            patterns = results['patterns']
+            market_mood = results['coeffs'][-1]
+            trend_direction = results['trend_direction']
+
+            # Print the results
+            print("Upper channel boundary:", upper)
+            print("Lower channel boundary:", lower)
+            print("Fibonacci retracement levels:", fibo_levels)
+            print("Dip price:", dip_price)
+            print("Top price:", top_price)
+            print("Short-term moving average:", short_ma)
+            print("Medium-term moving average:", med_ma)
+            print("Long-term moving average:", long_ma)
+            print("RSI:", rsi)
+            if patterns:
+                most_significant_pattern = patterns[-1]
+                print("Most significant chart pattern:", most_significant_pattern[0], "at price level:", close_prices[most_significant_pattern[1]])
+                print("No potential reversal identified for the most significant chart pattern.")
+            else:
+                print("No chart patterns identified.")
+            print("Market mood:", market_mood)
+            print("Trend direction:", trend_direction)
 
             print()
 
