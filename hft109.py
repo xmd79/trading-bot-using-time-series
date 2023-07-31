@@ -2471,18 +2471,28 @@ def main():
                 timestamp = current_time.strftime("%d %H %M %S")
 
                 if price < fast_target1 < fast_target2 < fast_target3 < fast_target4 and price < fastest_target and price < target1 < target2 < target3 < target4 < target5:
-                        if dist_from_close_to_min < 15 and current_quadrant == 1:
-                            if price < avg_mtf:
-                                if tr_sig == "Buy" or tr_sig == "Hold":
-                                    if momentum > 0:
-                                        trigger_long = True
+                        if price < avg_mtf:
+                            if tr_sig == "Buy" or tr_sig == "Hold":
+                                if momentum > 0:
+                                    trigger_long = True
 
                 if price > fast_target1 > fast_target2 > fast_target3 > fast_target4 and price > fastest_target and price > target1 > target2 > target3 > target4 > target5:
-                        if dist_from_close_to_max < 15 and current_quadrant == 4:
-                            if price > avg_mtf:
-                                if tr_sig == "Sell" or tr_sig == "Hold":
-                                    if momentum < 0:
-                                        trigger_short = True  
+                        if price > avg_mtf:
+                            if tr_sig == "Sell" or tr_sig == "Hold":
+                                if momentum < 0:
+                                    trigger_short = True  
+
+                if dist_from_close_to_min < 15 and current_quadrant == 1:
+                    if gann_sig == "Buy":
+                        if tr_sig == "Buy" or tr_sig == "Hold":
+                            if momentum > 0:
+                                trigger_long = True
+
+                if dist_from_close_to_max < 15 and current_quadrant == 4:
+                    if gann_sig == "Sell":
+                        if tr_sig == "Sell" or tr_sig == "Hold":
+                            if momentum < 0:
+                                trigger_short = True
 
                 if trigger_long:          
                     print("LONG signal!")  
