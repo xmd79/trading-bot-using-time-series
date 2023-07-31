@@ -2463,8 +2463,6 @@ def main():
             # Print the last level
             print("Last level:", last_level)
 
-            print()
-
             ##################################################
             ##################################################
 
@@ -2472,15 +2470,15 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < avg_mtf and price < fast_target1 and price < fast_target2 and price < fast_target3 and price < fast_target4 and price < fastest_target and price < target1 < target2 and market_mood_fft == "Bullish":
-                    if tr_sig == "Buy" or tr_sig == "Hold":
-                        if momentum > 0:
-                            trigger_long = True
+                if price < avg_mtf and price < fast_target1 < fast_target2 < fast_target3 < fast_target4 and price < fastest_target and price < target1 and market_mood_fft == "Bullish" and tr_sig == "Buy":
+                        if dist_from_close_to_min < 15 and last_level == "Support" and current_quadrant == 1:
+                            if momentum > 0:
+                                trigger_long = True
 
-                if price > avg_mtf and price > fast_target1 and price > fast_target2 and price > fast_target3 and price > fast_target4 and price > fastest_target and price > target1 > target2 and market_mood_fft == "Bearish": 
-                    if tr_sig == "Sell" or tr_sig == "Hold":
-                        if momentum < 0:
-                            trigger_short = True  
+                if price > avg_mtf and price > fast_target1 > fast_target2 > fast_target3 > fast_target4 and price > fastest_target and price > target1 and market_mood_fft == "Bearish" and tr_sig == "Sell":
+                        if dist_from_close_to_max < 15 and last_level == "Resistance" and current_quadrant == 4:
+                            if momentum < 0:
+                                trigger_short = True  
 
                 if trigger_long:          
                     print("LONG signal!")  
