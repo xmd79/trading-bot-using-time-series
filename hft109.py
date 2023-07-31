@@ -2471,12 +2471,12 @@ def main():
                 timestamp = current_time.strftime("%d %H %M %S")
 
                 if price < avg_mtf and price < fast_target1 and price < fast_target2 and price < fast_target3 and price < fast_target4 and price < fastest_target and price < target1 and price < price1 and market_mood_fft == "Bullish" and tr_sig == "Buy" and trading_signal == "Below" or trading_signal == "Hold":
-                        if dist_from_close_to_min < 15 and price < t1 and price < t2 and price < t3 and last_level == "Support":
+                        if dist_from_close_to_min < 15 and price < t1 and price < t2 and price < t3 and last_level == "Support" and current_quadrant == 1:
                             if momentum > 0:
                                 trigger_long = True
 
                 if price > avg_mtf and price > fast_target1 and price > fast_target2 and price > fast_target3 and price > fast_target4 and price > fastest_target and price > target1 and price > price1 and market_mood_fft == "Bearish" and tr_sig == "Sell" and trading_signal == "Above" or trading_signal == "Hold":
-                        if dist_from_close_to_max < 15 and price > t1 and price > t2 and price > t3 and last_level == "Resistance":
+                        if dist_from_close_to_max < 15 and price > t1 and price > t2 and price > t3 and last_level == "Resistance" and current_quadrant == 4:
                             if momentum < 0:
                                 trigger_short = True  
 
