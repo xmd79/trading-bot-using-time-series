@@ -1188,12 +1188,12 @@ results = regression_channel(close_prices)
 upper = results['upper'][-1]
 lower = results['lower'][-1]
 fibo_levels = results['fibo_levels']
-#dip_price = results['dip_prices'][0]
-#top_price = results['top_prices'][0]
-#short_ma = results['short_ma'][-1]
-#med_ma = results['med_ma'][-1]
-#long_ma = results['long_ma'][-1]
-#rsi = results['rsi'][-1]
+dip_price = results['dip_prices'][0]
+top_price = results['top_prices'][0]
+short_ma = results['short_ma'][-1]
+med_ma = results['med_ma'][-1]
+long_ma = results['long_ma'][-1]
+rsi = results['rsi'][-1]
 patterns = results['patterns']
 market_mood = results['coeffs'][-1]
 trend_direction = results['trend_direction']
@@ -1202,12 +1202,12 @@ trend_direction = results['trend_direction']
 print("Upper channel boundary:", upper)
 print("Lower channel boundary:", lower)
 print("Fibonacci retracement levels:", fibo_levels)
-print("Dip price:", dip_price)
-print("Top price:", top_price)
-print("Short-term moving average:", short_ma)
-print("Medium-term moving average:", med_ma)
-print("Long-term moving average:", long_ma)
-print("RSI:", rsi)
+#print("Dip price:", dip_price)
+#print("Top price:", top_price)
+#print("Short-term moving average:", short_ma)
+#print("Medium-term moving average:", med_ma)
+#print("Long-term moving average:", long_ma)
+#print("RSI:", rsi)
 if patterns:
     most_significant_pattern = patterns[-1]
     print("Most significant chart pattern:", most_significant_pattern[0], "at price level:", close_prices[most_significant_pattern[1]])
@@ -1591,12 +1591,12 @@ def main():
             upper = results['upper'][-1]
             lower = results['lower'][-1]
             fibo_levels = results['fibo_levels']
-            #dip_price = results['dip_prices'][0]
-            #top_price = results['top_prices'][0]
-            #short_ma = results['short_ma'][-1]
-            #med_ma = results['med_ma'][-1]
-            #long_ma = results['long_ma'][-1]
-            #rsi = results['rsi'][-1]
+            dip_price = results['dip_prices'][0]
+            top_price = results['top_prices'][0]
+            short_ma = results['short_ma'][-1]
+            med_ma = results['med_ma'][-1]
+            long_ma = results['long_ma'][-1]
+            rsi = results['rsi'][-1]
             patterns = results['patterns']
             market_mood = results['coeffs'][-1]
             trend_direction = results['trend_direction']
@@ -1605,12 +1605,12 @@ def main():
             print("Upper channel boundary:", upper)
             print("Lower channel boundary:", lower)
             print("Fibonacci retracement levels:", fibo_levels)
-            print("Dip price:", dip_price)
-            print("Top price:", top_price)
-            print("Short-term moving average:", short_ma)
-            print("Medium-term moving average:", med_ma)
-            print("Long-term moving average:", long_ma)
-            print("RSI:", rsi)
+            #print("Dip price:", dip_price)
+            #print("Top price:", top_price)
+            #print("Short-term moving average:", short_ma)
+            #print("Medium-term moving average:", med_ma)
+            #print("Long-term moving average:", long_ma)
+            #print("RSI:", rsi)
             if patterns:
                 most_significant_pattern = patterns[-1]
                 print("Most significant chart pattern:", most_significant_pattern[0], "at price level:", close_prices[most_significant_pattern[1]])
