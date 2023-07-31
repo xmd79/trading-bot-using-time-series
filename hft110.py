@@ -1188,12 +1188,12 @@ results = regression_channel(close_prices)
 upper = results['upper'][-1]
 lower = results['lower'][-1]
 fibo_levels = results['fibo_levels']
-dip_price = results['dip_prices'][0]
-top_price = results['top_prices'][0]
-short_ma = results['short_ma'][-1]
-med_ma = results['med_ma'][-1]
-long_ma = results['long_ma'][-1]
-rsi = results['rsi'][-1]
+#dip_price = results['dip_prices'][0]
+#top_price = results['top_prices'][0]
+#short_ma = results['short_ma'][-1]
+#med_ma = results['med_ma'][-1]
+#long_ma = results['long_ma'][-1]
+#rsi = results['rsi'][-1]
 patterns = results['patterns']
 market_mood = results['coeffs'][-1]
 trend_direction = results['trend_direction']
@@ -1591,12 +1591,12 @@ def main():
             upper = results['upper'][-1]
             lower = results['lower'][-1]
             fibo_levels = results['fibo_levels']
-            dip_price = results['dip_prices'][0]
-            top_price = results['top_prices'][0]
-            short_ma = results['short_ma'][-1]
-            med_ma = results['med_ma'][-1]
-            long_ma = results['long_ma'][-1]
-            rsi = results['rsi'][-1]
+            #dip_price = results['dip_prices'][0]
+            #top_price = results['top_prices'][0]
+            #short_ma = results['short_ma'][-1]
+            #med_ma = results['med_ma'][-1]
+            #long_ma = results['long_ma'][-1]
+            #rsi = results['rsi'][-1]
             patterns = results['patterns']
             market_mood = results['coeffs'][-1]
             trend_direction = results['trend_direction']
@@ -1630,13 +1630,13 @@ def main():
                 timestamp = current_time.strftime("%d %H %M %S")
 
                 if price < fast_target1 < fast_target2 < fast_target3 < fast_target4 and price < fastest_target and price < target1 < target2 < target3 < target4 < target5:
-                    if dist_from_close_to_min < 15 and current_quadrant == 1 and price < avg_mtf:
+                    if dist_from_close_to_min < 15 and current_quadrant == 1 and price < avg_mtf and trend_direction == "Up":
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                             if momentum > 0:
                                 trigger_long = True
 
                 if price > fast_target1 > fast_target2 > fast_target3 > fast_target4 and price > fastest_target and price > target1 > target2 > target3 > target4 > target5:
-                    if dist_from_close_to_max < 15 and current_quadrant == 4 and price > avg_mtf:
+                    if dist_from_close_to_max < 15 and current_quadrant == 4 and price > avg_mtf and trend_direction == "Down":
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                             if momentum < 0:
                                 trigger_short = True
