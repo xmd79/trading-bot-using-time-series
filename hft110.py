@@ -1049,6 +1049,69 @@ print()
 ##################################################
 ##################################################
 
+def regression_channel(close, degree=1, std_devs=2, use_upper_dev=True, use_lower_dev=True):
+    # Convert the list of close prices to a numpy array
+    close = np.array(close)
+    
+    # Define the x values as a range starting from 1
+    x = np.arange(1, len(close)+1)
+    
+    # Define a function to calculate the polynomial regression coefficients
+    def polyfit(x, y, degree):
+        coefficients = np.polyfit(x, y, degree)
+        return coefficients
+
+    # Define a function to calculate the upper and lower boundaries of the channel
+    def calc_channel(x, y, degree, std_devs, use_upper_dev=True, use_lower_dev=True):
+        coeffs = polyfit(x, y, degree)
+        poly = np.poly1d(coeffs)
+
+        residuals = y - poly(x)
+        std_dev = np.std(residuals)
+
+        if use_upper_dev:
+            upper_dev = std_devs * std_dev
+        else:
+            upper_dev = 0
+
+        if use_lower_dev:
+            lower_dev = -std_devs * std_dev
+        else:
+            lower_dev = 0
+
+        upper = poly(x) + upper_dev
+        lower = poly(x) + lower_dev
+
+        return upper, lower
+    
+    # Calculate the polynomial regression coefficients
+    coeffs = polyfit(x, close, degree)
+
+    # Calculate the upper and lower boundaries of the channel
+    upper, lower = calc_channel(x, close, degree, std_devs, use_upper_dev, use_lower_dev)
+    
+    # Find the reversal key points
+    diffs = np.diff(np.sign(np.diff(close)))
+    # Find the local maxima and minima
+    tops = (diffs < 0).nonzero()[0] + 1
+    dips = (diffs > 0).nonzero()[0] + 1
+    
+    # Calculate the prices of the reversal key points
+    top_prices = close[tops]
+    dip_prices = close[dips]
+    
+    # Return the regression coefficients, channel boundaries, and reversal key points and their prices
+    return coeffs, upper, lower, tops, dips, top_prices, dip_prices
+
+coeffs, upper, lower, tops, dips, top_prices, dip_prices = regression_channel(close)
+
+print("Regression Coefficients: ", coeffs[-1])
+print("Upper Channel: ", upper[-1])
+print("Lower Channel: ", lower[-1])
+print("Tops: ", tops[-1])
+print("Dips: ", dips[-1])
+print("Top Prices: ", top_prices[-1])
+print("Dip Prices: ", dip_prices[-1])
 
 print()
 
@@ -1416,6 +1479,16 @@ def main():
 
             ##################################################
             ##################################################
+
+            coeffs, upper, lower, tops, dips, top_prices, dip_prices = regression_channel(close)
+
+            print("Regression Coefficients: ", coeffs[-1])
+            print("Upper Channel: ", upper[-1])
+            print("Lower Channel: ", lower[-1])
+            print("Tops: ", tops[-1])
+            print("Dips: ", dips[-1])
+            print("Top Prices: ", top_prices[-1])
+            print("Dip Prices: ", dip_prices[-1])
 
             print()
 
