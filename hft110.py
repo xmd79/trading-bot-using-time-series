@@ -2026,14 +2026,14 @@ def main():
 
                 if current_quadrant == 1:
                     if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5:
-                        if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max:
+                        if dist_from_close_to_min < dist_from_close_to_max:
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                                 if momentum > 0:
                                     trigger_long = True
 
                 if current_quadrant == 4:
                     if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5:
-                        if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min:
+                        if dist_from_close_to_max < dist_from_close_to_min:
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                                 if momentum < 0:
                                     trigger_short = True
