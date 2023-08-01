@@ -1427,7 +1427,7 @@ def main():
             print("fft target3: ", target3)
             print("fft target4: ", target4)
             print("fft target5: ", target5)
-            print("fft avrg mtf price: ", avrg_mtf)
+            print("fft avrg mtf price: ", avg_mtf)
             print("dist from close to sine min: ", dist_from_close_to_min)
             print("dist from close to sine max: ", dist_from_close_to_max)
             print("dist from close to thres min: ", pct_diff_to_min)
