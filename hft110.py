@@ -1107,7 +1107,8 @@ def main():
             # Calculate fresh sine wave  
             close_prices = np.array(closes)
             sine, leadsine = talib.HT_SINE(close_prices)
-                
+            sine = -sine
+    
             # Call scale_to_sine() function   
             #dist_from_close_to_min, dist_from_close_to_max = scale_to_sine('1m')
 
@@ -1442,8 +1443,6 @@ def main():
             print("The highest close value in the array is:", max_val)
             print("momentum market mood: ", market_mood_sr)
             print("momentum value: ", momentum)
-            print("trigger long is now: ", trigger_long)
-            print("trigger short is now: ", trigger_short)
 
             print()
             ##################################################
@@ -1465,7 +1464,7 @@ def main():
                             if momentum < 0:
                                 trigger_short = True
 
-                if trigger_long:          
+                if trigger_long:        
                     print("LONG signal!")  
                     f.write(f"{timestamp} LONG {price}\n") 
                     trigger_long = False
