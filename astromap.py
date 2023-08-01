@@ -2,6 +2,8 @@ import datetime
 import pytz
 import ephem
 import math
+from astroquery.jplhorizons import Horizons
+from astropy.time import Time
 
 def get_moon_phase_momentum(current_time):
     # Set up timezone information
@@ -110,6 +112,34 @@ def get_astro_map_data(current_time):
     
     return astro_map_data
 
+def get_planet_positions():
+    now = Time.now()
+    
+    planet_positions = {}
+    sun_position = {}
+    
+    planets = [
+        {'name': 'Mercury', 'id': '1'},
+        {'name': 'Venus', 'id': '2'},
+        {'name': 'Mars', 'id': '4'},
+        {'name': 'Jupiter', 'id': '5'},
+        {'name': 'Saturn', 'id': '6'}
+    ]
+    
+    for planet in planets:
+       obj = Horizons(id=planet['id'], location='500', epochs=now.jd)  
+       eph = obj.ephemerides()[0] 
+       planet_positions[planet['name']] = {'RA': eph['RA'], 'DEC': eph['DEC']}
+       
+    obj = Horizons(id='10', location='500', epochs=now.jd)  
+    eph = obj.ephemerides()[0]  
+    sun_position['RA'] = eph['RA']  
+    sun_position['DEC'] = eph['DEC']
+        
+    return planet_positions, sun_position
+
+planet_positions, sun_position = get_planet_positions()
+
 def get_vedic_houses(date, observer):
     # Convert datetime to ephem date
     date_ephem = ephem.Date(date)
@@ -169,10 +199,11 @@ def get_vedic_sign(deg):
 
 # Define list of stars
 stars = [
-    ('Polaris', '02:31:49.09', '+89:15:50.8'),
+    ('Sun', ephem.Sun(), ''),    
+    ('Polaris', '02:31:49.09', '+89:15:50.8'), 
     ('Vega', '18:36:56.34', '+38:47:01.3'),
     ('Betelgeuse', '05:55:10.31', '+07:24:25.4'),
-    ('Rigel', '05:14:32.28', '-08:12:05.9'),
+    ('Rigel', '05:14:32.28', '-08:12:05.9'),  
     ('Achernar', '01:37:42.84', '-57:14:12.3'),
     ('Hadar', '14:03:49.40', '-60:22:22.3'),
     ('Altair', '19:50:46.99', '+08:52:05.9'),
@@ -284,3 +315,100 @@ for house, sign in vedic_houses.items():
     print(f"House {house} - {sign} at {degree:.2f} degrees") 
 
 print()
+
+from astroquery.jplhorizons import Horizons
+from astropy.time import Time
+
+def get_planet_positions():
+    # Define the list of planets to retrieve positions for
+    planets = [{'name': 'Mercury', 'id': '1'},
+               {'name': 'Venus', 'id': '2'},
+               {'name': 'Mars', 'id': '4'},
+               {'name': 'Jupiter', 'id': '5'},
+               {'name': 'Saturn', 'id': '6'},
+               {'name': 'Uranus', 'id': '7'},
+               {'name': 'Neptune', 'id': '8'}]
+
+    # Get the current date and time in UTC
+    now = Time.now()
+
+    # Create empty dictionaries to store the planet and sun positions
+    planet_positions = {}
+    sun_position = {}
+
+    # Loop through each planet and retrieve its position
+    for planet in planets:
+        # Query the JPL Horizons database to get the planet's position
+        obj = Horizons(id=planet['id'], location='500', epochs=now.jd)
+        eph = obj.ephemerides()[0]
+
+        # Store the position in the dictionary
+        planet_positions[planet['name']] = {'RA': eph['RA'], 'DEC': eph['DEC']}
+
+    # Retrieve the position of the Sun
+    obj = Horizons(id='10', location='500', epochs=now.jd)
+    eph = obj.ephemerides()[0]
+
+    # Store the position in the dictionary
+    sun_position['RA'] = eph['RA']
+    sun_position['DEC'] = eph['DEC']
+
+    # Return the dictionaries of planet and sun positions
+    return planet_positions, sun_position
+
+# Call the function to retrieve the planet and sun positions
+planet_positions, sun_position = get_planet_positions()
+
+# Print the positions in a detailed format
+print('Planet Positions:')
+for planet_name, position in planet_positions.items():
+    print('{}\n\tRA: {}\n\tDEC: {}'.format(planet_name, position['RA'], position['DEC']))
+    
+print('Sun Position:')
+print('\tRA: {}\n\tDEC: {}'.format(sun_position['RA'], sun_position['DEC']))
+
+print()
+
+# Function to convert degrees to hours, minutes, seconds
+def deg_to_hours(deg_str):
+    deg, minute, sec = deg_str.split(':') 
+    degrees = float(deg)
+    minutes = float(minute) / 60  
+    seconds = float(sec) / 3600    
+    return degrees + minutes + seconds
+
+def get_star_positions_from_sun(date):
+    sun = ephem.Sun()
+    sun.compute(date)
+    
+    obs = ephem.Observer()       
+    obs.lon = math.degrees(sun.a_ra)   
+    obs.lat = math.degrees(sun.a_dec)        
+    obs.date = ephem.Date(date)
+    
+    star_positions = []    
+            
+    for star in stars:
+        if star[0] == 'Sun':    
+            star_ephem = ephem.Sun() 
+        else:          
+            if len(star) == 3 and star[2]:
+               dec_deg = deg_to_hours(star[2])       
+               fixed_body = ephem.FixedBody()        
+               fixed_body._ra = star[1]
+               fixed_body._dec = dec_deg
+               star_ephem = fixed_body 
+         
+        star_ephem.compute(obs)       
+       
+        ra_deg = math.degrees(star_ephem.ra)     
+        dec_deg = math.degrees(star_ephem.dec)      
+        star_positions.append((star[0], ra_deg, dec_deg))
+            
+    return star_positions
+
+date = datetime.datetime.now()
+star_positions = get_star_positions_from_sun(date)
+
+for name, ra, dec in star_positions:
+    print(f"{name}: RA = {ra}, DEC = {dec}")  
