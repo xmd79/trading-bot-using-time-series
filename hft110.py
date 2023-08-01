@@ -506,9 +506,9 @@ def generate_momentum_sinewave(timeframes):
         #print(f"Last reversal was at {last_reversal} on the sine wave at {last_reversal_value_on_sine:.2f} ")
 
     # Return the momentum sorter, market mood, close prices between min and max sine, and reversal info
-    return momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max      
+    return momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max, min_val, max_val      
 
-momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max = generate_momentum_sinewave(timeframes)
+momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max, min_val, max_val = generate_momentum_sinewave(timeframes)
 
 print()
 
@@ -522,6 +522,10 @@ print("distances as percentages from close to min: ", dist_from_close_to_min, "%
 print("distances as percentages from close to max: ", dist_from_close_to_max, "%")
 print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
 print("Mood on 1min timeframe is now at: ", market_mood[-12])
+print("The lowest close value in the array is:", min_val)
+print("The highest close value in the array is:", max_val)
+
+
 
 print()
 
@@ -1120,7 +1124,7 @@ def main():
 
             print()
 
-            momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max = generate_momentum_sinewave(timeframes)
+            momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max, min_val, max_val = generate_momentum_sinewave(timeframes)
         
             print()
 
@@ -1129,6 +1133,8 @@ def main():
             print("Distance as percentages from close to max: ", dist_from_close_to_max, "%")
             #print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
             print("Mood on 1min timeframe is now at: ", market_mood[-12])
+            print("The lowest close value in the array is:", min_val)
+            print("The highest close value in the array is:", max_val)
 
             print()
 
@@ -1432,6 +1438,8 @@ def main():
             print("dist from close to sine max: ", dist_from_close_to_max)
             print("dist from close to thres min: ", pct_diff_to_min)
             print("dist from close to thres max: ", pct_diff_to_max)
+            print("The lowest close value in the array is:", min_val)
+            print("The highest close value in the array is:", max_val)
             print("momentum market mood: ", market_mood_sr)
             print("momentum value: ", momentum)
             print("trigger long is now: ", trigger_long)
