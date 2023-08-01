@@ -1437,13 +1437,16 @@ def main():
             print("Minimum threshold:", min_threshold)
             print("Avrg mtf price: ", avg_mtf)
             print("Maximum threshold:", max_threshold)
+            print("The lowest close value in the array is:", min_val)
+            print("The highest close value in the array is:", max_val)
+
+            print()
+
             print("Current quadrant: ", current_quadrant)
             print("dist from close to sine min: ", dist_from_close_to_min)
             print("dist from close to sine max: ", dist_from_close_to_max)
             print("dist from close to thres min: ", pct_diff_to_min)
             print("dist from close to thres max: ", pct_diff_to_max)
-            print("The lowest close value in the array is:", min_val)
-            print("The highest close value in the array is:", max_val)
             print("momentum market mood: ", market_mood_sr)
             print("momentum value: ", momentum)
 
