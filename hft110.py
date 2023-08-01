@@ -1417,10 +1417,10 @@ def main():
             ##################################################
             ##################################################
             print("current price at: ", price)
-            print("fft fast target1: ", fast_target1)
-            print("fft fast target2: ", fast_target2)
-            print("fft fast target3: ", fast_target3)
-            print("fft fast target4:", fast_target4)
+            print("fft fast target1: ", fast_target4)
+            print("fft fast target2: ", fast_target3)
+            print("fft fast target3: ", fast_target2)
+            print("fft fast target4:", fast_target1)
             print("fft fastest target: ", fastest_target)
             print("fft target1: ", target1)
             print("fft target2: ", target2)
@@ -1445,13 +1445,13 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if price < fast_target1 < fast_target2 < fast_target3 < fast_target4 and price < fastest_target and price < target1 < target2 < target3 < target4 < target5 and price < avg_mtf:
+                if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5:
                     if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                             if momentum > 0:
                                 trigger_long = True
 
-                if price > fast_target1 > fast_target2 > fast_target3 > fast_target4 and price > fastest_target and price > target1 > target2 > target3 > target4 > target5 and price > avg_mtf:
+                if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5:
                     if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                             if momentum < 0:
