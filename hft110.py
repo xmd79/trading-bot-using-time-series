@@ -1416,7 +1416,28 @@ def main():
 
             ##################################################
             ##################################################
+            print("current price at: ", price)
+            print("fft fast target1: ", fast_target1)
+            print("fft fast target2: ", fast_target2)
+            print("fft fast target3: ", fast_target3)
+            print("fft fast target4:", fast_target4)
+            print("fft fastest target: ", fastest_target)
+            print("fft target1: ", target1)
+            print("fft target2: ", target2)
+            print("fft target3: ", target3)
+            print("fft target4: ", target4)
+            print("fft target5: ", target5)
+            print("fft avrg mtf price: ", avrg_mtf)
+            print("dist from close to sine min: ", dist_from_close_to_min)
+            print("dist from close to sine max: ", dist_from_close_to_max)
+            print("dist from close to thres min: ", pct_diff_to_min)
+            print("dist from close to thres max: ", pct_diff_to_max)
+            print("momentum market mood: ", market_mood_sr)
+            print("momentum value: ", momentum)
+            print("trigger long is now: ", trigger_long)
+            print("trigger short is now: ", trigger_short)
 
+            print()
             ##################################################
             ##################################################
 
