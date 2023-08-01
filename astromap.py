@@ -412,3 +412,66 @@ star_positions = get_star_positions_from_sun(date)
 
 for name, ra, dec in star_positions:
     print(f"{name}: RA = {ra}, DEC = {dec}")  
+
+print()
+
+def get_observer():
+    obs = ephem.Observer() 
+    obs.lon = '21.21621'  # Longitude of Timișoara  
+    obs.lat = '45.75415'  # Latitude of Timișoara
+    obs.elevation = 102   # Elevation of Timișoara in meters
+    obs.date = ephem.now()
+    return obs
+
+def get_current_aspects():
+    # Create an observer at your location
+    obs = get_observer()
+
+    # Get the current date and time
+    current_date = ephem.now()
+
+    # Set the observer's date and time to the current date and time
+    obs.date = current_date
+
+    # Define the planets to check aspects for
+    planets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 
+                'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+
+    # Initialize list to store aspects    
+    aspects = []
+
+    # Loop through each planet           
+    for planet in planets:
+        p = getattr(ephem, planet)()
+        p.compute(obs)  # Compute the object's fields
+
+        # Calculate the angular separation from each other planet         
+        for other_planet in planets:
+            o = getattr(ephem, other_planet)()   
+            o.compute(obs)  # Compute the object's fields
+
+            # Compute the separation between the two objects
+            p.compute(obs)
+            o.compute(obs)
+            separation = ephem.separation(p, o)
+            separation_deg = ephem.degrees(separation)   
+                        
+            # Check if the planets form an aspect (within orb)                  
+            if check_aspect(separation_deg):
+                aspects.append((planet, other_planet, separation_deg))
+                
+    return aspects
+
+def check_aspect(sep):
+    orb = 6 # Degree orb for considering an aspect            
+    return sep <= orb or 360-sep <= orb
+
+# Call the function to get the current aspects
+aspects = get_current_aspects()
+    
+# Print the aspects
+print("Current aspects:")
+for planet1, planet2, separation in aspects:
+    print(f"{planet1} aspecting {planet2} at {separation}°")
+
+
