@@ -1434,6 +1434,9 @@ def main():
             print("fft target3: ", target3)
             print("fft target4: ", target4)
             print("fft target5: ", target5)
+
+            print()
+
             print("Minimum threshold:", min_threshold)
             print("Avrg mtf price: ", avg_mtf)
             print("Maximum threshold:", max_threshold)
