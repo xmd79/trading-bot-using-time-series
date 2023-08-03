@@ -1121,18 +1121,6 @@ for i, target in enumerate(inner_targets, start=1):
 
 print()
 
-print("Next Targets:")
-for i, (target_time, target_price) in enumerate(next_targets, start=1):
-    print(f"Target {i} at {target_time}: {target_price}")
-
-print()
-
-print("Inner Reversals:")
-for i, (inner_time, inner_price) in enumerate(inner_reversals, start=1):
-    print(f"Inner Reversal {i} at {inner_time}: {inner_price}")
-
-print()
-
 ##################################################
 ##################################################
 
@@ -2342,16 +2330,6 @@ def main():
                 print(f"Inner Target {i}: {target}")
 
             print()
-
-            print("Next Targets:")
-            for i, (target_time, target_price) in enumerate(next_targets, start=1):
-                print(f"Target {i} at {target_time}: {target_price}")
-
-            print()
-
-            print("Inner Reversals:")
-            for i, (inner_time, inner_price) in enumerate(inner_reversals, start=1):
-                print(f"Inner Reversal {i} at {inner_time}: {inner_price}")
 
             ##################################################
             ##################################################
