@@ -2277,6 +2277,7 @@ def main():
 
             ##################################################
             ##################################################
+
             print("current price at: ", price)
             print("fft fast target1: ", fast_target4)
             print("fft fast target2: ", fast_target3)
