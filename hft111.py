@@ -1913,6 +1913,44 @@ print()
 ##################################################
 ##################################################
 
+from sklearn.linear_model import LinearRegression
+
+def price_regression(close):
+    # Convert 'close' to a numpy array
+    close_data = np.array(close)
+
+    # Create timestamps based on the index (assuming each close price corresponds to a single time unit)
+    timestamps = np.arange(len(close_data))
+
+    # Fit a linear regression model
+    model = LinearRegression()
+    model.fit(timestamps.reshape(-1, 1), close_data)
+
+    # Predict future prices using the regression model
+    num_targets = 1
+    future_timestamps = np.arange(len(close_data), len(close_data) + num_targets)
+    future_prices = model.predict(future_timestamps.reshape(-1, 1))
+
+    return future_timestamps, future_prices
+
+##################################################
+##################################################
+
+# Convert 'close' list to a NumPy array
+close_np = np.array(close)
+
+# Call the price_regression function with the example data
+future_timestamps, future_prices = price_regression(close_np)
+
+# Print the predicted future prices
+for timestamp, f_price in zip(future_timestamps, future_prices):
+    print(f"Timestamp: {timestamp}, Predicted Price: {f_price}")
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2331,6 +2369,21 @@ def main():
                 print(f"Inner Target {i}: {target}")
 
             incoming_reversal_keypoint = float(incoming_reversal_keypoint)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Convert 'close' list to a NumPy array
+            close_np = np.array(close)
+
+            # Call the price_regression function with the example data
+            future_timestamps, future_prices = price_regression(close_np)
+
+            # Print the predicted future prices
+            for timestamp, f_price in zip(future_timestamps, future_prices):
+                print(f"Timestamp: {timestamp}, Predicted Price: {f_price}")
 
             print()
 
