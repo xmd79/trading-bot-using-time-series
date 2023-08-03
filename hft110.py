@@ -309,6 +309,9 @@ def get_moon_phase_momentum(current_time):
     
     return moon_data
 
+##################################################
+##################################################
+
 def get_astro_map_data(current_time):
     # Set up timezone information
     tz = pytz.timezone('Etc/GMT-3')  # Use 'Etc/GMT-3' for UTC+3
@@ -358,6 +361,9 @@ def get_astro_map_data(current_time):
     
     return astro_map_data
 
+##################################################
+##################################################
+
 def get_planet_positions():
     now = Time.now()
     
@@ -385,6 +391,9 @@ def get_planet_positions():
     return planet_positions, sun_position
 
 planet_positions, sun_position = get_planet_positions()
+
+##################################################
+##################################################
 
 def get_vedic_houses(date, observer):
     # Convert datetime to ephem date
@@ -415,6 +424,8 @@ def get_vedic_houses(date, observer):
     house_cusps_dict = {house: sign for house, sign in house_cusps}
     return house_cusps_dict
 
+##################################################
+##################################################
 
 def get_vedic_sign(deg):
     deg = (deg + 360) % 360
@@ -443,6 +454,9 @@ def get_vedic_sign(deg):
     elif deg >= 330 and deg < 360:
         return 'Pisces'
 
+##################################################
+##################################################
+
 # Define list of stars
 stars = [
     ('Sun', ephem.Sun(), ''),    
@@ -455,6 +469,9 @@ stars = [
     ('Altair', '19:50:46.99', '+08:52:05.9'),
     ('Deneb', '20:41:25.91', '+45:16:49.2')
 ]
+
+##################################################
+##################################################
 
 def get_star_positions(date, observer):
     # Set up ephem observer object
@@ -483,8 +500,14 @@ def get_star_positions(date, observer):
 
     return star_positions
 
+##################################################
+##################################################
+
 # Set up the current time
-current_time = datetime.datetime.utcnow()
+current_time = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+
+##################################################
+##################################################
 
 # Get the moon data
 moon_data = get_moon_phase_momentum(current_time)
@@ -508,25 +531,12 @@ print('Moon degree:', moon_data['astro_map']['moon']['degree'])
 
 print()
   
-# Define current_time with UTC+3 offset   
-current_time = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
-
-# Call the function to populate moon_data 
-moon_data = get_moon_phase_momentum(current_time)
-
-# Now we can access moon_data  
-print("Moon Phase: {:.2f}%".format(moon_data['moon_phase']))
-print("Moon Age: {} days".format(moon_data['moon_age']))
-print("Moon Sign: {}".format(moon_data['moon_sign']))
-print("Moon Distance from Earth: {:.2f} km".format(moon_data['moon_distance_km']))
-print("Moon Angular Diameter: {:.2f} degrees".format(moon_data['moon_angular_diameter']))
-print("Moon Speed: {:.2f} km/hr".format(moon_data['moon_speed_km_hr']))
-print("Moon Energy Level: {:.2f}%".format(moon_data['moon_energy']))
-print("Moon Astrological Map: {}".format(moon_data['astro_map']))
-
+##################################################
+##################################################
 
 # Calculate fixed_body
 obs = ephem.Observer()
+
 # Set observer info
 fixed_body = ephem.FixedBody()  
 fixed_body._ra = obs.sidereal_time()
@@ -561,6 +571,9 @@ for house, sign in vedic_houses.items():
     print(f"House {house} - {sign} at {degree:.2f} degrees") 
 
 print()
+
+##################################################
+##################################################
 
 from astroquery.jplhorizons import Horizons
 from astropy.time import Time
@@ -615,6 +628,9 @@ print('\tRA: {}\n\tDEC: {}'.format(sun_position['RA'], sun_position['DEC']))
 
 print()
 
+##################################################
+##################################################
+
 # Function to convert degrees to hours, minutes, seconds
 def deg_to_hours(deg_str):
     deg, minute, sec = deg_str.split(':') 
@@ -622,6 +638,9 @@ def deg_to_hours(deg_str):
     minutes = float(minute) / 60  
     seconds = float(sec) / 3600    
     return degrees + minutes + seconds
+
+##################################################
+##################################################
 
 def get_star_positions_from_sun(date):
     sun = ephem.Sun()
@@ -653,6 +672,9 @@ def get_star_positions_from_sun(date):
             
     return star_positions
 
+##################################################
+##################################################
+
 date = datetime.datetime.now()
 star_positions = get_star_positions_from_sun(date)
 
@@ -661,13 +683,19 @@ for name, ra, dec in star_positions:
 
 print()
 
+##################################################
+##################################################
+
 def get_observer():
     obs = ephem.Observer() 
-    obs.lon = '21.21621'  # Longitude of Timișoara  
-    obs.lat = '45.75415'  # Latitude of Timișoara
+    obs.lon = '21.22571'  # Longitude of Timișoara  
+    obs.lat = '45.75372'  # Latitude of Timișoara
     obs.elevation = 102   # Elevation of Timișoara in meters
     obs.date = ephem.now()
     return obs
+
+##################################################
+##################################################
 
 def get_current_aspects():
     # Create an observer at your location
@@ -708,11 +736,17 @@ def get_current_aspects():
                 
     return aspects
 
+##################################################
+##################################################
+
 def check_aspect(sep):
     orb = 6 # Degree orb for considering an aspect            
     return sep <= orb or 360-sep <= orb
 
 print()
+
+##################################################
+##################################################
 
 def get_predominant_frequencies(close):
     # Calculate the periodogram to find predominant frequencies
@@ -732,6 +766,9 @@ def get_predominant_frequencies(close):
     
     return timeframes
 
+##################################################
+##################################################
+
 def get_market_mood(close, aspects, vedic_houses):
     # Check for dip/top   
     if 'Moon' in [p[0] for p in aspects] or 'Saturn' in [p[0] for p in aspects]:
@@ -741,6 +778,9 @@ def get_market_mood(close, aspects, vedic_houses):
         mood = adjust_mood_from_houses(mood, vedic_houses)
       
     return mood
+
+##################################################
+##################################################
 
 def determine_mood_from_aspects(aspects):
     mood = 'neutral'
@@ -753,6 +793,9 @@ def determine_mood_from_aspects(aspects):
        
     return mood
 
+##################################################
+##################################################
+
 def adjust_mood_from_houses(mood, vedic_houses):  
     if 'Sun' in vedic_houses[1] or 'Jupiter' in vedic_houses[1]:
        mood = 'bullish' if mood == 'aggressive' else mood
@@ -761,6 +804,9 @@ def adjust_mood_from_houses(mood, vedic_houses):
        mood = 'bearish' if mood == 'optimistic' else mood
        
     return mood
+
+##################################################
+##################################################
 
 def get_possible_reversals(aspects):
     reversals = []
@@ -775,6 +821,9 @@ def get_possible_reversals(aspects):
     return reversals
   
 print()
+
+##################################################
+##################################################
 
 # Call the function to get the current aspects
 aspects = get_current_aspects() 
@@ -860,6 +909,219 @@ print()
 
 ##################################################
 ##################################################
+
+def get_custom_sine_wave(close, moon_data, factor=0.2):
+    close = np.array(close)  # Convert 'close' list to a numpy array
+
+    # Get moon energy level
+    moon_energy = moon_data['moon_energy']
+
+    # Calculate the sine wave based on time values
+    current_sine = -moon_energy  # Use the moon energy level as the current sine value
+    sine_wave, _ = talib.HT_SINE(close)
+    sine_wave = -np.nan_to_num(sine_wave)  # Replace NaN values with 0 and invert
+
+    # Calculate the min and max sine values
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+
+    # Scale the sine wave to the range of [min_close, max_close]
+    min_close = np.min(close)
+    max_close = np.max(close)
+    scaled_sine_wave = min_close + (sine_wave - sine_wave_min) * (max_close - min_close) / (sine_wave_max - sine_wave_min)
+
+    # Calculate the new custom sine value at the current time based on the astrological energy level
+    custom_sine_value = min_close + (moon_energy - sine_wave_min) * (max_close - min_close) / (sine_wave_max - sine_wave_min)
+
+    # Introduce a factor to control the magnitude of the changes
+    scaled_sine_wave = custom_sine_value + factor * (scaled_sine_wave - custom_sine_value)
+
+    # Calculate the min and max price values of the new custom sine wave
+    min_price = min(min_close, np.min(scaled_sine_wave))  # Ensure minimum price is below the current close
+    max_price = np.max(scaled_sine_wave)
+
+    return min_price, max_price
+
+##################################################
+##################################################
+
+def get_market_mood(close, moon_data, aspects, vedic_houses):
+    # Check for dip/top   
+    mood = 'neutral'
+
+    if 'Moon' in [p[0] for p in aspects] or 'Saturn' in [p[0] for p in aspects]:
+        # Reversal aspects - likely dip/top
+        mood = determine_mood_from_aspects(aspects)
+        mood = adjust_mood_from_houses(mood, vedic_houses)
+      
+    # Determine market direction based on sine wave
+    current_close = close[-1]
+    min_price, max_price = get_custom_sine_wave(close, moon_data, factor=0.2)
+
+    if current_close < min_price:
+        mood = 'bearish'
+    elif current_close > max_price:
+        mood = 'bullish'
+
+    return mood
+
+##################################################
+##################################################
+
+def determine_mood_from_aspects(aspects):
+    mood = 'neutral'
+    if any('Mars' in a for a in aspects):
+        mood = 'aggressive'
+    if any('Jupiter' in a for a in aspects):
+        mood = 'optimistic'
+    return mood
+
+##################################################
+##################################################
+
+def adjust_mood_from_houses(mood, vedic_houses):  
+    if 'Sun' in vedic_houses[1] or 'Jupiter' in vedic_houses[1]:
+        mood = 'bullish' if mood == 'aggressive' else mood
+    if 'Saturn' in vedic_houses[8] or 'Mars' in vedic_houses[8]:
+        mood = 'bearish' if mood == 'optimistic' else mood
+    return mood
+
+##################################################
+##################################################
+
+def get_hft_targets(close, moon_data, aspects, vedic_houses):
+    close = np.array(close)  # Convert 'close' list to a numpy array
+
+    # Get moon energy level
+    moon_energy = moon_data['moon_energy']
+
+    # Calculate the sine wave based on time values
+    current_sine = -moon_energy  # Use the moon energy level as the current sine value
+    sine_wave, _ = talib.HT_SINE(close)
+    sine_wave = -np.nan_to_num(sine_wave)  # Replace NaN values with 0 and invert
+
+    # Calculate the min and max sine values
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+
+    # Scale the sine wave to the range of [min_close, max_close]
+    min_close = np.min(close)
+    max_close = np.max(close)
+    scaled_sine_wave = min_close + (sine_wave - sine_wave_min) * (max_close - min_close) / (sine_wave_max - sine_wave_min)
+
+    # Calculate the new custom sine value at the current time based on the astrological energy level
+    custom_sine_value = min_close + (moon_energy - sine_wave_min) * (max_close - min_close) / (sine_wave_max - sine_wave_min)
+
+    # Use planetary positions for faster cycles
+    planetary_positions = {
+        'Mars': -20,
+        'Venus': 35,
+        'Jupiter': 70,
+        'Saturn': -10,
+        'Mercury': 25,
+        'Uranus': 50,
+        'Neptune': -5,
+        'Pluto': 30,
+        'Sun': 65,
+        'Moon': 0
+    }
+
+    for planet, position in planetary_positions.items():
+        if planet in vedic_houses[1] or planet in vedic_houses[8]:
+            # Adjust the sine wave based on the planetary position
+            scaled_sine_wave += position
+
+    # Introduce a factor to control the magnitude of the changes
+    scaled_sine_wave = custom_sine_value + 0.2 * (scaled_sine_wave - custom_sine_value)
+
+    # Calculate the min and max price values of the new custom sine wave
+    min_price = min(min_close, np.min(scaled_sine_wave))  # Ensure minimum price is below the current close
+    max_price = np.max(scaled_sine_wave)
+
+    # Calculate the reversal keypoint as the midpoint between min and max
+    reversal_keypoint = (min_price + max_price) / 2
+
+    # Determine market direction based on sine wave
+    current_close = close[-1]
+    market_mood = 'neutral'
+
+    if current_close < min_price:
+        market_mood = 'bearish'
+    elif current_close > max_price:
+        market_mood = 'bullish'
+
+    # Calculate the dip and top prices (always below close for dip and above close for top)
+    dip_price = min(reversal_keypoint, current_close)
+    top_price = max(reversal_keypoint, current_close)
+
+    # Calculate the incoming reversal keypoint for both dip and top
+    incoming_reversal_keypoint = reversal_keypoint - (current_close - reversal_keypoint) if market_mood == 'bearish' else reversal_keypoint + (reversal_keypoint - current_close)
+
+    # Determine if the incoming reversal is a dip or a top
+    incoming_reversal = 'dip' if market_mood == 'bearish' else 'top'
+
+    # Calculate the inner targets as percentages of the distance from the current close to the reversal keypoint
+    inner_target_factors = [0.1, 0.2, 0.3, 0.4]  # Adjust these factors as per your preference
+
+    # Determine if a dip or top is incoming based on market mood
+    if market_mood == 'bearish':
+        # If market mood is bearish, the path is to a dip, so inner targets are below the close
+        inner_targets = [current_close - factor * (current_close - reversal_keypoint) for factor in inner_target_factors]
+    else:
+        # If market mood is bullish, the path is to a top, so inner targets are above the close
+        inner_targets = [current_close + factor * (reversal_keypoint - current_close) for factor in inner_target_factors]
+
+    return min_price, max_price, dip_price, top_price, inner_targets, market_mood, incoming_reversal_keypoint, incoming_reversal
+
+# Example usage:
+# Assuming you have already calculated the 'close' prices, 'moon_data', 'aspects', and 'vedic_houses'
+min_price, max_price, dip_price, top_price, inner_targets, market_mood, incoming_reversal_keypoint, incoming_reversal = get_hft_targets(close, moon_data, aspects, vedic_houses)
+
+print("Minimum Price:", min_price)
+print("Maximum Price:", max_price)
+print("Dip Price:", dip_price)
+print("Top Price:", top_price)
+print("Market Mood:", market_mood)
+print("Incoming Reversal Keypoint:", incoming_reversal_keypoint)
+print("Incoming Reversal:", incoming_reversal)
+print("Inner Targets:")
+for i, target in enumerate(inner_targets, start=1):
+    print(f"Inner Target {i}: {target}")
+
+print()
+
+
+##################################################
+##################################################
+
+def custom_sine_wave(timeframe):
+    # Get close prices
+    closes = get_closes(timeframe)
+    
+    # Get astrological data
+    moon_data = get_moon_phase_momentum(datetime.datetime.utcnow())
+    vedic_houses = get_vedic_houses(datetime.datetime.utcnow(), observer)
+    aspects = get_current_aspects() 
+    
+    # Get market mood
+    mood = get_market_mood(closes, aspects, vedic_houses)
+            
+    # Generate HT_SINE as before
+    sine_wave, leadsine = talib.HT_SINE(closes)
+    sine_wave = -sine_wave
+    sine_wave_min = np.min(sine_wave)    
+    sine_wave_max = np.max(sine_wave)   
+        
+    # Adjust max and min based on market mood            
+    if mood == 'bullish': 
+        sine_wave_max = sine_wave_max * 1.1        
+    elif mood == 'bearish':     
+        sine_wave_min = sine_wave_min * 0.95
+        
+    # Regenerate sine wave                 
+    custom_sine, _ = talib.HT_SINE(closes, min=sine_wave_min, max=sine_wave_max)
+      
+    return custom_sine
 
 def get_momentum(timeframe):
     """Calculate momentum for a single timeframe"""
@@ -1202,8 +1464,6 @@ def generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, 
         "max": sine_wave_max
     }
    
-
-
 #sine_wave = generate_new_momentum_sinewave(close_prices, candles, percent_to_max_val=5, percent_to_min_val=5)
 #print(sine_wave)
 
@@ -1422,7 +1682,6 @@ print("Target 5 is: ", target5)
 
 print()
 
-
 ##################################################
 ##################################################
 
@@ -1608,12 +1867,6 @@ if len(levels) > 0:
 
     if incoming_bearish_reversal:
         print("Incoming bearish reversal signal!")
-
-
-print()
-
-##################################################
-##################################################
 
 
 print()
@@ -2016,6 +2269,25 @@ def main():
             print("momentum value: ", momentum)
 
             print()
+
+            ##################################################
+            ##################################################
+
+            min_price, max_price, dip_price, top_price, inner_targets, market_mood, incoming_reversal_keypoint, incoming_reversal = get_hft_targets(close, moon_data, aspects, vedic_houses)
+
+            print("Minimum Price:", min_price)
+            print("Maximum Price:", max_price)
+            print("Dip Price:", dip_price)
+            print("Top Price:", top_price)
+            print("Market Mood:", market_mood)
+            print("Incoming Reversal Keypoint:", incoming_reversal_keypoint)
+            print("Incoming Reversal:", incoming_reversal)
+            print("Inner Targets:")
+            for i, target in enumerate(inner_targets, start=1):
+                print(f"Inner Target {i}: {target}")
+
+            print()
+
             ##################################################
             ##################################################
 
@@ -2026,14 +2298,14 @@ def main():
 
                 if current_quadrant == 1:
                     if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5:
-                        if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < 15:
+                        if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max:
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                                 if momentum > 0:
                                     trigger_long = True
 
                 if current_quadrant == 4:
                     if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5:
-                        if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < 15:
+                        if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min:
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                                 if momentum < 0:
                                     trigger_short = True
@@ -2066,6 +2338,9 @@ def main():
         ##################################################
         ##################################################
 
+##################################################
+##################################################
+
 print()
 
 ##################################################
@@ -2074,3 +2349,13 @@ print()
 # Run the main function
 if __name__ == '__main__':
     main()
+
+##################################################
+##################################################
+
+
+print()
+##################################################
+##################################################
+
+
