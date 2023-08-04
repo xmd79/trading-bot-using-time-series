@@ -1642,49 +1642,31 @@ def get_target(closes, n_components, target_distance=0.01):
     diff = target_price - current_close
     if diff > 0:           
         market_mood = "Bullish"
-        fastest_target = current_close + target_distance/2
-        fast_target1 = current_close + target_distance/4
-        fast_target2 = current_close + target_distance/8
-        fast_target3 = current_close + target_distance/16
-        fast_target4 = current_close + target_distance/32
-        target1 = target_price + np.std(closes)/16
-        target2 = target_price + np.std(closes)/8
-        target3 = target_price + np.std(closes)/4
-        target4 = target_price + np.std(closes)/2
-        target5 = target_price + np.std(closes)
-    elif diff < 0:                 
+    else:
         market_mood = "Bearish"
-        fastest_target = current_close - target_distance/2
-        fast_target1 = current_close - target_distance/4
-        fast_target2 = current_close - target_distance/8
-        fast_target3 = current_close - target_distance/16
-        fast_target4 = current_close - target_distance/32
-        target1 = target_price - np.std(closes)/16
-        target2 = target_price - np.std(closes)/8
-        target3 = target_price - np.std(closes)/4
-        target4 = target_price - np.std(closes)/2
-        target5 = target_price - np.std(closes)
-    else:           
-        market_mood = "Neutral"
-        fastest_target = current_close + target_distance/2
-        fast_target1 = current_close - target_distance/4
-        fast_target2 = current_close + target_distance/8
-        fast_target3 = current_close - target_distance/16
-        fast_target4 = current_close + target_distance/32
-        target1 = target_price + np.std(closes)/16
-        target2 = target_price - np.std(closes)/8
-        target3 = target_price + np.std(closes)/4
-        target4 = target_price - np.std(closes)/2
-        target5 = target_price + np.std(closes)
+    
+    # Calculate fast cycle targets
+    fastest_target = current_close + target_distance / 2
+    fast_target1 = current_close + target_distance / 4
+    fast_target2 = current_close + target_distance / 8
+    fast_target3 = current_close + target_distance / 16
+    fast_target4 = current_close + target_distance / 32
+    
+    # Calculate other targets
+    target1 = target_price + np.std(closes) / 16
+    target2 = target_price + np.std(closes) / 8
+    target3 = target_price + np.std(closes) / 4
+    target4 = target_price + np.std(closes) / 2
+    target5 = target_price + np.std(closes)
     
     # Calculate the stop loss and target levels
     entry_price = closes[-1]    
-    stop_loss =  entry_price - 3*np.std(closes)   
+    stop_loss = entry_price - 3 * np.std(closes)   
     target6 = target_price + np.std(closes)
-    target7 = target_price + 2*np.std(closes)
-    target8 = target_price + 3*np.std(closes)
-    target9 = target_price + 4*np.std(closes)
-    target10 = target_price + 5*np.std(closes)
+    target7 = target_price + 2 * np.std(closes)
+    target8 = target_price + 3 * np.std(closes)
+    target9 = target_price + 4 * np.std(closes)
+    target10 = target_price + 5 * np.std(closes)
     
     return current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood
 
@@ -1693,31 +1675,32 @@ n_components = 5
 
 current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
 
-print("Current local Time is now at: ", current_time)
-print("Market mood is: ", market_mood)
+print("Current local Time is now at:", current_time)
+print("Market mood is:", market_mood)
 
 print()
 
-print("Current close price is at : ", current_close)
+current_close = closes[-1]
+print("Current close price is at:", current_close)
 
 print()
 
-print("Fast target 1 is: ", fast_target4)
-print("Fast target 2 is: ", fast_target3)
-print("Fast target 3 is: ", fast_target2)
-print("Fast target 4 is: ", fast_target1)
+print("Fast target 1 is:", fast_target4)
+print("Fast target 2 is:", fast_target3)
+print("Fast target 3 is:", fast_target2)
+print("Fast target 4 is:", fast_target1)
 
 print()
 
-print("Fastest target is: ", fastest_target)
+print("Fastest target is:", fastest_target)
 
 print()
 
-print("Target 1 is: ", target1)
-print("Target 2 is: ", target2)
-print("Target 3 is: ", target3)
-print("Target 4 is: ", target4)
-print("Target 5 is: ", target5)
+print("Target 1 is:", target1)
+print("Target 2 is:", target2)
+print("Target 3 is:", target3)
+print("Target 4 is:", target4)
+print("Target 5 is:", target5)
 
 print()
 
@@ -2398,14 +2381,14 @@ def main():
 
 
                 if current_quadrant == 1:
-                    if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5 and price < incoming_reversal_keypoint and price < f_price:
+                    if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5:
                         if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max:
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                                 if momentum > 0:
                                     trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5 and price > incoming_reversal_keypoint and price > f_price:
+                    if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5:
                         if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min:
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                                 if momentum < 0:
