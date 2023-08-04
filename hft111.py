@@ -2383,7 +2383,7 @@ def main():
 
             # Print the predicted future prices
             for timestamp, f_price in zip(future_timestamps, future_prices):
-                print(f"Timestamp: {timestamp}, Predicted Price: {f_price}")
+                print(f"Predicted Price using linear regression: {f_price}")
 
             f_price = float(f_price)
 
@@ -2458,5 +2458,4 @@ if __name__ == '__main__':
 print()
 ##################################################
 ##################################################
-
 
