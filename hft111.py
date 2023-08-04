@@ -1914,6 +1914,7 @@ print()
 ##################################################
 
 from sklearn.linear_model import LinearRegression
+import numpy as np
 
 def price_regression(close):
     # Convert 'close' to a numpy array
@@ -1926,25 +1927,28 @@ def price_regression(close):
     model = LinearRegression()
     model.fit(timestamps.reshape(-1, 1), close_data)
 
-    # Predict future prices using the regression model
+    # Find the last low and last high in the close data
+    last_low = np.min(close_data)
+    last_high = np.max(close_data)
+
+    # Predict future prices using the regression model based on last low and last high
     num_targets = 1
     future_timestamps = np.arange(len(close_data), len(close_data) + num_targets)
-    future_prices = model.predict(future_timestamps.reshape(-1, 1))
+    future_prices_low = model.predict(np.array([len(close_data) + num_targets - 1]).reshape(-1, 1)) - (last_high - last_low)
+    future_prices_high = model.predict(np.array([len(close_data) + num_targets - 1]).reshape(-1, 1)) + (last_high - last_low)
 
-    return future_timestamps, future_prices
-
-##################################################
-##################################################
+    return future_timestamps, future_prices_low, future_prices_high
 
 # Convert 'close' list to a NumPy array
 close_np = np.array(close)
 
 # Call the price_regression function with the example data
-future_timestamps, future_prices = price_regression(close_np)
+future_timestamps, future_prices_low, future_prices_high = price_regression(close_np)
 
 # Print the predicted future prices
-for timestamp, f_price in zip(future_timestamps, future_prices):
-    print(f"Timestamp: {timestamp}, Predicted Price: {f_price}")
+for timestamp, low_price, high_price in zip(future_timestamps, future_prices_low, future_prices_high):
+    print(f"Timestamp: {timestamp}, Predicted Low Price: {low_price:.2f}, Predicted High Price: {high_price:.2f}")
+
 
 print()
 
@@ -2379,13 +2383,11 @@ def main():
             close_np = np.array(close)
 
             # Call the price_regression function with the example data
-            future_timestamps, future_prices = price_regression(close_np)
+            future_timestamps, future_prices_low, future_prices_high = price_regression(close_np)
 
             # Print the predicted future prices
-            for timestamp, f_price in zip(future_timestamps, future_prices):
-                print(f"Predicted Price using linear regression: {f_price}")
-
-            f_price = float(f_price)
+            for timestamp, low_price, high_price in zip(future_timestamps, future_prices_low, future_prices_high):
+                print(f"Timestamp: {timestamp}, Predicted Low Price: {low_price:.2f}, Predicted High Price: {high_price:.2f}")
 
             print()
 
@@ -2458,4 +2460,3 @@ if __name__ == '__main__':
 print()
 ##################################################
 ##################################################
-
