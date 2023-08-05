@@ -2096,7 +2096,7 @@ def calculate_elements():
     # Calculate imaginary number
     imaginary_number = 1j
 
-    return sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number
+    return PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed  
 
 print()
 
