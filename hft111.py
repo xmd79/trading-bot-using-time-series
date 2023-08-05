@@ -2527,20 +2527,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Convert 'close' list to a NumPy array
-            close_np = np.array(close)
-
-            # Call the price_regression function with the example data
-            future_timestamps, future_prices = price_regression(close_np)
-
-            # Print the predicted future prices
-            for timestamp, f_price in zip(future_timestamps, future_prices):
-                print(f"Predicted Price using linear regression: {f_price}")
-
-            f_price = float(f_price)
-
-            print()
-
             # Call the calculate_reversal_and_forecast function with the example data
             (current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression, last_reversal, forecast_dip, forecast_top) = calculate_reversal_and_forecast(close)
             print("Forecast Direction:", forecast_direction if forecast_direction is not None else "None")
@@ -2582,14 +2568,14 @@ def main():
 
 
                 if current_quadrant == 1:
-                    if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5 and price < incoming_reversal_keypoint and price < f_price and price < forecast_price_fft:
+                    if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5 and price < incoming_reversal_keypoint and price < forecast_price_fft and price < future_price_regression:
                         if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max and forecast_direction == "Up":
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                                 if momentum > 0:
                                     trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5 and price > incoming_reversal_keypoint and price > f_price and price > forecast_price_fft:
+                    if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5 and price > incoming_reversal_keypoint and price > forecast_price_fft and price > future_price_regression:
                         if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min and forecast_direction == "Down":
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                                 if momentum < 0:
