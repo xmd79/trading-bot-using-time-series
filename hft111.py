@@ -1934,6 +1934,122 @@ print()
 ##################################################
 ##################################################
 
+def calculate_reversal_and_forecast(close):
+    # Initialize variables
+    current_reversal = None
+    next_reversal = None
+    last_reversal = None
+    forecast_dip = None
+    forecast_top = None
+    
+    # Calculate minimum and maximum values
+    min_value = np.min(close)
+    max_value = np.max(close)
+    
+    # Calculate forecast direction and price using FFT
+    fft = fftpack.rfft(close)
+    frequencies = fftpack.rfftfreq(len(close))
+    idx = np.argsort(np.abs(fft))[::-1][:10]
+    top_frequencies = frequencies[idx]
+    filtered_fft = np.zeros_like(fft)
+    filtered_fft[idx] = fft[idx]
+    filtered_signal = fftpack.irfft(filtered_fft)
+    
+    if len(close) > 1:
+        if filtered_signal[-1] > filtered_signal[-2]:
+            forecast_direction = "Up"
+            forecast_price_fft = filtered_signal[-1] + (filtered_signal[-1] - filtered_signal[-2]) * 0.5
+        else:
+            forecast_direction = "Down"
+            forecast_price_fft = filtered_signal[-1] - (filtered_signal[-2] - filtered_signal[-1]) * 0.5
+    else:
+        forecast_direction = "Neutral"
+        forecast_price_fft = close[-1]
+    
+    # Check the relationship between the last value and min/max
+    last_value = close[-1]
+    if min_value <= last_value <= max_value:
+        if last_value == min_value:
+            current_reversal = "DIP"
+            next_reversal = "TOP"
+        elif last_value == max_value:
+            current_reversal = "TOP"
+            next_reversal = "DIP"
+    else:
+        forecast_direction = "Up" if close[-1] > close[-2] else "Down"
+        forecast_price_fft = price_regression(close)
+    
+    # Initialize variables for last reversal and distance
+    distance = None
+    last_reversal = None
+    
+    # Calculate the distance between the last reversal and the last value
+    reversal_idx = None
+    for i in range(len(close) - 2, -1, -1):
+        if current_reversal == "DIP" and close[i] == min_value:
+            reversal_idx = i
+            break
+        elif current_reversal == "TOP" and close[i] == max_value:
+            reversal_idx = i
+            break
+    
+    if reversal_idx is not None:
+        distance = len(close) - 1 - reversal_idx
+        if current_reversal == "DIP":
+            last_reversal = "DIP"
+        elif current_reversal == "TOP":
+            last_reversal = "TOP"
+    
+    # Calculate forecast DIP and TOP
+    if last_reversal == "DIP":
+        forecast_dip = close[-1] - (distance * 0.1)
+        forecast_top = forecast_dip + (forecast_dip - close[-1]) * 2
+    elif last_reversal == "TOP":
+        forecast_top = close[-1] + (distance * 0.1)
+        forecast_dip = forecast_top - (close[-1] - forecast_top) * 2
+    
+    future_price_regression = price_regression(close)
+    
+    return current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression, last_reversal, forecast_dip, forecast_top
+
+
+
+# Call the calculate_reversal_and_forecast function with the example data
+(current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression, last_reversal, forecast_dip, forecast_top) = calculate_reversal_and_forecast(close)
+
+# Print the results
+print("Current Reversal:", current_reversal if current_reversal is not None else "None")
+print("Next Reversal:", next_reversal if next_reversal is not None else "None")
+print("Forecast Direction:", forecast_direction if forecast_direction is not None else "None")
+
+# Handle NaN and None values for Forecast Price FFT
+if forecast_price_fft is None or np.isnan(forecast_price_fft):
+    forecast_price_fft = close_np[-1]
+print("Forecast Price FFT:", forecast_price_fft)
+
+# Handle NaN and None values for Future Price Regression
+if future_price_regression is None or np.isnan(future_price_regression[1][0]):
+    future_price_regression = close_np[-1]
+else:
+    future_price_regression = future_price_regression[1][0]
+print("Future Price Regression:", future_price_regression)
+
+print("Last Reversal:", last_reversal if last_reversal is not None else "None")
+
+# Convert forecast_dip and forecast_top to NumPy floats if they are not None
+if forecast_dip is not None and not isinstance(forecast_dip, np.float64):
+    forecast_dip = np.float64(forecast_dip)
+if forecast_top is not None and not isinstance(forecast_top, np.float64):
+    forecast_top = np.float64(forecast_top)
+
+print("Forecast DIP:", forecast_dip if forecast_dip is not None else "None")
+print("Forecast TOP:", forecast_top if forecast_top is not None else "None")
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2372,6 +2488,28 @@ def main():
 
             print()
 
+            # Call the calculate_reversal_and_forecast function with the example data
+            (current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression, last_reversal, forecast_dip, forecast_top) = calculate_reversal_and_forecast(close)
+            print("Forecast Direction:", forecast_direction if forecast_direction is not None else "None")
+
+            # Handle NaN and None values for Forecast Price FFT
+            if forecast_price_fft is None or np.isnan(forecast_price_fft):
+                forecast_price_fft = close_np[-1]
+            print("Forecast Price FFT:", forecast_price_fft)
+
+            forecast_price_fft = float(forecast_price_fft)
+
+            # Handle NaN and None values for Future Price Regression
+            if future_price_regression is None or np.isnan(future_price_regression[1][0]):
+                future_price_regression = close_np[-1]
+            else:
+                future_price_regression = future_price_regression[1][0]
+            print("Future Price Regression:", future_price_regression)
+
+            future_price_regression = float(future_price_regression)
+
+            print()
+
             ##################################################
             ##################################################
 
@@ -2381,15 +2519,15 @@ def main():
 
 
                 if current_quadrant == 1:
-                    if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5 and price < incoming_reversal_keypoint and price < f_price:
-                        if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max:
+                    if price < fastest_target and price < avg_mtf and price < target1 < target2 < target3 < target4 < target5 and price < f_price and price < forecast_price_fft:
+                        if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max and forecast_direction == "Up":
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                                 if momentum > 0:
                                     trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5 and price > incoming_reversal_keypoint and price > f_price:
-                        if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min:
+                    if price > fastest_target and price > avg_mtf and price > target1 > target2 > target3 > target4 > target5 and price > f_price and price > forecast_price_fft:
+                        if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min and forecast_direction == "Down":
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                                 if momentum < 0:
                                     trigger_short = True
