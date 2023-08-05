@@ -2566,10 +2566,10 @@ def main():
             ##################################################
             ##################################################
 
-            if close[-1] < min(close[-5:]):
-                print("Last element is BELOW any of the last 5 elements.")
-            elif close[-1] > max(close[-5:]):
-                print("Last element is ABOVE any of the last 5 elements.")
+            #if close[-1] < min(close[-5:]):
+                #print("Last element is BELOW any of the last 5 elements.")
+            #elif close[-1] > max(close[-5:]):
+                #print("Last element is ABOVE any of the last 5 elements.")
 
             print()
 
