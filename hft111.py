@@ -2100,6 +2100,29 @@ def calculate_elements():
 
 print()
 
+def calculate_sma(close):
+    if not isinstance(close, np.ndarray):
+        close = np.array(close_prices, dtype=float)
+
+    # Replace NaN    
+    close = np.nan_to_num(close, nan=0.0)
+
+    # Calculate SMAs using TA-Lib
+    sma_12 = talib.SMA(close, timeperiod=12)
+    sma_27 = talib.SMA(close, timeperiod=27)
+    sma_56 = talib.SMA(close, timeperiod=56)
+    
+    return sma_12, sma_27, sma_56
+
+# Example usage:
+sma_12, sma_27, sma_56 = calculate_sma(close)
+
+print("SMA 12:", sma_12[-1])
+print("SMA 27:", sma_27[-1])
+print("SMA 56:", sma_56[-1])
+
+print()
+
 ##################################################
 ##################################################
 
@@ -2556,6 +2579,39 @@ def main():
                 #print("Last element is BELOW any of the last 5 elements.")
             #elif close[-1] > max(close[-5:]):
                 #print("Last element is ABOVE any of the last 5 elements.")
+
+            print()
+
+            sma_12, sma_27, sma_56 = calculate_sma(close)
+
+            sma_12 = float(sma_12[-1])
+            sma_27 = float(sma_27[-1])
+            sma_56 = float(sma_56[-1])
+
+            print("Close is now at: ", price)
+
+            print("SMA 12:", sma_12)
+            print("SMA 27:", sma_27)
+            print("SMA 56:", sma_56)
+
+            if price < sma_12 < sma_27 < sma_56:
+                print("close now below sma12, sma27, sma56")
+
+            elif price < sma_27 < sma_56:
+                print("close now below sma27, sma56")          
+
+            elif price < sma_56:
+                print("close now below sma56")
+
+            if price > sma_12 > sma_27 > sma_56:
+                print("close now above sma12, sma27, sma56")
+
+            elif price > sma_27 > sma_56:
+                print("close now above sma27, sma56")          
+
+            elif price > sma_56:
+                print("close now above sma56")
+
 
             print()
 
