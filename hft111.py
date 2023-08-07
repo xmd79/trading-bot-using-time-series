@@ -2594,10 +2594,10 @@ def main():
             print("SMA 27:", sma_27)
             print("SMA 56:", sma_56)
 
-            if price < sma_12 < sma_27 < sma_56:
+            if price < sma_12 and price < sma_27 and price < sma_56:
                 print("close now below sma12, sma27, sma56")
 
-            elif price > sma_12 > sma_27 > sma_56:
+            elif price > sma_12 and price > sma_27 and price > sma_56:
                 print("close now above sma12, sma27, sma56")
 
             print()
@@ -2614,7 +2614,7 @@ def main():
                     if price < avg_mtf and price < incoming_reversal_keypoint and price < forecast_price_fft and price < future_price_regression:
                         if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max:
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                                if price < sma_12 < sma_27 < sma_56:
+                                if price < sma_12 and price < sma_27 and price < sma_56:
                                     if momentum > 0:
                                         trigger_long = True
 
@@ -2622,7 +2622,7 @@ def main():
                     if price > avg_mtf and price > incoming_reversal_keypoint and price > forecast_price_fft and price > future_price_regression:
                         if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min:
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                                if price > sma_12 > sma_27 > sma_56:        
+                                if price > sma_12 and price > sma_27 and price > sma_56:        
                                     if momentum < 0:
                                         trigger_short = True
 
