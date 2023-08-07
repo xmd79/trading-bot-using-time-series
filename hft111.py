@@ -1270,11 +1270,11 @@ def generate_momentum_sinewave(timeframes):
         market_mood.append(mood)
 
         # Print distances and market mood
-        print(f"{timeframe} Close is now at "       
-              f"dist. to min: {avg_dist_min:.2f}% "
-              f"and at "
-              f"dist. to max: {avg_dist_max:.2f}%. "
-              f"Market mood: {mood}")
+        #print(f"{timeframe} Close is now at "       
+              #f"dist. to min: {avg_dist_min:.2f}% "
+              #f"and at "
+              #f"dist. to max: {avg_dist_max:.2f}%. "
+              #f"Market mood: {mood}")
 
         # Update last and next reversal info
         if next_reversal:
