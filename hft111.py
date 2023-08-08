@@ -2109,18 +2109,18 @@ def calculate_sma(close):
     close = np.nan_to_num(close, nan=0.0)
 
     # Calculate SMAs using TA-Lib
-    sma_12 = talib.SMA(close, timeperiod=12)
-    sma_27 = talib.SMA(close, timeperiod=27)
-    sma_56 = talib.SMA(close, timeperiod=56)
+    sma_12 = talib.SMA(close, timeperiod=5)
+    sma_27 = talib.SMA(close, timeperiod=7)
+    sma_56 = talib.SMA(close, timeperiod=9)
     
     return sma_12, sma_27, sma_56
 
 # Example usage:
-sma_12, sma_27, sma_56 = calculate_sma(close)
+sma_5, sma_7, sma_9 = calculate_sma(close)
 
-print("SMA 12:", sma_12[-1])
-print("SMA 27:", sma_27[-1])
-print("SMA 56:", sma_56[-1])
+print("SMA 5:", sma_5[-1])
+print("SMA 7:", sma_7[-1])
+print("SMA 9:", sma_9[-1])
 
 print()
 
@@ -2583,17 +2583,17 @@ def main():
 
             print()
 
-            sma_12, sma_27, sma_56 = calculate_sma(close)
+            sma_5, sma_7, sma_9 = calculate_sma(close)
 
-            sma_12 = float(sma_12[-1])
-            sma_27 = float(sma_27[-1])
-            sma_56 = float(sma_56[-1])
+            sma_5 = float(sma_5[-1])
+            sma_7 = float(sma_7[-1])
+            sma_9 = float(sma_9[-1])
 
             print("Close is now at: ", price)
 
-            print("SMA 12:", sma_12)
-            print("SMA 27:", sma_27)
-            print("SMA 56:", sma_56)
+            print("SMA 5:", sma_5)
+            print("SMA 7:", sma_7)
+            print("SMA 9:", sma_9)
 
             if price < sma_12 and price < sma_27 and price < sma_56:
                 print("close now below sma12, sma27, sma56")
@@ -2612,20 +2612,18 @@ def main():
 
 
                 if current_quadrant == 1:
-                    if price < avg_mtf and price < target5 and price < fastest_target and price < incoming_reversal_keypoint and price < forecast_price_fft and price < future_price_regression:
-                        if dist_from_close_to_min < dist_from_close_to_max and pct_diff_to_min < pct_diff_to_max:
-                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                                if price < sma_12 and price < sma_27 and price < sma_56:
-                                    if momentum > 0:
-                                        trigger_long = True
+                    if price < incoming_reversal_keypoint and price < forecast_price_fft and price < future_price_regression:
+                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and forecast_direction == "Up":
+                            if price < sma_5 and price < sma_7 and price < sma_9:
+                                if momentum > 0:
+                                    trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > avg_mtf and price > target5 and price > fastest_target and price > incoming_reversal_keypoint and price > forecast_price_fft and price > future_price_regression:
-                        if dist_from_close_to_max < dist_from_close_to_min and pct_diff_to_max < pct_diff_to_min:
-                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                                if price > sma_12 and price > sma_27 and price > sma_56:        
-                                    if momentum < 0:
-                                        trigger_short = True
+                    if price > incoming_reversal_keypoint and price > forecast_price_fft and price > future_price_regression:
+                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and forecast_direction == "Down":
+                            if price > sma_5 and price > sma_7 and price > sma_9:        
+                                if momentum < 0:
+                                    trigger_short = True
 
                 if trigger_long:        
                     print("LONG signal!")  
@@ -2680,7 +2678,14 @@ def main():
         del fast_target4
         del support_levels
         del resistance_levels
+        del inner_targets
+        del min_price
+        del max_price
+        del dip_price
+        del top_price
+        del forecast_direction
         del incoming_reversal_keypoint
+        del incoming_reversal
         del future_price_regression
         del min_val
         del max_val
@@ -2694,9 +2699,9 @@ def main():
         del max_threshold
         del avg_mtf
         del momentum
-        del sma_12
-        del sma_27
-        del sma_56
+        del sma_5
+        del sma_7
+        del sma_9
         del trigger_long
         del trigger_short
 
