@@ -36,6 +36,7 @@ import random
 import statistics
 from statistics import mean
 import scipy.fftpack as fftpack
+import gc
 
 ##################################################
 ##################################################
@@ -2647,6 +2648,56 @@ def main():
         except Exception as e:
             print(f"An error occurred: {e}")
             time.sleep(5)
+
+        del closes
+        del candles           
+        del sine
+        del sine_wave  
+        del sine_wave_min
+        del sine_wave_max
+        del levels           
+        del current_time 
+        del em_amp
+        del em_phase
+        del price_range_percent   
+        del filtered_signal  
+        del current_quadrant
+        del market_mood
+        del current_close
+        del price
+        del target1
+        del target2
+        del target3
+        del target4
+        del target5
+        del fastest_target
+        del fast_target1
+        del fast_target2
+        del fast_target3
+        del fast_target4
+        del support_levels
+        del resistance_levels
+        del incoming_reversal_keypoint
+        del future_price_regression
+        del min_val
+        del max_val
+        del dist_from_close_to_min
+        del dist_from_close_to_max
+        del pct_diff_to_min
+        del pct_diff_to_max
+        del momentum_signal
+        del market_mood_sr
+        del min_threshold
+        del max_threshold
+        del avg_mtf
+        del momentum
+        del sma_12
+        del sma_27
+        del sma_56
+        del trigger_long
+        del trigger_short
+
+        gc.collect() 
 
         time.sleep(5)
         print()
