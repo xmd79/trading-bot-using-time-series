@@ -2617,7 +2617,7 @@ def main():
                                 trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > avg_mtf and price > target4 and price > target3 and price > target2 and price > target1 and price > future_price_regression and price > forecast_price_fft:
+                    if price > avg_mtf and price > target5 and price > target4 and price > target3 and price > target2 and price > target1 and price > future_price_regression and price > forecast_price_fft:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":      
                             if momentum < 0:
                                 trigger_short = True
