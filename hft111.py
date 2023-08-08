@@ -2595,11 +2595,11 @@ def main():
             print("SMA 7:", sma_7)
             print("SMA 9:", sma_9)
 
-            if price < sma_12 and price < sma_27 and price < sma_56:
-                print("close now below sma12, sma27, sma56")
+            if price < sma_5 and price < sma_7 and price < sma_9:
+                print("close now below sma5, sma7, sma9")
 
-            elif price > sma_12 and price > sma_27 and price > sma_56:
-                print("close now above sma12, sma27, sma56")
+            elif price > sma_5 and price > sma_7 and price > sma_9:
+                print("close now above sma5, sma7, sma9")
 
             print()
 
