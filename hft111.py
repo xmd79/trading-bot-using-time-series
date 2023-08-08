@@ -2610,20 +2610,17 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-
                 if current_quadrant == 1:
-                    if price < avg_mtf and price < fastest_target and price < incoming_reversal_keypoint and price < forecast_price_fft and price < future_price_regression:
-                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and forecast_direction == "Up":
-                            if price < sma_5 and price < sma_7 and price < sma_9:
-                                if momentum > 0:
-                                    trigger_long = True
+                    if price < fastest_target:
+                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
+                            if momentum > 0:
+                                trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > avg_mtf and price > fastest_target and price > incoming_reversal_keypoint and price > forecast_price_fft and price > future_price_regression:
-                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and forecast_direction == "Down":
-                            if price > sma_5 and price > sma_7 and price > sma_9:        
-                                if momentum < 0:
-                                    trigger_short = True
+                    if price > fastest_target:
+                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":      
+                            if momentum < 0:
+                                trigger_short = True
 
                 if trigger_long:        
                     print("LONG signal!")  
