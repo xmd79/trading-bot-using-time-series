@@ -2498,11 +2498,11 @@ def main():
             print("fft fast target3: ", fast_target2)
             print("fft fast target4:", fast_target1)
             print("fft fastest target: ", fastest_target)
-            print("fft target1: ", target1)
-            print("fft target2: ", target2)
+            print("fft target1: ", target5)
+            print("fft target2: ", target4)
             print("fft target3: ", target3)
-            print("fft target4: ", target4)
-            print("fft target5: ", target5)
+            print("fft target4: ", target2)
+            print("fft target5: ", target1)
 
             print()
 
@@ -2612,14 +2612,14 @@ def main():
 
 
                 if current_quadrant == 1:
-                    if price < avg_mtf and price < fastest_target and price < target5 and price < incoming_reversal_keypoint and price < forecast_price_fft and price < future_price_regression:
+                    if price < avg_mtf and price < fastest_target and price < incoming_reversal_keypoint and price < forecast_price_fft and price < future_price_regression:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and forecast_direction == "Up":
                             if price < sma_5 and price < sma_7 and price < sma_9:
                                 if momentum > 0:
                                     trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > avg_mtf and price > fastest_target and price > target5 and price > incoming_reversal_keypoint and price > forecast_price_fft and price > future_price_regression:
+                    if price > avg_mtf and price > fastest_target and price > incoming_reversal_keypoint and price > forecast_price_fft and price > future_price_regression:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and forecast_direction == "Down":
                             if price > sma_5 and price > sma_7 and price > sma_9:        
                                 if momentum < 0:
