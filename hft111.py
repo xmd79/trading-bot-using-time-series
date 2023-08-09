@@ -2612,15 +2612,15 @@ def main():
                 if current_quadrant == 1:
                     if price < avg_mtf and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral": 
-                            if price > sma_5 and price > sma_7 and price > sma_9:
+                            if price < sma_5 and price < sma_7 and price < sma_9: 
                                 if pct_diff_to_min < pct_diff_to_max:
                                     if momentum > 0:
                                         trigger_long = True
 
                 if current_quadrant == 4:
                     if price > avg_mtf and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
-                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                            if price < sma_5 and price < sma_7 and price < sma_9:      
+                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral": 
+                            if price > sma_5 and price > sma_7 and price > sma_9:    
                                 if pct_diff_to_max < pct_diff_to_min:
                                     if momentum < 0:
                                         trigger_short = True
