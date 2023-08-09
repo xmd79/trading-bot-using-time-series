@@ -2325,11 +2325,11 @@ def main():
 
             print()
 
-            print("Target 1 is: ", target5)
-            print("Target 2 is: ", target4)
+            print("Target 1 is: ", target1)
+            print("Target 2 is: ", target2)
             print("Target 3 is: ", target3)
-            print("Target 4 is: ", target2)
-            print("Target 5 is: ", target1)
+            print("Target 4 is: ", target4)
+            print("Target 5 is: ", target5)
 
             # Get the current price
             price = get_current_price()
@@ -2498,11 +2498,11 @@ def main():
             print("fft fast target3: ", fast_target2)
             print("fft fast target4:", fast_target1)
             print("fft fastest target: ", fastest_target)
-            print("fft target1: ", target5)
-            print("fft target2: ", target4)
+            print("fft target1: ", target1)
+            print("fft target2: ", target2)
             print("fft target3: ", target3)
-            print("fft target4: ", target2)
-            print("fft target5: ", target1)
+            print("fft target4: ", target4)
+            print("fft target5: ", target5)
 
             print()
 
@@ -2610,7 +2610,7 @@ def main():
                 timestamp = current_time.strftime("%d %H %M %S")
 
                 if current_quadrant == 1:
-                    if price < avg_mtf and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
+                    if price < avg_mtf and price < fastest_target and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral": 
                             if price < sma_5 and price < sma_7 and price < sma_9: 
                                 if pct_diff_to_min < pct_diff_to_max:
@@ -2618,7 +2618,7 @@ def main():
                                         trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > avg_mtf and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
+                    if price > avg_mtf and price > fastest_target and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral": 
                             if price > sma_5 and price > sma_7 and price > sma_9:    
                                 if pct_diff_to_max < pct_diff_to_min:
