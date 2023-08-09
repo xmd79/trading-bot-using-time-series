@@ -1584,6 +1584,16 @@ print("Average MTF:", avg_mtf)
 #print("Range of prices within distance from current close price:")
 #print(range_price[-1])
 
+# Determine which threshold is closest to the current close
+closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - close[-1]))
+
+if closest_threshold == min_threshold:
+    print("The last minimum value is closest to the current close.")
+elif closest_threshold == max_threshold:
+    print("The last maximum value is closest to the current close.")
+else:
+    print("No threshold value found.")
+
 print()
 
 ##################################################
@@ -2602,6 +2612,18 @@ def main():
 
             print()
 
+            # Determine which threshold is closest to the current close
+            closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - close[-1]))
+
+            if closest_threshold == min_threshold:
+                print("The last minimum value is closest to the current close.")
+            elif closest_threshold == max_threshold:
+                print("The last maximum value is closest to the current close.")
+            else:
+                print("No threshold value found.")
+
+            print()
+
             ##################################################
             ##################################################
 
@@ -2612,14 +2634,14 @@ def main():
                 if current_quadrant == 1:
                     if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":  
-                            if pct_diff_to_min < pct_diff_to_max:
+                            if pct_diff_to_min < pct_diff_to_max and closest_threshold == min_threshold:
                                 if momentum > 0:
                                     trigger_long = True
 
                 if current_quadrant == 4:
                     if price > avg_mtf and price > fastest_target and price > target1 and price > target2 and price > target3 and price > target4 and price > target5 and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral": 
-                            if pct_diff_to_max < pct_diff_to_min:
+                            if pct_diff_to_max < pct_diff_to_min and closest_threshold == max_threshold:
                                 if momentum < 0:
                                     trigger_short = True
 
