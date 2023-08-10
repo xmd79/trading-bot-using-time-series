@@ -2888,14 +2888,14 @@ def main():
             if price <= lower_bb_5min[-1] and buy_volume_5min > sell_volume_5min and modified_support_levels and modified_resistance_levels:
                 if all(level < small_lvrg_levels_5min[0] for level in modified_support_levels) and all(level < medium_lvrg_levels_5min[0] for level in modified_support_levels) and all(level < large_lvrg_levels_5min[0] for level in modified_support_levels):
                     print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band and More Buy Volume at Support")
-                elif buy_volume_5min > sell_volume_5min:
-                    print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band")
+                #elif buy_volume_5min > sell_volume_5min:
+                    #print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band")
 
             if price >= upper_bb_5min[-1] and sell_volume_5min > buy_volume_5min and modified_support_levels and modified_resistance_levels:
                 if all(level > small_lvrg_levels_5min[0] for level in modified_resistance_levels) and all(level > medium_lvrg_levels_5min[0] for level in modified_resistance_levels) and all(level > large_lvrg_levels_5min[0] for level in modified_resistance_levels):
                     print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band and More Sell Volume at Resistance")
-                elif sell_volume_5min > buy_volume_5min:
-                    print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band")
+                #elif sell_volume_5min > buy_volume_5min:
+                    #print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band")
 
             print()
 
@@ -2914,7 +2914,7 @@ def main():
                 timestamp = current_time.strftime("%d %H %M %S")
 
                 if current_quadrant == 1:
-                    if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
+                    if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft and price <= lower_bb_5min[-1]:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":  
                             if pct_diff_to_min < pct_diff_to_max and closest_threshold == min_threshold:
                                 if buy_volume_5min > sell_volume_5min:
@@ -2922,7 +2922,7 @@ def main():
                                         trigger_long = True
 
                 if current_quadrant == 4:
-                    if price > avg_mtf and price > fastest_target and price > target1 and price > target2 and price > target3 and price > target4 and price > target5 and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
+                    if price > avg_mtf and price > fastest_target and price > target1 and price > target2 and price > target3 and price > target4 and price > target5 and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft and price >= lower_bb_5min[-1]:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral": 
                             if pct_diff_to_max < pct_diff_to_min and closest_threshold == max_threshold:
                                 if sell_volume_5min > buy_volume_5min:
