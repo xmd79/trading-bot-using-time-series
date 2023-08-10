@@ -2904,6 +2904,9 @@ def main():
             elif SELL_volume_5min > buy_volume_5min:
                 print("Sell vol is higher then buy vol: BEARISH")
 
+            print("Lower BB is now at: ", lower_bb_5min[-1])
+            print("Upper BB is now at: ", upper_bb_5min[-1])
+
             print()
 
             ##################################################
