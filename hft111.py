@@ -350,8 +350,11 @@ def calculate_poly_channel(candles, window=20):
 
 total_volume = calculate_volume(candles)
 buy_volume_5min, sell_volume_5min, buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
+
 (support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min) = calculate_support_resistance(candles)
+
 total_volume_5min = get_volume_5min(candles)
+total_volume_1min = get_volume_1min(candles)
 
 small_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 2)
 medium_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 5)
@@ -2832,8 +2835,11 @@ def main():
 
             total_volume = calculate_volume(candles)
             buy_volume_5min, sell_volume_5min, buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
+
             (support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min) = calculate_support_resistance(candles)
+
             total_volume_5min = get_volume_5min(candles)
+            total_volume_1min = get_volume_1min(candles)
 
             small_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 2)
             medium_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 5)
