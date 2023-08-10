@@ -2938,6 +2938,18 @@ def main():
 
             print()
 
+            distance_to_lower = abs(price - lower_bb)
+            distance_to_upper = abs(price - upper_bb)
+    
+            if distance_to_lower < distance_to_upper:
+                print("Price is closer to the Lower Bollinger Band")
+            elif distance_to_upper < distance_to_lower:
+                print("Price is closer to the upper Bollinger Band")
+            else:
+                print("Price is equidistant to both Bollinger Bands")
+
+            print()
+
             if buy_volume_5min > sell_volume_5min:
                 print("Buy vol on 5min tf is higher then sell vol: BULLISH")
             elif sell_volume_5min > buy_volume_5min:
@@ -2960,7 +2972,7 @@ def main():
                 if current_quadrant == 1:
                     if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":  
-                            if pct_diff_to_min < pct_diff_to_max and closest_threshold == min_threshold:
+                            if pct_diff_to_min < pct_diff_to_max and distance_to_lower < distance_to_upper and closest_threshold == min_threshold:
                                 if buy_volume_1min > sell_volume_1min and buy_volume_5min > sell_volume_5min:
                                     if momentum > 0:
                                         trigger_long = True
@@ -2968,7 +2980,7 @@ def main():
                 if current_quadrant == 4:
                     if price > avg_mtf and price > fastest_target and price > target1 and price > target2 and price > target3 and price > target4 and price > target5 and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral": 
-                            if pct_diff_to_max < pct_diff_to_min and closest_threshold == max_threshold:
+                            if pct_diff_to_max < pct_diff_to_min and distance_to_upper < distance_to_lower and closest_threshold == max_threshold:
                                 if sell_volume_1min > buy_volume_1min and sell_volume_5min > buy_volume_5min:
                                     if momentum < 0:
                                         trigger_short = True
@@ -3094,6 +3106,8 @@ def main():
         del resistance_levels_selected
         del modified_support_levels
         del modified_resistance_levels
+        del distance_to_lower
+        del distance_to_upper
 
         gc.collect() 
 
