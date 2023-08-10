@@ -2899,15 +2899,17 @@ def main():
 
             print()
 
-            if buy_volume_5min > sell_volume_5min:
-                print("Buy vol is higher then sell vol: BULLISH")
-            elif SELL_volume_5min > buy_volume_5min:
-                print("Sell vol is higher then buy vol: BEARISH")
-
             print("Lower BB is now at: ", lower_bb_5min[-1])
             print("Upper BB is now at: ", upper_bb_5min[-1])
             print("Lower Poly is now at: ", lower_poly_5min[-1])
             print("Upper Poly is now at: ", upper_poly_5min[-1])
+
+            print()
+
+            if buy_volume_5min > sell_volume_5min:
+                print("Buy vol is higher then sell vol: BULLISH")
+            elif SELL_volume_5min > buy_volume_5min:
+                print("Sell vol is higher then buy vol: BEARISH")
 
             print()
 
