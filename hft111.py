@@ -2938,8 +2938,8 @@ def main():
 
             print()
 
-            distance_to_lower = abs(price - lower_bb)
-            distance_to_upper = abs(price - upper_bb)
+            distance_to_lower = abs(price - lower_bb_5min[-1])
+            distance_to_upper = abs(price - upper_bb_5min[-1])
     
             if distance_to_lower < distance_to_upper:
                 print("Price is closer to the Lower Bollinger Band")
