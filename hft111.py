@@ -3055,6 +3055,7 @@ def main():
         del buy_volume_1min
         del sell_volume_1min
         del total_volume_5min
+        del total_volume_1min
         del support_levels_1min
         del resistance_levels_1min
         del support_levels_3min
