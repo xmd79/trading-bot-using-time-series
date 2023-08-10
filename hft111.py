@@ -252,10 +252,17 @@ def get_volume_5min(candles):
     total_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m")
     return total_volume_5min
 
+def get_volume_1min(candles):
+    total_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m")
+    return total_volume_1min
+
 def calculate_buy_sell_volume(candles):
     buy_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m" and candle["close"] > candle["open"])
     sell_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m" and candle["close"] < candle["open"])
-    return buy_volume_5min, sell_volume_5min
+    buy_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m" and candle["close"] > candle["open"])
+    sell_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m" and candle["close"] < candle["open"])
+
+    return buy_volume_5min, sell_volume_5min, buy_volume_1min, sell_volume_1min 
 
 def calculate_support_resistance(candles):
     support_levels_1min = []
@@ -342,7 +349,7 @@ def calculate_poly_channel(candles, window=20):
     return upper_channel.tolist(), lower_channel.tolist()
 
 total_volume = calculate_volume(candles)
-buy_volume_5min, sell_volume_5min = calculate_buy_sell_volume(candles)
+buy_volume_5min, sell_volume_5min, buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
 (support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min) = calculate_support_resistance(candles)
 total_volume_5min = get_volume_5min(candles)
 
@@ -362,8 +369,19 @@ higher_support_5min, higher_resistance_5min = get_higher_timeframe_data(TRADE_SY
 
 print("Total Volume:", total_volume)
 print("Total Volume (5min tf):", total_volume_5min)
+
+print()
+
 print("Buy Volume (5min tf):", buy_volume_5min)
 print("Sell Volume (5min tf):", sell_volume_5min)
+
+print()
+
+
+print("Buy Volume (1min tf):", buy_volume_1min)
+print("Sell Volume (1min tf):", sell_volume_1min)
+
+print()
 
 # Print support and resistance levels for the 5-minute timeframe
 print("Support Levels (5min tf):", support_levels_5min[-1])
@@ -2813,7 +2831,7 @@ def main():
             ##################################################
 
             total_volume = calculate_volume(candles)
-            buy_volume_5min, sell_volume_5min = calculate_buy_sell_volume(candles)
+            buy_volume_5min, sell_volume_5min, buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
             (support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min) = calculate_support_resistance(candles)
             total_volume_5min = get_volume_5min(candles)
 
@@ -2833,8 +2851,16 @@ def main():
 
             print("Total Volume:", total_volume)
             print("Total Volume (5min tf):", total_volume_5min)
+
+            print()
+
             print("Buy Volume (5min tf):", buy_volume_5min)
             print("Sell Volume (5min tf):", sell_volume_5min)
+
+            print()
+
+            print("Buy Volume (1min tf):", buy_volume_1min)
+            print("Sell Volume (1min tf):", sell_volume_1min)
 
             print()
 
@@ -2907,9 +2933,14 @@ def main():
             print()
 
             if buy_volume_5min > sell_volume_5min:
-                print("Buy vol is higher then sell vol: BULLISH")
-            elif SELL_volume_5min > buy_volume_5min:
-                print("Sell vol is higher then buy vol: BEARISH")
+                print("Buy vol on 5min tf is higher then sell vol: BULLISH")
+            elif sell_volume_5min > buy_volume_5min:
+                print("Sell vol on 5min tf is higher then buy vol: BEARISH")
+
+            if buy_volume_1min > sell_volume_1min:
+                print("Buy vol on 1min tf is higher then sell vol: BULLISH")
+            elif sell_volume_1min > buy_volume_1min:
+                print("Sell vol on 1min tf is higher then buy vol: BEARISH")
 
             print()
 
@@ -2924,7 +2955,7 @@ def main():
                     if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":  
                             if pct_diff_to_min < pct_diff_to_max and closest_threshold == min_threshold:
-                                if buy_volume_5min > sell_volume_5min:
+                                if buy_volume_1min > sell_volume_1min and buy_volume_5min > sell_volume_5min:
                                     if momentum > 0:
                                         trigger_long = True
 
@@ -3021,6 +3052,8 @@ def main():
         del total_volume
         del buy_volume_5min
         del sell_volume_5min
+        del buy_volume_1min
+        del sell_volume_1min
         del total_volume_5min
         del support_levels_1min
         del resistance_levels_1min
