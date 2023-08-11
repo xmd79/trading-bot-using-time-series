@@ -3083,7 +3083,7 @@ def main():
             ##################################################
 
             current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-            print("current PNL at: ", current_pnl)
+            print("current PNL at:", current_pnl)
 
             trade_entry_pnl = 0
             trade_exit_pnl = 0
@@ -3099,39 +3099,34 @@ def main():
                 symbol = position['symbol']
                 position_amount = float(position['positionAmt'])
 
-            # Print position if there is nor not     
-            if position_amount != 0:
-                print("Position open: ", position_amount)
- 
                 # Filter positions for the desired symbol (e.g., BTCUSDT)
-                desired_symbol = 'BTCUSDT'
-                open_positions = [position for position in positions if position['symbol'] == desired_symbol]
+                if symbol == 'BTCUSDT':
+                    print("Position open:", position_amount)
 
-                if open_positions:
-                    # Extract relevant information from the open position
-                    entry_price = float(open_positions[0]['entryPrice'])
-                    mark_price = float(open_positions[0]['markPrice'])
-                    position_amount = float(open_positions[0]['positionAmt'])
-                    current_pnl = float(open_positions[0]['unRealizedProfit'])
-    
-                    print("entry price at: ", entry_price)
-                    print("mark priceat: ", mark_price)
-                    print("position_amount: ", position_amount)
-                    print("Current PNL at:", current_pnl)
+                    if position_amount != 0:
+                        # Extract relevant information from the open position
+                        entry_price = float(position['entryPrice'])
+                        mark_price = float(position['markPrice'])
+                        current_pnl = float(position['unRealizedProfit'])
+                        initial_margin = float(position['isolatedMargin'])
 
-                    # Calculate and print PNL percentage (ROE %)
-                    if entry_price != 0:
-                        mark_price = float(open_positions[0]['markPrice'])
-                        position_amount = float(open_positions[0]['positionAmt'])
+                        print("entry price at:", entry_price)
+                        print("mark price at:", mark_price)
+                        print("position_amount:", position_amount)
+                        print("Current PNL at:", current_pnl)
 
-                        initial_pnl = (mark_price - entry_price) * position_amount
-                        pnl_percentage = (initial_pnl / (entry_price * position_amount)) * 100
-                        print("PNL Percentage (ROE %):", pnl_percentage)
-                    else:
-                        print("Entry Price is zero, unable to calculate PNL percentage.")
+                        # Calculate and print PNL percentage (ROE %)
+                        if initial_margin != 0:
+                            pnl_percentage = (current_pnl / initial_margin) * 100
+                            print("PNL Percentage (ROE %):", pnl_percentage)
+                        else:
+                            print("Initial Margin is zero, unable to calculate PNL percentage.")
 
-            elif position_amount == 0:
-                print("Position not open: ", position_amount)
+                    elif position_amount == 0:
+                        print("Position not open:", position_amount)
+
+            ##################################################
+            ##################################################
 
             print()
 
