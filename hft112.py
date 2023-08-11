@@ -3133,8 +3133,6 @@ def main():
             elif position_amount == 0:
                 print("Position not open: ", position_amount)
 
-            print(f"Current PNL: {current_pnl}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
-
             print()
 
             ##################################################
