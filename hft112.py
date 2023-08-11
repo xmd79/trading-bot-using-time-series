@@ -3082,11 +3082,14 @@ def main():
             ##################################################
             ##################################################
 
-            initial_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
-            print("Initial PNL at: ", initial_pnl)
+            current_pnl = float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])
+            print("current PNL at: ", current_pnl)
 
-            take_profit = 0.0233 * initial_pnl
-            stop_loss = -0.1576 * initial_pnl
+            trade_entry_pnl = 0
+            trade_exit_pnl = 0
+
+            take_profit = 2.33
+            stop_loss = -15.76
 
             # Get all open positions
             positions = client.futures_position_information()
@@ -3145,7 +3148,7 @@ def main():
 
                 # Check stop loss and take profit conditions
                 if position_amount != 0:
-                    if initial_pnl <= stop_loss or initial_pnl >= take_profit:
+                    if current_pnl <= stop_loss or current_pnl >= take_profit:
                         # Call exit_trade() function
                         exit_trade() 
  
