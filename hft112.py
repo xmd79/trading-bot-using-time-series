@@ -3102,11 +3102,38 @@ def main():
             # Print position if there is nor not     
             if position_amount != 0:
                 print("Position open: ", position_amount)
-                       
+ 
+                # Filter positions for the desired symbol (e.g., BTCUSDT)
+                desired_symbol = 'BTCUSDT'
+                open_positions = [position for position in positions if position['symbol'] == desired_symbol]
+
+                if open_positions:
+                    # Extract relevant information from the open position
+                    entry_price = float(open_positions[0]['entryPrice'])
+                    mark_price = float(open_positions[0]['markPrice'])
+                    position_amount = float(open_positions[0]['positionAmt'])
+                    current_pnl = float(open_positions[0]['unRealizedProfit'])
+    
+                    print("entry price at: ", entry_price)
+                    print("mark priceat: ", mark_price)
+                    print("position_amount: ", position_amount)
+                    print("Current PNL at:", current_pnl)
+
+                    # Calculate and print PNL percentage (ROE %)
+                    if entry_price != 0:
+                        mark_price = float(open_positions[0]['markPrice'])
+                        position_amount = float(open_positions[0]['positionAmt'])
+
+                        initial_pnl = (mark_price - entry_price) * position_amount
+                        pnl_percentage = (initial_pnl / (entry_price * position_amount)) * 100
+                        print("PNL Percentage (ROE %):", pnl_percentage)
+                    else:
+                        print("Entry Price is zero, unable to calculate PNL percentage.")
+
             elif position_amount == 0:
                 print("Position not open: ", position_amount)
 
-            print(f"Current PNL: {float(client.futures_position_information(symbol=TRADE_SYMBOL)[0]['unRealizedProfit'])}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
+            print(f"Current PNL: {current_pnl}, Entry PNL: {trade_entry_pnl}, Exit PNL: {trade_exit_pnl}")
 
             print()
 
@@ -3148,7 +3175,7 @@ def main():
 
                 # Check stop loss and take profit conditions
                 if position_amount != 0:
-                    if current_pnl <= stop_loss or current_pnl >= take_profit:
+                    if pnl_percentage <= stop_loss or pnl_percentage >= take_profit:
                         # Call exit_trade() function
                         exit_trade() 
  
