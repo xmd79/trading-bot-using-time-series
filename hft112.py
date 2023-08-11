@@ -3108,17 +3108,23 @@ def main():
                         entry_price = float(position['entryPrice'])
                         mark_price = float(position['markPrice'])
                         current_pnl = float(position['unRealizedProfit'])
-                        initial_margin = float(position['isolatedMargin'])
+                        position_amount = float(position['positionAmt'])
+                        leverage = float(position['leverage'])
 
                         print("entry price at:", entry_price)
                         print("mark price at:", mark_price)
                         print("position_amount:", position_amount)
                         print("Current PNL at:", current_pnl)
 
-                        # Calculate and print PNL percentage (ROE %)
-                        if initial_margin != 0:
-                            pnl_percentage = (current_pnl / initial_margin) * 100
-                            print("PNL Percentage (ROE %):", pnl_percentage)
+                        # Calculate ROE %
+                        direction = 1 if position_amount > 0 else -1
+                        unrealized_pnl = position_amount * direction * (mark_price - entry_price)
+                        imr = 1 / leverage
+                        entry_margin = position_amount * mark_price * imr
+
+                        if entry_margin != 0:
+                            roe_percentage = (unrealized_pnl / entry_margin) * 100
+                            print(f"ROE Percentage (ROE %) for {symbol}: {roe_percentage:.2f}%")
                         else:
                             print("Initial Margin is zero, unable to calculate PNL percentage.")
 
