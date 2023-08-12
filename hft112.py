@@ -3143,7 +3143,10 @@ def main():
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
 
-                if position_amount == 0:  # Check if a position is not open
+                if current_pnl == 0:  
+                    # Check if a position is not open
+                    print("Now not in a trade, seeking entry conditions")
+
                     if current_quadrant == 1:
                         if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
@@ -3173,7 +3176,9 @@ def main():
                         trigger_short = False
 
                 # Check stop loss and take profit conditions
-                if position_amount != 0:
+                if current_pnl != 0:
+                    print("Now in a trade, seeking exit conditions")
+
                     if roe_percentage <= stop_loss or roe_percentage >= take_profit:
                         # Call exit_trade() function
                         exit_trade() 
