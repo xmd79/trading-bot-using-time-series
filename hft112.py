@@ -3092,7 +3092,7 @@ def main():
             stop_loss = -15.76
 
             # Get all open positions
-            positions = client.futures_position_information()
+            positions = client.futures_position_information(symbol=TRADE_SYMBOL)
 
             # Loop through each position
             for position in positions:
