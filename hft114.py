@@ -3183,7 +3183,7 @@ def main():
                         if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
                                 if pct_diff_to_min < pct_diff_to_max and distance_to_lower < distance_to_upper and closest_threshold == min_threshold:
-                                    if buy_volume_1min > sell_volume_1min and buy_volume_5min > sell_volume_5min:
+                                    if buy_volume_1min > sell_volume_1min:
                                         if price <= lower_bb_5min[-1]:
                                             if momentum > 0:
                                                 trigger_long = True
@@ -3192,7 +3192,7 @@ def main():
                         if price > avg_mtf and price > fastest_target and price > target1 and price > target2 and price > target3 and price > target4 and price > target5 and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
                                 if pct_diff_to_max < pct_diff_to_min and distance_to_upper < distance_to_lower and closest_threshold == max_threshold:
-                                    if sell_volume_1min > buy_volume_1min and sell_volume_5min > buy_volume_5min:
+                                    if sell_volume_1min > buy_volume_1min:
                                         if price >= upper_bb_5min[-1]:
                                             if momentum < 0:
                                                 trigger_short = True
