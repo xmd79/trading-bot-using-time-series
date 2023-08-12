@@ -254,6 +254,10 @@ def get_volume_5min(candles):
     total_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m")
     return total_volume_5min
 
+def get_volume_3min(candles):
+    total_volume_3min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "3m")
+    return total_volume_3min
+
 def get_volume_1min(candles):
     total_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m")
     return total_volume_1min
@@ -261,10 +265,12 @@ def get_volume_1min(candles):
 def calculate_buy_sell_volume(candles):
     buy_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m" and candle["close"] > candle["open"])
     sell_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m" and candle["close"] < candle["open"])
+    buy_volume_3min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "3m" and candle["close"] > candle["open"])
+    sell_volume_3min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "3m" and candle["close"] < candle["open"])
     buy_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m" and candle["close"] > candle["open"])
     sell_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m" and candle["close"] < candle["open"])
 
-    return buy_volume_5min, sell_volume_5min, buy_volume_1min, sell_volume_1min 
+    return buy_volume_5min, sell_volume_5min, buy_volume_3min, sell_volume_3min , buy_volume_1min, sell_volume_1min 
 
 def calculate_support_resistance(candles):
     support_levels_1min = []
@@ -343,7 +349,7 @@ def calculate_rolling_std(data, window):
     return rolling_std
 
 def calculate_poly_channel(candles, window=20):
-    close_prices = [candle["close"] for candle in candles if candle["timeframe"] == "5m"]
+    close_prices = [candle["close"] for candle in candles if candle["timeframe"] == "1m"]
     poly_channel = np.polyfit(range(len(close_prices)), close_prices, 1)
     channel = np.polyval(poly_channel, range(len(close_prices)))
     upper_channel = channel + np.std(channel) * window
@@ -351,11 +357,12 @@ def calculate_poly_channel(candles, window=20):
     return upper_channel.tolist(), lower_channel.tolist()
 
 total_volume = calculate_volume(candles)
-buy_volume_5min, sell_volume_5min, buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
+buy_volume_5min, sell_volume_5min, buy_volume_3min, sell_volume_3min , buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
 
 (support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min) = calculate_support_resistance(candles)
 
 total_volume_5min = get_volume_5min(candles)
+total_volume_3min = get_volume_3min(candles)
 total_volume_1min = get_volume_1min(candles)
 
 small_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 2)
@@ -2960,7 +2967,7 @@ def main():
             ##################################################
 
             total_volume = calculate_volume(candles)
-            buy_volume_5min, sell_volume_5min, buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
+            buy_volume_5min, sell_volume_5min, buy_volume_3min, sell_volume_3min , buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
 
             (support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min) = calculate_support_resistance(candles)
 
@@ -2988,6 +2995,11 @@ def main():
 
             print("Buy Volume (5min tf):", buy_volume_5min)
             print("Sell Volume (5min tf):", sell_volume_5min)
+
+            print()
+
+            print("Buy Volume (3min tf):", buy_volume_3min)
+            print("Sell Volume (3min tf):", sell_volume_3min)
 
             print()
 
@@ -3080,6 +3092,11 @@ def main():
                 print("Buy vol on 5min tf is higher then sell vol: BULLISH")
             elif sell_volume_5min > buy_volume_5min:
                 print("Sell vol on 5min tf is higher then buy vol: BEARISH")
+
+            if buy_volume_3min > sell_volume_3min:
+                print("Buy vol on 3min tf is higher then sell vol: BULLISH")
+            elif sell_volume_3min > buy_volume_3min:
+                print("Sell vol on 3min tf is higher then buy vol: BEARISH")
 
             if buy_volume_1min > sell_volume_1min:
                 print("Buy vol on 1min tf is higher then sell vol: BULLISH")
