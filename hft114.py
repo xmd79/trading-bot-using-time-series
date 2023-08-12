@@ -2301,12 +2301,12 @@ def calculate_elements():
     reciprocal_phi_squared = PHI ** -2
     reciprocal_phi_cubed = PHI ** -3
 
-    # Calculate unit circle degrees for each quadrant
+    # Calculate unit circle degrees for each quadrant, including dip reversal up and top reversal down cycles
     unit_circle_degrees = {
-        1: -45,  # Apex
-        2: 135,  # Left
-        3: 225,  # Base
-        4: 45   # Right
+        1: {'angle': 135, 'polarity': ('-', '-'), 'cycle': 'dip_to_top'},  # Quadrant 1 (Dip to Top)
+        2: {'angle': 45, 'polarity': ('+', '+'), 'cycle': 'top_to_dip'},   # Quadrant 2 (Top to Dip)
+        3: {'angle': 315, 'polarity': ('+', '-'), 'cycle': 'dip_to_top'},  # Quadrant 3 (Dip to Top)
+        4: {'angle': 225, 'polarity': ('-', '+'), 'cycle': 'top_to_dip'},   # Quadrant 4 (Top to Dip)
     }
 
     # Calculate ratios up to 12 ratio degrees
