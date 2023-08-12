@@ -3174,7 +3174,7 @@ def main():
 
                 # Check stop loss and take profit conditions
                 if position_amount != 0:
-                    if pnl_percentage <= stop_loss or pnl_percentage >= take_profit:
+                    if roe_percentage <= stop_loss or roe_percentage >= take_profit:
                         # Call exit_trade() function
                         exit_trade() 
  
