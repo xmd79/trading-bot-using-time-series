@@ -3136,7 +3136,7 @@ def main():
                             roe_percentage = (unrealized_pnl / entry_margin) * 100
                             print(f"ROE Percentage (ROE %) for {TRADE_SYMBOL}: {roe_percentage:.2f}%")
                         else:
-                            print("Initial Margin is zero, unable to calculate PNL percentage.")
+                            print("Initial Margin is zero, no position is open yet")
                         break
         
                     if not found_position:
