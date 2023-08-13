@@ -3136,6 +3136,18 @@ def main():
             ##################################################
             ##################################################
 
+            period = 56
+            upper, middle, lower = calculate_donchian_channel(close, period)
+
+            print("Lower Line:", lower)
+            print("Middle Line:", middle)
+            print("Upper Line:", upper)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 2.27
             stop_loss = -15.76
 
@@ -3189,17 +3201,6 @@ def main():
 
             else:
                 print("Failed to retrieve position information. Status code:", response.status_code)
-
-
-            ##################################################
-            ##################################################
-
-            period = 56
-            upper, middle, lower = calculate_donchian_channel(close, period)
-
-            print("Lower Line:", lower)
-            print("Middle Line:", middle)
-            print("Upper Line:", upper)
 
             print()
 
