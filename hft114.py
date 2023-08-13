@@ -3209,7 +3209,7 @@ def main():
             ##################################################
 
             take_profit = 2.27
-            stop_loss = -15.76
+            #stop_loss = -15.76
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3294,14 +3294,14 @@ def main():
 
                     if current_quadrant == 1:
                         if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
-                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and distance_to_lower < distance_to_upper and price <= lower:
+                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and distance_to_lower < distance_to_upper and price <= lower and market_mood == "Oversold" and reversal_signal == "Positive Reversal":
                                 if pct_diff_to_min < pct_diff_to_max and distance_to_lower < distance_to_upper and closest_threshold == min_threshold:
                                     if momentum > 0:
                                         trigger_long = True
 
                     if current_quadrant == 4:
                         if price > avg_mtf and price > fastest_target and price > target1 and price > target2 and price > target3 and price > target4 and price > target5 and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
-                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and distance_to_upper < distance_to_lower and price >= upper:
+                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and distance_to_upper < distance_to_lower and price >= upper and market_mood == "Overbrought" and reversal_signal == "Negative Reversal":
                                 if pct_diff_to_max < pct_diff_to_min and distance_to_upper < distance_to_lower and closest_threshold == max_threshold:
                                     if momentum < 0:
                                         trigger_short = True
@@ -3322,7 +3322,7 @@ def main():
                 if un_realized_profit != 0:
                     print("Now in a trade, seeking exit conditions")
 
-                    if roe_percentage <= stop_loss or roe_percentage >= take_profit:
+                    if roe_percentage >= take_profit:
                         # Call exit_trade() function
                         exit_trade() 
  
