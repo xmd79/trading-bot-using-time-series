@@ -2425,7 +2425,7 @@ def entry_short(symbol):
 def exit_trade():
     try:
         # Get all open positions
-        positions = client.futures_position_information_v2()
+        positions = client.futures_position_information()
 
         # Loop through each position
         for position in positions:
