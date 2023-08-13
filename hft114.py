@@ -2476,9 +2476,9 @@ print()
 period = 56
 upper, middle, lower = calculate_donchian_channel(close, period)
 
-print("Upper Line:", upper)
-print("Middle Line:", middle)
 print("Lower Line:", lower)
+print("Middle Line:", middle)
+print("Upper Line:", upper)
 
 print()
 
@@ -3136,12 +3136,20 @@ def main():
             ##################################################
             ##################################################
 
-            period = 56
+            period = 256
             upper, middle, lower = calculate_donchian_channel(close, period)
 
             print("Lower Line:", lower)
             print("Middle Line:", middle)
             print("Upper Line:", upper)
+
+            distance_to_lower = abs(price - lower)
+            distance_to_upper = abs(price - upper)
+    
+            if distance_to_lower < distance_to_upper:
+                print("Price is closer to the Lower Line")
+            else:
+                print("Price is closer to the Upper Line")
 
             print()
 
@@ -3217,14 +3225,14 @@ def main():
 
                     if current_quadrant == 1:
                         if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
-                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and price <= lower:
+                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and distance_to_lower < distance_to_upper and price <= lower:
                                 if pct_diff_to_min < pct_diff_to_max and distance_to_lower < distance_to_upper and closest_threshold == min_threshold:
                                     if momentum > 0:
                                         trigger_long = True
 
                     if current_quadrant == 4:
                         if price > avg_mtf and price > fastest_target and price > target1 and price > target2 and price > target3 and price > target4 and price > target5 and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
-                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and price >= upper:
+                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and distance_to_upper < distance_to_lower and price >= upper:
                                 if pct_diff_to_max < pct_diff_to_min and distance_to_upper < distance_to_lower and closest_threshold == max_threshold:
                                     if momentum < 0:
                                         trigger_short = True
