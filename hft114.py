@@ -2485,6 +2485,58 @@ print()
 ##################################################
 ##################################################
 
+def calculate_bb_percent_b(close, period, std_dev_factor, min_reversal, max_reversal):
+    import numpy as np
+
+    # Calculate the moving average and standard deviation
+    moving_avg = np.mean(close[-period:])
+    std_dev = np.std(close[-period:])
+
+    # Calculate upper and lower Bollinger Bands
+    upper_band = moving_avg + std_dev_factor * std_dev
+    lower_band = moving_avg - std_dev_factor * std_dev
+
+    # Calculate %B
+    percent_b = (close[-1] - lower_band) / (upper_band - lower_band)
+
+    # Determine market mood based on %B
+    market_mood = "Neutral"
+    if percent_b < 0.2:
+        market_mood = "Oversold"
+    elif percent_b > 0.8:
+        market_mood = "Overbought"
+
+    # Determine reversal signals based on %B and provided min/max reversal thresholds
+    reversal_signal = "No Reversal"
+    if percent_b <= min_reversal:
+        reversal_signal = "Positive Reversal"
+    elif percent_b >= max_reversal:
+        reversal_signal = "Negative Reversal"
+
+    return percent_b, market_mood, reversal_signal
+
+# Example usage
+period = 20
+std_dev_factor = 2
+min_reversal = 0.1
+max_reversal = 0.9
+
+percent_b, market_mood, reversal_signal = calculate_bb_percent_b(close, period, std_dev_factor, min_reversal, max_reversal)
+
+print("BB %B:", percent_b)
+print("Market Mood:", market_mood)
+print("Reversal Signal:", reversal_signal)
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -3215,6 +3267,23 @@ def main():
             ##################################################
             ##################################################
 
+            # Example usage
+            period = 20
+            std_dev_factor = 2
+            min_reversal = 0.1
+            max_reversal = 0.9
+
+            percent_b, market_mood, reversal_signal = calculate_bb_percent_b(close, period, std_dev_factor, min_reversal, max_reversal)
+
+            print("BB %B:", percent_b)
+            print("Market Mood:", market_mood)
+            print("Reversal Signal:", reversal_signal)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             with open("signals.txt", "a") as f:
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
@@ -3375,6 +3444,8 @@ def main():
         del modified_resistance_levels
         del distance_to_lower
         del distance_to_upper
+        del percent_b
+        del reversal_signal
 
         gc.collect() 
 
