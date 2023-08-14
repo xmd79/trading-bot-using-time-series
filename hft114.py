@@ -2567,7 +2567,7 @@ PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number,
 forecasted_price_fft = fft_forecast_price(price, close)
 
 # Calculate extended target forecasted prices
-spread = 25.0  # Adjust this value as needed
+spread = 5.0  # Adjust this value as needed
 extended_target_1 = forecasted_price_fft + spread
 extended_target_2 = forecasted_price_fft + 2 * spread
 extended_target_3 = forecasted_price_fft + 3 * spread
@@ -3356,7 +3356,7 @@ def main():
             forecasted_price_fft = fft_forecast_price(price, close)
 
             # Calculate extended target forecasted prices
-            spread = 10.0  # Adjust this value as needed
+            spread = 5.0  # Adjust this value as needed
             extended_target_1 = forecasted_price_fft + spread
             extended_target_2 = forecasted_price_fft + 2 * spread
             extended_target_3 = forecasted_price_fft + 3 * spread
