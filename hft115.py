@@ -2928,11 +2928,11 @@ def main():
             print("fft fast target3: ", fast_target2)
             print("fft fast target4:", fast_target1)
             print("fft fastest target: ", fastest_target)
-            print("fft target1: ", target1)
-            print("fft target2: ", target2)
+            print("fft target1: ", target5)
+            print("fft target2: ", target4)
             print("fft target3: ", target3)
-            print("fft target4: ", target4)
-            print("fft target5: ", target5)
+            print("fft target4: ", target2)
+            print("fft target5: ", target1)
 
             print()
 
@@ -3209,7 +3209,7 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 2.33
+            take_profit = 2.36
             #stop_loss = -15.76
 
             # Current timestamp in milliseconds
