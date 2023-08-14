@@ -3299,14 +3299,14 @@ def main():
                     print("Now not in a trade, seeking entry conditions")
 
                     if current_quadrant == 1:
-                        if price < avg_mtf and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
+                        if price < avg_mtf and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft and price < lower:
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and distance_to_lower < distance_to_upper:
                                 if pct_diff_to_min < pct_diff_to_max and closest_threshold == min_threshold:
                                     if momentum > 0:
                                         trigger_long = True
 
                     if current_quadrant == 4:
-                        if price > avg_mtf and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
+                        if price > avg_mtf and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft and price > upper:
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and distance_to_upper < distance_to_lower:
                                 if pct_diff_to_max < pct_diff_to_min and closest_threshold == max_threshold:
                                     if momentum < 0:
