@@ -2532,7 +2532,56 @@ print()
 ##################################################
 ##################################################
 
+def fft_forecast_price(price, close):
+    PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed = calculate_elements()
+
+    # Apply FFT to the close prices
+    fft_result = np.fft.fft(close)
+    fft_freqs = np.fft.fftfreq(len(fft_result))
+    
+    # Identify the dominant frequency component
+    dominant_freq_index = np.argmax(np.abs(fft_result))
+    dominant_freq = fft_freqs[dominant_freq_index]
+    
+    # Modify the dominant frequency using inverse powers of phi, phi reciprocals, and sacred frequency
+    modified_freq = dominant_freq * sacred_freq * inverse_phi_cubed
+    
+    # Reconstruct the modified frequency components to generate a forecasted price series
+    forecast_fft_result = np.zeros_like(fft_result)
+    forecast_fft_result[dominant_freq_index] = fft_result[dominant_freq_index]
+    forecasted_prices = np.fft.ifft(forecast_fft_result).real
+    
+    # Calculate the forecasted price based on the modified dominant frequency
+    forecasted_price = price * math.cos(2 * math.pi * modified_freq)
+    
+    # Add spread to the forecasted price
+    spread = 10.0  # Adjust this value as needed
+    forecasted_price += spread
+
+    return forecasted_price
+
+# Calculate elements
+PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed = calculate_elements()
+
+# Generate the forecasted prices using FFT and sacred frequency
+forecasted_price_fft = fft_forecast_price(price, close)
+
+# Calculate extended target forecasted prices
+spread = 10.0  # Adjust this value as needed
+extended_target_1 = forecasted_price_fft + spread
+extended_target_2 = forecasted_price_fft + 2 * spread
+extended_target_3 = forecasted_price_fft + 3 * spread
+extended_target_4 = forecasted_price_fft + 4 * spread
+
+print("Current Price:", price)
+print("FFT Forecasted Price:", forecasted_price_fft)
+print("Extended Target 1:", extended_target_1)
+print("Extended Target 2:", extended_target_2)
+print("Extended Target 3:", extended_target_3)
+print("Extended Target 4:", extended_target_4)
+
 print()
+
 
 ##################################################
 ##################################################
@@ -3208,7 +3257,7 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 2.27
+            take_profit = 3.67
             #stop_loss = -15.76
 
             # Current timestamp in milliseconds
@@ -3284,6 +3333,31 @@ def main():
             ##################################################
             ##################################################
 
+            # Calculate elements
+            PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed = calculate_elements()
+
+            # Generate the forecasted prices using FFT and sacred frequency
+            forecasted_price_fft = fft_forecast_price(price, close)
+
+            # Calculate extended target forecasted prices
+            spread = 10.0  # Adjust this value as needed
+            extended_target_1 = forecasted_price_fft + spread
+            extended_target_2 = forecasted_price_fft + 2 * spread
+            extended_target_3 = forecasted_price_fft + 3 * spread
+            extended_target_4 = forecasted_price_fft + 4 * spread
+
+            print("Current Price:", price)
+            print("FFT Forecasted Price:", forecasted_price_fft)
+            print("Extended Target 1:", extended_target_1)
+            print("Extended Target 2:", extended_target_2)
+            print("Extended Target 3:", extended_target_3)
+            print("Extended Target 4:", extended_target_4)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             with open("signals.txt", "a") as f:
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
@@ -3294,14 +3368,14 @@ def main():
 
                     if current_quadrant == 1:
                         if price < avg_mtf and price < fastest_target and price < target1 and price < target2 and price < target3 and price < target4 and price < target5 and price < incoming_reversal_keypoint and price < future_price_regression and price < forecast_price_fft:
-                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and distance_to_lower < distance_to_upper and price <= lower and market_mood == "Oversold" and reversal_signal == "Positive Reversal":
+                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and distance_to_lower < distance_to_upper and price < forecasted_price_fft < extended_target_1 < extended_target_2 < extended_target_3 < extended_target_4:
                                 if pct_diff_to_min < pct_diff_to_max and distance_to_lower < distance_to_upper and closest_threshold == min_threshold:
                                     if momentum > 0:
                                         trigger_long = True
 
                     if current_quadrant == 4:
                         if price > avg_mtf and price > fastest_target and price > target1 and price > target2 and price > target3 and price > target4 and price > target5 and price > incoming_reversal_keypoint and price > future_price_regression and price > forecast_price_fft:
-                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and distance_to_upper < distance_to_lower and price >= upper and market_mood == "Overbrought" and reversal_signal == "Negative Reversal":
+                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and distance_to_upper < distance_to_lower and price > forecasted_price_fft > extended_target_1 > extended_target_2 > extended_target_3 > extended_target_4:
                                 if pct_diff_to_max < pct_diff_to_min and distance_to_upper < distance_to_lower and closest_threshold == max_threshold:
                                     if momentum < 0:
                                         trigger_short = True
