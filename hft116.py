@@ -3438,8 +3438,6 @@ def main():
         del modified_resistance_levels
         del distance_to_lower
         del distance_to_upper
-        del percent_b
-        del reversal_signal
 
         gc.collect() 
 
