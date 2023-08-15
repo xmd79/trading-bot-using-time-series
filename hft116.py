@@ -2424,6 +2424,14 @@ def entry_short(symbol):
 
 def exit_trade():
     try:
+        # Get account information including available margin
+        account_info = client.futures_account()
+
+        # Check available margin before proceeding
+        if float(account_info['availableMargin']) < 0:
+            print("Insufficient available margin to exit trades.")
+            return
+
         # Get all open positions
         positions = client.futures_position_information()
 
@@ -2433,24 +2441,26 @@ def exit_trade():
             position_amount = float(position['positionAmt'])
 
             # Determine order side
-            if position['positionSide'] == 'LONG':
+            if position_amount > 0:
                 order_side = 'SELL'
-            else: 
-                order_side = 'BUY'  
+            elif position_amount < 0:
+                order_side = 'BUY'
+            else:
+                continue  # Skip positions with zero amount
 
             # Place order to exit position      
-            if position_amount != 0:
-                order = client.futures_create_order(
-                    symbol=symbol,
-                    side=order_side,
-                    type='MARKET',
-                    quantity=abs(position_amount))
+            order = client.futures_create_order(
+                symbol=symbol,
+                side=order_side,
+                type='MARKET',
+                quantity=abs(position_amount))
 
-                print(f"{order_side} order created to exit {abs(position_amount)} {symbol}.")
+            print(f"{order_side} order created to exit {abs(position_amount)} {symbol}.")
 
         print("All positions exited!")
     except BinanceAPIException as e:
         print(f"Error exiting trade: {e}")
+
 
 print()
 
