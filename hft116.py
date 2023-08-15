@@ -2573,6 +2573,8 @@ def main():
     # Instantiate Binance client
     client = BinanceClient(api_key, api_secret)
 
+    get_account_balance()
+
     ##################################################
     ##################################################
 
