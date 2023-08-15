@@ -2427,39 +2427,47 @@ def exit_trade():
         # Get account information including available margin
         account_info = client.futures_account()
 
-        # Check available margin before proceeding
-        if float(account_info['availableMargin']) < 0:
-            print("Insufficient available margin to exit trades.")
-            return
+        # Check if 'availableBalance' is present in the response
+        if 'availableBalance' in account_info:
+            available_margin = float(account_info['availableBalance'])
 
-        # Get all open positions
-        positions = client.futures_position_information()
+            # Check available margin before proceeding
+            if available_margin < 0:
+                print("Insufficient available margin to exit trades.")
+                return
 
-        # Loop through each position
-        for position in positions:
-            symbol = position['symbol']
-            position_amount = float(position['positionAmt'])
+            # Get all open positions
+            positions = client.futures_position_information()
 
-            # Determine order side
-            if position_amount > 0:
-                order_side = 'SELL'
-            elif position_amount < 0:
-                order_side = 'BUY'
-            else:
-                continue  # Skip positions with zero amount
+            # Loop through each position
+            for position in positions:
+                symbol = position['symbol']
+                position_amount = float(position['positionAmt'])
 
-            # Place order to exit position      
-            order = client.futures_create_order(
-                symbol=symbol,
-                side=order_side,
-                type='MARKET',
-                quantity=abs(position_amount))
+                # Determine order side
+                if position_amount > 0:
+                    order_side = 'SELL'
+                elif position_amount < 0:
+                    order_side = 'BUY'
+                else:
+                    continue  # Skip positions with zero amount
 
-            print(f"{order_side} order created to exit {abs(position_amount)} {symbol}.")
+                # Place order to exit position      
+                order = client.futures_create_order(
+                    symbol=symbol,
+                    side=order_side,
+                    type='MARKET',
+                    quantity=abs(position_amount))
 
-        print("All positions exited!")
+                print(f"{order_side} order created to exit {abs(position_amount)} {symbol}.")
+
+            print("All positions exited!")
+        else:
+            print("Error: 'availableBalance' not found in account_info.")
     except BinanceAPIException as e:
         print(f"Error exiting trade: {e}")
+
+
 
 
 print()
