@@ -2550,6 +2550,50 @@ print()
 ##################################################
 ##################################################
 
+def kepler_triangle(close):
+    # Calculate the other side lengths using Kepler triangle properties
+    long_side = close * math.sqrt(2 + math.sqrt(2))
+    short_side = close * math.sqrt(2 - math.sqrt(2))
+    
+    # Return the calculated side lengths as a dictionary
+    triangle_sides = {
+        'close': close,
+        'long_side': long_side,
+        'short_side': short_side
+    }
+    
+    return triangle_sides
+
+def map_frequency_bands(triangle_sides):
+    # EM field bands and their frequency ranges
+    bands = {
+        'gamma': [1e-18, 3e-15],    # Hz (added gamma band)
+        'alpha': [1e-3, 100e3],     # Hz (alpha band)
+        'delta': [100e3, 4e6],      # Hz (delta band)
+        'theta': [4e6, 8e6],        # Hz (theta band)
+        'beta': [12e6, 30e6],       # Hz (beta band)
+        'omega': [30e6, 300e6],     # Hz (omega band)
+        # Add more bands and ranges as needed
+    }
+    
+    # Determine the EM field band for the close value
+    close = triangle_sides['close']
+    em_field_band = None
+    for band, (lower, upper) in bands.items():
+        if lower <= close <= upper:
+            em_field_band = band
+            break
+    
+    if em_field_band is not None:
+        triangle_sides['em_field_band'] = em_field_band
+
+# Example usage
+close_length = 0.05  # Example close length in MHz (gamma band range)
+triangle_sides = kepler_triangle(close_length)
+map_frequency_bands(triangle_sides)
+print(triangle_sides)
+
+
 print()
 
 
@@ -3229,7 +3273,7 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 2.36
+            take_profit = 4.20
             #stop_loss = -15.76
 
             # Current timestamp in milliseconds
