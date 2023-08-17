@@ -2819,11 +2819,11 @@ def main():
 
             print()
 
-            print("Target 1 is: ", target1)
-            print("Target 2 is: ", target2)
+            print("Target 1 is: ", target5)
+            print("Target 2 is: ", target4)
             print("Target 3 is: ", target3)
-            print("Target 4 is: ", target4)
-            print("Target 5 is: ", target5)
+            print("Target 4 is: ", target2)
+            print("Target 5 is: ", target1)
 
             # Get the current price
             price = get_current_price()
@@ -3273,8 +3273,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 4.20
-            #stop_loss = -15.76
+            take_profit = 2.33
+            stop_loss = -2.33
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3380,10 +3380,10 @@ def main():
                 if un_realized_profit != 0:
                     print("Now in a trade, seeking exit conditions")
 
-                    if roe_percentage >= take_profit:
+                    if roe_percentage >= take_profit or roe_percentage <= stop_loss:
                         # Call exit_trade() function
                         exit_trade() 
- 
+                    
             ##################################################
             ##################################################
 
