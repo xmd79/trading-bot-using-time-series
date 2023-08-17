@@ -3354,14 +3354,14 @@ def main():
                         if price < avg_mtf and price < fastest_target and price < future_price_regression and price < forecast_price_fft:
                             if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and distance_to_lower < distance_to_upper:
                                 if pct_diff_to_min < pct_diff_to_max and closest_threshold == min_threshold:
-                                    if momentum > 0:
+                                    if momentum > 0 and buy_volume_1min > sell_volume_1min:
                                         trigger_long = True
 
                     if current_quadrant == 4:
                         if price > avg_mtf and price > fastest_target and price > future_price_regression and price > forecast_price_fft:
                             if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and distance_to_upper < distance_to_lower:
                                 if pct_diff_to_max < pct_diff_to_min and closest_threshold == max_threshold:
-                                    if momentum < 0:
+                                    if momentum < 0 and sell_volume_1min > buy_volume_1min:
                                         trigger_short = True
 
                     if trigger_long:
