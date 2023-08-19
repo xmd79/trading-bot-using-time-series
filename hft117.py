@@ -3353,17 +3353,19 @@ def main():
 
                     if current_quadrant == 1:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                            if momentum > 0 and buy_volume_1min > sell_volume_1min:
-                                for i, target in enumerate(inner_targets, start=1):
-                                    if price < target:
-                                        trigger_long = True
+                            if forecast_direction == "Up":
+                                if momentum > 0 and buy_volume_1min > sell_volume_1min:
+                                    for i, target in enumerate(inner_targets, start=1):
+                                        if price < target:
+                                            trigger_long = True
 
                     if current_quadrant == 4:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                            if momentum < 0 and sell_volume_1min > buy_volume_1min:
-                                for i, target in enumerate(inner_targets, start=1):
-                                    if price > target:
-                                        trigger_short = True
+                            if forecast_direction == "Down":
+                                if momentum < 0 and sell_volume_1min > buy_volume_1min:
+                                    for i, target in enumerate(inner_targets, start=1):
+                                        if price > target:
+                                            trigger_short = True
 
                     if trigger_long:
                         print("LONG signal!")
