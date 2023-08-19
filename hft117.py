@@ -2992,11 +2992,6 @@ def main():
             print("fft fast target3: ", fast_target2)
             print("fft fast target4:", fast_target1)
             print("fft fastest target: ", fastest_target)
-            print("fft target1: ", target5)
-            print("fft target2: ", target4)
-            print("fft target3: ", target3)
-            print("fft target4: ", target2)
-            print("fft target5: ", target1)
 
             print()
 
@@ -3352,7 +3347,7 @@ def main():
 
                     if current_quadrant == 1 and price < forecast_price_fft:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                            if forecast_direction == "Up":
+                            if forecast_direction == "Up" and price < avg_mtf and price < fastest_target:
                                 if momentum > 0 and buy_volume_1min > sell_volume_1min:
                                     for i, target in enumerate(inner_targets, start=1):
                                         if price < target:
@@ -3360,7 +3355,7 @@ def main():
 
                     if current_quadrant == 4 and price > forecast_price_fft:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                            if forecast_direction == "Down":
+                            if forecast_direction == "Down" and price > avg_mtf and price > fastest_target:
                                 if momentum < 0 and sell_volume_1min > buy_volume_1min:
                                     for i, target in enumerate(inner_targets, start=1):
                                         if price > target:
