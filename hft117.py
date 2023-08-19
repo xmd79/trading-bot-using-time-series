@@ -2819,11 +2819,11 @@ def main():
 
             print()
 
-            print("Target 1 is: ", target5)
-            print("Target 2 is: ", target4)
+            print("Target 1 is: ", target1)
+            print("Target 2 is: ", target2)
             print("Target 3 is: ", target3)
-            print("Target 4 is: ", target2)
-            print("Target 5 is: ", target1)
+            print("Target 4 is: ", target4)
+            print("Target 5 is: ", target5)
 
             # Get the current price
             price = get_current_price()
