@@ -3352,16 +3352,18 @@ def main():
 
 
                     if current_quadrant == 1:
-                        if price < avg_mtf and price < fastest_target and price < future_price_regression and price < forecast_price_fft:
-                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                                if momentum > 0 and buy_volume_1min > sell_volume_1min:
-                                    trigger_long = True
+                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
+                            if momentum > 0 and buy_volume_1min > sell_volume_1min:
+                                for i, target in enumerate(inner_targets, start=1):
+                                    if price < target:
+                                        trigger_long = True
 
                     if current_quadrant == 4:
-                        if price > avg_mtf and price > fastest_target and price > future_price_regression and price > forecast_price_fft:
-                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                                if momentum < 0 and sell_volume_1min > buy_volume_1min:
-                                    trigger_short = True
+                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
+                            if momentum < 0 and sell_volume_1min > buy_volume_1min:
+                                for i, target in enumerate(inner_targets, start=1):
+                                    if price > target:
+                                        trigger_short = True
 
                     if trigger_long:
                         print("LONG signal!")
