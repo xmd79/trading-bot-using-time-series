@@ -2625,22 +2625,11 @@ def calculate_price_distance_and_wave(price, close):
     closest_to_min = np.abs(close - np.min(close)).argmin()
     closest_to_max = np.abs(close - np.max(close)).argmin()
     
-    # Check if the last reversal closest to the last value was a minimum
-    if closest_to_min == len(close) - 1:
+    # Check if any of the elements in the close array up to the last value is the minimum or maximum
+    if np.any(close[:len(close)-1] == np.min(close[:len(close)-1])):
         market_mood = "Uptrend"
-    elif closest_to_max == len(close) - 1:
+    elif np.any(close[:len(close)-1] == np.max(close[:len(close)-1])):
         market_mood = "Downtrend"
-    else:
-        if ht_sine[-1] > 0 and ht_sine[-2] <= 0:
-            if closest_to_min < closest_to_max:
-                market_mood = "Uptrend"
-            else:
-                market_mood = "Downtrend"
-        else:
-            if closest_to_min < closest_to_max:
-                market_mood = "Downtrend"
-            else:
-                market_mood = "Uptrend"
 
     result = {
         "price": price,
