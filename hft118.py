@@ -2600,7 +2600,6 @@ print()
 ##################################################
 
 def calculate_normalized_distance(price, close):
-    # Calculate the normalized distance from price to min and max
     min_price = np.min(close)
     max_price = np.max(close)
     
@@ -2613,32 +2612,21 @@ def calculate_normalized_distance(price, close):
     return normalized_distance_to_min, normalized_distance_to_max
 
 def calculate_price_distance_and_wave(price, close):
-    # Golden ratio
-    phi = (1 + np.sqrt(5)) / 2
-
-    # Calculate the time value for the given price
-    t = (price - np.min(close)) / (np.max(close) - np.min(close)) * 2 * np.pi
-    
-    # Sinusoidal wave parameters
-    amplitude = phi * 100  # Using phi as the amplitude
-    frequency = 1  # Frequency of the wave
-
-    # Calculate the value of the sine wave at the current time step
-    wave_value = amplitude * np.sin(frequency * t)
-    
     normalized_distance_to_min, normalized_distance_to_max = calculate_normalized_distance(price, close)
     
-    # Determine market mood based on closest reversal
-    closest_to_min = np.abs(close - np.min(close)).argmin()
-    closest_to_max = np.abs(close - np.max(close)).argmin()
-    if closest_to_min < closest_to_max:
+    # Calculate HT_SINE using talib
+    ht_sine, _ = talib.HT_SINE(close) 
+    ht_sine = -ht_sine
+
+    # Determine market mood based on HT_SINE crossings
+    if ht_sine[-1] > 0 and ht_sine[-2] <= 0:
         market_mood = "Uptrend"
     else:
         market_mood = "Downtrend"
     
     result = {
         "price": price,
-        "wave_value": wave_value,
+        "ht_sine_value": ht_sine[-1],
         "normalized_distance_to_min": normalized_distance_to_min,
         "normalized_distance_to_max": normalized_distance_to_max,
         "min_price": np.min(close),
@@ -2648,16 +2636,20 @@ def calculate_price_distance_and_wave(price, close):
     
     return result
 
+# Example close prices
+close_prices = np.array(close)  # Insert your actual close prices here
+
 result = calculate_price_distance_and_wave(price, close_prices)
 
 # Print the detailed information for the given price
 print(f"Price: {result['price']:.2f}")
-print(f"Wave Value at Current Time: {result['wave_value']:.2f}")
+print(f"HT_SINE Value: {result['ht_sine_value']:.2f}")
 print(f"Normalized Distance to Min: {result['normalized_distance_to_min']:.2f}%")
 print(f"Normalized Distance to Max: {result['normalized_distance_to_max']:.2f}%")
 print(f"Min Price: {result['min_price']:.2f}")
 print(f"Max Price: {result['max_price']:.2f}")
 print(f"Market Mood: {result['market_mood']}")
+
 
 print()
 
@@ -3332,16 +3324,21 @@ def main():
             ##################################################
             ##################################################
 
+            # Example close prices
+            close_prices = np.array(close)  # Insert your actual close prices here
+
             result = calculate_price_distance_and_wave(price, close_prices)
 
             # Print the detailed information for the given price
             print(f"Price: {result['price']:.2f}")
-            print(f"Wave Value at Current Time: {result['wave_value']:.2f}")
+            print(f"HT_SINE Value: {result['ht_sine_value']:.2f}")
             print(f"Normalized Distance to Min: {result['normalized_distance_to_min']:.2f}%")
             print(f"Normalized Distance to Max: {result['normalized_distance_to_max']:.2f}%")
             print(f"Min Price: {result['min_price']:.2f}")
             print(f"Max Price: {result['max_price']:.2f}")
             print(f"Market Mood: {result['market_mood']}")
+    
+            market_mood_sine = result['market_mood']
 
             print()
 
