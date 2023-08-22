@@ -2628,22 +2628,13 @@ def calculate_price_distance_and_wave(price, close):
     
     normalized_distance_to_min, normalized_distance_to_max = calculate_normalized_distance(price, close)
     
-    # Determine market mood based on closest reversal and sine wave phase
+    # Determine market mood based on closest reversal
     closest_to_min = np.abs(close - np.min(close)).argmin()
     closest_to_max = np.abs(close - np.max(close)).argmin()
-    min_reversal_phase = np.pi / 2
-    max_reversal_phase = 3 * np.pi / 2
-    
     if closest_to_min < closest_to_max:
-        if t < min_reversal_phase:
-            market_mood_sine = "Uptrend"
-        else:
-            market_mood_sine = "Downtrend"
+        market_mood = "Uptrend"
     else:
-        if t < max_reversal_phase:
-            market_mood_sine = "Downtrend"
-        else:
-            market_mood_sine = "Uptrend"
+        market_mood = "Downtrend"
     
     result = {
         "price": price,
@@ -2652,7 +2643,7 @@ def calculate_price_distance_and_wave(price, close):
         "normalized_distance_to_max": normalized_distance_to_max,
         "min_price": np.min(close),
         "max_price": np.max(close),
-        "market_mood_sine": market_mood_sine
+        "market_mood": market_mood
     }
     
     return result
@@ -2666,7 +2657,7 @@ print(f"Normalized Distance to Min: {result['normalized_distance_to_min']:.2f}%"
 print(f"Normalized Distance to Max: {result['normalized_distance_to_max']:.2f}%")
 print(f"Min Price: {result['min_price']:.2f}")
 print(f"Max Price: {result['max_price']:.2f}")
-print(f"Market Mood: {result['market_mood_sine']}")
+print(f"Market Mood: {result['market_mood']}")
 
 print()
 
@@ -3350,10 +3341,7 @@ def main():
             print(f"Normalized Distance to Max: {result['normalized_distance_to_max']:.2f}%")
             print(f"Min Price: {result['min_price']:.2f}")
             print(f"Max Price: {result['max_price']:.2f}")
-            print(f"Market Mood: {result['market_mood_sine']}")
-
-            market_mood_sine = result['market_mood_sine']
-
+            print(f"Market Mood: {result['market_mood']}")
 
             print()
 
