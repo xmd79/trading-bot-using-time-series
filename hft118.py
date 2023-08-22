@@ -2596,6 +2596,79 @@ print(triangle_sides)
 
 print()
 
+##################################################
+##################################################
+
+def calculate_normalized_distance(price, close):
+    # Calculate the normalized distance from price to min and max
+    min_price = np.min(close)
+    max_price = np.max(close)
+    
+    distance_to_min = price - min_price
+    distance_to_max = max_price - price
+    
+    normalized_distance_to_min = distance_to_min / (distance_to_min + distance_to_max) * 100
+    normalized_distance_to_max = distance_to_max / (distance_to_min + distance_to_max) * 100
+    
+    return normalized_distance_to_min, normalized_distance_to_max
+
+def calculate_price_distance_and_wave(price, close):
+    # Golden ratio
+    phi = (1 + np.sqrt(5)) / 2
+
+    # Calculate the time value for the given price
+    t = (price - np.min(close)) / (np.max(close) - np.min(close)) * 2 * np.pi
+    
+    # Sinusoidal wave parameters
+    amplitude = phi * 100  # Using phi as the amplitude
+    frequency = 1  # Frequency of the wave
+
+    # Calculate the value of the sine wave at the current time step
+    wave_value = amplitude * np.sin(frequency * t)
+    
+    normalized_distance_to_min, normalized_distance_to_max = calculate_normalized_distance(price, close)
+    
+    # Determine market mood based on closest reversal and sine wave phase
+    closest_to_min = np.abs(close - np.min(close)).argmin()
+    closest_to_max = np.abs(close - np.max(close)).argmin()
+    min_reversal_phase = np.pi / 2
+    max_reversal_phase = 3 * np.pi / 2
+    
+    if closest_to_min < closest_to_max:
+        if t < min_reversal_phase:
+            market_mood_sine = "Uptrend"
+        else:
+            market_mood_sine = "Downtrend"
+    else:
+        if t < max_reversal_phase:
+            market_mood_sine = "Downtrend"
+        else:
+            market_mood_sine = "Uptrend"
+    
+    result = {
+        "price": price,
+        "wave_value": wave_value,
+        "normalized_distance_to_min": normalized_distance_to_min,
+        "normalized_distance_to_max": normalized_distance_to_max,
+        "min_price": np.min(close),
+        "max_price": np.max(close),
+        "market_mood_sine": market_mood_sine
+    }
+    
+    return result
+
+result = calculate_price_distance_and_wave(price, close_prices)
+
+# Print the detailed information for the given price
+print(f"Price: {result['price']:.2f}")
+print(f"Wave Value at Current Time: {result['wave_value']:.2f}")
+print(f"Normalized Distance to Min: {result['normalized_distance_to_min']:.2f}%")
+print(f"Normalized Distance to Max: {result['normalized_distance_to_max']:.2f}%")
+print(f"Min Price: {result['min_price']:.2f}")
+print(f"Max Price: {result['max_price']:.2f}")
+print(f"Market Mood: {result['market_mood_sine']}")
+
+print()
 
 ##################################################
 ##################################################
@@ -3268,6 +3341,25 @@ def main():
             ##################################################
             ##################################################
 
+            result = calculate_price_distance_and_wave(price, close_prices)
+
+            # Print the detailed information for the given price
+            print(f"Price: {result['price']:.2f}")
+            print(f"Wave Value at Current Time: {result['wave_value']:.2f}")
+            print(f"Normalized Distance to Min: {result['normalized_distance_to_min']:.2f}%")
+            print(f"Normalized Distance to Max: {result['normalized_distance_to_max']:.2f}%")
+            print(f"Min Price: {result['min_price']:.2f}")
+            print(f"Max Price: {result['max_price']:.2f}")
+            print(f"Market Mood: {result['market_mood_sine']}")
+
+            market_mood_sine = result['market_mood_sine']
+
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 2.33
             stop_loss = -2.33
 
@@ -3327,16 +3419,6 @@ def main():
             ##################################################
             ##################################################
 
-            print()
-
-            ##################################################
-            ##################################################
-
-            print()
-
-            ##################################################
-            ##################################################
-
             with open("signals.txt", "a") as f:
                 # Get data and calculate indicators here...
                 timestamp = current_time.strftime("%d %H %M %S")
@@ -3347,7 +3429,7 @@ def main():
 
                     if current_quadrant == 1 and price < forecast_price_fft:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and closest_threshold == min_threshold:
-                            if forecast_direction == "Up" and price < avg_mtf:
+                            if forecast_direction == "Up" and market_mood_sine == "Uptrend" and price < avg_mtf:
                                 if momentum > 0:
                                     for i, target in enumerate(inner_targets, start=1):
                                         if price < target:
@@ -3355,7 +3437,7 @@ def main():
 
                     if current_quadrant == 4 and price > forecast_price_fft:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and closest_threshold == max_threshold:
-                            if forecast_direction == "Down" and price > avg_mtf:
+                            if forecast_direction == "Down"  and market_mood_sine == "Downtrend" and price > avg_mtf:
                                 if momentum < 0:
                                     for i, target in enumerate(inner_targets, start=1):
                                         if price > target:
