@@ -2616,7 +2616,7 @@ def calculate_price_distance_and_wave(price, close):
     
     # Calculate HT_SINE using talib
     ht_sine, _ = talib.HT_SINE(close) 
-    ht_sine = -ht_sine
+    #ht_sine = -ht_sine
 
     # Initialize market_mood
     market_mood = None
