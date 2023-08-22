@@ -2618,12 +2618,30 @@ def calculate_price_distance_and_wave(price, close):
     ht_sine, _ = talib.HT_SINE(close) 
     ht_sine = -ht_sine
 
-    # Determine market mood based on HT_SINE crossings
-    if ht_sine[-1] > 0 and ht_sine[-2] <= 0:
-        market_mood = "Uptrend"
-    else:
-        market_mood = "Downtrend"
+    # Initialize market_mood
+    market_mood = None
     
+    # Determine market mood based on HT_SINE crossings and closest reversal
+    closest_to_min = np.abs(close - np.min(close)).argmin()
+    closest_to_max = np.abs(close - np.max(close)).argmin()
+    
+    # Check if the last reversal closest to the last value was a minimum
+    if closest_to_min == len(close) - 1:
+        market_mood = "Uptrend"
+    elif closest_to_max == len(close) - 1:
+        market_mood = "Downtrend"
+    else:
+        if ht_sine[-1] > 0 and ht_sine[-2] <= 0:
+            if closest_to_min < closest_to_max:
+                market_mood = "Uptrend"
+            else:
+                market_mood = "Downtrend"
+        else:
+            if closest_to_min < closest_to_max:
+                market_mood = "Downtrend"
+            else:
+                market_mood = "Uptrend"
+
     result = {
         "price": price,
         "ht_sine_value": ht_sine[-1],
@@ -2649,7 +2667,6 @@ print(f"Normalized Distance to Max: {result['normalized_distance_to_max']:.2f}%"
 print(f"Min Price: {result['min_price']:.2f}")
 print(f"Max Price: {result['max_price']:.2f}")
 print(f"Market Mood: {result['market_mood']}")
-
 
 print()
 
