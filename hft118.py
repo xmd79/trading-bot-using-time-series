@@ -3423,7 +3423,7 @@ def main():
 
                     if current_quadrant == 1 and price < forecast_price_fft and normalized_distance_to_min < normalized_distance_to_max:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and closest_threshold == min_threshold:
-                            if forecast_direction == "Up" and price < avg_mtf:
+                            if forecast_direction == "Up" and market_mood_sine == "Uptrend" and price < avg_mtf:
                                 if momentum > 0:
                                     for i, target in enumerate(inner_targets, start=1):
                                         if price < target:
@@ -3431,7 +3431,7 @@ def main():
 
                     if current_quadrant == 4 and price > forecast_price_fft and normalized_distance_to_min > normalized_distance_to_max:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and closest_threshold == max_threshold:
-                            if forecast_direction == "Down" and price > avg_mtf:
+                            if forecast_direction == "Down"  and market_mood_sine == "Downtrend" and price > avg_mtf:
                                 if momentum < 0:
                                     for i, target in enumerate(inner_targets, start=1):
                                         if price > target:
