@@ -459,7 +459,6 @@ print()
 ##################################################
 ##################################################
 
-
 import datetime
 import pytz
 import ephem
@@ -622,23 +621,26 @@ def get_vedic_houses(date, observer):
     obs.date = date_ephem
 
     # Calculate the sidereal time at the observer's location
-    sidereal_time = float(obs.sidereal_time())
+    sidereal_time = obs.sidereal_time()
+
+    # Calculate the Local Sidereal Time (LST)
+    lst_hours = sidereal_time * 24 / (2 * ephem.pi)
+    lst_deg = (lst_hours * 15) % 360
 
     # Calculate the ascendant degree
-    asc_deg = obs.radec_of(date_ephem, 0)[0] * 180 / ephem.pi
-
-    # Calculate the MC degree
-    mc_deg = (sidereal_time - asc_deg + 180) % 360
+    asc_deg = (lst_deg + 180) % 360
 
     # Calculate the house cusps
     house_cusps = []
     for i in range(1, 13):
-        cusp_deg = (i * 30 - asc_deg) % 360
+        cusp_deg = (asc_deg + (i - 1) * 30) % 360
         cusp_sign = get_vedic_sign(cusp_deg)
-        house_cusps.append((i, cusp_sign))
+        house_cusps.append((i, cusp_sign, cusp_deg))
 
-    house_cusps_dict = {house: sign for house, sign in house_cusps}
+    house_cusps_dict = {house: (sign, deg) for house, sign, deg in house_cusps}
     return house_cusps_dict
+
+
 
 ##################################################
 ##################################################
@@ -774,6 +776,8 @@ fixed_body.compute(current_time)
 for house, sign in vedic_houses.items():
     print(f"House {house}: {sign}")
 
+print()
+
 # Print results
 for house in range(1,13):
     sign = vedic_houses[house]
@@ -782,9 +786,9 @@ for house in range(1,13):
 print()
 
 print("Full Results:")
-for house, sign in vedic_houses.items():
-    degree = math.degrees(fixed_body.ra)  
-    print(f"House {house} - {sign} at {degree:.2f} degrees") 
+
+for house, (sign, deg) in vedic_houses.items():
+    print(f"House {house} - {sign} at {deg:.2f} degrees")
 
 print()
 
