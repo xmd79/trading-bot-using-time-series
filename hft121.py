@@ -3425,7 +3425,7 @@ def main():
                     # Check if a position is not open
                     print("Now not in a trade, seeking entry conditions")
 
-                    if current_quadrant == 1 and price < incoming_reversal_keypoint and price < future_price_regression and normalized_distance_to_min < normalized_distance_to_max:
+                    if current_quadrant == 1 and price < fastest_target and price < target1 and price < incoming_reversal_keypoint and price < future_price_regression and normalized_distance_to_min < normalized_distance_to_max:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and closest_threshold == min_threshold:
                             if forecast_direction == "Up" and market_mood_sine == "Uptrend" and price < avg_mtf and price < middle:
                                 if momentum > 0:
@@ -3433,7 +3433,7 @@ def main():
                                         if price < target:
                                             trigger_long = True
 
-                    if current_quadrant == 4 and price > incoming_reversal_keypoint and price > future_price_regression and normalized_distance_to_min > normalized_distance_to_max:
+                    if current_quadrant == 4 and price > fastest_target and price > target1 and price > incoming_reversal_keypoint and price > future_price_regression and normalized_distance_to_min > normalized_distance_to_max:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and closest_threshold == max_threshold:
                             if forecast_direction == "Down"  and market_mood_sine == "Downtrend" and price > avg_mtf and price > middle:
                                 if momentum < 0:
