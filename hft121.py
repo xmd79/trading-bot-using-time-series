@@ -3358,8 +3358,38 @@ def main():
             ##################################################
             ##################################################
 
+            # Check for new dip and new high
+            for timeframe, candles in candle_map.items():
+                if len(candles) >= 4:  # Ensure there are enough candles to compare
+                    last_two_lows = [candle["low"] for candle in candles[-2:]]
+                    last_two_highs = [candle["high"] for candle in candles[-2:]]
+                    last_closes = [candle["close"] for candle in candles[-2:]]
+
+                    if last_two_lows[1] < last_two_lows[0]:
+                        new_dip_price = last_two_lows[1]
+                        print(f"New dip detected in {timeframe} timeframe! Price: {new_dip_price}")
+
+                        if last_closes[1] < last_two_lows[0]:
+                            print(f"Downtrend continuation pattern detected in {timeframe} timeframe")
+                        else:
+                            print(f"Reversal dip pattern detected in {timeframe} timeframe")
+
+                    if last_two_highs[1] > last_two_highs[0]:
+                        new_high_price = last_two_highs[1]
+                        print(f"New high detected in {timeframe} timeframe! Price: {new_high_price}")
+
+                        if last_closes[1] > last_two_highs[0]:
+                            print(f"Uptrend continuation pattern detected in {timeframe} timeframe")
+                        else:
+                            print(f"Reversal top pattern detected in {timeframe} timeframe")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 2.33
-            stop_loss = -2.33
+            #stop_loss = -2.33
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3579,6 +3609,8 @@ def main():
         del modified_resistance_levels
         del distance_to_lower
         del distance_to_upper
+        del new_dip_price
+        del new_high_price
 
         gc.collect() 
 
