@@ -3609,8 +3609,6 @@ def main():
         del modified_resistance_levels
         del distance_to_lower
         del distance_to_upper
-        del new_dip_price
-        del new_high_price
 
         gc.collect() 
 
