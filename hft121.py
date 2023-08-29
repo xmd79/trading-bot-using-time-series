@@ -3609,6 +3609,9 @@ def main():
         del modified_resistance_levels
         del distance_to_lower
         del distance_to_upper
+        del lower
+        del middle
+        del upper
 
         gc.collect() 
 
