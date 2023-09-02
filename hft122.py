@@ -3395,10 +3395,10 @@ def main():
                 print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
                 print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
 
-                if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max and dist_from_close_to_min < 20:
+                if timeframe == '15m' and dist_from_close_to_min < dist_from_close_to_max and dist_from_close_to_min < 20:
                     print(f"Close on {timeframe} tf in reversal dip area") 
 
-                elif timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max and dist_from_close_to_max < 20:
+                elif timeframe == '15m' and dist_from_close_to_min > dist_from_close_to_max and dist_from_close_to_max < 20:
                     print(f"Close on {timeframe} tf in reversal top area")
 
             print()
@@ -3479,7 +3479,7 @@ def main():
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and closest_threshold == min_threshold:
                             if forecast_direction == "Up" and market_mood_sine == "Uptrend" and price < avg_mtf and price < middle:
                                 for timeframe in timeframes:
-                                    if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max and dist_from_close_to_min < 20:
+                                    if timeframe == '15m' and dist_from_close_to_min < dist_from_close_to_max and dist_from_close_to_min < 20:
                                         if momentum > 0:
                                             for i, target in enumerate(inner_targets, start=1):
                                                 if price < target:
@@ -3489,7 +3489,7 @@ def main():
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and closest_threshold == max_threshold:
                             if forecast_direction == "Down"  and market_mood_sine == "Downtrend" and price > avg_mtf and price > middle:
                                 for timeframe in timeframes:
-                                    if timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max and dist_from_close_to_max < 20:
+                                    if timeframe == '15m' and dist_from_close_to_min > dist_from_close_to_max and dist_from_close_to_max < 20:
                                         if momentum < 0:
                                             for i, target in enumerate(inner_targets, start=1):
                                                 if price > target:
