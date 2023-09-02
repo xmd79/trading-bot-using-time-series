@@ -3395,10 +3395,10 @@ def main():
                 print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
                 print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
 
-                if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max and dist_from_close_to_min < 20:
+                if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
                     print(f"Close on {timeframe} tf in reversal dip area") 
 
-                elif timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max and dist_from_close_to_max < 20:
+                elif timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max:
                     print(f"Close on {timeframe} tf in reversal top area")
 
             print()
