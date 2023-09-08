@@ -3401,12 +3401,12 @@ def main():
                 #elif timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max:
                     #print(f"Close on {timeframe} tf in reversal top area")
 
+            print("Last reversal keypoint was: ", closest_threshold)
+            
             print()
 
             ##################################################
             ##################################################
-
-            print()
 
             take_profit = 4.20
             #stop_loss = -2.33
