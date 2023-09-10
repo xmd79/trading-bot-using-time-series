@@ -3483,9 +3483,8 @@ def main():
                                 if momentum > 0:
                                     for timeframe in timeframes:
                                         if timeframe == '1m' and dist_from_close_to_min < dist_from_close_to_max:
-                                            if timeframe == '3m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                    trigger_long = True
+                                            if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
+                                                trigger_long = True
 
                     if current_quadrant == 4 and price > fastest_target and normalized_distance_to_min > normalized_distance_to_max:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
@@ -3493,9 +3492,8 @@ def main():
                                 if momentum < 0:
                                     for timeframe in timeframes:
                                         if timeframe == '1m' and dist_from_close_to_min > dist_from_close_to_max:
-                                            if timeframe == '3m' and dist_from_close_to_min > dist_from_close_to_max:
-                                                if timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max:
-                                                    trigger_short = True
+                                            if timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max:
+                                                trigger_short = True
 
                     if trigger_long:
                         print("LONG signal!")
