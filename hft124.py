@@ -3410,7 +3410,7 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 4.20
+            take_profit = 5.00
             #stop_loss = -2.33
 
             # Current timestamp in milliseconds
@@ -3477,23 +3477,21 @@ def main():
                     # Check if a position is not open
                     print("Now not in a trade, seeking entry conditions")
 
-                    if price < fastest_target and normalized_distance_to_min < normalized_distance_to_max:
-                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
+                    if current_quadrant == 1 and price < fastest_target and normalized_distance_to_min < normalized_distance_to_max:
+                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral" and closest_threshold < price:
                             if market_mood_sine == "Uptrend" and price < avg_mtf and price < middle:
                                 if momentum > 0:
                                     for timeframe in timeframes:
-                                        if timeframe == '1m' and dist_from_close_to_min < dist_from_close_to_max:
-                                            if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                trigger_long = True
+                                        if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
+                                            trigger_long = True
 
-                    if price > fastest_target and normalized_distance_to_min > normalized_distance_to_max:
-                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
+                    if current_quadrant == 4 and price > fastest_target and normalized_distance_to_min > normalized_distance_to_max:
+                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral" and closest_threshold > price:
                             if market_mood_sine == "Downtrend" and price > avg_mtf and price > middle:
                                 if momentum < 0:
                                     for timeframe in timeframes:
-                                        if timeframe == '1m' and dist_from_close_to_min > dist_from_close_to_max:
-                                            if timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max:
-                                                trigger_short = True
+                                        if timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max:
+                                            trigger_short = True
 
                     if trigger_long:
                         print("LONG signal!")
