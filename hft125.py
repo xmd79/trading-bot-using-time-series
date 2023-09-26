@@ -3495,6 +3495,8 @@ def main():
                                             if timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max:
                                                 trigger_short = True
 
+                    print()
+
                     if trigger_long:
                         print("LONG signal!")
                         f.write(f"{timestamp} LONG {price}\n")
