@@ -3495,10 +3495,7 @@ def main():
                                                     print("LONG condition 8: momentum > 0")
                                                     if forecast_direction == "Up":
                                                         print("LONG condition 9: forecast_direction == Up")
-                                                        for timeframe in timeframes:
-                                                            if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                                print("LONG condition 10: timeframe == 5m and dist_from_close_to_min < dist_from_close_to_max")
-                                                                trigger_long = True
+                                                        trigger_long = True
 
                     if normalized_distance_to_max < normalized_distance_to_min:
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")
@@ -3518,10 +3515,7 @@ def main():
                                                     print("SHORT condition 8: momentum < 0")
                                                     if forecast_direction == "Down":
                                                         print("SHORT condition 9: forecast_direction == Down")
-                                                        for timeframe in timeframes:
-                                                            if timeframe == '5m' and dist_from_close_to_max < dist_from_close_to_min:
-                                                                print("SHORT condition 10: timeframe == 5m and dist_from_close_to_max < dist_from_close_to_min")
-                                                                trigger_short = True
+                                                        trigger_short = True
 
                     print()
 
