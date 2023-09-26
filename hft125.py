@@ -3479,7 +3479,7 @@ def main():
 
                     if current_quadrant == 1 and price < incoming_reversal_keypoint and normalized_distance_to_min < normalized_distance_to_max:
                         if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                            if closest_threshold < price:
+                            if closest_threshold < price and price < avg_mtf:
                                 if market_mood_sine == "Uptrend":
                                     if momentum > 0:
                                         for timeframe in timeframes:
@@ -3488,7 +3488,7 @@ def main():
 
                     if current_quadrant == 4 and price > incoming_reversal_keypoint and normalized_distance_to_min > normalized_distance_to_max:
                         if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                            if closest_threshold > price:
+                            if closest_threshold > price and price > avg_mtf:
                                 if market_mood_sine == "Downtrend":
                                     if momentum < 0:
                                         for timeframe in timeframes:
