@@ -3477,23 +3477,47 @@ def main():
                     # Check if a position is not open
                     print("Now not in a trade, seeking entry conditions")
 
-                    if current_quadrant == 1 and price < incoming_reversal_keypoint and normalized_distance_to_min < normalized_distance_to_max:
-                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                            if closest_threshold < price and price < avg_mtf:
+                    if normalized_distance_to_min < normalized_distance_to_max:
+                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")
+                        if price < incoming_reversal_keypoint:
+                            print("LONG condition 2: price < incoming_reversal_keypoint")
+                            if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
+                                print("LONG condition 3: market_mood_sr == Bullish or market_mood_sr == Neutral")
                                 if market_mood_sine == "Uptrend":
-                                    if momentum > 0:
-                                        for timeframe in timeframes:
-                                            if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                trigger_long = True
+                                    print("LONG condition 4: market_mood_sine == Uptrend")
+                                    if closest_threshold < price:
+                                        print("LONG condition 5: closest_threshold < price")    
+                                        if price < avg_mtf:
+                                            print("LONG condition 6: price < avg_mtf")                                
+                                            if current_quadrant == 1:
+                                                print("LONG condition 7: current_quadrant == 1")
+                                                if momentum > 0:
+                                                    print("LONG condition 8: momentum > 0")
+                                                    for timeframe in timeframes:
+                                                        if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
+                                                            print("LONG condition 9: on timeframe 5m dist_from_close_to_min < dist_from_close_to_max")
+                                                            trigger_long = True
 
-                    if current_quadrant == 4 and price > incoming_reversal_keypoint and normalized_distance_to_min > normalized_distance_to_max:
-                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                            if closest_threshold > price and price > avg_mtf:
+                    if normalized_distance_to_max < normalized_distance_to_min:
+                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")
+                        if price > incoming_reversal_keypoint:
+                            print("SHORT condition 2: price > incoming_reversal_keypoint")
+                            if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
+                                print("SHORT condition 3: market_mood_sr == Bearish or market_mood_sr == Neutral")
                                 if market_mood_sine == "Downtrend":
-                                    if momentum < 0:
-                                        for timeframe in timeframes:
-                                            if timeframe == '5m' and dist_from_close_to_min > dist_from_close_to_max:
-                                                trigger_short = True
+                                    print("SHORT condition 4: market_mood_sine == Downtrend")
+                                    if closest_threshold > price:
+                                        print("SHORT condition 5: closest_threshold > price")    
+                                        if price > avg_mtf:
+                                            print("SHORT condition 6: price > avg_mtf")                                
+                                            if current_quadrant == 4:
+                                                print("SHORT condition 7: current_quadrant == 4")
+                                                if momentum < 0:
+                                                    print("SHORT condition 8: momentum < 0")
+                                                    for timeframe in timeframes:
+                                                        if timeframe == '5m' and dist_from_close_to_max < dist_from_close_to_min:
+                                                            print("SHORT condition 9: on timeframe 5m dist_from_close_to_max < dist_from_close_to_min")
+                                                            trigger_short = True
 
                     print()
 
@@ -3509,6 +3533,8 @@ def main():
                         entry_short(symbol)
                         trigger_short = False
 
+                    print()
+
                 # Check stop loss and take profit conditions
                 if un_realized_profit != 0:
                     print("Now in a trade, seeking exit conditions")
@@ -3517,11 +3543,6 @@ def main():
                         # Call exit_trade() function
                         exit_trade() 
                     
-            ##################################################
-            ##################################################
-
-            print()
-
             ##################################################
             ##################################################
 
