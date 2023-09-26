@@ -3493,10 +3493,9 @@ def main():
                                                 print("LONG condition 7: current_quadrant == 1")
                                                 if momentum > 0:
                                                     print("LONG condition 8: momentum > 0")
-                                                    for timeframe in timeframes:
-                                                        if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                            print("LONG condition 9: on timeframe 5m dist_from_close_to_min < dist_from_close_to_max")
-                                                            trigger_long = True
+                                                    if forecast_direction == "Up":
+                                                        print("LONG condition 9: forecast_direction == Up")
+                                                        trigger_long = True
 
                     if normalized_distance_to_max < normalized_distance_to_min:
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")
@@ -3514,10 +3513,9 @@ def main():
                                                 print("SHORT condition 7: current_quadrant == 4")
                                                 if momentum < 0:
                                                     print("SHORT condition 8: momentum < 0")
-                                                    for timeframe in timeframes:
-                                                        if timeframe == '5m' and dist_from_close_to_max < dist_from_close_to_min:
-                                                            print("SHORT condition 9: on timeframe 5m dist_from_close_to_max < dist_from_close_to_min")
-                                                            trigger_short = True
+                                                    if forecast_direction == "Down":
+                                                        print("SHORT condition 9: forecast_direction == Down")
+                                                        trigger_short = True
 
                     print()
 
