@@ -3515,7 +3515,7 @@ def main():
                                                     print("SHORT condition 8: current_quadrant == 4")
                                                     if momentum < 0:
                                                         print("SHORT condition 9: momentum < 0")
-                                                        trigger_long = True
+                                                        trigger_short = True
 
                     print()
 
