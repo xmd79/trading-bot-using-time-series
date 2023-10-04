@@ -3483,17 +3483,22 @@ def main():
                             print("LONG condition 2: price < incoming_reversal_keypoint")
                             if price < avg_mtf:
                                 print("LONG condition 3: price < avg_mtf") 
-                                if closest_threshold < price:
-                                    print("LONG condition 4: closest_threshold < price")    
-                                    if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                                        print("LONG condition 5: market_mood_sr == Bullish or market_mood_sr == Neutral")
-                                        if forecast_direction == "Up":
-                                            print("LONG condition 6: forecast_direction == Up")
-                                            if current_quadrant == 1:
-                                                print("LONG condition 7: current_quadrant == 1")
-                                                if momentum > 0:
-                                                    print("LONG condition 8: momentum > 0")
-                                                    trigger_long = True
+                                if market_mood_sine == "Uptrend":
+                                    print("LONG condition 4: market_mood_sine == Uptrend")
+                                    if closest_threshold < price:
+                                        print("LONG condition 5: closest_threshold < price")    
+                                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
+                                            print("LONG condition 6: market_mood_sr == Bullish or market_mood_sr == Neutral")
+                                            if forecast_direction == "Up":
+                                                print("LONG condition 7: forecast_direction == Up")
+                                                for timeframe in timeframes:
+                                                    if timeframe == "5m" and dist_from_close_to_min < dist_from_close_to_max:
+                                                        print("LONG condition 8: dist_from_close_to_min < dist_from_close_to_max")
+                                                        if current_quadrant == 1:
+                                                            print("LONG condition 9: current_quadrant == 1")
+                                                            if momentum > 0:
+                                                                print("LONG condition 10: momentum > 0")
+                                                                trigger_long = True
 
                     if normalized_distance_to_max < normalized_distance_to_min:
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")
@@ -3501,17 +3506,22 @@ def main():
                             print("SHORT condition 2: price > incoming_reversal_keypoint")
                             if price > avg_mtf:
                                 print("SHORT condition 3: price > avg_mtf") 
-                                if closest_threshold > price:
-                                    print("SHORT condition 4: closest_threshold > price")    
-                                    if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                                        print("SHORT condition 5: market_mood_sr == Bearish or market_mood_sr == Neutral")
-                                        if forecast_direction == "Down":
-                                            print("SHORT condition 6: forecast_direction == Down")
-                                            if current_quadrant == 4:
-                                                print("SHORT condition 7: current_quadrant == 4")
-                                                if momentum < 0:
-                                                    print("SHORT condition 8: momentum < 0")
-                                                    trigger_short = True
+                                if market_mood_sine == "Downtrend":
+                                    print("SHORT condition 4: market_mood_sine == Downtrend")
+                                    if closest_threshold > price:
+                                        print("SHORT condition 5: closest_threshold > price")    
+                                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
+                                            print("SHORT condition 6: market_mood_sr == Bearish or market_mood_sr == Neutral")
+                                            if forecast_direction == "Down":
+                                                print("SHORT condition 7: forecast_direction == Down")
+                                                for timeframe in timeframes:
+                                                    if timeframe == "5m" and dist_from_close_to_min > dist_from_close_to_max:
+                                                        print("SHORT condition 8: dist_from_close_to_min > dist_from_close_to_max")
+                                                        if current_quadrant == 4:
+                                                            print("SHORT condition 9: current_quadrant == 4")
+                                                            if momentum < 0:
+                                                                print("SHORT condition 10: momentum < 0")
+                                                                trigger_short = True
 
                     print()
 
