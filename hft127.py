@@ -3479,8 +3479,8 @@ def main():
 
                     if normalized_distance_to_min < normalized_distance_to_max:
                         print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")
-                        if price < fft fastest target:
-                            print("LONG condition 2: price < fft fastest target")
+                        if price < fft_fastest target:
+                            print("LONG condition 2: price < fft_fastest target")
                             if price < incoming_reversal_keypoint:
                                 print("LONG condition 3: price < incoming_reversal_keypoint")
                                 if price < avg_mtf:
@@ -3499,8 +3499,8 @@ def main():
 
                     if normalized_distance_to_max < normalized_distance_to_min:
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")
-                        if price > fft fastest target:
-                            print("SHORT condition 2: price > fft fastest target")
+                        if price > fft_fastest target:
+                            print("SHORT condition 2: price > fft_fastest target")
                             if price > incoming_reversal_keypoint:
                                 print("SHORT condition 3: price > incoming_reversal_keypoint")
                                 if price > avg_mtf:
