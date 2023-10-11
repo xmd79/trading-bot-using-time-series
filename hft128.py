@@ -3478,7 +3478,7 @@ def main():
                     print("Now not in a trade, seeking entry conditions")
 
                     if normalized_distance_to_min < normalized_distance_to_max and normalized_distance_to_min < 25:
-                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max and normalized_distance_to_min < 25")
+                        print("LONG condition 1: normalized_distance_to_min < 25")
                         if price < fastest_target:
                             print("LONG condition 2: price < fastest_target")
                             if price < incoming_reversal_keypoint:
@@ -3498,7 +3498,7 @@ def main():
                                                         trigger_long = True
 
                     if normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 25:
-                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 25")
+                        print("SHORT condition 1: normalized_distance_to_max < 25")
                         if price > fastest_target:
                             print("SHORT condition 2: price > fastest_target")
                             if price > incoming_reversal_keypoint:
