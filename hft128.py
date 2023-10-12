@@ -3487,12 +3487,12 @@ def main():
                                     print("LONG condition 4: price < avg_mtf") 
                                     if closest_threshold < price:
                                         print("LONG condition 5: closest_threshold < price")  
-                                        if market_mood_sr == "Bullish" or market_mood_sr == "Neutral":
-                                            print("LONG condition 6: market_mood_sr == Bullish or market_mood_sr == Neutral")
+                                        if market_mood_sr == "Bullish":
+                                            print("LONG condition 6: market_mood_sr == Bullish")
                                             if forecast_direction == "Up":
                                                 print("LONG condition 7: forecast_direction == Up")
-                                                if current_quadrant == 1:
-                                                    print("LONG condition 8: current_quadrant == 1")
+                                                if market_mood_sine == "Uptrend":
+                                                    print("LONG condition 8: market_mood_sine == Uptrend")
                                                     if momentum > 0:
                                                         print("LONG condition 9: momentum > 0")
                                                         trigger_long = True
@@ -3507,12 +3507,12 @@ def main():
                                     print("SHORT condition 4: price > avg_mtf") 
                                     if closest_threshold > price:
                                         print("SHORT condition 5: closest_threshold > price")  
-                                        if market_mood_sr == "Bearish" or market_mood_sr == "Neutral":
-                                            print("SHORT condition 6: market_mood_sr == Bearish or market_mood_sr == Neutral")
+                                        if market_mood_sr == "Bearish":
+                                            print("SHORT condition 6: market_mood_sr == Bearish")
                                             if forecast_direction == "Down":
                                                 print("SHORT condition 7: forecast_direction == Down")  
-                                                if current_quadrant == 4:
-                                                    print("SHORT condition 8: current_quadrant == 4")
+                                                if market_mood_sine == "Downtrend":
+                                                    print("SHORT condition 8: market_mood_sine == Downtrend")
                                                     if momentum < 0:
                                                         print("SHORT condition 9: momentum < 0")
                                                         trigger_short = True
