@@ -1060,86 +1060,8 @@ print()
 ##################################################
 ##################################################
 
-def identify_double_pattern(close, pattern_type='bottom'):
-    """
-    Identify double bottom or double top pattern in financial time series data.
-
-    Parameters:
-    - close: List of close prices or any iterable.
-    - pattern_type: 'bottom' for double bottom, 'top' for double top.
-
-    Returns:
-    - forecast: Dictionary with small, medium, and large range forecasts.
-    - pattern_data: List of close prices for the detected pattern.
-    """
-    # Calculate percentage change in closing prices
-    pct_changes = [((b - a) / a) if a != 0 else 0 for a, b in zip(close[:-1], close[1:])]
-
-    # Define the pattern recognition criteria
-    criteria = {
-        'bottom': [pct_changes, pct_changes[:-1], pct_changes[:-2]],
-        'top': [-x for x in pct_changes],  # Invert for top pattern
-    }
-
-    # Check for pattern
-    for i in range(2, len(close)):
-        if (
-            sum(criteria[pattern_type][0][i-2:i+1]) < 0 and
-            sum(criteria[pattern_type][1][i-1:i+1]) > 0 and
-            criteria[pattern_type][2][i-1] > 0
-        ):
-            # Forecast prices for small, medium, and large ranges
-            current_close = close[i]
-            small_range = current_close * 1.01
-            medium_range = current_close * 1.03
-            large_range = current_close * 1.05
-
-            forecast = {
-                'small_range': small_range,
-                'medium_range': medium_range,
-                'large_range': large_range
-            }
-
-            # Extract pattern data
-            pattern_data = close[i-2:i+1]
-
-            return forecast, pattern_data
-
-    return None, None
-
-# Example usage:
-# Assuming you have a list 'close' with close prices
-pattern_forecast, pattern_data = identify_double_pattern(close, pattern_type='bottom')
-
-# Print detailed information
-if pattern_forecast is not None:
-    print("Bottom pattern detected:")
-    print("Pattern Data:", pattern_data)
-    print("\nPrice Forecast:")
-    print(f"Small Range: {pattern_forecast['small_range']:.2f}")
-    print(f"Medium Range: {pattern_forecast['medium_range']:.2f}")
-    print(f"Large Range: {pattern_forecast['large_range']:.2f}")
-else:
-    # If no bottom pattern is detected, check for top pattern
-    pattern_forecast_top, pattern_data_top = identify_double_pattern(close, pattern_type='top')
-    
-    if pattern_forecast_top is not None:
-        print("Top pattern detected:")
-        print("Pattern Data:", pattern_data_top)
-        print("\nPrice Forecast:")
-        print(f"Small Range: {pattern_forecast_top['small_range']:.2f}")
-        print(f"Medium Range: {pattern_forecast_top['medium_range']:.2f}")
-        print(f"Large Range: {pattern_forecast_top['large_range']:.2f}")
-    else:
-        print("No bottom or top pattern detected.")
-
-
-print()
-
 ##################################################
 ##################################################
-
-
 
 ##################################################
 ##################################################
@@ -1357,38 +1279,6 @@ def main():
             ##################################################
             ##################################################
 
-            pattern_forecast, pattern_data = identify_double_pattern(close, pattern_type='bottom')
-
-            pattern_forecast_top = None
-            pattern_data_top = None
-
-            # Print detailed information
-            if pattern_forecast is not None:
-                print("Bottom pattern detected:")
-                print("Pattern Data:", pattern_data)
-                print("\nPrice Forecast:")
-                print(f"Small Range: {pattern_forecast['small_range']:.2f}")
-                print(f"Medium Range: {pattern_forecast['medium_range']:.2f}")
-                print(f"Large Range: {pattern_forecast['large_range']:.2f}")
-            else:
-            # If no bottom pattern is detected, check for top pattern
-                pattern_forecast_top, pattern_data_top = identify_double_pattern(close, pattern_type='top')
-    
-            if pattern_forecast_top is not None:
-                print("Top pattern detected:")
-                print("Pattern Data:", pattern_data_top)
-                print("\nPrice Forecast:")
-                print(f"Small Range: {pattern_forecast_top['small_range']:.2f}")
-                print(f"Medium Range: {pattern_forecast_top['medium_range']:.2f}")
-                print(f"Large Range: {pattern_forecast_top['large_range']:.2f}")
-            #else:
-                #print("No bottom or top pattern detected.")
-
-            print()
-
-            ##################################################
-            ##################################################
-
             # Initialize variables
             trigger_long = False 
             trigger_short = False
@@ -1489,11 +1379,9 @@ def main():
                                 print("LONG condition 3: forecast_direction == Up")
                                 if closest_threshold < price:
                                     print("LONG condition 4: closest_threshold < price") 
-                                    if pattern_forecast_top is not None:
-                                        print("LONG condition 5: top pattern incoming") 
-                                        if momentum > 0:
-                                            print("LONG condition 6: momentum > 0")
-                                            trigger_long = True
+                                    if momentum > 0:
+                                        print("LONG condition 5: momentum > 0")
+                                        trigger_long = True
 
                     if trend == "Downtrend":
                         print("SHORT condition 1: trend == Downtrend") 
@@ -1502,12 +1390,10 @@ def main():
                             if forecast_direction == "Down":
                                 print("SHORT condition 3: forecast_direction == Down")
                                 if closest_threshold > price:
-                                    print("SHORT condition 4: closest_threshold > price") 
-                                    if pattern_forecast is not None:
-                                        print("SHORT condition 5: bottom pattern incoming") 
-                                        if momentum < 0:
-                                            print("SHORT condition 6: momentum < 0")
-                                            trigger_short = True
+                                    print("SHORT condition 4: closest_threshold > price")
+                                    if momentum < 0:
+                                        print("SHORT condition 5: momentum < 0")
+                                        trigger_short = True
 
                     print()
 
@@ -1568,8 +1454,7 @@ def main():
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del last_reversal, forecast_dip, forecast_top, pattern_forecast, pattern_data, pattern_forecast_top, pattern_data_top
-        del trigger_long, trigger_short, result, trend, amplitude_ranges, custom_wave
+        del trigger_long, trigger_short, result, trend
 
         gc.collect() 
 
