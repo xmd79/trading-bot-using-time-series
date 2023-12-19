@@ -1405,12 +1405,6 @@ def main():
 
             print()
 
-            # Example usage with specified amplitude ranges for each stage
-            amplitude_ranges = [(0.1, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.0)]
-            custom_wave = custom_sinewave_from_close(close, amplitude_ranges=amplitude_ranges)
-
-            print()
-
             print("Last reversal keypoint was: ", closest_threshold)
             
             print()
