@@ -1139,8 +1139,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-
 def calculate_amplitude_in_range(harmonic_wave, t, min_range, max_range):
     # Calculate the amplitude within the specified range
     mask = (t >= min_range) & (t <= max_range)
@@ -1220,8 +1218,32 @@ def custom_sinewave_from_close(close, amplitude_ranges=None):
     print(f"Current Frequency: {current_frequency} Hz")
 
     # Determine market mood
-    market_mood = "Bullish" if current_amplitude > stage_amplitude else "Bearish"
-    print(f"Market Mood: {market_mood}")
+    market_mood = "Bullish" if current_amplitude < stage_amplitude else "Bearish"
+
+    # Check for reversal conditions at harmonic 1 and harmonic 7
+    if current_harmonic == 1 or current_harmonic == 7:
+        print("\nReversal Triggered! Adjusting Harmonics...")
+
+        # Determine direction of the cycle (upward or downward)
+        cycle_direction = "Up" if current_harmonic == 1 else "Down"
+
+        if cycle_direction == "Up":
+            # Loop through harmonics in ascending order for upward cycle (1 to 7)
+            current_harmonic = (current_harmonic % max_harmonic) + 1
+        elif cycle_direction == "Down":
+            # Loop through harmonics in descending order for downward cycle (7 to 1)
+            current_harmonic = (current_harmonic - 2) % max_harmonic + 1
+
+        # Recalculate harmonic wave after reversal
+        harmonic_wave = np.sin(current_harmonic * t)
+
+        # Update market mood after reversal
+        current_amplitude = np.max(np.abs(harmonic_wave))
+        stage_amplitude = calculate_amplitude_in_range(harmonic_wave, t, range_min * (2 * np.pi), range_max * (2 * np.pi))
+        market_mood = "Bullish" if current_amplitude < stage_amplitude else "Bearish"
+    
+    # Print final market mood after reversal
+    print(f"\nCurrent Market Mood: {market_mood}")
 
     # Determine last, current, and next harmonic numbers
     last_harmonic = current_harmonic - 1 if current_harmonic > 1 else max_harmonic
@@ -1232,12 +1254,12 @@ def custom_sinewave_from_close(close, amplitude_ranges=None):
     print(f"Current Harmonic: {current_harmonic}")
     print(f"Next Harmonic: {next_harmonic}")
 
-    return custom_wave
+    return custom_wave, current_harmonic
 
 # Example usage with specified amplitude ranges for each stage
 amplitude_ranges = [(0.1, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.0)]
 
-custom_wave = custom_sinewave_from_close(close, amplitude_ranges=amplitude_ranges)
+custom_wave, current_harmonic = custom_sinewave_from_close(close, amplitude_ranges=amplitude_ranges)
 
 print()
 
@@ -1671,7 +1693,7 @@ def main():
 
         # Delete variables to clean up for the next iteration
         del closes, close, candles, sine, leadsine
-        del url, params, response, data, price, current_time, current_close, momentum
+        del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
         del last_reversal, forecast_dip, forecast_top, pattern_forecast, pattern_data, pattern_forecast_top, pattern_data_top
