@@ -1367,7 +1367,7 @@ def main():
                     print()
 
                     if trend == "Uptrend":
-                        print("LONG condition 1: trend_forecast == Up")                     
+                        print("LONG condition 1: trend == Uptrend")                     
                         if price < fastest_target:
                             print("LONG condition 2: price < fastest_target") 
                             if forecast_direction == "Up":
@@ -1379,7 +1379,7 @@ def main():
                                         trigger_long = True
 
                     if trend == "Downtrend":
-                        print("SHORT condition 1: trend_forecast == Down") 
+                        print("SHORT condition 1: trend == Downtrend") 
                         if price > fastest_target:
                             print("SHORT condition 2: price > fastest_target") 
                             if forecast_direction == "Down":
