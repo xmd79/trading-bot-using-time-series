@@ -1139,6 +1139,111 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def calculate_amplitude_in_range(harmonic_wave, t, min_range, max_range):
+    # Calculate the amplitude within the specified range
+    mask = (t >= min_range) & (t <= max_range)
+    
+    # Check if the mask is non-empty
+    if np.any(mask):
+        amplitude_in_range = np.max(np.abs(harmonic_wave[mask]))
+    else:
+        amplitude_in_range = 0
+    
+    return amplitude_in_range
+
+def find_current_harmonic(close, t, amplitude_ranges):
+    # Constants
+    max_harmonic = 7  # Maximum harmonic number
+
+    # Calculate inner harmonics
+    harmonics = [np.sin(2 * np.pi * harmonic * t) for harmonic in range(1, max_harmonic + 1)]
+
+    # Find the harmonic with the highest amplitude within the specified range
+    max_amplitude = 0
+    current_harmonic = 1
+    for i, (range_min, range_max) in enumerate(amplitude_ranges, start=1):
+        stage_amplitude = calculate_amplitude_in_range(harmonics[i - 1], t, range_min * len(close), range_max * len(close))
+        if stage_amplitude > max_amplitude:
+            max_amplitude = stage_amplitude
+            current_harmonic = i
+
+    return current_harmonic, max_harmonic
+
+def custom_sinewave_from_close(close, amplitude_ranges=None):
+    # Convert 'close' to a numpy array for proper indexing
+    close = np.array(close)
+
+    # Constants
+    duration_seconds = len(close)
+    t = np.linspace(0, 2 * np.pi, duration_seconds, endpoint=False)
+
+    # Find the current harmonic based on the provided close array
+    current_harmonic, max_harmonic = find_current_harmonic(close, t, amplitude_ranges)
+
+    # Calculate the specified harmonic
+    harmonic_wave = np.sin(current_harmonic * t)
+
+    # Combine base wave with the specified harmonic based on 'close'
+    custom_wave = close[:, np.newaxis] * harmonic_wave
+
+    # Normalize to the range [-1, 1]
+    custom_wave /= np.max(np.abs(custom_wave))
+
+    # Calculate stationary amplitude and frequency between min and max
+    stationary_amplitude = np.max(np.abs(custom_wave))
+    stationary_frequency = current_harmonic / (2 * np.pi)
+
+    # Print details for the specified harmonic and its distance between min and max
+    print(f"Stationary Amplitude: {stationary_amplitude}")
+    print(f"Stationary Frequency: {stationary_frequency} Hz")
+
+    # Define amplitude range for the specified harmonic
+    if amplitude_ranges is None:
+        amplitude_ranges = [(0.1, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.0)]
+
+    range_min, range_max = amplitude_ranges[current_harmonic - 1]
+
+    # Calculate and print current amplitude, frequency, and market mood for the specified harmonic
+    current_amplitude = np.max(np.abs(harmonic_wave))
+    current_frequency = current_harmonic / (2 * np.pi)
+
+    # Fix for calculating stage_amplitude
+    stage_amplitude = calculate_amplitude_in_range(harmonic_wave, t, range_min * (2 * np.pi), range_max * (2 * np.pi))
+
+    print("\nCurrent Harmonic Details:")
+    print(f"Amplitude Range: {range_min} to {range_max}")
+    print(f"Specified Amplitude: {stage_amplitude}")
+    print(f"Specified Frequency: {current_frequency} Hz")
+    print(f"Current Amplitude: {current_amplitude}")
+    print(f"Current Frequency: {current_frequency} Hz")
+
+    # Determine market mood
+    market_mood = "Bullish" if current_amplitude > stage_amplitude else "Bearish"
+    print(f"Market Mood: {market_mood}")
+
+    # Determine last, current, and next harmonic numbers
+    last_harmonic = current_harmonic - 1 if current_harmonic > 1 else max_harmonic
+    next_harmonic = current_harmonic + 1 if current_harmonic < max_harmonic else 1
+
+    print(f"\nHarmonic Numbers:")
+    print(f"Last Harmonic: {last_harmonic}")
+    print(f"Current Harmonic: {current_harmonic}")
+    print(f"Next Harmonic: {next_harmonic}")
+
+    return custom_wave
+
+# Example usage with specified amplitude ranges for each stage
+amplitude_ranges = [(0.1, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.0)]
+
+custom_wave = custom_sinewave_from_close(close, amplitude_ranges=amplitude_ranges)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -1400,6 +1505,12 @@ def main():
 
             print()
 
+            # Example usage with specified amplitude ranges for each stage
+            amplitude_ranges = [(0.1, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.0)]
+            custom_wave = custom_sinewave_from_close(close, amplitude_ranges=amplitude_ranges)
+
+            print()
+
             print("Last reversal keypoint was: ", closest_threshold)
             
             print()
@@ -1554,6 +1665,19 @@ def main():
         except Exception as e:
             print(f"An error occurred: {e}")
             time.sleep(5)
+
+        ##################################################
+        ##################################################
+
+        # Delete variables to clean up for the next iteration
+        del closes, close, candles, sine, leadsine
+        del url, params, response, data, price, current_time, current_close, momentum
+        del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
+        del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
+        del last_reversal, forecast_dip, forecast_top, pattern_forecast, pattern_data, pattern_forecast_top, pattern_data_top
+        del trigger_long, trigger_short, result, trend, amplitude_ranges, custom_wave
+
+        gc.collect() 
 
         ##################################################
         ##################################################
