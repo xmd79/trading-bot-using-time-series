@@ -1415,7 +1415,7 @@ def main():
                                         if market_mood_fft == "Bullish":
                                             print("LONG condition 6:market_mood_fft == Bullish")
                                             if momentum > 0:
-                                                print("LONG condition 6: momentum > 0")
+                                                print("LONG condition 7: momentum > 0")
                                                 trigger_long = True
 
                     # Downtrend cycle trigger conditions
@@ -1432,7 +1432,7 @@ def main():
                                         if market_mood_fft == "Bearish":
                                             print("SHORT condition 6:market_mood_fft == Bearish")
                                             if momentum < 0:
-                                                print("SHORT condition 6: momentum < 0")
+                                                print("SHORT condition 7: momentum < 0")
                                                 trigger_short = True
 
                     print()
