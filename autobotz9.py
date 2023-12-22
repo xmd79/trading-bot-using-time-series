@@ -1486,10 +1486,12 @@ def main():
                                 if forecast_price_fft > price:
                                     print("LONG condition 4: forecast_price_fft > price")
                                     if market_mood_fft == "Bullish":
-                                        print("LONG condition 5:market_mood_fft == Bullish")
-                                        if momentum > 0:
-                                            print("LONG condition 6: momentum > 0")
-                                            trigger_long = True
+                                        print("LONG condition 5: market_mood_fft == Bullish")
+                                        if close_prices[-1] > 0:
+                                            print("LONG condition 6: Current Market Mood: Positive")
+                                            if momentum > 0:
+                                                print("LONG condition 7: momentum > 0")
+                                                trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if closest_threshold > price:
@@ -1501,10 +1503,12 @@ def main():
                                 if forecast_price_fft < price:
                                     print("SHORT condition 4: forecast_price_fft < price")
                                     if market_mood_fft == "Bearish":
-                                        print("SHORT condition 5:market_mood_fft == Bearish")
-                                        if momentum < 0:
-                                            print("SHORT condition 6: momentum < 0")
-                                            trigger_short = True
+                                        print("SHORT condition 5: market_mood_fft == Bearish")
+                                        if close_prices[-1] < 0:
+                                            print("SHORT condition 6: Current Market Mood: Negative")
+                                            if momentum < 0:
+                                                print("SHORT condition 6: momentum < 0")
+                                                trigger_short = True
 
                     print()
 
