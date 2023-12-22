@@ -1397,7 +1397,7 @@ def main():
                         if price < fastest_target:
                             print("LONG condition 2: price < fastest_target") 
                             if future_price_regression > price:
-                                print("LONG condition 3: future_price_regression < price")
+                                print("LONG condition 3: forecast_price_fft > price")
                                 if market_mood_fft == "Bullish":
                                     print("LONG condition 4:market_mood_fft == Bullish")
                                     if momentum > 0:
@@ -1410,7 +1410,7 @@ def main():
                         if price > fastest_target:
                             print("SHORT condition 2: price > fastest_target") 
                             if future_price_regression < price:
-                                print("SHORT condition 3: future_price_regression > price")
+                                print("SHORT condition 3: forecast_price_fft < price")
                                 if market_mood_fft == "Bearish":
                                     print("SHORT condition 4:market_mood_fft == Bearish")
                                     if momentum < 0:
