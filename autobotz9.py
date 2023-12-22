@@ -1391,35 +1391,31 @@ def main():
 
                     print()
 
-                    # Uptrend cycle trigger conditions
-                    if market_mood_val == "Uptrend":
-                        print("LONG condition 1: market_mood_val == Uptrend")                      
+                    # Uptrend cycle trigger conditions                                
+                    if closest_threshold < price:  
+                        print("LONG condition 1: closest_threshold < price")                
                         if price < fastest_target:
                             print("LONG condition 2: price < fastest_target") 
                             if forecast_direction == "Up":
                                 print("LONG condition 3: forecast_direction == Up")
-                                if closest_threshold < price:
-                                    print("LONG condition 4: closest_threshold < price") 
-                                    if market_mood_fft == "Bullish":
-                                        print("LONG condition 5:market_mood_fft == Bullish")
-                                        if momentum > 0:
-                                            print("LONG condition 6: momentum > 0")
-                                            trigger_long = True
+                                if market_mood_fft == "Bullish":
+                                    print("LONG condition 4:market_mood_fft == Bullish")
+                                    if momentum > 0:
+                                        print("LONG condition 5: momentum > 0")
+                                        trigger_long = True
 
                     # Downtrend cycle trigger conditions
-                    if market_mood_val == "Downtrend":
-                        print("SHORT condition 1: market_mood_val == Downtrend") 
+                    if closest_threshold > price:
+                        print("SHORT condition 1: closest_threshold > price")
                         if price > fastest_target:
                             print("SHORT condition 2: price > fastest_target") 
                             if forecast_direction == "Down":
                                 print("SHORT condition 3: forecast_direction == Down")
-                                if closest_threshold > price:
-                                    print("SHORT condition 4: closest_threshold > price")
-                                    if market_mood_fft == "Bearish":
-                                        print("SHORT condition 5:market_mood_fft == Bearish")
-                                        if momentum < 0:
-                                            print("SHORT condition 6: momentum < 0")
-                                            trigger_short = True
+                                if market_mood_fft == "Bearish":
+                                    print("SHORT condition 4:market_mood_fft == Bearish")
+                                    if momentum < 0:
+                                        print("SHORT condition 5: momentum < 0")
+                                        trigger_short = True
 
                     print()
 
