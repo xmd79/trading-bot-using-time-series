@@ -1061,6 +1061,52 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+from scipy.fft import fft, ifft
+
+def custom_compounded_sin(min_val, max_val, num_points=500):
+    """Generate a compounded sine wave."""
+    t = np.linspace(0, 1, num_points)
+    compounded_wave = min_val + (max_val - min_val) * (np.sin(2 * np.pi * 5 * t) + 0.5 * np.sin(2 * np.pi * 20 * t))
+    return compounded_wave
+
+# 1. Generate the compounded sine wave
+min_val = -1  # Min of sine as dip
+max_val = 1   # Max of sine as top
+close_prices = custom_compounded_sin(min_val, max_val)
+
+# 2. Calculate Fourier Transform
+fourier_transform = fft(close_prices)
+
+# Extract last 5 frequencies
+last_5_freqs = fourier_transform[-5:]
+
+# Interpret the last 5 frequencies in relation to min and max values
+for idx, freq in enumerate(last_5_freqs, start=1):
+    if freq.real < 0:
+        print(f"Frequency {idx}: Most negative, indicating a possible dip in the market.")
+    else:
+        print(f"Frequency {idx}: Most positive, indicating a possible rise in the market.")
+
+# Print the compounded sine wave for the current cycle
+if close_prices[-1] < 0:
+    print("\nCurrent Market Mood: Positive")
+else:
+    print("\nCurrent Market Mood: Negative")
+
+# Print initial values for each transformation
+print("\nFirst 10 values of Fourier Transform:")
+print(fourier_transform[:10])
+
+# 3. Inverse Fourier Transform
+inverse_fourier_transform = ifft(fourier_transform)
+
+# Print initial values of the inverse transform
+print("\nFirst 10 values of Inverse Fourier Transform:")
+print(inverse_fourier_transform[:10])
+
+print()
+
 ##################################################
 ##################################################
 
@@ -1315,6 +1361,45 @@ def main():
 
             current_time = datetime.datetime.utcnow() + timedelta(hours=3)
 
+            print()
+
+            # 1. Generate the compounded sine wave
+            min_val = -1  # Min of sine as dip
+            max_val = 1   # Max of sine as top
+            close_prices = custom_compounded_sin(min_val, max_val)
+
+            # 2. Calculate Fourier Transform
+            fourier_transform = fft(close_prices)
+
+            # Extract last 5 frequencies
+            last_5_freqs = fourier_transform[-5:]
+
+            # Interpret the last 5 frequencies in relation to min and max values
+            for idx, freq in enumerate(last_5_freqs, start=1):
+                if freq.real > 0:
+                    print(f"Frequency {idx}: Most negative, indicating a possible dip in the market.")
+                else:
+                    print(f"Frequency {idx}: Most positive, indicating a possible rise in the market.")
+
+            # Print the compounded sine wave for the current cycle
+            if close_prices[-1] < 0:
+                print("\nCurrent Market Mood: Positive")
+            else:
+                print("\nCurrent Market Mood: Negative")
+
+            # Print initial values for each transformation
+            print("\nFirst 10 values of Fourier Transform:")
+            print(fourier_transform[:10])
+
+            # 3. Inverse Fourier Transform
+            inverse_fourier_transform = ifft(fourier_transform)
+
+            # Print initial values of the inverse transform
+            print("\nFirst 10 values of Inverse Fourier Transform:")
+            print(inverse_fourier_transform[:10])
+
+            print()
+
             print("Last reversal keypoint was: ", closest_threshold)
             
             print()
@@ -1322,8 +1407,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 5
-            stop_loss = -5
+            take_profit = 15
+            stop_loss = -25
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
