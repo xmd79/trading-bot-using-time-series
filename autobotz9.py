@@ -1322,8 +1322,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 10.00
-            stop_loss = -10.00
+            take_profit = 5
+            stop_loss = -5
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
