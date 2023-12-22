@@ -1376,13 +1376,13 @@ def main():
 
             # Interpret the last 5 frequencies in relation to min and max values
             for idx, freq in enumerate(last_5_freqs, start=1):
-                if freq.real < 0:
+                if freq.real > 0:
                     print(f"Frequency {idx}: Most negative, indicating a possible dip in the market.")
                 else:
                     print(f"Frequency {idx}: Most positive, indicating a possible top in the market.")
 
             # Print the compounded sine wave for the current cycle
-            if close_prices[-1] > 0:
+            if close_prices[-1] < 0:
                 print("\nCurrent Market Mood: Positive")
             else:
                 print("\nCurrent Market Mood: Negative")
@@ -1408,7 +1408,7 @@ def main():
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -25.00
+            stop_loss = -15.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -1487,7 +1487,7 @@ def main():
                                     print("LONG condition 4: forecast_price_fft > price")
                                     if market_mood_fft == "Bullish":
                                         print("LONG condition 5: market_mood_fft == Bullish")
-                                        if close_prices[-1] > 0:
+                                        if close_prices[-1] < 0:
                                             print("LONG condition 6: Current Market Mood: Positive")
                                             if momentum > 0:
                                                 print("LONG condition 7: momentum > 0")
@@ -1504,7 +1504,7 @@ def main():
                                     print("SHORT condition 4: forecast_price_fft < price")
                                     if market_mood_fft == "Bearish":
                                         print("SHORT condition 5: market_mood_fft == Bearish")
-                                        if close_prices[-1] < 0:
+                                        if close_prices[-1] > 0:
                                             print("SHORT condition 6: Current Market Mood: Negative")
                                             if momentum < 0:
                                                 print("SHORT condition 7: momentum < 0")
