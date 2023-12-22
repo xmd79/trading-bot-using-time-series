@@ -1376,13 +1376,13 @@ def main():
 
             # Interpret the last 5 frequencies in relation to min and max values
             for idx, freq in enumerate(last_5_freqs, start=1):
-                if freq.real > 0:
+                if freq.real < 0:
                     print(f"Frequency {idx}: Most negative, indicating a possible dip in the market.")
                 else:
-                    print(f"Frequency {idx}: Most positive, indicating a possible rise in the market.")
+                    print(f"Frequency {idx}: Most positive, indicating a possible top in the market.")
 
             # Print the compounded sine wave for the current cycle
-            if close_prices[-1] < 0:
+            if close_prices[-1] > 0:
                 print("\nCurrent Market Mood: Positive")
             else:
                 print("\nCurrent Market Mood: Negative")
