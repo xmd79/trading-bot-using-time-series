@@ -323,29 +323,29 @@ def analyze_sine_wave(close):
     frequencies = np.fft.fftfreq(len(sine_wave))
 
     # Consider the last 3 most negative and last 3 most positive frequencies
-    num_freqs = 3
+    num_freqs = 3  # Consider the last 3 frequencies
     neg_freq_indices = np.argsort(frequencies)[:num_freqs]
     pos_freq_indices = np.argsort(frequencies)[-num_freqs:]
 
-    # Calculate average frequencies for negative and positive frequencies
-    avg_neg_freq = np.abs(np.mean(frequencies[neg_freq_indices]))
-    avg_pos_freq = np.abs(np.mean(frequencies[pos_freq_indices]))
+    # Calculate amplitudes for negative and positive frequencies
+    avg_neg_amp = np.abs(np.mean(spectrum[neg_freq_indices]))
+    avg_pos_amp = np.abs(np.mean(spectrum[pos_freq_indices]))
 
-    # Identify trend based on average frequencies
-    trend = "Uptrend" if avg_pos_freq < avg_neg_freq else "Downtrend"
+    # Identify trend based on average amplitudes of negative and positive frequencies
+    trend = "Uptrend" if avg_pos_amp < avg_neg_amp else "Downtrend"
 
     # Forecasting for fast, medium, and large bands
-    fast_band = forecast_price(sine_wave, avg_neg_freq, len(close) + 5)
-    medium_band = forecast_price(sine_wave, avg_neg_freq, len(close) + 30)
-    large_band = forecast_price(sine_wave, avg_neg_freq, len(close) + 120)
+    fast_band = forecast_price(sine_wave, frequencies[neg_freq_indices[-1]], len(close) + 5)
+    medium_band = forecast_price(sine_wave, frequencies[neg_freq_indices[-1]], len(close) + 30)
+    large_band = forecast_price(sine_wave, frequencies[neg_freq_indices[-1]], len(close) + 120)
 
     return {
         "sine_wave_min": sine_wave_min,
         "sine_wave_max": sine_wave_max,
         "spectrum": spectrum,
         "frequencies": frequencies,
-        "avg_neg_freq": avg_neg_freq,
-        "avg_pos_freq": avg_pos_freq,
+        "avg_neg_amp": avg_neg_amp,
+        "avg_pos_amp": avg_pos_amp,
         "trend": trend,
         "fast_band": fast_band,
         "medium_band": medium_band,
@@ -382,28 +382,28 @@ sine_wave_min = result['sine_wave_min']
 sine_wave_max = result['sine_wave_max']
 spectrum = result['spectrum']
 frequencies = result['frequencies']
-avg_neg_freq = result['avg_neg_freq']
-avg_pos_freq = result['avg_pos_freq']
+avg_neg_amp = result['avg_neg_amp']
+avg_pos_amp = result['avg_pos_amp']
 trend = result['trend']
 fast_band = result['fast_band']
 medium_band = result['medium_band']
 large_band = result['large_band']
 
-# Print detailed information
+# Print detailed information about the sine wave analysis
 print("Sine Wave Analysis:")
-print("Min Value of Sine Wave:", sine_wave_min)
-print("Max Value of Sine Wave:", sine_wave_max)
-print("Spectrum:", spectrum)
-print("Frequencies:", frequencies)
-print("Average Frequency (Negative):", avg_neg_freq)
-print("Average Frequency (Positive):", avg_pos_freq)
-print("Trend:", trend)
+print(f"Minimum value of the Sine Wave: {sine_wave_min}")
+print(f"Maximum value of the Sine Wave: {sine_wave_max}")
+print(f"Spectrum: {spectrum}")
+print(f"Frequencies: {frequencies}")
+print(f"Average Amplitude (Negative Frequencies): {avg_neg_amp}")
+print(f"Average Amplitude (Positive Frequencies): {avg_pos_amp}")
+print(f"Trend based on predominant frequencies: {trend}")
 
-# Print forecasted prices
+# Print forecasted prices for different bands
 print("\nForecasted Prices:")
-print("Fast Band Forecast:", fast_band)
-print("Medium Band Forecast:", medium_band)
-print("Large Band Forecast:", large_band)
+print(f"Forecast for Fast Band: {fast_band}")
+print(f"Forecast for Medium Band: {medium_band}")
+print(f"Forecast for Large Band: {large_band}")
 
 # Determine market mood for each band
 market_mood_fast = "Bullish" if fast_band[-1] > close[-1] else "Bearish"
@@ -412,9 +412,9 @@ market_mood_large = "Bullish" if large_band[-1] > close[-1] else "Bearish"
 
 # Print market mood for each band
 print("\nMarket Mood:")
-print("Fast Band Market Mood:", market_mood_fast)
-print("Medium Band Market Mood:", market_mood_medium)
-print("Large Band Market Mood:", market_mood_large)
+print(f"Market Mood for Fast Band: {market_mood_fast}")
+print(f"Market Mood for Medium Band: {market_mood_medium}")
+print(f"Market Mood for Large Band: {market_mood_large}")
 
 print()
 
@@ -1323,7 +1323,7 @@ def main():
             ##################################################
 
             take_profit = 10.00
-            stop_loss = -5.00
+            stop_loss = -10.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -1427,15 +1427,15 @@ def main():
                     #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message)
                     #response = webhook.execute()
 
-                    #message_long = f'LONG signal! Price now at: {price}\n'
-                    #message_short = f'SHORT signal! Price now at: {price}\n'
+                    message_long = f'LONG signal! Price now at: {price}\n'
+                    message_short = f'SHORT signal! Price now at: {price}\n'
 
                     if trigger_long:
                         print("LONG signal!")
                         f.write(f"{current_time} LONG {price}\n")
 
-                        #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message_long)
-                        #response = webhook.execute()
+                        webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message_long)
+                        response = webhook.execute()
 
                         entry_long(symbol)
                         trigger_long = False
@@ -1444,8 +1444,8 @@ def main():
                         print("SHORT signal!")
                         f.write(f"{current_time} SHORT {price}\n")
 
-                        #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message_short)
-                        #response = webhook.execute()
+                        webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message_short)
+                        response = webhook.execute()
 
                         entry_short(symbol)
                         trigger_short = False
