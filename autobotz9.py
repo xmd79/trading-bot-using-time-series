@@ -1507,7 +1507,7 @@ def main():
                                         if close_prices[-1] < 0:
                                             print("SHORT condition 6: Current Market Mood: Negative")
                                             if momentum < 0:
-                                                print("SHORT condition 6: momentum < 0")
+                                                print("SHORT condition 7: momentum < 0")
                                                 trigger_short = True
 
                     print()
