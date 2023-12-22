@@ -1396,8 +1396,8 @@ def main():
                         print("LONG condition 1: closest_threshold < price")                
                         if price < fastest_target:
                             print("LONG condition 2: price < fastest_target") 
-                            if forecast_direction == "Up":
-                                print("LONG condition 3: forecast_direction == Up")
+                            if future_price_regression < price:
+                                print("LONG condition 3: future_price_regression < price")
                                 if market_mood_fft == "Bullish":
                                     print("LONG condition 4:market_mood_fft == Bullish")
                                     if momentum > 0:
@@ -1409,8 +1409,8 @@ def main():
                         print("SHORT condition 1: closest_threshold > price")
                         if price > fastest_target:
                             print("SHORT condition 2: price > fastest_target") 
-                            if forecast_direction == "Down":
-                                print("SHORT condition 3: forecast_direction == Down")
+                            if future_price_regression > price:
+                                print("SHORT condition 3: future_price_regression > price")
                                 if market_mood_fft == "Bearish":
                                     print("SHORT condition 4:market_mood_fft == Bearish")
                                     if momentum < 0:
