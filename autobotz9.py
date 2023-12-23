@@ -1388,15 +1388,15 @@ def main():
                 print("\nCurrent Market Mood: Negative")
 
             # Print initial values for each transformation
-            print("\nFirst 10 values of Fourier Transform:")
-            print(fourier_transform[:10])
+            #print("\nFirst 10 values of Fourier Transform:")
+            #print(fourier_transform[:10])
 
             # 3. Inverse Fourier Transform
-            inverse_fourier_transform = ifft(fourier_transform)
+            #inverse_fourier_transform = ifft(fourier_transform)
 
             # Print initial values of the inverse transform
-            print("\nFirst 10 values of Inverse Fourier Transform:")
-            print(inverse_fourier_transform[:10])
+            #print("\nFirst 10 values of Inverse Fourier Transform:")
+            #print(inverse_fourier_transform[:10])
 
             print()
 
@@ -1487,11 +1487,9 @@ def main():
                                     print("LONG condition 4: forecast_price_fft > price")
                                     if market_mood_fft == "Bullish":
                                         print("LONG condition 5: market_mood_fft == Bullish")
-                                        if close_prices[-1] < 0:
-                                            print("LONG condition 6: Current Market Mood: Positive")
-                                            if momentum > 0:
-                                                print("LONG condition 7: momentum > 0")
-                                                trigger_long = True
+                                        if momentum > 0:
+                                            print("LONG condition 6: momentum > 0")
+                                            trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if closest_threshold > price:
@@ -1504,11 +1502,9 @@ def main():
                                     print("SHORT condition 4: forecast_price_fft < price")
                                     if market_mood_fft == "Bearish":
                                         print("SHORT condition 5: market_mood_fft == Bearish")
-                                        if close_prices[-1] > 0:
-                                            print("SHORT condition 6: Current Market Mood: Negative")
-                                            if momentum < 0:
-                                                print("SHORT condition 7: momentum < 0")
-                                                trigger_short = True
+                                        if momentum < 0:
+                                            print("SHORT condition 6: momentum < 0")
+                                            trigger_short = True
 
                     print()
 
@@ -1569,7 +1565,8 @@ def main():
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del trigger_long, trigger_short, result
+        del trigger_long, trigger_short, result, un_realized_profit
+
 
         # Force garbage collection to free up memory
         gc.collect()
