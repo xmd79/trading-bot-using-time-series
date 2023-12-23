@@ -1114,36 +1114,48 @@ import numpy as np
 
 def fourierExtrapolation(x, n_predict):
     n = x.size
-    n_harm = 10                     # number of harmonics in model
+    n_harm = 10
     t = np.arange(0, n)
-    p = np.polyfit(t, x, 1)         # find linear trend in x
-    x_notrend = x - p[0] * t        # detrended x
-    x_freqdom = np.fft.fft(x_notrend)  # detrended x in frequency domain
-    f = np.fft.fftfreq(n)           # frequencies
+    p = np.polyfit(t, x, 1)
+    x_notrend = x - p[0] * t
+    x_freqdom = np.fft.fft(x_notrend)
+    f = np.fft.fftfreq(n)
     indexes = range(n)
-    # sort indexes by frequency, lower -> higher
     indexes = sorted(indexes, key=lambda i: np.absolute(f[i]))
 
     t = np.arange(0, n + n_predict)
     restored_sig = np.zeros(t.size)
     for i in indexes[:1 + n_harm * 2]:
-        ampli = np.absolute(x_freqdom[i]) / n   # amplitude
-        phase = np.angle(x_freqdom[i])          # phase
+        ampli = np.absolute(x_freqdom[i]) / n
+        phase = np.angle(x_freqdom[i])
         restored_sig += ampli * np.cos(2 * np.pi * f[i] * t + phase)
     
     forecasted_prices = restored_sig + p[0] * t
-    return forecasted_prices[-n_predict:]  # Return the last n_predict values as forecast
+    return forecasted_prices[-n_predict:]
 
 # Convert the list to a NumPy array
 x = np.array(close)
-n_predict = 100
+n_predict = 105
 forecasted_prices = fourierExtrapolation(x, n_predict)
 
-# Choose the best forecast value based on the last known price
 momentum_forecast = forecasted_prices[-1]
 
-# Print the best forecasted price
 print("Momentum Forecasted Price:", momentum_forecast)
+
+# Add 5 more forecast targets that are further into the future
+extended_forecast_1 = forecasted_prices[-(n_predict - 5)]
+extended_forecast_2 = forecasted_prices[-(n_predict - 10)]
+extended_forecast_3 = forecasted_prices[-(n_predict - 15)]
+extended_forecast_4 = forecasted_prices[-(n_predict - 20)]
+extended_forecast_5 = forecasted_prices[-(n_predict - 25)]
+
+print("\nExtended Forecast Prices:")
+print("Forecast for extended time 1:", extended_forecast_1)
+print("Forecast for extended time 2:", extended_forecast_2)
+print("Forecast for extended time 3:", extended_forecast_3)
+print("Forecast for extended time 4:", extended_forecast_4)
+print("Forecast for extended time 5:", extended_forecast_5)
+
 
 print()
 
@@ -1385,7 +1397,6 @@ def main():
             print(f"Min Price: {min_price_val:.2f}")
             print(f"Max Price: {max_price_val:.2f}")
             print(f"Market Mood: {market_mood_val}")
-            print("-------------------------------------------------------")
 
             print()
 
@@ -1459,6 +1470,20 @@ def main():
 
             # Print the best forecasted price
             print("Momentum Forecasted Price:", momentum_forecast)
+
+            # Add 5 more forecast targets that are further into the future
+            extended_forecast_1 = forecasted_prices[-(n_predict - 5)]
+            extended_forecast_2 = forecasted_prices[-(n_predict - 10)]
+            extended_forecast_3 = forecasted_prices[-(n_predict - 15)]
+            extended_forecast_4 = forecasted_prices[-(n_predict - 20)]
+            extended_forecast_5 = forecasted_prices[-(n_predict - 25)]
+
+            print("\nExtended Forecast Prices:")
+            print("Forecast for extended time 1:", extended_forecast_1)
+            print("Forecast for extended time 2:", extended_forecast_2)
+            print("Forecast for extended time 3:", extended_forecast_3)
+            print("Forecast for extended time 4:", extended_forecast_4)
+            print("Forecast for extended time 5:", extended_forecast_5)
 
             print()
 
