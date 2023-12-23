@@ -1479,11 +1479,11 @@ def main():
             extended_forecast_5 = forecasted_prices[-(n_predict - 25)]
 
             print("\nExtended Forecast Prices:")
-            print("Forecast for extended time 1:", extended_forecast_1)
-            print("Forecast for extended time 2:", extended_forecast_2)
+            print("Forecast for extended time 1:", extended_forecast_5)
+            print("Forecast for extended time 2:", extended_forecast_4)
             print("Forecast for extended time 3:", extended_forecast_3)
-            print("Forecast for extended time 4:", extended_forecast_4)
-            print("Forecast for extended time 5:", extended_forecast_5)
+            print("Forecast for extended time 4:", extended_forecast_2)
+            print("Forecast for extended time 5:", extended_forecast_1)
 
             print()
 
