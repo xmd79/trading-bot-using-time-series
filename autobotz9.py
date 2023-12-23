@@ -1110,6 +1110,43 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def fourierExtrapolation(x, n_predict):
+    n = x.size
+    n_harm = 10                     # number of harmonics in model
+    t = np.arange(0, n)
+    p = np.polyfit(t, x, 1)         # find linear trend in x
+    x_notrend = x - p[0] * t        # detrended x
+    x_freqdom = np.fft.fft(x_notrend)  # detrended x in frequency domain
+    f = np.fft.fftfreq(n)           # frequencies
+    indexes = range(n)
+    # sort indexes by frequency, lower -> higher
+    indexes = sorted(indexes, key=lambda i: np.absolute(f[i]))
+
+    t = np.arange(0, n + n_predict)
+    restored_sig = np.zeros(t.size)
+    for i in indexes[:1 + n_harm * 2]:
+        ampli = np.absolute(x_freqdom[i]) / n   # amplitude
+        phase = np.angle(x_freqdom[i])          # phase
+        restored_sig += ampli * np.cos(2 * np.pi * f[i] * t + phase)
+    
+    forecasted_prices = restored_sig + p[0] * t
+    return forecasted_prices[-n_predict:]  # Return the last n_predict values as forecast
+
+# Convert the list to a NumPy array
+x = np.array(close)
+n_predict = 100
+forecasted_prices = fourierExtrapolation(x, n_predict)
+
+# Choose the best forecast value based on the last known price
+momentum_forecast = forecasted_prices[-1]
+
+# Print the best forecasted price
+print("Momentum Forecasted Price:", momentum_forecast)
+
+print()
+
 ##################################################
 ##################################################
 
@@ -1407,7 +1444,28 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 5.00
+            # Convert the list to a NumPy array
+            x = np.array(close)
+            n_predict = 100
+            forecasted_prices = fourierExtrapolation(x, n_predict)
+    
+            # Print the forecasted prices
+            #print("Forecasted prices:")
+            #for price in forecasted_prices:
+                #print(price)
+
+            # Choose the best forecast value based on the last known price
+            momentum_forecast = forecasted_prices[-1]
+
+            # Print the best forecasted price
+            print("Momentum Forecasted Price:", momentum_forecast)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            take_profit = 15.00
             stop_loss = -15.00
 
             # Current timestamp in milliseconds
@@ -1565,7 +1623,7 @@ def main():
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del trigger_long, trigger_short, result, un_realized_profit
+        del trigger_long, trigger_short, result
 
 
         # Force garbage collection to free up memory
