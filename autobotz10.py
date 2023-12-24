@@ -949,50 +949,6 @@ print()
 ##################################################
 ##################################################
 
-def kepler_triangle(close):
-    # Calculate the other side lengths using Kepler triangle properties
-    long_side = close * math.sqrt(2 + math.sqrt(2))
-    short_side = close * math.sqrt(2 - math.sqrt(2))
-    
-    # Return the calculated side lengths as a dictionary
-    triangle_sides = {
-        'close': close,
-        'long_side': long_side,
-        'short_side': short_side
-    }
-    
-    return triangle_sides
-
-def map_frequency_bands(triangle_sides):
-    # EM field bands and their frequency ranges
-    bands = {
-        'gamma': [1e-18, 3e-15],    # Hz (added gamma band)
-        'alpha': [1e-3, 100e3],     # Hz (alpha band)
-        'delta': [100e3, 4e6],      # Hz (delta band)
-        'theta': [4e6, 8e6],        # Hz (theta band)
-        'beta': [12e6, 30e6],       # Hz (beta band)
-        'omega': [30e6, 300e6],     # Hz (omega band)
-        # Add more bands and ranges as needed
-    }
-    
-    # Determine the EM field band for the close value
-    close = triangle_sides['close']
-    em_field_band = None
-    for band, (lower, upper) in bands.items():
-        if lower <= close <= upper:
-            em_field_band = band
-            break
-    
-    if em_field_band is not None:
-        triangle_sides['em_field_band'] = em_field_band
-
-# Example usage
-close_length = 0.05  # Example close length in MHz (gamma band range)
-triangle_sides = kepler_triangle(close_length)
-map_frequency_bands(triangle_sides)
-print(triangle_sides)
-
-
 print()
 
 ##################################################
@@ -1061,101 +1017,11 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-from scipy.fft import fft, ifft
-
-def custom_compounded_sin(min_val, max_val, num_points=500):
-    """Generate a compounded sine wave."""
-    t = np.linspace(0, 1, num_points)
-    compounded_wave = min_val + (max_val - min_val) * (np.sin(2 * np.pi * 5 * t) + 0.5 * np.sin(2 * np.pi * 20 * t))
-    return compounded_wave
-
-# 1. Generate the compounded sine wave
-min_val = -1  # Min of sine as dip
-max_val = 1   # Max of sine as top
-close_prices = custom_compounded_sin(min_val, max_val)
-
-# 2. Calculate Fourier Transform
-fourier_transform = fft(close_prices)
-
-# Extract last 5 frequencies
-last_5_freqs = fourier_transform[-5:]
-
-# Interpret the last 5 frequencies in relation to min and max values
-for idx, freq in enumerate(last_5_freqs, start=1):
-    if freq.real < 0:
-        print(f"Frequency {idx}: Most negative, indicating a possible dip in the market.")
-    else:
-        print(f"Frequency {idx}: Most positive, indicating a possible rise in the market.")
-
-# Print the compounded sine wave for the current cycle
-if close_prices[-1] < 0:
-    print("\nCurrent Market Mood: Positive")
-else:
-    print("\nCurrent Market Mood: Negative")
-
-# Print initial values for each transformation
-print("\nFirst 10 values of Fourier Transform:")
-print(fourier_transform[:10])
-
-# 3. Inverse Fourier Transform
-inverse_fourier_transform = ifft(fourier_transform)
-
-# Print initial values of the inverse transform
-print("\nFirst 10 values of Inverse Fourier Transform:")
-print(inverse_fourier_transform[:10])
 
 print()
 
 ##################################################
 ##################################################
-
-import numpy as np
-
-def fourierExtrapolation(x, n_predict):
-    n = x.size
-    n_harm = 10
-    t = np.arange(0, n)
-    p = np.polyfit(t, x, 1)
-    x_notrend = x - p[0] * t
-    x_freqdom = np.fft.fft(x_notrend)
-    f = np.fft.fftfreq(n)
-    indexes = range(n)
-    indexes = sorted(indexes, key=lambda i: np.absolute(f[i]))
-
-    t = np.arange(0, n + n_predict)
-    restored_sig = np.zeros(t.size)
-    for i in indexes[:1 + n_harm * 2]:
-        ampli = np.absolute(x_freqdom[i]) / n
-        phase = np.angle(x_freqdom[i])
-        restored_sig += ampli * np.cos(2 * np.pi * f[i] * t + phase)
-    
-    forecasted_prices = restored_sig + p[0] * t
-    return forecasted_prices[-n_predict:]
-
-# Convert the list to a NumPy array
-x = np.array(close)
-n_predict = 105
-forecasted_prices = fourierExtrapolation(x, n_predict)
-
-momentum_forecast = forecasted_prices[-1]
-
-print("Momentum Forecasted Price:", momentum_forecast)
-
-# Add 5 more forecast targets that are further into the future
-extended_forecast_1 = forecasted_prices[-(n_predict - 5)]
-extended_forecast_2 = forecasted_prices[-(n_predict - 10)]
-extended_forecast_3 = forecasted_prices[-(n_predict - 15)]
-extended_forecast_4 = forecasted_prices[-(n_predict - 20)]
-extended_forecast_5 = forecasted_prices[-(n_predict - 25)]
-
-print("\nExtended Forecast Prices:")
-print("Forecast for extended time 1:", extended_forecast_1)
-print("Forecast for extended time 2:", extended_forecast_2)
-print("Forecast for extended time 3:", extended_forecast_3)
-print("Forecast for extended time 4:", extended_forecast_4)
-print("Forecast for extended time 5:", extended_forecast_5)
-
 
 print()
 
@@ -1403,6 +1269,11 @@ def main():
             ##################################################
             ##################################################
 
+            print()
+
+            ##################################################
+            ##################################################
+
             # Initialize variables
             trigger_long = False 
             trigger_short = False
@@ -1422,7 +1293,7 @@ def main():
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -10.00
+            stop_loss = -25.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
