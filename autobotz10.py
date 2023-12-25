@@ -1385,7 +1385,7 @@ def main():
                     if normalized_distance_to_max < normalized_distance_to_min:
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")
                         if price > avg_mtf:
-                            print("SHORT condition 2: price < avg_mtf")  
+                            print("SHORT condition 2: price > avg_mtf")  
                             if closest_threshold > price:
                                 print("SHORT condition 3: closest_threshold > price")
                                 if price > fastest_target:
