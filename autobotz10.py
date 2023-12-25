@@ -1285,22 +1285,28 @@ def main():
             ##################################################
 
             # Filter timeframes
-            timeframes = ['1m', '5m']  # Only '1m' and '5m'
+            timeframes = ['1m', '5m', '30m']  # Only '1m' and '5m'
 
             # Call function and print signals
             for timeframe in timeframes:
                 dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
-    
+
                 if timeframe == '1m' and dist_from_close_to_min < dist_from_close_to_max:
                     print(f"LONG signal for {timeframe} timeframe!")
                     if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
                         print(f"LONG signal for {timeframe} timeframe!")
-                        print("LONG MTF Signal!")
-                elif timeframe == '1m' and dist_from_close_to_max < dist_from_close_to_min:
+                        if timeframe == '30m' and dist_from_close_to_min < dist_from_close_to_max:
+                            print(f"LONG signal for {timeframe} timeframe!")
+                            print("LONG MTF Signal!")
+
+                elif timeframe == '1m' and dist_from_close_to_max < dist_from_close_to_max:
                     print(f"SHORT signal for {timeframe} timeframe!")
                     if timeframe == '5m' and dist_from_close_to_max < dist_from_close_to_min:
                         print(f"SHORT signal for {timeframe} timeframe!")
-                        print("SHORT MTF Signal!")
+                        if timeframe == '30m' and dist_from_close_to_max < dist_from_close_to_min:
+                            print(f"SHORT signal for {timeframe} timeframe!")
+                            print("SHORT MTF Signal!")
+
             print()
 
             ##################################################
