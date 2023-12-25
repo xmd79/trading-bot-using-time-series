@@ -1285,7 +1285,7 @@ def main():
             ##################################################
 
             # Filter timeframes
-            timeframes = ['5m']  # Only '1m' and '5m'
+            timeframes = ['30m']
 
             # Call function and print signals
             for timeframe in timeframes:
