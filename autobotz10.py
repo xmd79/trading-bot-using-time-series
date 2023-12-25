@@ -294,9 +294,23 @@ def scale_to_sine(timeframe):
 
     return dist_from_close_to_min, dist_from_close_to_max, current_sine
 
+# Filter timeframes
+timeframes = ['1m', '5m']  # Only '1m' and '5m'
+
 # Call function           
-for timeframe in timeframes:        
-    scale_to_sine(timeframe)
+#for timeframe in timeframes:        
+    #scale_to_sine(timeframe)
+
+# Call function and print signals
+for timeframe in timeframes:
+    dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
+    
+    if timeframe == '1m' and dist_from_close_to_min < dist_from_close_to_max:
+        print(f"LONG signal for {timeframe} timeframe!")
+    elif timeframe == '5m' and dist_from_close_to_max < dist_from_close_to_max:
+        print(f"LONG signal for {timeframe} timeframe!")
+    elif dist_from_close_to_max < dist_from_close_to_max:
+        print(f"SHORT signal for {timeframe} timeframe!")
 
 print()
 
@@ -1270,6 +1284,23 @@ def main():
             ##################################################
             ##################################################
 
+            # Filter timeframes
+            timeframes = ['1m', '5m']  # Only '1m' and '5m'
+
+            # Call function and print signals
+            for timeframe in timeframes:
+                dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
+    
+                if timeframe == '1m' and dist_from_close_to_min < dist_from_close_to_max:
+                    print(f"LONG signal for {timeframe} timeframe!")
+                    if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
+                        print(f"LONG signal for {timeframe} timeframe!")
+                        print("LONG MTF Signal!")
+                elif timeframe == '1m' and dist_from_close_to_max < dist_from_close_to_min:
+                    print(f"SHORT signal for {timeframe} timeframe!")
+                    if timeframe == '5m' and dist_from_close_to_max < dist_from_close_to_min:
+                        print(f"SHORT signal for {timeframe} timeframe!")
+                        print("SHORT MTF Signal!")
             print()
 
             ##################################################
@@ -1294,7 +1325,7 @@ def main():
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -5.00
+            stop_loss = -95.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
