@@ -1083,6 +1083,20 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import talib
+
+def generate_wave(sine_wave):
+    # Find the minimum and maximum values of the sine wave
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+    
+    # Generate upward and downward waves
+    upward_wave = np.linspace(sine_wave_min, sine_wave_max, 60)
+    downward_wave = np.linspace(sine_wave_max, sine_wave_min, 60)
+    
+    return upward_wave, downward_wave
+
 def forecast_market_mood(close):
     # Convert the close list to a NumPy array
     close_array = np.array(close)
@@ -1092,38 +1106,39 @@ def forecast_market_mood(close):
     
     # Replace NaN values with 0
     sine_wave = np.nan_to_num(sine_wave)
-    #sine_wave = -sine_wave
     
     # Get the sine value for the last close price
     current_sine = sine_wave[-1]
     
-    # Calculate the min and max of the sine wave
-    sine_wave_min = np.min(sine_wave)
-    sine_wave_max = np.max(sine_wave)
-    
-    # Calculate percentage distances from the current sine value to min and max
-    if sine_wave_max == sine_wave_min:
-        dist_from_close_to_min = 0.0
-        dist_from_close_to_max = 0.0
-    else:
-        dist_from_close_to_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
-        dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
-    
     # Determine market mood based on the sine wave
     mood = 'bullish' if sine_wave[-1] > sine_wave[0] else 'bearish'
     
-    # Placeholder for peaks detection
-    peaks = []  # You can add logic to detect peaks if needed
+    # Find the minimum and maximum values of the sine wave
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+    
+    # Get the last reversal keypoint
+    last_reversal = sine_wave_min if mood == 'bullish' else sine_wave_max
+    
+    # Anticipate the next reversal based on the current mood
+    next_reversal = "top" if mood == 'bullish' else "dip"
+    
+    # Generate the upward and downward waves
+    upward_wave, downward_wave = generate_wave(sine_wave)
     
     # Return the results
-    return mood, peaks[-1] if peaks else None, current_sine, dist_from_close_to_min, dist_from_close_to_max
+    return mood, last_reversal, next_reversal, current_sine, upward_wave, downward_wave
 
-mood, last_peak, current_sine_value, percentage_to_min, percentage_to_max = forecast_market_mood(close)
+mood, last_peak, next_reversal, current_sine_value, upward_wave, downward_wave = forecast_market_mood(close)
 print(f"Market Mood: {mood}")
-print(f"Last Peak at Reversal: {last_peak}")
+print(f"Last Reversal at: {last_peak}")
+print(f"Next Anticipated Reversal: {next_reversal}")
 print(f"Current Sine Value: {current_sine_value}")
-print(f"Percentage to Min Pole: {percentage_to_min:.2f}%")
-print(f"Percentage to Max Pole: {percentage_to_max:.2f}%")
+
+print()
+
+print(f"Upward Wave: {upward_wave}")
+print(f"Downward Wave: {downward_wave}")
 
 print()
 
@@ -1395,13 +1410,17 @@ def main():
             ##################################################
             ##################################################
 
-            mood, last_peak, current_sine_value, percentage_to_min, percentage_to_max = forecast_market_mood(close)
+            mood, last_peak, next_reversal, current_sine_value, upward_wave, downward_wave = forecast_market_mood(close)
 
             print(f"Market Mood: {mood}")
-            print(f"Last Peak at Reversal: {last_peak}")
+            print(f"Last Reversal at: {last_peak}")
+            print(f"Next Anticipated Reversal: {next_reversal}")
             print(f"Current Sine Value: {current_sine_value}")
-            print(f"Percentage to Min Pole: {percentage_to_min:.2f}%")
-            print(f"Percentage to Max Pole: {percentage_to_max:.2f}%")
+
+            print()
+
+            print(f"Upward Wave: {upward_wave}")
+            print(f"Downward Wave: {downward_wave}")
 
             print()
 
