@@ -1435,8 +1435,8 @@ def main():
 
             print()
 
-            print(f"Upward Wave: {upward_wave}")
-            print(f"Downward Wave: {downward_wave}")
+            #print(f"Upward Wave: {upward_wave}")
+            #print(f"Downward Wave: {downward_wave}")
 
             print()
 
