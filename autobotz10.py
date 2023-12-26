@@ -1097,6 +1097,13 @@ def generate_wave(sine_wave):
     
     return upward_wave, downward_wave
 
+def find_keypoints(close):
+    # Identify the last lowest low and the last highest high relative to close[-1]
+    last_lowest_low = np.min(close[:len(close)-1])  # Exclude the last element
+    last_highest_high = np.max(close[:len(close)-1])  # Exclude the last element
+    
+    return last_lowest_low, last_highest_high
+
 def forecast_market_mood(close):
     # Convert the close list to a NumPy array
     close_array = np.array(close)
@@ -1113,12 +1120,11 @@ def forecast_market_mood(close):
     # Determine market mood based on the sine wave
     mood = 'bullish' if sine_wave[-1] > sine_wave[0] else 'bearish'
     
-    # Find the minimum and maximum values of the sine wave
-    sine_wave_min = np.min(sine_wave)
-    sine_wave_max = np.max(sine_wave)
+    # Find the last lowest low and last highest high in the close price array
+    last_lowest_low, last_highest_high = find_keypoints(close)
     
-    # Get the last reversal keypoint
-    last_reversal = sine_wave_min if mood == 'bullish' else sine_wave_max
+    # Set the reversals based on the last lowest low and highest high
+    last_reversal = last_lowest_low if mood == 'bullish' else last_highest_high
     
     # Anticipate the next reversal based on the current mood
     next_reversal = "top" if mood == 'bullish' else "dip"
@@ -1139,6 +1145,11 @@ print()
 
 print(f"Upward Wave: {upward_wave}")
 print(f"Downward Wave: {downward_wave}")
+
+print()
+
+##################################################
+##################################################
 
 print()
 
