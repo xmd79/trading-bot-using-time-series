@@ -1031,7 +1031,53 @@ print()
 ##################################################
 ##################################################
 
+def calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold):
+    """
+    Determine market mood and forecast price movement based on sine wave reversals.
+    """
+    
+    # Create a sequence of close prices centered around the thresholds to compute the sine wave
+    sequence_min = np.linspace(min_threshold - 10, min_threshold + 10, 100)  # Adjust range and number as needed
+    sequence_max = np.linspace(max_threshold - 10, max_threshold + 10, 100)  # Adjust range and number as needed
+    
+    # Compute HT_SINE for both sequences
+    ht_sine_min, _ = talib.HT_SINE(sequence_min)
+    ht_sine_max, _ = talib.HT_SINE(sequence_max)
 
+    market_mood = None
+    forecast_price = None
+
+    # Check for uptrend based on the last reversal being the min_threshold
+    if ht_sine_min[-1] < ht_sine_min[-2] and closes[-1] > min_threshold:
+        market_mood = "Uptrend"
+        forecast_price = min_threshold + (ht_sine_min[-1] - np.min(ht_sine_min[-10:]))
+    
+    # Check for downtrend based on the last reversal being the max_threshold
+    elif ht_sine_max[-1] > ht_sine_max[-2] and closes[-1] < max_threshold:
+        market_mood = "Downtrend"
+        forecast_price = max_threshold - (np.max(ht_sine_max[-10:]) - ht_sine_max[-1])
+
+    return market_mood, forecast_price
+
+min_threshold, max_threshold, avg_mtf, momentum_signal, _ = calculate_thresholds(close, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
+
+print("Momentum signal:", momentum_signal)
+print("Minimum threshold:", min_threshold)
+print("Maximum threshold:", max_threshold)
+print("Average MTF:", avg_mtf)
+
+market_mood, forecast_price = calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold)
+if market_mood:
+    print(f"Market mood: {market_mood}")
+    print(f"Forecast price: {forecast_price}")
+
+closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - closes[-1]))
+if closest_threshold == min_threshold:
+    print("The last minimum value is closest to the current close.")
+elif closest_threshold == max_threshold:
+    print("The last maximum value is closest to the current close.")
+else:
+    print("No threshold value found.")
 
 print()
 
@@ -1284,6 +1330,25 @@ def main():
             ##################################################
             ##################################################
 
+            min_threshold, max_threshold, avg_mtf, momentum_signal, _ = calculate_thresholds(close, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
+
+            print("Momentum signal:", momentum_signal)
+            print("Minimum threshold:", min_threshold)
+            print("Maximum threshold:", max_threshold)
+            print("Average MTF:", avg_mtf)
+
+            market_mood, forecast_price = calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold)
+            if market_mood:
+                print(f"Forecast price: {forecast_price}")
+
+            closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - closes[-1]))
+            if closest_threshold == min_threshold:
+                print("The last minimum value is closest to the current close.")
+            elif closest_threshold == max_threshold:
+                print("The last maximum value is closest to the current close.")
+            else:
+                print("No threshold value found.")
+
             print()
 
             ##################################################
@@ -1382,20 +1447,22 @@ def main():
                         if closest_threshold == min_threshold and price < avg_mtf:
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
                             if closest_threshold < price:  
-                                print("LONG condition 3: closest_threshold < price")                
-                                if price < fastest_target:
-                                    print("LONG condition 4: price < fastest_target") 
-                                    if forecast_direction == "Up":
-                                        print("LONG condition 5: forecast_direction == Up")                             
-                                        if future_price_regression > price:
-                                            print("LONG condition 6: future_price_regression > price")
-                                            if forecast_price_fft > price:
-                                                print("LONG condition 7: forecast_price_fft > price")
-                                                if market_mood_fft == "Bullish":
-                                                    print("LONG condition 8: market_mood_fft == Bullish")
-                                                    if momentum > 0:
-                                                        print("LONG condition 9: momentum > 0")
-                                                        trigger_long = True
+                                print("LONG condition 3: closest_threshold < price")
+                                if price < forecast_price:
+                                    print("LONG condition 4: price < forecast_price")             
+                                    if price < fastest_target:
+                                        print("LONG condition 5: price < fastest_target") 
+                                        if forecast_direction == "Up":
+                                            print("LONG condition 6: forecast_direction == Up")                             
+                                            if future_price_regression > price:
+                                                print("LONG condition 7: future_price_regression > price")
+                                                if forecast_price_fft > price:
+                                                    print("LONG condition 8: forecast_price_fft > price")
+                                                    if market_mood_fft == "Bullish":
+                                                        print("LONG condition 9: market_mood_fft == Bullish")
+                                                        if momentum > 0:
+                                                            print("LONG condition 10: momentum > 0")
+                                                            trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_min > normalized_distance_to_max and normalized_distance_to_max < 25:
@@ -1404,19 +1471,21 @@ def main():
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")  
                             if closest_threshold > price:
                                 print("SHORT condition 3: closest_threshold > price")
-                                if price > fastest_target:
-                                    print("SHORT condition 4: price > fastest_target") 
-                                    if forecast_direction == "Down":
-                                        print("SHORT condition 5: forecast_direction == Down") 
-                                        if future_price_regression < price:
-                                            print("SHORT condition 6: future_price_regression < price")
-                                            if forecast_price_fft < price:
-                                                print("SHORT condition 7: forecast_price_fft < price")
-                                                if market_mood_fft == "Bearish":
-                                                    print("SHORT condition 8: market_mood_fft == Bearish")
-                                                    if momentum < 0:
-                                                        print("SHORT condition 9: momentum < 0")
-                                                        trigger_short = True
+                                if price > forecast_price:
+                                    print("SHORT condition 4: price > forecast_price")   
+                                    if price > fastest_target:
+                                        print("SHORT condition 5: price > fastest_target") 
+                                        if forecast_direction == "Down":
+                                            print("SHORT condition 6: forecast_direction == Down") 
+                                            if future_price_regression < price:
+                                                print("SHORT condition 7: future_price_regression < price")
+                                                if forecast_price_fft < price:
+                                                    print("SHORT condition 8: forecast_price_fft < price")
+                                                    if market_mood_fft == "Bearish":
+                                                        print("SHORT condition 9: market_mood_fft == Bearish")
+                                                        if momentum < 0:
+                                                            print("SHORT condition 10: momentum < 0")
+                                                            trigger_short = True
 
                     print()
 
