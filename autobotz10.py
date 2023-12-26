@@ -1094,7 +1094,7 @@ def forecast_market_mood(close):
     - mood (str): Market mood ('bullish' or 'bearish').
     - last_forecasted_price (float): Last forecasted price at the reversal.
     - current_sine_value (float): Current value on the sine wave.
-    - time_to_reversal (str): Time remaining to the next reversal in hh:mm:ss format.
+    - time_to_reversal (str): Time remaining to the next reversal in minutes and seconds format.
     """
     
     # Step 2: Normalize Prices
@@ -1103,34 +1103,19 @@ def forecast_market_mood(close):
     normalized_prices = [((price - min_price) / (max_price - min_price)) * 2 - 1 for price in close]
     
     # Step 3: Generate Sine Wave
-    time = np.linspace(0, 30, len(normalized_prices))
+    time = np.linspace(0, 60, len(normalized_prices))
     sine_wave = np.sin(time) * normalized_prices
-    
+    sine_wave = -sine_wave
+
     # Step 4: Calculate Reversals
     diff_sine = np.diff(np.sign(np.diff(sine_wave)))
     peaks = np.where(diff_sine < 0)[0] + 1
     
     # Step 5: Forecast Market Mood
-    mood = 'bullish' if sine_wave[-1] > sine_wave[0] else 'bearish'
+    mood = 'bullish' if sine_wave[-1] < sine_wave[0] else 'bearish'
     
     # Calculate current value on the sine wave
     current_sine_value = sine_wave[-1]
-    
-    # Calculate time to the next reversal
-    time_interval = 30 / len(normalized_prices)  # Calculate the time interval per data point
-    
-    if peaks.size > 0:
-        for peak in peaks:
-            if peak > len(sine_wave) - 1:
-                break
-            if sine_wave[peak] > current_sine_value:
-                time_to_next_reversal = (peak / len(normalized_prices)) * 30  # Convert to minutes
-                break
-        else:
-            time_to_next_reversal = (30 - time[-1])  # If no future reversal is found, time remaining is till 30 mins
-        time_to_reversal = str(datetime.timedelta(minutes=time_to_next_reversal))
-    else:
-        time_to_reversal = "N/A"  # No reversal detected
     
     # Step 6: Forecast Prices
     forecasted_prices = [sine_wave[i] for i in peaks]
@@ -1138,11 +1123,11 @@ def forecast_market_mood(close):
     
     return mood, last_forecasted_price, current_sine_value, time_to_reversal
 
-mood, last_forecasted_price, current_sine_value, time_to_reversal = forecast_market_mood(close)
+mood, last_forecasted_price, current_sine_value = forecast_market_mood(close)
 print(f"Market Mood: {mood}")
 print(f"Last Forecasted Price at Reversal: {last_forecasted_price}")
 print(f"Current Sine Value: {current_sine_value}")
-print(f"Time to Next Reversal: {time_to_reversal}")
+
 
 print()
 
@@ -1414,11 +1399,10 @@ def main():
             ##################################################
             ##################################################
 
-            mood, last_forecasted_price, current_sine_value, time_to_reversal = forecast_market_mood(close)
+            mood, last_forecasted_price, current_sine_value = forecast_market_mood(close)
             print(f"Market Mood: {mood}")
             print(f"Last Forecasted Price at Reversal: {last_forecasted_price}")
             print(f"Current Sine Value: {current_sine_value}")
-            print(f"Time to Next Reversal: {time_to_reversal}")
 
             print()
 
