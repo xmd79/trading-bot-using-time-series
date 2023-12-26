@@ -1084,50 +1084,46 @@ print()
 ##################################################
 
 def forecast_market_mood(close):
-    """
-    Forecast market mood based on a list of close prices.
+    # Convert the close list to a NumPy array
+    close_array = np.array(close)
     
-    Args:
-    - close (list): List of close prices.
+    # Calculate sine wave using HT_SINE from TA-Lib
+    sine_wave, _ = talib.HT_SINE(close_array)
     
-    Returns:
-    - mood (str): Market mood ('bullish' or 'bearish').
-    - last_forecasted_price (float): Last forecasted price at the reversal.
-    - current_sine_value (float): Current value on the sine wave.
-    - time_to_reversal (str): Time remaining to the next reversal in minutes and seconds format.
-    """
-    
-    # Step 2: Normalize Prices
-    min_price = min(close)
-    max_price = max(close)
-    normalized_prices = [((price - min_price) / (max_price - min_price)) * 2 - 1 for price in close]
-    
-    # Step 3: Generate Sine Wave
-    time = np.linspace(0, 60, len(normalized_prices))
-    sine_wave = np.sin(time) * normalized_prices
+    # Replace NaN values with 0
+    sine_wave = np.nan_to_num(sine_wave)
     sine_wave = -sine_wave
-
-    # Step 4: Calculate Reversals
-    diff_sine = np.diff(np.sign(np.diff(sine_wave)))
-    peaks = np.where(diff_sine < 0)[0] + 1
     
-    # Step 5: Forecast Market Mood
+    # Get the sine value for the last close price
+    current_sine = sine_wave[-1]
+    
+    # Calculate the min and max of the sine wave
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+    
+    # Calculate percentage distances from the current sine value to min and max
+    if sine_wave_max == sine_wave_min:
+        dist_from_close_to_min = 0.0
+        dist_from_close_to_max = 0.0
+    else:
+        dist_from_close_to_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+        dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
+    
+    # Determine market mood based on the sine wave
     mood = 'bullish' if sine_wave[-1] < sine_wave[0] else 'bearish'
     
-    # Calculate current value on the sine wave
-    current_sine_value = sine_wave[-1]
+    # Placeholder for peaks detection
+    peaks = []  # You can add logic to detect peaks if needed
     
-    # Step 6: Forecast Prices
-    forecasted_prices = [sine_wave[i] for i in peaks]
-    last_forecasted_price = forecasted_prices[-1] if forecasted_prices else None
-    
-    return mood, last_forecasted_price, current_sine_value, time_to_reversal
+    # Return the results
+    return mood, peaks[-1] if peaks else None, current_sine, dist_from_close_to_min, dist_from_close_to_max
 
-mood, last_forecasted_price, current_sine_value = forecast_market_mood(close)
+mood, last_peak, current_sine_value, percentage_to_min, percentage_to_max = forecast_market_mood(close)
 print(f"Market Mood: {mood}")
-print(f"Last Forecasted Price at Reversal: {last_forecasted_price}")
+print(f"Last Peak at Reversal: {last_peak}")
 print(f"Current Sine Value: {current_sine_value}")
-
+print(f"Percentage to Min Pole: {percentage_to_min:.2f}%")
+print(f"Percentage to Max Pole: {percentage_to_max:.2f}%")
 
 print()
 
@@ -1399,10 +1395,13 @@ def main():
             ##################################################
             ##################################################
 
-            mood, last_forecasted_price, current_sine_value = forecast_market_mood(close)
+            mood, last_peak, current_sine_value, percentage_to_min, percentage_to_max = forecast_market_mood(close)
+
             print(f"Market Mood: {mood}")
-            print(f"Last Forecasted Price at Reversal: {last_forecasted_price}")
+            print(f"Last Peak at Reversal: {last_peak}")
             print(f"Current Sine Value: {current_sine_value}")
+            print(f"Percentage to Min Pole: {percentage_to_min:.2f}%")
+            print(f"Percentage to Max Pole: {percentage_to_max:.2f}%")
 
             print()
 
