@@ -1129,16 +1129,20 @@ def forecast_market_mood(close):
     # Anticipate the next reversal based on the current mood
     next_reversal = "top" if mood == 'bullish' else "dip"
     
+    # Forecast the incoming reversal price based on the mood
+    forecasted_reversal_price = last_highest_high if mood == 'bullish' else last_lowest_low
+    
     # Generate the upward and downward waves
     upward_wave, downward_wave = generate_wave(sine_wave)
     
     # Return the results
-    return mood, last_reversal, next_reversal, current_sine, upward_wave, downward_wave
+    return mood, last_reversal, next_reversal, forecasted_reversal_price, current_sine, upward_wave, downward_wave
 
-mood, last_peak, next_reversal, current_sine_value, upward_wave, downward_wave = forecast_market_mood(close)
+mood, last_peak, next_reversal, forecasted_reversal_price, current_sine_value, upward_wave, downward_wave = forecast_market_mood(close)
 print(f"Market Mood: {mood}")
 print(f"Last Reversal at: {last_peak}")
 print(f"Next Anticipated Reversal: {next_reversal}")
+print(f"Forecasted Incoming Reversal Price: {forecasted_reversal_price}")
 print(f"Current Sine Value: {current_sine_value}")
 
 print()
