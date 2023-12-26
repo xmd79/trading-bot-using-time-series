@@ -1549,9 +1549,11 @@ def main():
                                                     print("LONG condition 8: forecast_price_fft > price")
                                                     if market_mood_fft == "Bullish":
                                                         print("LONG condition 9: market_mood_fft == Bullish")
-                                                        if momentum > 0:
-                                                            print("LONG condition 10: momentum > 0")
-                                                            trigger_long = True
+                                                        if next_reversal == "top":
+                                                            print("LONG condition 10: next_reversal == top")
+                                                            if momentum > 0:
+                                                                print("LONG condition 11: momentum > 0")
+                                                                trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_min > normalized_distance_to_max and normalized_distance_to_max < 25:
@@ -1572,10 +1574,11 @@ def main():
                                                     print("SHORT condition 8: forecast_price_fft < price")
                                                     if market_mood_fft == "Bearish":
                                                         print("SHORT condition 9: market_mood_fft == Bearish")
-                                                        if momentum < 0:
-                                                            print("SHORT condition 10: momentum < 0")
-                                                            trigger_short = True
-
+                                                        if next_reversal == "dip":
+                                                            print("SHORT condition 10: next_reversal == dip")
+                                                            if momentum < 0:
+                                                                print("SHORT condition 11: momentum < 0")
+                                                                trigger_long = True
                     print()
 
                     #message = f'Price: ${price}' 
