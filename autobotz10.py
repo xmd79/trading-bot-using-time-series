@@ -1425,11 +1425,12 @@ def main():
             ##################################################
             ##################################################
 
-            mood, last_peak, next_reversal, current_sine_value, upward_wave, downward_wave = forecast_market_mood(close)
+            mood, last_peak, next_reversal, forecasted_reversal_price, current_sine_value, upward_wave, downward_wave = forecast_market_mood(close)
 
             print(f"Market Mood: {mood}")
             print(f"Last Reversal at: {last_peak}")
             print(f"Next Anticipated Reversal: {next_reversal}")
+            print(f"Forecasted Incoming Reversal Price: {forecasted_reversal_price}")
             print(f"Current Sine Value: {current_sine_value}")
 
             print()
