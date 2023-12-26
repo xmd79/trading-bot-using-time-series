@@ -1092,7 +1092,7 @@ def forecast_market_mood(close):
     
     # Replace NaN values with 0
     sine_wave = np.nan_to_num(sine_wave)
-    sine_wave = -sine_wave
+    #sine_wave = -sine_wave
     
     # Get the sine value for the last close price
     current_sine = sine_wave[-1]
@@ -1110,7 +1110,7 @@ def forecast_market_mood(close):
         dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
     
     # Determine market mood based on the sine wave
-    mood = 'bullish' if sine_wave[-1] < sine_wave[0] else 'bearish'
+    mood = 'bullish' if sine_wave[-1] > sine_wave[0] else 'bearish'
     
     # Placeholder for peaks detection
     peaks = []  # You can add logic to detect peaks if needed
