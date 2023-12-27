@@ -1110,7 +1110,7 @@ def forecast_market_mood(close):
     
     # Calculate sine wave using HT_SINE from TA-Lib
     sine_wave, _ = talib.HT_SINE(close_array)
-    #sine_wave = -sine_wave
+    sine_wave = -sine_wave
  
     # Replace NaN values with 0
     sine_wave = np.nan_to_num(sine_wave)
