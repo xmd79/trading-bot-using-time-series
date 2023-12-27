@@ -1562,19 +1562,19 @@ def main():
                             if closest_threshold > price:
                                 print("SHORT condition 3: closest_threshold > price")   
                                 if price > fastest_target:
-                                    print("SHORT condition 5: price > fastest_target") 
+                                    print("SHORT condition 4: price > fastest_target") 
                                     if forecast_direction == "Down":
-                                        print("SHORT condition 6: forecast_direction == Down") 
+                                        print("SHORT condition 5: forecast_direction == Down") 
                                         if future_price_regression < price:
-                                            print("SHORT condition 7: future_price_regression < price")
+                                            print("SHORT condition 6: future_price_regression < price")
                                             if forecast_price_fft < price:
-                                                print("SHORT condition 8: forecast_price_fft < price")
+                                                print("SHORT condition 7: forecast_price_fft < price")
                                                 if market_mood_fft == "Bearish":
-                                                    print("SHORT condition 9: market_mood_fft == Bearish")
+                                                    print("SHORT condition 8: market_mood_fft == Bearish")
                                                     if next_reversal == "dip":
-                                                        print("SHORT condition 10: next_reversal == dip")
+                                                        print("SHORT condition 9: next_reversal == dip")
                                                         if momentum < 0:
-                                                            print("SHORT condition 11: momentum < 0")
+                                                            print("SHORT condition 10: momentum < 0")
                                                             trigger_long = True
                     print()
 
