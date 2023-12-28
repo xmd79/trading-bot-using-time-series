@@ -1170,24 +1170,24 @@ def identify_dominant_frequencies(close_prices):
     # Get the frequencies corresponding to the peaks
     dominant_freqs = freqs[peaks]
     
-    return dominant_freqs
-
-def determine_market_mood(dominant_freqs):
-    # Determine if mostly negative or positive frequencies
-    negative_count = sum(1 for freq in dominant_freqs if freq < 0)
-    positive_count = sum(1 for freq in dominant_freqs if freq > 0)
+    # Sort frequencies based on their significance (absolute value)
+    sorted_indices = np.argsort(np.abs(fft_result[peaks]))[::-1]  # Descending order
+    most_significant_freqs = dominant_freqs[sorted_indices[:25]]  # Take the top 25 significant frequencies
     
-    if negative_count > positive_count:
-        return "Bullish"
-    else:
-        return "Bearish"
+    # Extract the last 5 dominant frequencies
+    last_5_dominant_freqs = most_significant_freqs[-5:]
+    
+    return last_5_dominant_freqs
 
 def forecast_price_based_on_phi(current_price, close_prices):
     # Identify dominant frequencies from the close prices
     dominant_freqs = identify_dominant_frequencies(close_prices)
     
-    # Determine market mood
-    market_mood = determine_market_mood(dominant_freqs)
+    # Determine market mood based on dominant frequencies
+    if np.any(dominant_freqs < 0):  # If any of the dominant frequencies are negative, then bullish
+        market_mood = "Bullish"
+    else:
+        market_mood = "Bearish"
     
     # Define Phi and related constants
     phi = (1 + np.sqrt(5)) / 2
@@ -1223,7 +1223,7 @@ def forecast_price_based_on_phi(current_price, close_prices):
 # Convert close list to a numpy array
 close_prices = np.array(close)
 
-# Current price (extracted from your previous result)
+# Current price
 current_price = price
 
 # Use the function to forecast
@@ -1232,6 +1232,7 @@ forecast_result = forecast_price_based_on_phi(current_price, close_prices)
 print(f"Forecasted Future Price: {forecast_result['Forecasted Future Price']:.2f}")
 print(f"Phi Levels: {forecast_result['Phi Levels']}")
 print(f"Market Mood: {forecast_result['Market Mood']}")
+
 
 print()
 
