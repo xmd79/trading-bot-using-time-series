@@ -1156,6 +1156,83 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+from scipy.signal import find_peaks
+
+def identify_dominant_frequencies(close_prices):
+    # Compute FFT
+    fft_result = np.fft.fft(close_prices)
+    freqs = np.fft.fftfreq(len(close_prices))
+    
+    # Find peaks in the absolute value of the FFT result
+    peaks, _ = find_peaks(np.abs(fft_result))
+    
+    # Get the frequencies corresponding to the peaks
+    dominant_freqs = freqs[peaks]
+    
+    return dominant_freqs
+
+def determine_market_mood(dominant_freqs):
+    # Determine if mostly negative or positive frequencies
+    negative_count = sum(1 for freq in dominant_freqs if freq < 0)
+    positive_count = sum(1 for freq in dominant_freqs if freq > 0)
+    
+    if negative_count > positive_count:
+        return "Bullish"
+    else:
+        return "Bearish"
+
+def forecast_price_based_on_phi(current_price, close_prices):
+    # Identify dominant frequencies from the close prices
+    dominant_freqs = identify_dominant_frequencies(close_prices)
+    
+    # Determine market mood
+    market_mood = determine_market_mood(dominant_freqs)
+    
+    # Define Phi and related constants
+    phi = (1 + np.sqrt(5)) / 2
+    
+    # Calculate phi-based levels
+    phi_levels = []
+    for freq in dominant_freqs:
+        if isinstance(freq, (float, int)):
+            phi_levels.extend([
+                current_price * phi ** freq,
+                current_price / (phi ** freq),
+                current_price * phi ** (-freq),
+                current_price / (phi ** (-freq)),
+                current_price * np.exp(phi * freq),
+                current_price / np.exp(phi * freq)
+            ])
+    
+    # Use Fibonacci scaling between min and max levels
+    fibo_min = min(phi_levels)
+    fibo_max = max(phi_levels)
+    
+    # Predict very fast changes by considering time factor (e.g., 1-hour or 1-day ahead)
+    time_factor = 1.01  # Increase in price over 1 unit time (can be adjusted)
+    
+    future_price = current_price * time_factor  # Adjust based on the dominant trend
+    
+    return {
+        "Phi Levels": [fibo_min, fibo_max],
+        "Forecasted Future Price": future_price,
+        "Market Mood": market_mood
+    }
+
+# Convert close list to a numpy array
+close_prices = np.array(close)
+
+# Current price (extracted from your previous result)
+current_price = price
+
+# Use the function to forecast
+forecast_result = forecast_price_based_on_phi(current_price, close_prices)
+
+print(f"Forecasted Future Price: {forecast_result['Forecasted Future Price']:.2f}")
+print(f"Phi Levels: {forecast_result['Phi Levels']}")
+print(f"Market Mood: {forecast_result['Market Mood']}")
+
 print()
 
 ##################################################
@@ -1444,6 +1521,24 @@ def main():
             ##################################################
             ##################################################
 
+            # Convert close list to a numpy array
+            close_prices = np.array(close)
+
+            # Current price (extracted from your previous result)
+            current_price = price
+
+            # Use the function to forecast
+            forecast_result = forecast_price_based_on_phi(current_price, close_prices)
+
+            print(f"Forecasted Future Price: {forecast_result['Forecasted Future Price']:.2f}")
+            print(f"Phi Levels: {forecast_result['Phi Levels']}")
+            print(f"Market Mood: {forecast_result['Market Mood']}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             # Initialize variables
             trigger_long = False 
             trigger_short = False
@@ -1632,6 +1727,7 @@ def main():
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
         del market_mood, forecast_price, closest_threshold, mood, last_peak, forecasted_reversal_price, current_sine_value, upward_wave, downward_wave
+        del close_prices, current_price, forecast_result
 
         # Force garbage collection to free up memory
         gc.collect()
