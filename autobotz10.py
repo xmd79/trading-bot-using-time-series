@@ -1119,7 +1119,7 @@ def forecast_market_mood(close):
     current_sine = sine_wave[-1]
     
     # Determine market mood based on the sine wave
-    mood = 'bullish' if sine_wave[-1] < sine_wave[0] else 'bearish'
+    mood = 'bullish' if sine_wave[-1] > sine_wave[0] else 'bearish'
     
     # Find the last lowest low and last highest high in the close price array
     last_lowest_low, last_highest_high = find_keypoints(close)
