@@ -1377,8 +1377,8 @@ def main():
                                                             if timeframe == '1m' and dist_from_close_to_max < dist_from_close_to_min:
                                                                 if timeframe == '3m' and dist_from_close_to_max < dist_from_close_to_min:
                                                                     if timeframe == '5m' and dist_from_close_to_max < dist_from_close_to_min:
-                                                                        print("SHORT condition 10: mtf mood is bullish")
-                                                                        trigger_long = True
+                                                                        print("SHORT condition 10: mtf mood is bearish")
+                                                                        trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
