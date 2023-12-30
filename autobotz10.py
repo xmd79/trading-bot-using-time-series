@@ -276,7 +276,7 @@ def dominant_frequencies(range_frequencies):
     return range_frequencies[-3:]
 
 # Filter timeframes
-timeframes = ['1m', '5m']
+timeframes = ['1m']
 
 # Call function and print signals
 for timeframe in timeframes:
@@ -1352,11 +1352,9 @@ def main():
                                             if forecast_price_fft > price:
                                                 print("LONG condition 7: forecast_price_fft > price")
                                                 if market_mood_fft == "Bullish":
-                                                    print("LONG condition 8: market_mood_fft == Bullish")
-                                                    if dominant[-1] > 0:
-                                                        print("LONG condition 9: dominant[-1] > 0")                                          
+                                                    print("LONG condition 8: market_mood_fft == Bullish")                                       
                                                     if momentum > 0:
-                                                        print("LONG condition 10: momentum > 0")
+                                                        print("LONG condition 9: momentum > 0")
                                                         trigger_long = True
 
                     # Downtrend cycle trigger conditions
@@ -1376,11 +1374,9 @@ def main():
                                                 print("SHORT condition 7: forecast_price_fft < price")
                                                 if market_mood_fft == "Bearish":
                                                     print("SHORT condition 8: market_mood_fft == Bearish")
-                                                    if dominant[-1] < 0:
-                                                        print("LONG condition 9: dominant[-1] < 0") 
-                                                        if momentum < 0:
-                                                            print("SHORT condition 10: momentum < 0")
-                                                            trigger_long = True
+                                                    if momentum < 0:
+                                                        print("SHORT condition 9: momentum < 0")
+                                                        trigger_long = True
                     print()
 
                     #message = f'Price: ${price}' 
