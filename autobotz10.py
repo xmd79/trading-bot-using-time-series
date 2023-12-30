@@ -287,7 +287,7 @@ for timeframe in timeframes:
     range_frequencies = np.argsort(spectrum)[-25:]
     dominant = dominant_frequencies(range_frequencies)
     
-    if dominant[-1] < 0:
+    if dominant[-1] > 0:
         print("Last dominant frequency is negative: Bullish")
     else:
         print("Last dominant frequency is positive: Bearish")
@@ -1231,7 +1231,7 @@ def main():
                 range_frequencies = np.argsort(spectrum)[-25:]
                 dominant = dominant_frequencies(range_frequencies)
     
-                if dominant[-1] < 0:
+                if dominant[-1] > 0:
                     print("Last dominant frequency is negative: Bullish")
                 else:
                     print("Last dominant frequency is positive: Bearish")
@@ -1353,8 +1353,8 @@ def main():
                                                 print("LONG condition 7: forecast_price_fft > price")
                                                 if market_mood_fft == "Bullish":
                                                     print("LONG condition 8: market_mood_fft == Bullish")
-                                                    if dominant[-1] < 0:
-                                                        print("LONG condition 9: dominant[-1] < 0")                                          
+                                                    if dominant[-1] > 0:
+                                                        print("LONG condition 9: dominant[-1] > 0")                                          
                                                     if momentum > 0:
                                                         print("LONG condition 10: momentum > 0")
                                                         trigger_long = True
@@ -1376,8 +1376,8 @@ def main():
                                                 print("SHORT condition 7: forecast_price_fft < price")
                                                 if market_mood_fft == "Bearish":
                                                     print("SHORT condition 8: market_mood_fft == Bearish")
-                                                    if dominant[-1] > 0:
-                                                        print("LONG condition 9: dominant[-1] > 0") 
+                                                    if dominant[-1] < 0:
+                                                        print("LONG condition 9: dominant[-1] < 0") 
                                                         if momentum < 0:
                                                             print("SHORT condition 10: momentum < 0")
                                                             trigger_long = True
