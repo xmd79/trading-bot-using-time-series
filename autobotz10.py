@@ -248,52 +248,52 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-import talib
-import scipy.fftpack as fftpack
-
+# Scale current close price to sine wave       
 def scale_to_sine(timeframe):  
+  
     close_prices = np.array(get_close(timeframe))
-    sine_wave, _ = talib.HT_SINE(close_prices)
+  
+    # Get last close price 
+    current_close = close_prices[-1]      
+        
+    # Calculate sine wave        
+    sine_wave, leadsine = talib.HT_SINE(close_prices)
+            
+    # Replace NaN values with 0        
     sine_wave = np.nan_to_num(sine_wave)
     sine_wave = -sine_wave
-    current_sine = sine_wave
-    sine_wave_min = np.min(sine_wave)
+        
+    # Get the sine value for last close      
+    current_sine = sine_wave[-1]
+            
+    # Calculate the min and max sine           
+    sine_wave_min = np.min(sine_wave)        
     sine_wave_max = np.max(sine_wave)
 
-    return current_sine
+    # Calculate % distances            
+    dist_min, dist_max = [], []
+ 
+    for close in close_prices:    
+        # Calculate distances as percentages        
+        dist_from_close_to_min = ((current_sine - sine_wave_min) /  
+                           (sine_wave_max - sine_wave_min)) * 100            
+        dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                           (sine_wave_max - sine_wave_min)) * 100
+                
+        dist_min.append(dist_from_close_to_min)       
+        dist_max.append(dist_from_close_to_max)
 
-def get_spectrum_frequencies(sine_wave):
-    # Ensure that the input is 1D for FFT
-    if sine_wave.ndim > 1:
-        sine_wave = sine_wave.flatten()
-    # Calculate the FFT of the sine wave
-    spectrum = fftpack.fft(sine_wave)
-    frequencies = fftpack.fftfreq(len(spectrum))
-    return frequencies, np.abs(spectrum)
-
-def dominant_frequencies(range_frequencies):
-    return range_frequencies[-3:]
-
-# Filter timeframes
-timeframes = ['1m']
-
-# Call function and print signals
+    return dist_from_close_to_min, dist_from_close_to_max, current_sine
+      
+# Iterate over each timeframe and call the scale_to_sine function
 for timeframe in timeframes:
-    current_sine = scale_to_sine(timeframe)
+    dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
     
-    # Calculate and print spectrum frequencies and dominant frequencies
-    frequencies, spectrum = get_spectrum_frequencies(np.array(current_sine))
-    range_frequencies = np.argsort(spectrum)[-25:]
-    dominant = dominant_frequencies(range_frequencies)
-    
-    if dominant[-1] > 0:
-        print("Last dominant frequency is negative: Bullish")
-    else:
-        print("Last dominant frequency is positive: Bearish")
-    
-    print(f"Last 3 dominant frequencies: {dominant}")
-    print()
+    # Print the results for each timeframe
+    print(f"For {timeframe} timeframe:")
+    print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+    print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+    print(f"Current Sine value: {current_sine}\n")
 
 print()
 
@@ -1219,24 +1219,16 @@ def main():
             ##################################################
             ##################################################
 
-            # Filter timeframes
-            timeframes = ['1m']
-
-            # Call function and print signals
+            # Iterate over each timeframe and call the scale_to_sine function
             for timeframe in timeframes:
-                current_sine = scale_to_sine(timeframe)
+                dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
     
-                # Calculate and print spectrum frequencies and dominant frequencies
-                frequencies, spectrum = get_spectrum_frequencies(np.array(current_sine))
-                range_frequencies = np.argsort(spectrum)[-25:]
-                dominant = dominant_frequencies(range_frequencies)
-    
-                if dominant[-1] > 0:
-                    print("Last dominant frequency is negative: Bullish")
-                else:
-                    print("Last dominant frequency is positive: Bearish")
-    
-                print(f"Last 3 dominant frequencies: {dominant}")
+                # Print the results for each timeframe
+                print(f"For {timeframe} timeframe:")
+                print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+                print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+                print(f"Current Sine value: {current_sine}\n")
+
                 print()
 
             print()
@@ -1355,7 +1347,12 @@ def main():
                                                     print("LONG condition 8: market_mood_fft == Bullish")                                       
                                                     if momentum > 0:
                                                         print("LONG condition 9: momentum > 0")
-                                                        trigger_long = True
+                                                        for timeframe in timeframes:
+                                                            if timeframe = '1m' and dist_from_close_to_min < dist_from_close_to_max:
+                                                                if timeframe = '3m' and dist_from_close_to_min < dist_from_close_to_max:
+                                                                    if timeframe = '5m' and dist_from_close_to_min < dist_from_close_to_max:
+                                                                        print("LONG condition 10: mtf mood is bullish")
+                                                                        trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < 35:
@@ -1376,7 +1373,12 @@ def main():
                                                     print("SHORT condition 8: market_mood_fft == Bearish")
                                                     if momentum < 0:
                                                         print("SHORT condition 9: momentum < 0")
-                                                        trigger_long = True
+                                                        for timeframe in timeframes:
+                                                            if timeframe = '1m' and dist_from_close_to_max < dist_from_close_to_min:
+                                                                if timeframe = '3m' and dist_from_close_to_max < dist_from_close_to_min:
+                                                                    if timeframe = '5m' and dist_from_close_to_max < dist_from_close_to_min:
+                                                                        print("SHORT condition 10: mtf mood is bullish")
+                                                                        trigger_long = True
                     print()
 
                     #message = f'Price: ${price}' 
