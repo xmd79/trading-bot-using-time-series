@@ -948,6 +948,33 @@ print()
 ##################################################
 ##################################################
 
+# Calculate the 45-degree angle (simple linear regression)
+x = np.arange(len(close))
+slope, intercept = np.polyfit(x, close, 1)
+
+# Calculate the expected trend line value for the last close price
+expected_price = slope * len(close) + intercept
+
+# Display the expected price on the 45-degree angle trend
+print(f"Expected price on the 45-degree angle trend: {expected_price}")
+
+# Get the last close price from the list for forecasting
+last_close_price = price
+
+# Define a function to forecast based on the 45-degree angle
+def forecast_45_degree_angle(close_price, expected_price):
+    if close_price < expected_price:
+        return "Bullish Market Mood: Close below 45-degree angle moving towards it."
+    elif close_price > expected_price:
+        return "Bearish Market Mood: Close above 45-degree angle moving towards it."
+    else:
+        return "Neutral: Close at the 45-degree angle."
+
+# Generate forecast based on the 45-degree angle
+forecast_result = forecast_45_degree_angle(last_close_price, expected_price)
+
+# Display the forecast result
+print(forecast_result)
 
 print()
 
@@ -1236,6 +1263,25 @@ def main():
             ##################################################
             ##################################################
 
+            # Calculate the 45-degree angle (simple linear regression)
+            x = np.arange(len(close))
+            slope, intercept = np.polyfit(x, close, 1)
+
+            # Calculate the expected trend line value for the last close price
+            expected_price = slope * len(close) + intercept
+
+            # Display the expected price on the 45-degree angle trend
+            print(f"Expected price on the 45-degree angle trend: {expected_price}")
+
+            # Get the last close price from the list for forecasting
+            last_close_price = price
+
+            # Generate forecast based on the 45-degree angle
+            forecast_result = forecast_45_degree_angle(last_close_price, expected_price)
+
+            # Display the forecast result
+            print(forecast_result)
+
             print()
 
             ##################################################
@@ -1343,16 +1389,13 @@ def main():
                                             print("LONG condition 6: future_price_regression > price")
                                             if forecast_price_fft > price:
                                                 print("LONG condition 7: forecast_price_fft > price")
-                                                if market_mood_fft == "Bullish":
-                                                    print("LONG condition 8: market_mood_fft == Bullish")                                       
-                                                    if momentum > 0:
-                                                        print("LONG condition 9: momentum > 0")
-                                                        for timeframe in timeframes:
-                                                            if timeframe == '1m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                                if timeframe == '3m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                                    if timeframe == '5m' and dist_from_close_to_min < dist_from_close_to_max:
-                                                                        print("LONG condition 10: mtf mood is bullish")
-                                                                        trigger_long = True
+                                                if price < expected_price:
+                                                    print("LONG condition 8: price < expected_price") 
+                                                    if market_mood_fft == "Bullish":
+                                                        print("LONG condition 9: market_mood_fft == Bullish")                                       
+                                                        if momentum > 0:
+                                                            print("LONG condition 10: momentum > 0")
+                                                            trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < 35:
@@ -1369,16 +1412,13 @@ def main():
                                             print("SHORT condition 6: future_price_regression < price")
                                             if forecast_price_fft < price:
                                                 print("SHORT condition 7: forecast_price_fft < price")
+                                                if price > expected_price:
+                                                    print("SHORT condition 8: price > expected_price") 
                                                 if market_mood_fft == "Bearish":
-                                                    print("SHORT condition 8: market_mood_fft == Bearish")
+                                                    print("SHORT condition 9: market_mood_fft == Bearish")
                                                     if momentum < 0:
-                                                        print("SHORT condition 9: momentum < 0")
-                                                        for timeframe in timeframes:
-                                                            if timeframe == '1m' and dist_from_close_to_max < dist_from_close_to_min:
-                                                                if timeframe == '3m' and dist_from_close_to_max < dist_from_close_to_min:
-                                                                    if timeframe == '5m' and dist_from_close_to_max < dist_from_close_to_min:
-                                                                        print("SHORT condition 10: mtf mood is bearish")
-                                                                        trigger_short = True
+                                                        print("SHORT condition 10: momentum < 0")
+                                                        trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
