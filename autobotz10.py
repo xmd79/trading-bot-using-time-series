@@ -1247,18 +1247,18 @@ def main():
             ##################################################
 
             # Iterate over each timeframe and call the scale_to_sine function
-            for timeframe in timeframes:
-                dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
+            #for timeframe in timeframes:
+                #dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
     
                 # Print the results for each timeframe
-                print(f"For {timeframe} timeframe:")
-                print(f"Distance to min: {dist_from_close_to_min:.2f}%")
-                print(f"Distance to max: {dist_from_close_to_max:.2f}%")
-                print(f"Current Sine value: {current_sine}\n")
+                #print(f"For {timeframe} timeframe:")
+                #print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+                #print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+                #print(f"Current Sine value: {current_sine}\n")
 
-                print()
+                #print()
 
-            print()
+            #print()
 
             ##################################################
             ##################################################
