@@ -982,53 +982,119 @@ print()
 ##################################################
 ##################################################
 
-def format_price(value):
-    """Format the price value as xxxx.xx."""
-    return "{:.2f}".format(value).replace('.', '')
+print()
 
-def fourier_analysis(close):
-    # Compute the Fourier transform of the close prices array
-    fourier_transform = np.fft.fft(close)
+##################################################
+##################################################
+
+import numpy as np
+import talib  # Assuming you have the TA-Lib library installed and imported
+
+# Time Series Decomposition
+def decompose_time_series(close):
+    padding = len(close) - len(np.convolve(close, np.ones(10)/10, mode='valid'))
+    trend = np.convolve(close, np.ones(10)/10, mode='valid')
+    trend = np.pad(trend, (padding, 0), mode='constant', constant_values=(trend[0], trend[-1]))
+
+    seasonal = close - trend
+    residual = close - (trend + seasonal)
+    return trend, seasonal, residual
+
+# Fast Fourier Transform (FFT)
+def apply_fft(close):
+    fft_values = np.fft.fft(close)
+    frequencies = np.fft.fftfreq(len(fft_values))
+    dominant_idx = np.argmax(np.abs(fft_values[:25]))
+    dominant_frequency = frequencies[dominant_idx]
+    return dominant_frequency
+
+# Identify Reversals
+def identify_reversals(close):
+    trend, seasonal, residual = decompose_time_series(close)
+    trend_direction = "up" if trend[-1] < trend[-2] else "down"
+    dominant_frequency = apply_fft(close)
     
-    # Compute the frequencies corresponding to the Fourier transform
-    freqs = np.fft.fftfreq(len(close))
-    
-    # Find the index of the maximum value in the Fourier transform
-    dominant_index = np.argmax(np.abs(fourier_transform))
-    dominant_freq = freqs[dominant_index]
-    
-    # Determine market mood based on dominant frequency
-    if dominant_freq > 0:
-        market_mood = "Bullish"
-    elif dominant_freq < 0:
-        market_mood = "Bearish"
+    if dominant_frequency < 0:
+        market_mood = "Negative"
     else:
-        market_mood = "Neutral"
+        market_mood = "Positive"
+        
+    forecasted_price = 4264490  # Placeholder value
+    print(f"Forecasted Price: {forecasted_price // 100}.{forecasted_price % 100:02}")
     
-    # Current price value
-    current_price = close[-1]
-    
-    # Forecast price value
-    forecast_value = np.abs(fourier_transform[dominant_index])
-    
-    # Determine keypoint of compound stationary wave
-    if forecast_value > np.mean(np.abs(fourier_transform)):
-        if forecast_value > current_price:
-            keypoint = f"Incoming Reversal: Top at Price: {format_price(forecast_value)}"
-        else:
-            keypoint = f"Incoming Reversal: Dip at Price: {format_price(forecast_value)}"
+    return forecasted_price
+
+# Toroidal Group Symmetry Analysis
+def toroidal_group_symmetry_analysis(close):
+    fft_values = np.fft.fft(close)
+    frequencies = np.fft.fftfreq(len(fft_values))
+
+    # Get the indices of the 25 dominant frequencies
+    dominant_indices = np.argsort(np.abs(fft_values))[-25:]
+
+    # Get the last 5 dominant frequencies
+    last_five_dominant_frequencies = frequencies[dominant_indices][-5:]
+
+    # Count how many of the last 5 dominant frequencies are negative or positive
+    negative_count = np.sum(last_five_dominant_frequencies < 0)
+    positive_count = np.sum(last_five_dominant_frequencies > 0)
+
+    if negative_count > positive_count:
+        trend_behavior = "up"
+    elif positive_count > negative_count:
+        trend_behavior = "down"
     else:
-        keypoint = "Stable"
+        trend_behavior = "neutral"
+
+    if abs(np.mean(last_five_dominant_frequencies)) < 0.5:
+        print("The sinewave stationary circuit is stable based on toroidal group symmetry.")
+    else:
+        print("The sinewave stationary circuit might be unstable based on toroidal group symmetry.")
     
-    # Print results
-    print(f"Dominant Frequency: {format_price(dominant_freq)}")
-    print(f"Market Mood: {market_mood}")
-    print(f"Price: {format_price(current_price)}")
-    print(keypoint)
+    if trend_behavior == "up":
+        print("Designing a filter to pass only the fundamental frequency (based on toroidal group symmetry).")
+        print("Designing a circuit to generate square waves (based on toroidal group symmetry).")
+    elif trend_behavior == "down":
+        print("Designing a filter to block higher harmonics (based on toroidal group symmetry).")
+        print("Designing a circuit to generate sawtooth waves (based on toroidal group symmetry).")
+    else:
+        print("Neutral: No definitive trend behavior based on the last 5 dominant frequencies yet.")
 
+# Scale current close price to sine wave
+def scale_to_sine(timeframe):
+    close_prices = np.random.rand(1001)  # Replace with your actual close prices array
+    current_close = close_prices[-1]
+        
+    sine_wave, _ = talib.HT_SINE(close_prices)
+    sine_wave = np.nan_to_num(sine_wave)
+    sine_wave = -sine_wave
+    current_sine = sine_wave[-1]
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
 
-fourier_analysis(close)
+    dist_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+    dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
 
+    print(f"For {timeframe} timeframe:")
+    print(f"Distance to min: {dist_min:.2f}%")
+    print(f"Distance to max: {dist_max:.2f}%")
+    print(f"Current Sine value: {current_sine}\n")
+
+    return dist_min, dist_max  # Return these values
+
+forecasted_price = identify_reversals(close)
+toroidal_group_symmetry_analysis(close)
+
+print()
+
+for timeframe in timeframes:
+    dist_min, dist_max = scale_to_sine(timeframe)
+    if dist_min < dist_max:
+        print(f"For {timeframe} timeframe: Up")
+    else:
+        print(f"For {timeframe} timeframe: Down")
+
+    print()
 
 print()
 
@@ -1356,6 +1422,22 @@ def main():
             ##################################################
             ##################################################
 
+            forecasted_price = identify_reversals(close)
+            toroidal_group_symmetry_analysis(close)
+
+            print()
+
+            for timeframe in timeframes:
+                dist_min, dist_max = scale_to_sine(timeframe)
+                if dist_min < dist_max:
+                    print(f"For {timeframe} timeframe: Up")
+                else:
+                    print(f"For {timeframe} timeframe: Down")
+
+                print()
+
+            print()
+
             ##################################################
             ##################################################
 
@@ -1532,6 +1614,7 @@ def main():
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
+        del dist_min, dist_max
 
         # Force garbage collection to free up memory
         gc.collect()
