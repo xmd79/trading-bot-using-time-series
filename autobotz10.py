@@ -981,6 +981,59 @@ print()
 ##################################################
 ##################################################
 
+def format_price(value):
+    """Format the price value as xxxx.xx."""
+    return "{:.2f}".format(value).replace('.', '')
+
+def fourier_analysis(close):
+    # Compute the Fourier transform of the close prices array
+    fourier_transform = np.fft.fft(close)
+    
+    # Compute the frequencies corresponding to the Fourier transform
+    freqs = np.fft.fftfreq(len(close))
+    
+    # Find the index of the maximum value in the Fourier transform
+    dominant_index = np.argmax(np.abs(fourier_transform))
+    dominant_freq = freqs[dominant_index]
+    
+    # Determine market mood based on dominant frequency
+    if dominant_freq > 0:
+        market_mood = "Bullish"
+    elif dominant_freq < 0:
+        market_mood = "Bearish"
+    else:
+        market_mood = "Neutral"
+    
+    # Current price value
+    current_price = close[-1]
+    
+    # Forecast price value
+    forecast_value = np.abs(fourier_transform[dominant_index])
+    
+    # Determine keypoint of compound stationary wave
+    if forecast_value > np.mean(np.abs(fourier_transform)):
+        if forecast_value > current_price:
+            keypoint = f"Incoming Reversal: Top at Price: {format_price(forecast_value)}"
+        else:
+            keypoint = f"Incoming Reversal: Dip at Price: {format_price(forecast_value)}"
+    else:
+        keypoint = "Stable"
+    
+    # Print results
+    print(f"Dominant Frequency: {format_price(dominant_freq)}")
+    print(f"Market Mood: {market_mood}")
+    print(f"Price: {format_price(current_price)}")
+    print(keypoint)
+
+
+fourier_analysis(close)
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -1375,8 +1428,8 @@ def main():
                     print()
 
                     # Uptrend cycle trigger conditions 
-                    if normalized_distance_to_min < 35:
-                        print("LONG condition 1: normalized_distance_to_min < 35")                
+                    if normalized_distance_to_min < normalized_distance_to_max:
+                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")                
                         if closest_threshold == min_threshold and price < avg_mtf:
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
                             if closest_threshold < price:  
@@ -1398,8 +1451,8 @@ def main():
                                                             trigger_long = True
 
                     # Downtrend cycle trigger conditions
-                    if normalized_distance_to_max < 35:
-                        print("SHORT condition 1: normalized_distance_to_max < 35") 
+                    if normalized_distance_to_max < normalized_distance_to_min:
+                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min") 
                         if closest_threshold == max_threshold and price > avg_mtf:
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")  
                             if closest_threshold > price:
