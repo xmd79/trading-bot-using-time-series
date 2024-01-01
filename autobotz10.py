@@ -1101,6 +1101,102 @@ print()
 ##################################################
 ##################################################
 
+def calculate_value_area(close):
+    """
+    Calculate the Value Area based on the lows and highs of the closing prices.
+
+    Args:
+    - close (list): List of closing prices for a given trading session.
+
+    Returns:
+    - value_area_low (float): Lower boundary of the Value Area.
+    - value_area_high (float): Upper boundary of the Value Area.
+    """
+    
+    # Calculate the Point of Control (POC) - the price with the highest trading volume.
+    poc = max(set(close), key=close.count)
+    
+    # Calculate the Value Area boundaries based on 70% of the total prices
+    threshold = 0.7 * len(close)
+    
+    # Count occurrences of each price
+    price_counts = {price: close.count(price) for price in set(close)}
+    
+    cumulative_count = 0
+    value_area_low = None
+    value_area_high = None
+    
+    # Calculate Value Area Low
+    for price, count in sorted(price_counts.items()):
+        cumulative_count += count
+        if cumulative_count >= threshold:
+            value_area_low = price
+            break
+
+    cumulative_count = 0  # Reset cumulative count for the upper boundary
+    
+    # Calculate Value Area High
+    for price, count in sorted(price_counts.items(), reverse=True):
+        cumulative_count += count
+        if cumulative_count >= threshold:
+            value_area_high = price
+            break
+    
+    return value_area_low, value_area_high
+
+
+def analyze_market_profile(close):
+    """
+    Analyze the Market Profile to determine Value Area, Support, Resistance, Market Mood, and Forecast Price.
+
+    Args:
+    - close (list): List of closing prices for a given trading session.
+
+    Returns:
+    - value_area_low (float): Lower boundary of the Value Area.
+    - value_area_high (float): Upper boundary of the Value Area.
+    - support (float): Current support level.
+    - resistance (float): Current resistance level.
+    - market_mood (str): Market mood based on current price position relative to the Value Area.
+    - forecast_price (float): Forecasted price based on Value Area.
+    """
+    
+    # Calculate Value Area boundaries
+    value_area_low, value_area_high = calculate_value_area(close)
+    
+    # Calculate Support and Resistance levels
+    support = min(close)
+    resistance = max(close)
+    
+    # Determine Market Mood
+    current_price = close[-1]
+    if current_price > value_area_low:
+        market_mood = "Bearish"
+    elif current_price < value_area_high:
+        market_mood = "Bullish"
+    else:
+        market_mood = "Neutral"
+    
+    # Forecast Price based on Value Area
+    forecast_price = (value_area_high + value_area_low) / 2  # Midpoint of Value Area
+    
+    return value_area_low, value_area_high, support, resistance, market_mood, forecast_price
+
+
+val_low, val_high, sup, res, mood, forecast = analyze_market_profile(close)
+
+print(f"Value Area Low: {val_low}, Value Area High: {val_high}")
+print(f"Current Support: {sup}, Current Resistance: {res}")
+print(f"Market Mood: {mood}")
+print(f"Forecasted Price: {forecast}")
+
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -1407,6 +1503,18 @@ def main():
             ##################################################
             ##################################################
 
+            val_low, val_high, sup, res, mood, forecast = analyze_market_profile(close)
+
+            print(f"Value Area Low: {val_low}, Value Area High: {val_high}")
+            print(f"Current Support: {sup}, Current Resistance: {res}")
+            print(f"Market Mood: {mood}")
+            print(f"Forecasted Price: {forecast}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             # Initialize variables
             trigger_long = False 
             trigger_short = False
@@ -1427,22 +1535,22 @@ def main():
 
             print()
 
-            for timeframe in timeframes:
-                dist_min, dist_max = scale_to_sine(timeframe)
-                if dist_min < dist_max:
-                    print(f"For {timeframe} timeframe: Up")
-                else:
-                    print(f"For {timeframe} timeframe: Down")
+            #for timeframe in timeframes:
+                #dist_min, dist_max = scale_to_sine(timeframe)
+                #if dist_min < dist_max:
+                    #print(f"For {timeframe} timeframe: Up")
+                #else:
+                    #print(f"For {timeframe} timeframe: Down")
 
-                print()
+                #print()
 
-            print()
+            #print()
 
             ##################################################
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -50.00
+            stop_loss = -90.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -1528,10 +1636,12 @@ def main():
                                                 if price < expected_price:
                                                     print("LONG condition 8: price < expected_price") 
                                                     if market_mood_fft == "Bullish":
-                                                        print("LONG condition 9: market_mood_fft == Bullish")                                       
-                                                        if momentum > 0:
-                                                            print("LONG condition 10: momentum > 0")
-                                                            trigger_long = True
+                                                        print("LONG condition 9: market_mood_fft == Bullish")  
+                                                        if mood == "Bullish" and price < forecast:
+                                                            print("LONG condition 10: mood == Bullish and price < forecast")                                      
+                                                            if momentum > 0:
+                                                                print("LONG condition 11: momentum > 0")
+                                                                trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -1552,9 +1662,11 @@ def main():
                                                     print("SHORT condition 8: price > expected_price") 
                                                 if market_mood_fft == "Bearish":
                                                     print("SHORT condition 9: market_mood_fft == Bearish")
-                                                    if momentum < 0:
-                                                        print("SHORT condition 10: momentum < 0")
-                                                        trigger_short = True
+                                                    if mood == "Bearish" and price > forecast:
+                                                        print("SHORT condition 10: mood == Bearish and price > forecast")                                                  
+                                                        if momentum < 0:
+                                                            print("SHORT condition 11: momentum < 0")
+                                                            trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
@@ -1614,7 +1726,8 @@ def main():
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del dist_min, dist_max
+        #del dist_min, dist_max
+        del val_low, val_high, sup, res, mood, forecast
 
         # Force garbage collection to free up memory
         gc.collect()
