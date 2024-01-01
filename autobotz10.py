@@ -1660,13 +1660,13 @@ def main():
                                                 print("SHORT condition 7: forecast_price_fft < price")
                                                 if price > expected_price:
                                                     print("SHORT condition 8: price > expected_price") 
-                                                if market_mood_fft == "Bearish":
-                                                    print("SHORT condition 9: market_mood_fft == Bearish")
-                                                    if mood == "Bearish" and price > forecast:
-                                                        print("SHORT condition 10: mood == Bearish and price > forecast")                                                  
-                                                        if momentum < 0:
-                                                            print("SHORT condition 11: momentum < 0")
-                                                            trigger_short = True
+                                                    if market_mood_fft == "Bearish":
+                                                        print("SHORT condition 9: market_mood_fft == Bearish")
+                                                        if mood == "Bearish" and price > forecast:
+                                                            print("SHORT condition 10: mood == Bearish and price > forecast")                                                  
+                                                            if momentum < 0:
+                                                                print("SHORT condition 11: momentum < 0")
+                                                                trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
