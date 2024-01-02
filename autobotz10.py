@@ -1535,16 +1535,21 @@ def main():
 
             print()
 
-            #for timeframe in timeframes:
-                #dist_min, dist_max = scale_to_sine(timeframe)
-                #if dist_min < dist_max:
-                    #print(f"For {timeframe} timeframe: Up")
-                #else:
-                    #print(f"For {timeframe} timeframe: Down")
+            for timeframe in timeframes:
+                dist_min, dist_max = scale_to_sine(timeframe)
+                if dist_min < dist_max:
+                    print(f"For {timeframe} timeframe: Up")
+                else:
+                    print(f"For {timeframe} timeframe: Down")
 
-                #print()
+                print()
 
-            #print()
+            print()
+
+            ##################################################
+            ##################################################
+
+            print()
 
             ##################################################
             ##################################################
@@ -1641,7 +1646,11 @@ def main():
                                                             print("LONG condition 10: mood == Bullish and price < forecast")                                      
                                                             if momentum > 0:
                                                                 print("LONG condition 11: momentum > 0")
-                                                                trigger_long = True
+                                                                for timeframe in timeframes:
+                                                                    if timeframe == "1m" and dist_min < dist_max:
+                                                                        if timeframe == "3m" and dist_min < dist_max:
+                                                                            print("LONG condition 12: 1min and 3min mtf momentum bullish")
+                                                                            trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 15:
@@ -1666,7 +1675,11 @@ def main():
                                                             print("SHORT condition 10: mood == Bearish and price > forecast")                                                  
                                                             if momentum < 0:
                                                                 print("SHORT condition 11: momentum < 0")
-                                                                trigger_short = True
+                                                                for timeframe in timeframes:
+                                                                    if timeframe == "1m" and dist_max < dist_min:
+                                                                        if timeframe == "3m" and dist_max < dist_min:
+                                                                            print("SHORT condition 12: 1min and 3min mtf momentum bearish")
+                                                                            trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
