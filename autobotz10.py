@@ -728,49 +728,34 @@ def calculate_elements():
 print()
 
 
-def forecast_sma_targets(close_price):
-    # Retrieve the calculated elements
+def forecast_sma_targets(price):
     (PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed) = calculate_elements()
 
-    # Calculate the three gradual targets for each quadrant
-    targets = {}
-    for quadrant, data in unit_circle_degrees.items():
-        target1 = close_price + (sacred_freq * (1 + (quadrant * 0.25)))
-        target2 = close_price + (sacred_freq * (1.5 + (quadrant * 0.25)))
-        target3 = close_price + (sacred_freq * (2 + (quadrant * 0.25)))
-
-        # Calculate distances from close_price to each target in percentages
-        distances = {
-            f"Target1_Quad_{quadrant}": ((target1 - close_price) / close_price) * 100,
-            f"Target2_Quad_{quadrant}": ((target2 - close_price) / close_price) * 100,
-            f"Target3_Quad_{quadrant}": ((target3 - close_price) / close_price) * 100,
-        }
-
-        targets[f"Quadrant_{quadrant}"] = {
-            "Target1": target1,
-            "Target2": target2,
-            "Target3": target3,
-            "Distances": distances
-        }
-
-    # Print the results
-    print(f"Given Close Price (Center of Unit Circle): {close_price}\n")
+    output_data = []
+    output_data.append(f"Given Close Price (Center of Unit Circle): {price}\n")
     
-    for quadrant, data in targets.items():
-        print(f"Quadrant: {quadrant}")
-        print(f"Targets and Their Price Values:")
-        for target_name, target_value in data.items():
-            if target_name != "Distances":
-                print(f"{target_name}: {target_value:.2f}")
+    for quadrant, _ in unit_circle_degrees.items():
+        # Calculate the forecast price using sacred_freq and square of 9 for the quadrant
+        target = price + (sacred_freq * math.pow(9, (quadrant * 0.25)))
         
-        print("\nDistances in Percentage from Given Close Price (Center) to Each Forecast Target:")
-        for distance_name, distance_value in data["Distances"].items():
-            print(f"{distance_name}: {distance_value:.2f}%")
-        
-        print("\n" + "-"*50 + "\n")
+        # Adjust the target price with a 45-degree angle (using trigonometry)
+        angle_adjustment = sacred_freq * math.cos(math.radians(45)) * (quadrant * 0.25)
+        target_45 = price + angle_adjustment
 
-# Example usage with a close price of 100
-forecast_sma_targets(price)
+        distance = ((target - price) / price) * 100
+
+        output_data.append(f"Quadrant: {quadrant}")
+        output_data.append(f"Forecasted Target_Quad_{quadrant}: Price - {target:.2f}, Distance Percentage - {distance:.2f}%")
+        output_data.append(f"Forecasted 45Degree_Target_Quad_{quadrant}: Price - {target_45:.2f}")
+        output_data.append("-" * 50)
+
+    return output_data
+
+results = forecast_sma_targets(price)
+
+# Print each output string separately
+for result in results:
+    print(result)
 
 print()
 
@@ -1810,6 +1795,17 @@ def main():
             dominant_trend, forecasted_price = forecast_next_hour_price(close)
 
             print(f"Dominant Trend: {dominant_trend}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            results = forecast_sma_targets(price)
+
+            # Print each output string separately
+            for result in results:
+                print(result)
 
             print()
 
