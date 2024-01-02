@@ -1195,59 +1195,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-
-def generate_gann_magic_square():
-    square = np.zeros((3, 3), dtype=int)
-    square[1, 1] = 1
-    
-    for i in range(3):
-        for j in range(3):
-            if (i, j) != (1, 1):
-                square[i, j] = (i * 3 + j + 1) ** 2
-    return square
-
-def calculate_forecasts(square, close):
-    magic_number = np.sum(square[1, :])
-    
-    support_level = magic_number - np.min(close)
-    resistance_level = magic_number + np.max(close)
-    
-    fast_wave_cycle_forecast = f"Support Level (Fast): {abs(support_level):.2f}"
-    large_wave_cycle_forecast = f"Resistance Level (Large): {abs(resistance_level):.2f}"
-    
-    return fast_wave_cycle_forecast, large_wave_cycle_forecast, magic_number
-
-# Generate the Gann Magic Square
-gann_square = generate_gann_magic_square()
-
-# Calculate forecasts based on the Gann Magic Square and close prices
-fast_wave_cycle_forecast, large_wave_cycle_forecast, magic_number = calculate_forecasts(gann_square, close)
-
-# Determine market mood for Fast and Large Wave Cycles
-market_mood_fast = "Negative" if abs(magic_number - np.min(close)) < price else "Positive"
-market_mood_large = "Positive" if abs(magic_number + np.max(close)) > price else "Negative"
-
-pos = abs(magic_number - np.min(close))
-pos = str(pos)
-
-print(pos)
-
-neg = abs(magic_number + np.max(close))
-neg = str(neg)
-
-print(neg)
-
-# Print forecasts for Fast and Large Wave Cycles
-print("\nMarket Mood Forecast:")
-print("Fast Wave Cycle:", fast_wave_cycle_forecast)
-print("Large Wave Cycle:", large_wave_cycle_forecast)
-
-# Print market mood type for Fast and Large Wave Cycles
-print("\nMarket Mood Type:")
-print("Fast Wave Cycle:", market_mood_fast)
-print("Large Wave Cycle:", market_mood_large)
-
 
 print()
 
@@ -1566,41 +1513,13 @@ def main():
             ##################################################
             ##################################################
 
-            # Generate the Gann Magic Square
-            gann_square = generate_gann_magic_square()
-
-            # Calculate forecasts based on the Gann Magic Square and close prices
-            fast_wave_cycle_forecast, large_wave_cycle_forecast, magic_number = calculate_forecasts(gann_square, close)
-
-            # Determine market mood for Fast and Large Wave Cycles
-            market_mood_fast = "Negative" if abs(magic_number - np.min(close)) < price else "Positive"
-            market_mood_large = "Positive" if abs(magic_number + np.max(close)) > price else "Negative"
-
-            pos = abs(magic_number - np.min(close))
-            pos = str(pos)
-
-            neg = abs(magic_number + np.max(close))
-            neg = str(neg)
-
-            print(neg)
-
-            # Print forecasts for Fast and Large Wave Cycles
-            print("\nMarket Mood Forecast:")
-            print("Fast Wave Cycle:", fast_wave_cycle_forecast)
-            print("Large Wave Cycle:", large_wave_cycle_forecast)
-
-            # Print market mood type for Fast and Large Wave Cycles
-            print("\nMarket Mood Type:")
-            print("Fast Wave Cycle:", market_mood_fast)
-            print("Large Wave Cycle:", market_mood_large)
-
             print()
 
             ##################################################
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -10.00
+            stop_loss = -5.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
