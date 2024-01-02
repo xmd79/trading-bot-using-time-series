@@ -1800,7 +1800,7 @@ def main():
                                                             if reversals_confirmations == "Bearish":
                                                                 print("SHORT condition 11: reversals_confirmations == Bearish") 
                                                                 if price > fast_price:   
-                                                                    print("SHORT condition 12: price < fast_price")                                             
+                                                                    print("SHORT condition 12: price > fast_price")                                             
                                                                     if momentum < 0:
                                                                         print("SHORT condition 13: momentum < 0")
                                                                         trigger_short = True
