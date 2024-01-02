@@ -1364,13 +1364,6 @@ timez = np.linspace(0, 10 * np.pi, num_days)
 forecast1 = compute_fft_and_print_dominant_frequencies(close, sampling_rate)
 print(f"Forecasted Price 1 based on Dominant Frequency: {forecast1}")
     
-# Add two more forecasted prices further in the time series data maintaining the same direction based on market mood
-forecast2 = forecast1 + 5  # Adding 5 for demonstration (maintaining the same direction)
-forecast3 = forecast2 + 5  # Adding 5 for demonstration (maintaining the same direction)
-    
-print(f"Forecasted Price 2 based on Market Mood: {forecast2}")
-print(f"Forecasted Price 3 based on Market Mood: {forecast3}")
-
 print()
 
 ##################################################
@@ -1752,17 +1745,8 @@ def main():
             # Compute FFT and print forecasted price based on dominant frequency
             forecast1 = compute_fft_and_print_dominant_frequencies(close, sampling_rate)
             print(f"Forecasted Price 1 based on Dominant Frequency: {forecast1}")
-    
-            # Add two more forecasted prices further in the time series data maintaining the same direction based on market mood
-            forecast2 = forecast1 + 5  # Adding 5 for demonstration (maintaining the same direction)
-            forecast3 = forecast2 + 5  # Adding 5 for demonstration (maintaining the same direction)
-    
-            print(f"Forecasted Price 2 based on Market Mood: {forecast2}")
-            print(f"Forecasted Price 3 based on Market Mood: {forecast3}")
 
             forecast1 = float(forecast1)
-            forecast2 = float(forecast2)
-            forecast3 = float(forecast3)
 
             print()
 
