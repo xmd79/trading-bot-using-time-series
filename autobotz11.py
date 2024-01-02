@@ -882,6 +882,57 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import talib
+
+def market_reversals(close):
+    gradients = np.gradient(close)
+    reversals = np.where(np.diff(np.sign(gradients)))[0]
+    return reversals
+
+def calculate_marketdata_mood(close):
+    reversals = market_reversals(close)
+    
+    if len(reversals) < 2:
+        return "Neutral", None
+    
+    last_reversal = close[reversals[-2]]
+    current_reversal = close[reversals[-1]]
+    
+    if current_reversal > last_reversal:
+        return "Bullish", current_reversal
+    elif current_reversal < last_reversal:
+        return "Bearish", current_reversal
+    else:
+        return "Neutral", current_reversal
+
+def forecast_sine_price(close):
+    mood, current_price = calculate_marketdata_mood(close)
+    
+    if mood == "Bullish":
+        forecasted_price = current_price + (current_price - close[-1])  # Real forecast based on the last price difference
+        return "Up", forecasted_price
+    elif mood == "Bearish":
+        forecasted_price = current_price - (close[-1] - current_price)  # Real forecast based on the last price difference
+        return "Down", forecasted_price
+    else:
+        return "Stable", current_price
+
+# Generate a sine wave data for demonstration
+t = np.linspace(0, 4 * np.pi, 1000)
+sine_wave = np.sin(t)
+sine_wave = -sine_wave
+
+# Example usage:
+reversals = market_reversals(sine_wave)
+last_reversal_price = sine_wave[reversals[-2]] if len(reversals) >= 2 else None
+current_reversal_price = sine_wave[reversals[-1]] if len(reversals) >= 1 else None
+sine_forecast_direction, real_forecasted_price = forecast_sine_price(sine_wave)
+
+print(f"Last Reversal Price: {last_reversal_price}")
+print(f"Current Reversal Price: {current_reversal_price}")
+print(f"Forecasted Price on Sine Direction: {sine_forecast_direction}")
+
 
 print()
 
@@ -1849,6 +1900,23 @@ def main():
             ##################################################
             ##################################################
 
+            # Generate a sine wave data for demonstration
+            t = np.linspace(0, 4 * np.pi, 1000)
+            sine_wave = np.sin(t)
+            sine_wave = -sine_wave
+
+            # Example usage:
+            reversals = market_reversals(sine_wave)
+            last_reversal_price = sine_wave[reversals[-2]] if len(reversals) >= 2 else None
+            current_reversal_price = sine_wave[reversals[-1]] if len(reversals) >= 1 else None
+            sine_forecast_direction = forecast_sine_price(sine_wave)
+
+            print(f"Last Reversal Price: {last_reversal_price}")
+            print(f"Current Reversal Price: {current_reversal_price}")
+            print(f"Forecasted Price on Sine Direction: {sine_forecast_direction}")
+
+            print()
+
             ##################################################
             ##################################################
 
@@ -1946,11 +2014,13 @@ def main():
                                                                 print("LONG condition 11: reversals_confirmations == Bullish") 
                                                                 if price < fast_price:   
                                                                     print("LONG condition 12: price < fast_price")
-                                                                    if positive_count > negative_count:
-                                                                        print("LONG condition 13: positive_count > negative_count")                                
-                                                                        if momentum > 0:
-                                                                            print("LONG condition 14: momentum > 0")
-                                                                            trigger_long = True
+                                                                    if sine_forecast_direction == "Up":
+                                                                        print("LONG condition 13: sine_forecast_direction == Up")  
+                                                                        if positive_count > negative_count:
+                                                                            print("LONG condition 14: positive_count > negative_count")                                
+                                                                            if momentum > 0:
+                                                                                print("LONG condition 15: momentum > 0")
+                                                                                trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -1977,11 +2047,13 @@ def main():
                                                                 print("SHORT condition 11: reversals_confirmations == Bearish") 
                                                                 if price > fast_price:   
                                                                     print("SHORT condition 12: price > fast_price")
-                                                                    if positive_count < negative_count:
-                                                                        print("SHORT condition 13: positive_count < negative_count")                                              
-                                                                        if momentum < 0:
-                                                                            print("SHORT condition 14: momentum < 0")
-                                                                            trigger_short = True
+                                                                    if sine_forecast_direction == "Down":
+                                                                        print("SHORT condition 13: sine_forecast_direction == Down")  
+                                                                        if positive_count < negative_count:
+                                                                            print("SHORT condition 14: positive_count < negative_count")                                              
+                                                                            if momentum < 0:
+                                                                                print("SHORT condition 15: momentum < 0")
+                                                                                trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
