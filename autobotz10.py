@@ -1260,6 +1260,60 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import scipy.fftpack as fftpack
+
+def forecast_prices(close):
+    time = np.linspace(0, 1, len(close), endpoint=False)
+
+    fast_frequency = 10
+    medium_frequency = 5
+    slow_frequency = 2
+
+    fast_sinewave = np.sin(2 * np.pi * fast_frequency * time)
+    medium_sinewave = 0.5 * np.sin(2 * np.pi * medium_frequency * time)
+    slow_sinewave = 0.2 * np.sin(2 * np.pi * slow_frequency * time)
+
+    combined_sinewave = fast_sinewave + medium_sinewave + slow_sinewave
+
+    fft_output = fftpack.fft(combined_sinewave)
+
+    dominant_frequency_index = np.argmax(np.abs(fft_output))
+    fast_forecasted_frequency = dominant_frequency_index / time[-1]
+    medium_forecasted_frequency = dominant_frequency_index / time[-1] * 0.5
+    slow_forecasted_frequency = dominant_frequency_index / time[-1] * 0.2
+
+    next_minute = time[-1] + 1
+
+    fast_forecasted_sine = np.sin(2 * np.pi * fast_forecasted_frequency * next_minute)
+    medium_forecasted_sine = 0.5 * np.sin(2 * np.pi * medium_forecasted_frequency * next_minute)
+    slow_forecasted_sine = 0.2 * np.sin(2 * np.pi * slow_forecasted_frequency * next_minute)
+
+    # Convert sine forecasted values back to price values
+    price_min = min(close)
+    price_max = max(close)
+
+    fast_forecasted_price = price_min + 0.5 * (fast_forecasted_sine + 1) * (price_max - price_min)
+    medium_forecasted_price = price_min + 0.5 * (medium_forecasted_sine + 1) * (price_max - price_min)
+    slow_forecasted_price = price_min + 0.5 * (slow_forecasted_sine + 1) * (price_max - price_min)
+
+    return fast_forecasted_price, medium_forecasted_price, slow_forecasted_price
+
+# Forecast prices
+fast_price, medium_price, slow_price = forecast_prices(close)
+
+# Print forecasted prices
+print(f"Forecasted price for the next minute (fast cycle): {fast_price:.2f}")
+print(f"Forecasted price for the next minute (medium cycle): {medium_price:.2f}")
+print(f"Forecasted price for the next minute (slow cycle): {slow_price:.2f}")
+
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -1603,6 +1657,19 @@ def main():
             print(f"Dominant Frequency (Energy): {dominant_freq}")
             print(f"Total Momentum (Peaks + Troughs): {momentum}")
             print(f"Reversals Confirmation: {reversals_confirmations}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Forecast prices
+            fast_price, medium_price, slow_price = forecast_prices(close)
+
+            # Print forecasted prices
+            print(f"Forecasted price for the next minute (fast cycle): {fast_price:.2f}")
+            print(f"Forecasted price for the next minute (medium cycle): {medium_price:.2f}")
+            print(f"Forecasted price for the next minute (slow cycle): {slow_price:.2f}")
 
             print()
 
