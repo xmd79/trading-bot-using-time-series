@@ -1312,46 +1312,61 @@ print()
 ##################################################
 ##################################################
 
-# Convert the list to a numpy array for FFT processing
-close_array = np.array(close)
-
-# Compute FFT
-fft_values = np.fft.fft(close_array)
-freq = np.fft.fftfreq(len(close_array))
-
-# Identify significant frequencies based on a threshold
-threshold = 100
-significant_freq_indices = np.where(np.abs(fft_values) > threshold)[0]
-
-significant_freqs = freq[significant_freq_indices]
-significant_fft_values = fft_values[significant_freq_indices]
-
-# Extract amplitude and phase from FFT values
-amplitudes = np.abs(significant_fft_values) / len(close_array)
-phases = np.angle(significant_fft_values)
-
-# Generate a forecast with a difference of at least $200 from the current price
-# Let's assume the current price is the last price in the close_prices list
-current_price = close_prices[-1]
-
-forecast_difference = 200  # Target difference from the current price
-
-forecast_time = len(close_array)  # Forecasting for the next time step
-
-# Initialize forecast
-forecast = 0
-
-# Use sinusoidal model for forecasting
-for freq, amp, phase in zip(significant_freqs, amplitudes, phases):
-    forecast += amp * np.sin(2 * np.pi * freq * forecast_time + phase)
-
-# Calculate the forecasted price with the required difference from the current price
-required_forecast = current_price + forecast_difference
-
-# Print the required forecasted price
-print(f"Forecasted Price fft200: {required_forecast}")
-
+def forecast_next_hour_price(close_prices):
+    """
+    Forecast the price for the next hour based on the given close prices using FFT.
     
+    Parameters:
+    - close_prices (list): List of close prices for the timeframe.
+    
+    Returns:
+    - dominant_trend (str): Dominant trend identified (Upward/Downward).
+    - forecast_price (float): Forecasted price for the next hour.
+    """
+    
+    # Convert the list to a numpy array for FFT processing
+    close_array = np.array(close_prices)
+
+    # Compute FFT
+    fft_values = np.fft.fft(close_array)
+    freq = np.fft.fftfreq(len(close_array))
+
+    # Identify significant frequencies based on a threshold
+    threshold = 100
+    significant_freq_indices = np.where(np.abs(fft_values) > threshold)[0]
+
+    # Get the last three significant frequencies
+    last_three_significant_freqs = freq[significant_freq_indices][-3:]
+    last_three_amplitudes = np.abs(fft_values[significant_freq_indices][-3:])
+    last_three_phases = np.angle(fft_values[significant_freq_indices][-3:])
+
+    # Calculate the average between the most negative and most positive frequencies
+    most_negative_freq = last_three_significant_freqs[np.argmin(last_three_significant_freqs)]
+    most_positive_freq = last_three_significant_freqs[np.argmax(last_three_significant_freqs)]
+    average_freq = (most_negative_freq + most_positive_freq) / 2
+
+    # Determine the dominant trend
+    dominant_trend = "Up" if average_freq < 0 else "Down"
+
+    # Forecast for the next hour (assuming 60 minutes in an hour)
+    forecast_time = len(close_array) + 60  # Forecasting for the next hour
+
+    # Initialize forecast
+    forecast = 0
+
+    # Use sinusoidal model for forecasting with the average frequency
+    forecast += np.mean(last_three_amplitudes) * np.sin(2 * np.pi * average_freq * forecast_time + np.mean(last_three_phases))
+
+    # Calculate the forecasted price for the next hour
+    current_price = close_prices[-1]
+    forecast_price = current_price + forecast
+
+    return dominant_trend, forecast_price
+
+dominant_trend, forecasted_price = forecast_next_hour_price(close)
+
+print(f"Dominant Trend: {dominant_trend}")
+
 print()
 
 ##################################################
@@ -1723,45 +1738,9 @@ def main():
             ##################################################
             ##################################################
 
-            # Convert the list to a numpy array for FFT processing
-            close_array = np.array(close)
+            dominant_trend, forecasted_price = forecast_next_hour_price(close)
 
-            # Compute FFT
-            fft_values = np.fft.fft(close_array)
-            freq = np.fft.fftfreq(len(close_array))
-
-            # Identify significant frequencies based on a threshold
-            threshold = 100
-            significant_freq_indices = np.where(np.abs(fft_values) > threshold)[0]
-
-            significant_freqs = freq[significant_freq_indices]
-            significant_fft_values = fft_values[significant_freq_indices]
-
-            # Extract amplitude and phase from FFT values
-            amplitudes = np.abs(significant_fft_values) / len(close_array)
-            phases = np.angle(significant_fft_values)
-
-            # Generate a forecast with a difference of at least $200 from the current price
-            # Let's assume the current price is the last price in the close_prices list
-            current_price = close_prices[-1]
-
-            forecast_difference = 200  # Target difference from the current price
-
-            forecast_time = len(close_array)  # Forecasting for the next time step
-
-            # Initialize forecast
-            forecast = 0
-
-            # Use sinusoidal model for forecasting
-            for freq, amp, phase in zip(significant_freqs, amplitudes, phases):
-                forecast += amp * np.sin(2 * np.pi * freq * forecast_time + phase)
-
-            # Calculate the forecasted price with the required difference from the current price
-            required_forecast = current_price + forecast_difference
-
-            # Print the required forecasted price
-            print(f"Forecasted Price fft200: {required_forecast}")
-            required_forecast = float(required_forecast)
+            print(f"Dominant Trend: {dominant_trend}")
 
             print()
 
@@ -1862,8 +1841,8 @@ def main():
                                                                 print("LONG condition 11: reversals_confirmations == Bullish") 
                                                                 if price < fast_price:   
                                                                     print("LONG condition 12: price < fast_price")
-                                                                    if price < required_forecast:
-                                                                        print("LONG condition 13: price < required_forecast")                                
+                                                                    if dominant_trend == "Up":
+                                                                        print("LONG condition 13: dominant_trend == Up")                                
                                                                         if momentum > 0:
                                                                             print("LONG condition 14: momentum > 0")
                                                                             trigger_long = True
@@ -1893,8 +1872,8 @@ def main():
                                                                 print("SHORT condition 11: reversals_confirmations == Bearish") 
                                                                 if price > fast_price:   
                                                                     print("SHORT condition 12: price > fast_price")
-                                                                    if price > required_forecast:
-                                                                        print("SHORT condition 13: price > required_forecast")                                              
+                                                                    if dominant_trend == "Down":
+                                                                        print("SHORT condition 13: dominant_trend == Down")                                              
                                                                         if momentum < 0:
                                                                             print("SHORT condition 14: momentum < 0")
                                                                             trigger_short = True
