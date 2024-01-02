@@ -1802,7 +1802,7 @@ def main():
                                                                 if price > fast_price:   
                                                                     print("SHORT condition 12: price < fast_price")                                             
                                                                     if momentum < 0:
-                                                                        print("SHORT condition 12: momentum < 0")
+                                                                        print("SHORT condition 13: momentum < 0")
                                                                         trigger_short = True
                     print()
 
