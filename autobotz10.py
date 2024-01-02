@@ -1841,8 +1841,8 @@ def main():
                                                                 print("LONG condition 11: reversals_confirmations == Bullish") 
                                                                 if price < fast_price:   
                                                                     print("LONG condition 12: price < fast_price")
-                                                                    if dominant_trend == "Up":
-                                                                        print("LONG condition 13: dominant_trend == Up")                                
+                                                                    if price < val_low:
+                                                                        print("LONG condition 13: price < val_low")                                
                                                                         if momentum > 0:
                                                                             print("LONG condition 14: momentum > 0")
                                                                             trigger_long = True
@@ -1872,8 +1872,8 @@ def main():
                                                                 print("SHORT condition 11: reversals_confirmations == Bearish") 
                                                                 if price > fast_price:   
                                                                     print("SHORT condition 12: price > fast_price")
-                                                                    if dominant_trend == "Down":
-                                                                        print("SHORT condition 13: dominant_trend == Down")                                              
+                                                                    if price > val_high:
+                                                                        print("SHORT condition 13: price > val_high")                                              
                                                                         if momentum < 0:
                                                                             print("SHORT condition 14: momentum < 0")
                                                                             trigger_short = True
