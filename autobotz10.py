@@ -1190,6 +1190,53 @@ print(f"Current Support: {sup}, Current Resistance: {res}")
 print(f"Market Mood: {mood}")
 print(f"Forecasted Price: {forecast}")
 
+print()
+
+##################################################
+##################################################
+
+import numpy as np
+
+def generate_gann_magic_square():
+    square = np.zeros((3, 3), dtype=int)
+    square[1, 1] = 1
+    
+    for i in range(3):
+        for j in range(3):
+            if (i, j) != (1, 1):
+                square[i, j] = (i * 3 + j + 1) ** 2
+    return square
+
+def calculate_forecasts(square, close):
+    magic_number = np.sum(square[1, :])
+    
+    support_level = magic_number - np.min(close)
+    resistance_level = magic_number + np.max(close)
+    
+    fast_wave_cycle_forecast = f"Support Level (Fast): {abs(support_level):.2f}"
+    large_wave_cycle_forecast = f"Resistance Level (Large): {abs(resistance_level):.2f}"
+    
+    return fast_wave_cycle_forecast, large_wave_cycle_forecast, magic_number
+
+# Generate the Gann Magic Square
+gann_square = generate_gann_magic_square()
+
+# Calculate forecasts based on the Gann Magic Square and close prices
+fast_wave_cycle_forecast, large_wave_cycle_forecast, magic_number = calculate_forecasts(gann_square, close)
+
+# Determine market mood for Fast and Large Wave Cycles
+market_mood_fast = "Negative" if abs(magic_number - np.min(close)) < 0 else "Positive"
+market_mood_large = "Positive" if abs(magic_number + np.max(close)) >= 0 else "Negative"
+
+# Print forecasts for Fast and Large Wave Cycles
+print("\nMarket Mood Forecast:")
+print("Fast Wave Cycle:", fast_wave_cycle_forecast)
+print("Large Wave Cycle:", large_wave_cycle_forecast)
+
+# Print market mood type for Fast and Large Wave Cycles
+print("\nMarket Mood Type:")
+print("Fast Wave Cycle:", market_mood_fast)
+print("Large Wave Cycle:", market_mood_large)
 
 
 print()
@@ -1462,23 +1509,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Iterate over each timeframe and call the scale_to_sine function
-            #for timeframe in timeframes:
-                #dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
-    
-                # Print the results for each timeframe
-                #print(f"For {timeframe} timeframe:")
-                #print(f"Distance to min: {dist_from_close_to_min:.2f}%")
-                #print(f"Distance to max: {dist_from_close_to_max:.2f}%")
-                #print(f"Current Sine value: {current_sine}\n")
-
-                #print()
-
-            #print()
-
-            ##################################################
-            ##################################################
-
             # Calculate the 45-degree angle (simple linear regression)
             x = np.arange(len(close))
             slope, intercept = np.polyfit(x, close, 1)
@@ -1503,12 +1533,25 @@ def main():
             ##################################################
             ##################################################
 
-            val_low, val_high, sup, res, mood, forecast = analyze_market_profile(close)
+            # Generate the Gann Magic Square
+            gann_square = generate_gann_magic_square()
 
-            print(f"Value Area Low: {val_low}, Value Area High: {val_high}")
-            print(f"Current Support: {sup}, Current Resistance: {res}")
-            print(f"Market Mood: {mood}")
-            print(f"Forecasted Price: {forecast}")
+            # Calculate forecasts based on the Gann Magic Square and close prices
+            fast_wave_cycle_forecast, large_wave_cycle_forecast, magic_number = calculate_forecasts(gann_square, close)
+
+            # Determine market mood for Fast and Large Wave Cycles
+            market_mood_fast = "Negative" if abs(magic_number - np.min(close)) < 0 else "Positive"
+            market_mood_large = "Positive" if abs(magic_number + np.max(close)) >= 0 else "Negative"
+
+            # Print forecasts for Fast and Large Wave Cycles
+            print("\nMarket Mood Forecast:")
+            print("Fast Wave Cycle:", fast_wave_cycle_forecast)
+            print("Large Wave Cycle:", large_wave_cycle_forecast)
+
+            # Print market mood type for Fast and Large Wave Cycles
+            print("\nMarket Mood Type:")
+            print("Fast Wave Cycle:", market_mood_fast)
+            print("Large Wave Cycle:", market_mood_large)
 
             print()
 
@@ -1535,21 +1578,24 @@ def main():
 
             print()
 
-            timeframes = ['1m', '3m']
-
-            for timeframe in timeframes:
-                dist_min, dist_max = scale_to_sine(timeframe)
-                if dist_min < dist_max:
-                    print(f"For {timeframe} timeframe: Up")
-                else:
-                    print(f"For {timeframe} timeframe: Down")
-
-                print()
-
-            print()
-
             ##################################################
             ##################################################
+
+            fast_wave_cycle_forecast, large_wave_cycle_forecast, magic_number = calculate_forecasts(gann_square, close)
+        
+            # Determine market mood for Fast and Large Wave Cycles
+            market_mood_fast = "Negative" if abs(magic_number - np.min(close)) < 0 else "Positive"
+            market_mood_large = "Positive" if abs(magic_number + np.max(close)) >= 0 else "Negative"
+        
+            # Print forecasts for Fast and Large Wave Cycles
+            print("\nMarket Mood Forecast:")
+            print("Fast Wave Cycle:", fast_wave_cycle_forecast)
+            print("Large Wave Cycle:", large_wave_cycle_forecast)
+
+            # Print market mood type for Fast and Large Wave Cycles
+            print("\nMarket Mood Type:")
+            print("Fast Wave Cycle:", market_mood_fast)
+            print("Large Wave Cycle:", market_mood_large)
 
             print()
 
@@ -1648,11 +1694,7 @@ def main():
                                                             print("LONG condition 10: mood == Bullish and price < forecast")                                      
                                                             if momentum > 0:
                                                                 print("LONG condition 11: momentum > 0")
-                                                                for timeframe in timeframes:
-                                                                    if timeframe == "1m" and dist_min < dist_max:
-                                                                        if timeframe == "3m" and dist_min < dist_max:
-                                                                            print("LONG condition 12: 1min and 3min mtf momentum bullish")
-                                                                            trigger_long = True
+                                                                trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 15:
@@ -1677,11 +1719,7 @@ def main():
                                                             print("SHORT condition 10: mood == Bearish and price > forecast")                                                  
                                                             if momentum < 0:
                                                                 print("SHORT condition 11: momentum < 0")
-                                                                for timeframe in timeframes:
-                                                                    if timeframe == "1m" and dist_max < dist_min:
-                                                                        if timeframe == "3m" and dist_max < dist_min:
-                                                                            print("SHORT condition 12: 1min and 3min mtf momentum bearish")
-                                                                            trigger_short = True
+                                                                trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
@@ -1741,8 +1779,6 @@ def main():
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        #del dist_min, dist_max
-        del val_low, val_high, sup, res, mood, forecast
 
         # Force garbage collection to free up memory
         gc.collect()
