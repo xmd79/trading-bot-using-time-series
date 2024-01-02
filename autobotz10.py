@@ -1358,7 +1358,7 @@ num_days = 365
 sampling_rate = 1
     
 # Generate synthetic closing prices using a sine wave with a frequency of 1/30.
-time = np.linspace(0, 10 * np.pi, num_days)
+timez = np.linspace(0, 10 * np.pi, num_days)
     
 # Compute FFT and print forecasted price based on dominant frequency
 forecast1 = compute_fft_and_print_dominant_frequencies(close, sampling_rate)
@@ -1747,7 +1747,7 @@ def main():
             sampling_rate = 1
     
             # Generate synthetic closing prices using a sine wave with a frequency of 1/30.
-            time = np.linspace(0, 10 * np.pi, num_days)
+            timez = np.linspace(0, 10 * np.pi, num_days)
     
             # Compute FFT and print forecasted price based on dominant frequency
             forecast1 = compute_fft_and_print_dominant_frequencies(close, sampling_rate)
