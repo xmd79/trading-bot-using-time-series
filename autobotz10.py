@@ -1195,6 +1195,65 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import numpy.fft as fft
+
+def preprocess_data(close):
+    # Simple preprocessing: normalize data by subtracting mean and dividing by standard deviation
+    return (close - np.mean(close)) / np.std(close)
+
+def apply_fourier_transform(close):
+    # Apply Fourier Transform
+    transformed_data = fft.fft(close)
+    
+    # Extract frequencies and magnitudes
+    frequencies = fft.fftfreq(len(close))
+    magnitudes = np.abs(transformed_data)  # Corrected the variable name here
+    
+    # Get dominant frequency (peak frequency)
+    dominant_frequency = frequencies[np.argmax(magnitudes)]
+    
+    return dominant_frequency
+
+def time_geometry_analysis(close):
+    # Identify peaks and troughs
+    peaks = np.where((close[1:-1] > close[:-2]) & (close[1:-1] > close[2:]))[0] + 1
+    troughs = np.where((close[1:-1] < close[:-2]) & (close[1:-1] < close[2:]))[0] + 1
+    
+    return peaks, troughs
+
+def calculate_metrics(dominant_frequency, peaks, troughs):
+    # Calculate energy based on dominant frequency
+    energy = np.abs(dominant_frequency)
+    
+    # Calculate momentum (simplified as the number of peaks and troughs)
+    momentum = len(peaks) + len(troughs)
+    
+    # Determine reversals: if the number of peaks is greater than troughs, it's bullish; otherwise, bearish
+    reversals_confirmations = "Bullish" if len(peaks) > len(troughs) else "Bearish"
+    
+    return energy, momentum, reversals_confirmations
+
+# Convert the list to a numpy array for processing
+close_prices = np.array(close)
+
+# Step 1: Preprocess Data
+processed_data = preprocess_data(close_prices)
+
+# Step 2: Apply Fourier Transform
+dominant_freq = apply_fourier_transform(processed_data)
+
+# Step 3: Time Geometry Analysis
+peaks, troughs = time_geometry_analysis(processed_data)
+
+# Step 4: Calculate Metrics
+energy, momentum, reversals_confirmations = calculate_metrics(dominant_freq, peaks, troughs)
+
+# Step 5: Make Predictions
+print(f"Dominant Frequency (Energy): {dominant_freq}")
+print(f"Total Momentum (Peaks + Troughs): {momentum}")
+print(f"Reversals Confirmation: {reversals_confirmations}")
+
 
 print()
 
@@ -1490,6 +1549,18 @@ def main():
             ##################################################
             ##################################################
 
+            val_low, val_high, sup, res, mood, forecast = analyze_market_profile(close)
+
+            print(f"Value Area Low: {val_low}, Value Area High: {val_high}")
+            print(f"Current Support: {sup}, Current Resistance: {res}")
+            print(f"Market Mood: {mood}")
+            print(f"Forecasted Price: {forecast}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             # Initialize variables
             trigger_long = False 
             trigger_short = False
@@ -1506,12 +1577,32 @@ def main():
             ##################################################
 
             forecasted_price = identify_reversals(close)
-            toroidal_group_symmetry_analysis(close)
+            #toroidal_group_symmetry_analysis(close)
 
             print()
 
             ##################################################
             ##################################################
+
+            # Convert the list to a numpy array for processing
+            close_prices = np.array(close)
+
+            # Step 1: Preprocess Data
+            processed_data = preprocess_data(close_prices)
+
+            # Step 2: Apply Fourier Transform
+            dominant_freq = apply_fourier_transform(processed_data)
+
+            # Step 3: Time Geometry Analysis
+            peaks, troughs = time_geometry_analysis(processed_data)
+
+            # Step 4: Calculate Metrics
+            energy, momentum, reversals_confirmations = calculate_metrics(dominant_freq, peaks, troughs)
+
+            # Step 5: Make Predictions
+            print(f"Dominant Frequency (Energy): {dominant_freq}")
+            print(f"Total Momentum (Peaks + Troughs): {momentum}")
+            print(f"Reversals Confirmation: {reversals_confirmations}")
 
             print()
 
@@ -1607,10 +1698,12 @@ def main():
                                                     if market_mood_fft == "Bullish":
                                                         print("LONG condition 9: market_mood_fft == Bullish")  
                                                         if mood == "Bullish" and price < forecast:
-                                                            print("LONG condition 10: mood == Bullish and price < forecast")                                      
-                                                            if momentum > 0:
-                                                                print("LONG condition 11: momentum > 0")
-                                                                trigger_long = True
+                                                            print("LONG condition 10: mood == Bullish and price < forecast")  
+                                                            if reversals_confirmations == "Bullish":
+                                                                print("LONG condition 11: reversals_confirmations == Bullish")                                     
+                                                                if momentum > 0:
+                                                                    print("LONG condition 12: momentum > 0")
+                                                                    trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 15:
@@ -1632,10 +1725,12 @@ def main():
                                                     if market_mood_fft == "Bearish":
                                                         print("SHORT condition 9: market_mood_fft == Bearish")
                                                         if mood == "Bearish" and price > forecast:
-                                                            print("SHORT condition 10: mood == Bearish and price > forecast")                                                  
-                                                            if momentum < 0:
-                                                                print("SHORT condition 11: momentum < 0")
-                                                                trigger_short = True
+                                                            print("SHORT condition 10: mood == Bearish and price > forecast")  
+                                                            if reversals_confirmations == "Bearish":
+                                                                print("SHORT condition 11: reversals_confirmations == Bearish")                                             
+                                                                if momentum < 0:
+                                                                    print("SHORT condition 12: momentum < 0")
+                                                                    trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
