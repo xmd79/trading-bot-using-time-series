@@ -1307,8 +1307,6 @@ print(f"Forecasted price for the next minute (fast cycle): {fast_price:.2f}")
 print(f"Forecasted price for the next minute (medium cycle): {medium_price:.2f}")
 print(f"Forecasted price for the next minute (slow cycle): {slow_price:.2f}")
 
-
-
 print()
 
 ##################################################
@@ -1631,7 +1629,6 @@ def main():
             ##################################################
 
             forecasted_price = identify_reversals(close)
-            #toroidal_group_symmetry_analysis(close)
 
             print()
 
@@ -1667,9 +1664,14 @@ def main():
             fast_price, medium_price, slow_price = forecast_prices(close)
 
             # Print forecasted prices
-            print(f"Forecasted price for the next minute (fast cycle): {fast_price:.2f}")
-            print(f"Forecasted price for the next minute (medium cycle): {medium_price:.2f}")
-            print(f"Forecasted price for the next minute (slow cycle): {slow_price:.2f}")
+            print(f"Forecasted price (fast cycle): {fast_price:.2f}")
+            print(f"Forecasted price (medium cycle): {medium_price:.2f}")
+            print(f"Forecasted price (slow cycle): {slow_price:.2f}")
+
+
+            fast_price = str(fast_price)
+            medium_price = str(medium_price)
+            slow_price = str(slow_price)
 
             print()
 
@@ -1767,10 +1769,12 @@ def main():
                                                         if mood == "Bullish" and price < forecast:
                                                             print("LONG condition 10: mood == Bullish and price < forecast")  
                                                             if reversals_confirmations == "Bullish":
-                                                                print("LONG condition 11: reversals_confirmations == Bullish")                                     
-                                                                if momentum > 0:
-                                                                    print("LONG condition 12: momentum > 0")
-                                                                    trigger_long = True
+                                                                print("LONG condition 11: reversals_confirmations == Bullish") 
+                                                                if price < fast_price:   
+                                                                    print("LONG condition 12: price < fast_price")                                 
+                                                                    if momentum > 0:
+                                                                        print("LONG condition 13: momentum > 0")
+                                                                        trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 15:
@@ -1794,10 +1798,12 @@ def main():
                                                         if mood == "Bearish" and price > forecast:
                                                             print("SHORT condition 10: mood == Bearish and price > forecast")  
                                                             if reversals_confirmations == "Bearish":
-                                                                print("SHORT condition 11: reversals_confirmations == Bearish")                                             
-                                                                if momentum < 0:
-                                                                    print("SHORT condition 12: momentum < 0")
-                                                                    trigger_short = True
+                                                                print("SHORT condition 11: reversals_confirmations == Bearish") 
+                                                                if price > fast_price:   
+                                                                    print("SHORT condition 12: price < fast_price")                                             
+                                                                    if momentum < 0:
+                                                                        print("SHORT condition 12: momentum < 0")
+                                                                        trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
