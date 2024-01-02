@@ -1926,29 +1926,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Calculate GMMA and Sine Wave indicators
-            short_term_ema, long_term_ema, sine_wave = calculate_gmma_sine_wave(close)
-
-            # Identify reversals
-            reversal_points = identify_reversals(short_term_ema, long_term_ema, sine_wave)
-
-            # Determine forecasted price and market mood based on the latest reversal point
-            if reversal_points:
-                trend_direction, last_reversal_index = reversal_points[-1]
-    
-                # Forecasted price based on the trend direction
-                if trend_direction == 'Bullish':
-                    forecasted_price = "Expect higher prices"
-                else:
-                    forecasted_price = "Expect lower prices"
-    
-                print(f"Latest Reversal: Index {last_reversal_index}, {trend_direction} Reversal.")
-                print(f"Forecast: {forecasted_price}")
-            else:
-                print("No recent reversals identified.")
-
-            print()
-
             ##################################################
             ##################################################
 
