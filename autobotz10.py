@@ -1346,7 +1346,7 @@ def forecast_next_hour_price(close_prices):
     average_freq = (most_negative_freq + most_positive_freq) / 2
 
     # Determine the dominant trend
-    dominant_trend = "Up" if average_freq < 0 else "Down"
+    dominant_trend = "Up" if average_freq > 0 else "Down"
 
     # Forecast for the next hour (assuming 60 minutes in an hour)
     forecast_time = len(close_array) + 60  # Forecasting for the next hour
