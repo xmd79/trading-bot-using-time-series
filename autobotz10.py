@@ -1669,9 +1669,9 @@ def main():
             print(f"Forecasted price (slow cycle): {slow_price:.2f}")
 
 
-            fast_price = str(fast_price)
-            medium_price = str(medium_price)
-            slow_price = str(slow_price)
+            fast_price = float(fast_price)
+            medium_price = float(medium_price)
+            slow_price = float(slow_price)
 
             print()
 
