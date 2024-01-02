@@ -1835,8 +1835,8 @@ def main():
                                                     print("LONG condition 8: price < expected_price") 
                                                     if market_mood_fft == "Bullish":
                                                         print("LONG condition 9: market_mood_fft == Bullish")  
-                                                        if mood == "Bullish" and price < forecast:
-                                                            print("LONG condition 10: mood == Bullish and price < forecast")  
+                                                        if price < forecast:
+                                                            print("LONG condition 10: price < forecast")  
                                                             if reversals_confirmations == "Bullish":
                                                                 print("LONG condition 11: reversals_confirmations == Bullish") 
                                                                 if price < fast_price:   
@@ -1866,8 +1866,8 @@ def main():
                                                     print("SHORT condition 8: price > expected_price") 
                                                     if market_mood_fft == "Bearish":
                                                         print("SHORT condition 9: market_mood_fft == Bearish")
-                                                        if mood == "Bearish" and price > forecast:
-                                                            print("SHORT condition 10: mood == Bearish and price > forecast")  
+                                                        if price > forecast:
+                                                            print("SHORT condition 10: price > forecast")  
                                                             if reversals_confirmations == "Bearish":
                                                                 print("SHORT condition 11: reversals_confirmations == Bearish") 
                                                                 if price > fast_price:   
