@@ -1303,14 +1303,79 @@ def forecast_prices(close):
 fast_price, medium_price, slow_price = forecast_prices(close)
 
 # Print forecasted prices
-print(f"Forecasted price for the next minute (fast cycle): {fast_price:.2f}")
-print(f"Forecasted price for the next minute (medium cycle): {medium_price:.2f}")
-print(f"Forecasted price for the next minute (slow cycle): {slow_price:.2f}")
+print(f"Forecasted price (fast cycle): {fast_price:.2f}")
+print(f"Forecasted price (medium cycle): {medium_price:.2f}")
+print(f"Forecasted price (slow cycle): {slow_price:.2f}")
 
 print()
 
 ##################################################
 ##################################################
+
+import numpy as np
+
+def compute_fft_and_print_dominant_frequencies(close, sampling_rate):
+    """
+    Compute FFT and print dominant frequencies and their magnitudes.
+    
+    Parameters:
+    - close (list or np.ndarray): Closing prices time series data.
+    - sampling_rate (float): Sampling rate of the time series data (typically 1 if data is daily).
+    
+    Returns:
+    None
+    """
+    # Convert close to numpy array if it's not already one
+    close_prices = np.array(close)
+    
+    # Compute FFT
+    fft_result = np.fft.fft(close_prices)
+    
+    # Compute frequencies corresponding to FFT components
+    frequencies = np.fft.fftfreq(len(fft_result), 1/sampling_rate)
+    
+    # Get magnitudes of FFT components
+    magnitudes = np.abs(fft_result)
+    
+    # Sort frequencies and magnitudes in descending order of magnitudes
+    sorted_indices = np.argsort(magnitudes)[::-1]
+    sorted_frequencies = frequencies[sorted_indices]
+    sorted_magnitudes = magnitudes[sorted_indices]
+    
+    # Print dominant frequencies and their magnitudes
+    #print("Dominant Frequencies and Magnitudes:")
+    #for freq, mag in zip(sorted_frequencies[:10], sorted_magnitudes[:10]):
+        #print(f"Frequency: {freq} Hz, Magnitude: {mag}")
+    
+    # Forecasted price value based on the dominant frequency
+    dominant_frequency = sorted_frequencies[0]  # Taking the highest magnitude frequency as dominant
+    forecasted_price = close_prices[-1] * np.cos(2 * np.pi * dominant_frequency / sampling_rate)
+    
+    return forecasted_price
+
+# Generate synthetic closing prices for 1 year (365 days) with a sampling rate of 1 day.
+num_days = 365
+sampling_rate = 1
+    
+# Generate synthetic closing prices using a sine wave with a frequency of 1/30.
+time = np.linspace(0, 10 * np.pi, num_days)
+    
+# Compute FFT and print forecasted price based on dominant frequency
+forecast1 = compute_fft_and_print_dominant_frequencies(close, sampling_rate)
+print(f"Forecasted Price 1 based on Dominant Frequency: {forecast1}")
+    
+# Add two more forecasted prices further in the time series data maintaining the same direction based on market mood
+forecast2 = forecast1 + 5  # Adding 5 for demonstration (maintaining the same direction)
+forecast3 = forecast2 + 5  # Adding 5 for demonstration (maintaining the same direction)
+    
+print(f"Forecasted Price 2 based on Market Mood: {forecast2}")
+print(f"Forecasted Price 3 based on Market Mood: {forecast3}")
+
+print()
+
+##################################################
+##################################################
+
 
 print("Init main() loop: ")
 
@@ -1668,10 +1733,36 @@ def main():
             print(f"Forecasted price (medium cycle): {medium_price:.2f}")
             print(f"Forecasted price (slow cycle): {slow_price:.2f}")
 
-
             fast_price = float(fast_price)
             medium_price = float(medium_price)
             slow_price = float(slow_price)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Generate synthetic closing prices for 1 year (365 days) with a sampling rate of 1 day.
+            num_days = 365
+            sampling_rate = 1
+    
+            # Generate synthetic closing prices using a sine wave with a frequency of 1/30.
+            time = np.linspace(0, 10 * np.pi, num_days)
+    
+            # Compute FFT and print forecasted price based on dominant frequency
+            forecast1 = compute_fft_and_print_dominant_frequencies(close, sampling_rate)
+            print(f"Forecasted Price 1 based on Dominant Frequency: {forecast1}")
+    
+            # Add two more forecasted prices further in the time series data maintaining the same direction based on market mood
+            forecast2 = forecast1 + 5  # Adding 5 for demonstration (maintaining the same direction)
+            forecast3 = forecast2 + 5  # Adding 5 for demonstration (maintaining the same direction)
+    
+            print(f"Forecasted Price 2 based on Market Mood: {forecast2}")
+            print(f"Forecasted Price 3 based on Market Mood: {forecast3}")
+
+            forecast1 = float(forecast1)
+            forecast2 = float(forecast2)
+            forecast3 = float(forecast3)
 
             print()
 
@@ -1771,10 +1862,12 @@ def main():
                                                             if reversals_confirmations == "Bullish":
                                                                 print("LONG condition 11: reversals_confirmations == Bullish") 
                                                                 if price < fast_price:   
-                                                                    print("LONG condition 12: price < fast_price")                                 
-                                                                    if momentum > 0:
-                                                                        print("LONG condition 13: momentum > 0")
-                                                                        trigger_long = True
+                                                                    print("LONG condition 12: price < fast_price")
+                                                                    if price < forecast1:
+                                                                        print("LONG condition 13: price < forecast1")                                
+                                                                        if momentum > 0:
+                                                                            print("LONG condition 14: momentum > 0")
+                                                                            trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 15:
@@ -1800,10 +1893,12 @@ def main():
                                                             if reversals_confirmations == "Bearish":
                                                                 print("SHORT condition 11: reversals_confirmations == Bearish") 
                                                                 if price > fast_price:   
-                                                                    print("SHORT condition 12: price > fast_price")                                             
-                                                                    if momentum < 0:
-                                                                        print("SHORT condition 13: momentum < 0")
-                                                                        trigger_short = True
+                                                                    print("SHORT condition 12: price > fast_price")
+                                                                    if price > forecast1:
+                                                                        print("SHORT condition 13: price > forecast1")                                              
+                                                                        if momentum < 0:
+                                                                            print("SHORT condition 14: momentum < 0")
+                                                                            trigger_short = True
                     print()
 
                     #message = f'Price: ${price}' 
