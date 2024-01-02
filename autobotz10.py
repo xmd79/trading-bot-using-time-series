@@ -1426,6 +1426,87 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def calculate_gmma_sine_wave(close):
+    """
+    Calculate GMMA (Guppy Multiple Moving Average) and Sine Wave indicators.
+    
+    Parameters:
+    - close (np.array): Array of closing prices for the asset.
+    
+    Returns:
+    - short_term_ema (np.array): Short-term EMAs.
+    - long_term_ema (np.array): Long-term EMAs.
+    - sine_wave (np.array): Sine wave values.
+    """
+    # GMMA Calculation
+    short_term_ema = [np.mean(close[-term:]) for term in [3, 5, 8, 10, 12, 15]]
+    long_term_ema = [np.mean(close[-term:]) for term in [30, 35, 40, 45, 50, 60]]
+    
+    # Sine Wave Calculation using the closing prices
+    sine_wave = np.sin(close)
+    
+    return np.array(short_term_ema), np.array(long_term_ema), sine_wave
+
+def identify_reversals(short_term_ema, long_term_ema, sine_wave):
+    """
+    Identify potential reversals using GMMA and Sine Wave indicators.
+    
+    Parameters:
+    - short_term_ema (np.array): Short-term EMAs.
+    - long_term_ema (np.array): Long-term EMAs.
+    - sine_wave (np.array): Sine wave values.
+    
+    Returns:
+    - reversal_points (list): List of reversal indices.
+    """
+    reversal_points = []
+    
+    # Identify GMMA Reversals
+    for i in range(1, len(short_term_ema)):
+        if short_term_ema[i] > long_term_ema[i] and short_term_ema[i - 1] <= long_term_ema[i - 1]:
+            reversal_points.append(('Bullish', i))
+        elif short_term_ema[i] < long_term_ema[i] and short_term_ema[i - 1] >= long_term_ema[i - 1]:
+            reversal_points.append(('Bearish', i))
+    
+    # Identify Sine Wave Reversals (Peaks and Troughs)
+    for i in range(1, len(sine_wave) - 1):
+        if sine_wave[i] > sine_wave[i - 1] and sine_wave[i] > sine_wave[i + 1]:
+            reversal_points.append(('Bearish', i))
+        elif sine_wave[i] < sine_wave[i - 1] and sine_wave[i] < sine_wave[i + 1]:
+            reversal_points.append(('Bullish', i))
+    
+    return reversal_points
+
+
+# Calculate GMMA and Sine Wave indicators
+short_term_ema, long_term_ema, sine_wave = calculate_gmma_sine_wave(close)
+
+# Identify reversals
+reversal_points = identify_reversals(short_term_ema, long_term_ema, sine_wave)
+
+# Determine forecasted price and market mood based on the latest reversal point
+if reversal_points:
+    trend_direction, last_reversal_index = reversal_points[-1]
+    
+    # Forecasted price based on the trend direction
+    if trend_direction == 'Bullish':
+        forecasted_price = "Expect higher prices"
+    else:
+        forecasted_price = "Expect lower prices"
+    
+    print(f"Latest Reversal: Index {last_reversal_index}, {trend_direction} Reversal.")
+    print(f"Forecast: {forecasted_price}")
+else:
+    print("No recent reversals identified.")
+
+
+
+print()
+
+##################################################
+##################################################
 
 print("Init main() loop: ")
 
@@ -1845,8 +1926,34 @@ def main():
             ##################################################
             ##################################################
 
+            # Calculate GMMA and Sine Wave indicators
+            short_term_ema, long_term_ema, sine_wave = calculate_gmma_sine_wave(close)
+
+            # Identify reversals
+            reversal_points = identify_reversals(short_term_ema, long_term_ema, sine_wave)
+
+            # Determine forecasted price and market mood based on the latest reversal point
+            if reversal_points:
+                trend_direction, last_reversal_index = reversal_points[-1]
+    
+                # Forecasted price based on the trend direction
+                if trend_direction == 'Bullish':
+                    forecasted_price = "Expect higher prices"
+                else:
+                    forecasted_price = "Expect lower prices"
+    
+                print(f"Latest Reversal: Index {last_reversal_index}, {trend_direction} Reversal.")
+                print(f"Forecast: {forecasted_price}")
+            else:
+                print("No recent reversals identified.")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 5.00
-            stop_loss = -5.00
+            stop_loss = -10.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
