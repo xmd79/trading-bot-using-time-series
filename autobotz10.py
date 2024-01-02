@@ -396,13 +396,33 @@ def get_momentum(timeframe):
     momentum = talib.MOM(np.array([c["close"] for c in candles]), timeperiod=14)
     return momentum[-1]
 
-##################################################
-##################################################
-
 # Calculate momentum for each timeframe
+momentum_values = {}
 for timeframe in timeframes:
     momentum = get_momentum(timeframe)
+    momentum_values[timeframe] = momentum
     print(f"Momentum for {timeframe}: {momentum}")
+
+# Convert momentum to a normalized scale and determine if it's positive or negative
+normalized_momentum = {}
+for timeframe, momentum in momentum_values.items():
+    normalized_value = (momentum + 100) / 2  # Normalize to a scale between 0 and 100
+    normalized_momentum[timeframe] = normalized_value
+    print(f"Normalized Momentum for {timeframe}: {normalized_value:.2f}%")
+
+# Calculate dominant ratio
+positive_count = sum(1 for value in normalized_momentum.values() if value > 50)
+negative_count = len(normalized_momentum) - positive_count
+
+print(f"Positive momentum timeframes: {positive_count}/{len(normalized_momentum)}")
+print(f"Negative momentum timeframes: {negative_count}/{len(normalized_momentum)}")
+
+if positive_count > negative_count:
+    print("Overall dominant momentum: Positive")
+elif positive_count < negative_count:
+    print("Overall dominant momentum: Negative")
+else:
+    print("Overall dominant momentum: Balanced")
 
 print()
 
@@ -652,6 +672,8 @@ def calculate_reversal_and_forecast(close):
 # Call the calculate_reversal_and_forecast function with the example data
 (current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression, last_reversal, forecast_dip, forecast_top) = calculate_reversal_and_forecast(close)
 
+print()
+
 ##################################################
 ##################################################
 
@@ -702,6 +724,53 @@ def calculate_elements():
     imaginary_number = 1j
 
     return PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed  
+
+print()
+
+
+def forecast_sma_targets(close_price):
+    # Retrieve the calculated elements
+    (PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed) = calculate_elements()
+
+    # Calculate the three gradual targets for each quadrant
+    targets = {}
+    for quadrant, data in unit_circle_degrees.items():
+        target1 = close_price + (sacred_freq * (1 + (quadrant * 0.25)))
+        target2 = close_price + (sacred_freq * (1.5 + (quadrant * 0.25)))
+        target3 = close_price + (sacred_freq * (2 + (quadrant * 0.25)))
+
+        # Calculate distances from close_price to each target in percentages
+        distances = {
+            f"Target1_Quad_{quadrant}": ((target1 - close_price) / close_price) * 100,
+            f"Target2_Quad_{quadrant}": ((target2 - close_price) / close_price) * 100,
+            f"Target3_Quad_{quadrant}": ((target3 - close_price) / close_price) * 100,
+        }
+
+        targets[f"Quadrant_{quadrant}"] = {
+            "Target1": target1,
+            "Target2": target2,
+            "Target3": target3,
+            "Distances": distances
+        }
+
+    # Print the results
+    print(f"Given Close Price (Center of Unit Circle): {close_price}\n")
+    
+    for quadrant, data in targets.items():
+        print(f"Quadrant: {quadrant}")
+        print(f"Targets and Their Price Values:")
+        for target_name, target_value in data.items():
+            if target_name != "Distances":
+                print(f"{target_name}: {target_value:.2f}")
+        
+        print("\nDistances in Percentage from Given Close Price (Center) to Each Forecast Target:")
+        for distance_name, distance_value in data["Distances"].items():
+            print(f"{distance_name}: {distance_value:.2f}%")
+        
+        print("\n" + "-"*50 + "\n")
+
+# Example usage with a close price of 100
+forecast_sma_targets(price)
 
 print()
 
@@ -1741,6 +1810,39 @@ def main():
             dominant_trend, forecasted_price = forecast_next_hour_price(close)
 
             print(f"Dominant Trend: {dominant_trend}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Calculate momentum for each timeframe
+            momentum_values = {}
+            for timeframe in timeframes:
+                momentum = get_momentum(timeframe)
+                momentum_values[timeframe] = momentum
+                print(f"Momentum for {timeframe}: {momentum}")
+
+            # Convert momentum to a normalized scale and determine if it's positive or negative
+            normalized_momentum = {}
+            for timeframe, momentum in momentum_values.items():
+                normalized_value = (momentum + 100) / 2  # Normalize to a scale between 0 and 100
+                normalized_momentum[timeframe] = normalized_value
+                print(f"Normalized Momentum for {timeframe}: {normalized_value:.2f}%")
+
+            # Calculate dominant ratio
+            positive_count = sum(1 for value in normalized_momentum.values() if value > 50)
+            negative_count = len(normalized_momentum) - positive_count
+
+            print(f"Positive momentum timeframes: {positive_count}/{len(normalized_momentum)}")
+            print(f"Negative momentum timeframes: {negative_count}/{len(normalized_momentum)}")
+
+            if positive_count > negative_count:
+                print("Overall dominant momentum: Positive")
+            elif positive_count < negative_count:
+                print("Overall dominant momentum: Negative")
+            else:
+                print("Overall dominant momentum: Balanced")
 
             print()
 
