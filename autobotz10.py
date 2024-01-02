@@ -1680,7 +1680,7 @@ def main():
                         print("LONG signal!")
                         f.write(f"{current_time} LONG {price}\n")
 
-                        webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message_long)
+                        webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1191539448782000189/Jvz-8g-pEa3FxWdnIL51Fi5XQJFZDmPrsOYaw8NOvp66S0BESptJ99sZAdtdQe4HGI0C', content=message_long)
                         response = webhook.execute()
 
                         entry_long(symbol)
@@ -1690,7 +1690,7 @@ def main():
                         print("SHORT signal!")
                         f.write(f"{current_time} SHORT {price}\n")
 
-                        webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message_short)
+                        webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1191539448782000189/Jvz-8g-pEa3FxWdnIL51Fi5XQJFZDmPrsOYaw8NOvp66S0BESptJ99sZAdtdQe4HGI0C', content=message_short)
                         response = webhook.execute()
 
                         entry_short(symbol)
