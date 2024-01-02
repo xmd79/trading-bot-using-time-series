@@ -1535,6 +1535,8 @@ def main():
 
             print()
 
+            timeframes = ['1m', '3m']
+
             for timeframe in timeframes:
                 dist_min, dist_max = scale_to_sine(timeframe)
                 if dist_min < dist_max:
