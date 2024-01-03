@@ -2112,6 +2112,10 @@ def main():
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
         del x, slope, intercept, expected_price, last_close_price
+        del processed_data, dominant_freq, peaks, troughs, energy, reversals_confirmations
+        del fast_price, medium_price, slow_price, dominant_trend, forecasted_price, results
+        del momentum_values, normalized_momentum, positive_count, negative_count  
+        del t, sine_wave, reversals, last_reversal_price, current_reversal_price, sine_forecast_direction 
 
         # Force garbage collection to free up memory
         gc.collect()
