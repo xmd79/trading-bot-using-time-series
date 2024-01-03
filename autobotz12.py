@@ -1425,6 +1425,52 @@ print()
 ##################################################
 ##################################################
 
+def impulse_momentum_overall_signal(closes):
+    overall_signal = None  # Can be 'BUY', 'SELL', or None
+    mean_price = sum(closes) / len(closes)
+
+    for i in range(1, len(closes)):
+        current_price = closes[i]
+        previous_price = closes[i - 1]
+
+        # Mean reversion strategy
+        if current_price > mean_price:
+            overall_signal = 'BUY'
+
+        elif current_price < mean_price:
+            overall_signal = 'SELL'
+
+        # Breakout trading strategy
+        if current_price > previous_price:
+            overall_signal = 'BUY'
+
+        elif current_price < previous_price:
+            overall_signal = 'SELL'
+
+        # Range trading strategy
+        range_threshold = 0.02 * mean_price  # 2% range around the mean
+        if current_price > mean_price + range_threshold:
+            overall_signal = 'SELL'
+        elif current_price < mean_price - range_threshold:
+            overall_signal = 'BUY'
+
+        # Volatility trading strategy
+        price_change_percentage = ((current_price - previous_price) / previous_price) * 100
+        volatility_threshold = 5  # 5% volatility threshold
+        if abs(price_change_percentage) > volatility_threshold:
+            if price_change_percentage > 0:
+                overall_signal = 'BUY'
+            else:
+                overall_signal = 'SELL'
+
+    return overall_signal
+
+# Example usage:
+closes = close
+
+signal = impulse_momentum_overall_signal(closes)
+print("Overall Signal:", signal)
+
 print()
 
 ##################################################
@@ -1807,22 +1853,11 @@ def main():
             ##################################################
             ##################################################
 
-            # Calculate fresh sine wave  
-            close_prices = np.array(closes)
-            sine, leadsine = talib.HT_SINE(close_prices)
-            sine = -sine
+            # Example usage:
+            closes = close
 
-            timeframes = ['1m', '5m']
-            
-            # Call scale_to_sine() function   
-            for timeframe in timeframes:
-                dist_min, dist_max = scale_to_sine(timeframe)
-                if dist_min < dist_max:
-                    print(f"For {timeframe} timeframe: Up")
-                else:
-                    print(f"For {timeframe} timeframe: Down")
-
-                print()
+            signal = impulse_momentum_overall_signal(closes)
+            print("Overall Signal:", signal)
 
             print()
 
@@ -1925,14 +1960,12 @@ def main():
                                                                     if positive_count > negative_count:
                                                                         print("LONG condition 12: positive_count > negative_count")     
                                                                     elif positive_count == negative_count:
-                                                                        print("LONG condition 12: positive_count = negative_count")                              
-                                                                    if momentum > 0:
-                                                                        print("LONG condition 13: momentum > 0")
-                                                                        for timeframe in timeframes:
-                                                                            if timeframe == "1m" and dist_min < dist_max:
-                                                                                if timeframe == "5m" and dist_min < dist_max:
-                                                                                    print("LONG condition 14: for 1min and 5min tfs dist_min < dist_max") 
-                                                                                    trigger_long = True
+                                                                        print("LONG condition 12: positive_count = negative_count")
+                                                                    if signal == "BUY":
+                                                                        print("LONG condition 13: signal == BUY")                             
+                                                                        if momentum > 0:
+                                                                            print("LONG condition 14: momentum > 0")
+                                                                            trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -1961,14 +1994,12 @@ def main():
                                                                     if positive_count < negative_count:
                                                                         print("SHORT condition 12: positive_count < negative_count")     
                                                                     elif positive_count == negative_count:
-                                                                        print("SHORT condition 12: positive_count = negative_count")                                            
-                                                                    if momentum < 0:
-                                                                        print("SHORT condition 13: momentum < 0")
-                                                                        for timeframe in timeframes:
-                                                                            if timeframe == "1m" and dist_min > dist_max:
-                                                                                if timeframe == "5m" and dist_min > dist_max:
-                                                                                    print("SHORT condition 14: for 1min and 5min tfs dist_min > dist_max") 
-                                                                                    trigger_short = True
+                                                                        print("SHORT condition 12: positive_count = negative_count")   
+                                                                    if signal == "SELL":
+                                                                        print("SHORT condition 13: signal == SELL")                                          
+                                                                        if momentum < 0:
+                                                                            print("SHORT condition 13: momentum < 0")
+                                                                            trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
