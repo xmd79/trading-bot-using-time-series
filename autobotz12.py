@@ -911,12 +911,10 @@ def forecast_sine_price(close):
     
     if mood == "Bullish":
         forecasted_price = current_price + (current_price - close[-1])  # Real forecast based on the last price difference
-        return "Up", forecasted_price
+        return "Up"
     elif mood == "Bearish":
         forecasted_price = current_price - (close[-1] - current_price)  # Real forecast based on the last price difference
-        return "Down", forecasted_price
-    else:
-        return "Stable", current_price
+        return "Down"
 
 # Generate a sine wave data for demonstration
 t = np.linspace(0, 4 * np.pi, 1000)
