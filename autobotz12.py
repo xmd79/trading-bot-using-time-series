@@ -1920,8 +1920,11 @@ def main():
                                                             print("LONG condition 10: price < forecast")   
                                                             if price < fast_price:   
                                                                 print("LONG condition 11: price < fast_price")  
-                                                                if positive_count > negative_count:
-                                                                    print("LONG condition 12: positive_count > negative_count")                                
+                                                                if positive_count > negative_count or positive_count == negative_count:
+                                                                    if positive_count > negative_count:
+                                                                        print("LONG condition 12: positive_count > negative_count")     
+                                                                    elif positive_count == negative_count:
+                                                                        print("LONG condition 12: positive_count = negative_count")                              
                                                                     if momentum > 0:
                                                                         print("LONG condition 13: momentum > 0")
                                                                         trigger_long = True
@@ -1949,8 +1952,11 @@ def main():
                                                             print("SHORT condition 10: price > forecast")
                                                             if price > fast_price:   
                                                                 print("SHORT condition 11: price > fast_price")
-                                                                if positive_count < negative_count:
-                                                                    print("SHORT condition 12: positive_count < negative_count")                                              
+                                                                if positive_count < negative_count or positive_count == negative_count:
+                                                                    if positive_count < negative_count:
+                                                                        print("SHORT condition 12: positive_count < negative_count")     
+                                                                    elif positive_count == negative_count:
+                                                                        print("SHORT condition 12: positive_count = negative_count")                                            
                                                                     if momentum < 0:
                                                                         print("SHORT condition 13: momentum < 0")
                                                                         trigger_short = True
