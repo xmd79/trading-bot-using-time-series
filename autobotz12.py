@@ -1998,7 +1998,7 @@ def main():
                                                                     if signal == "SELL":
                                                                         print("SHORT condition 13: signal == SELL")                                          
                                                                         if momentum < 0:
-                                                                            print("SHORT condition 13: momentum < 0")
+                                                                            print("SHORT condition 14: momentum < 0")
                                                                             trigger_short = True
                     print()  
 
@@ -2055,13 +2055,13 @@ def main():
         ##################################################
 
         # Delete variables and elements to clean up for the next iteration
-        del closes, close, candles, sine, leadsine
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
         del x, slope, intercept, expected_price, last_close_price, forecast_result
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
+        del closes, close, candles
 
         # Force garbage collection to free up memory
         gc.collect()
