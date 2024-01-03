@@ -1931,8 +1931,8 @@ def main():
                                                                     if momentum > 0:
                                                                         print("LONG condition 13: momentum > 0")
                                                                         if timeframe == "1m" and dist_min < dist_max:
-                                                                            if timeframe == "3m" and dist_min < dist_max:
-                                                                                print("LONG condition 14: for 1min and 3min tfs dist_min < dist_max") 
+                                                                            if timeframe == "5m" and dist_min < dist_max:
+                                                                                print("LONG condition 14: for 1min and 5min tfs dist_min < dist_max") 
                                                                                 trigger_long = True
 
                     # Downtrend cycle trigger conditions
@@ -1966,8 +1966,8 @@ def main():
                                                                     if momentum < 0:
                                                                         print("SHORT condition 13: momentum < 0")
                                                                         if timeframe == "1m" and dist_min > dist_max:
-                                                                            if timeframe == "3m" and dist_min > dist_max:
-                                                                                print("SHORT condition 14: for 1min and 3min tfs dist_min > dist_max") 
+                                                                            if timeframe == "5m" and dist_min > dist_max:
+                                                                                print("SHORT condition 14: for 1min and 5min tfs dist_min > dist_max") 
                                                                                 trigger_short = True
                     print()  
 
