@@ -1436,6 +1436,9 @@ def adf_test(close):
     return result[1]
 
 def analyze_financial_data(close):
+    # Convert close prices to a NumPy array to ensure consistent data type
+    close = np.array(close)
+
     results = {}
     
     # Step 1: Test for stationarity using ADF test
