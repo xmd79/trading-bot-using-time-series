@@ -2009,18 +2009,16 @@ def main():
                                                     if market_mood_fft == "Bullish":
                                                         print("LONG condition 9: market_mood_fft == Bullish")  
                                                         if price < forecast:
-                                                            print("LONG condition 10: price < forecast")  
-                                                            if market_mood_sin == "Up":
-                                                                print("LONG condition 11: market_mood_sin == Up") 
-                                                                if reversals_confirmations == "Bullish":
-                                                                    print("LONG condition 12: reversals_confirmations == Bullish") 
-                                                                    if price < fast_price:   
-                                                                        print("LONG condition 13: price < fast_price")  
-                                                                        if positive_count > negative_count:
-                                                                            print("LONG condition 14: positive_count > negative_count")                                
-                                                                            if momentum > 0:
-                                                                                print("LONG condition 15: momentum > 0")
-                                                                                trigger_long = True
+                                                            print("LONG condition 10: price < forecast")   
+                                                            if reversals_confirmations == "Bullish":
+                                                                print("LONG condition 11: reversals_confirmations == Bullish") 
+                                                                if price < fast_price:   
+                                                                    print("LONG condition 12: price < fast_price")  
+                                                                    if positive_count > negative_count:
+                                                                        print("LONG condition 13: positive_count > negative_count")                                
+                                                                        if momentum > 0:
+                                                                            print("LONG condition 14: momentum > 0")
+                                                                            trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -2043,17 +2041,15 @@ def main():
                                                         print("SHORT condition 9: market_mood_fft == Bearish")
                                                         if price > forecast:
                                                             print("SHORT condition 10: price > forecast")
-                                                            if market_mood_sin == "Down":
-                                                                print("SHORT condition 11: market_mood_sin == Down")   
-                                                                if reversals_confirmations == "Bearish":
-                                                                    print("SHORT condition 12: reversals_confirmations == Bearish") 
-                                                                    if price > fast_price:   
-                                                                        print("SHORT condition 13: price > fast_price")
-                                                                        if positive_count < negative_count:
-                                                                            print("SHORT condition 14: positive_count < negative_count")                                              
-                                                                            if momentum < 0:
-                                                                                print("SHORT condition 15: momentum < 0")
-                                                                                trigger_short = True
+                                                            if reversals_confirmations == "Bearish":
+                                                                print("SHORT condition 11: reversals_confirmations == Bearish") 
+                                                                if price > fast_price:   
+                                                                    print("SHORT condition 12: price > fast_price")
+                                                                    if positive_count < negative_count:
+                                                                        print("SHORT condition 13: positive_count < negative_count")                                              
+                                                                        if momentum < 0:
+                                                                            print("SHORT condition 14: momentum < 0")
+                                                                            trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
