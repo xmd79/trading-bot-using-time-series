@@ -2111,6 +2111,7 @@ def main():
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
+        del x, slope, intercept, expected_price, last_close_price
 
         # Force garbage collection to free up memory
         gc.collect()
