@@ -1753,26 +1753,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Convert the list to a numpy array for processing
-            close_prices = np.array(close)
-
-            # Step 1: Preprocess Data
-            processed_data = preprocess_data(close_prices)
-
-            # Step 2: Apply Fourier Transform
-            dominant_freq = apply_fourier_transform(processed_data)
-
-            # Step 3: Time Geometry Analysis
-            peaks, troughs = time_geometry_analysis(processed_data)
-
-            # Step 4: Calculate Metrics
-            energy, momentum, reversals_confirmations = calculate_metrics(dominant_freq, peaks, troughs)
-
-            # Step 5: Make Predictions
-            print(f"Dominant Frequency (Energy): {dominant_freq}")
-            print(f"Total Momentum (Peaks + Troughs): {momentum}")
-            print(f"Reversals Confirmation: {reversals_confirmations}")
-
             print()
 
             ##################################################
@@ -1794,10 +1774,6 @@ def main():
 
             ##################################################
             ##################################################
-
-            dominant_trend, forecasted_price = forecast_next_hour_price(close)
-
-            print(f"Dominant Trend: {dominant_trend}")
 
             print()
 
@@ -2038,9 +2014,8 @@ def main():
         del response, data, price, current_time, current_close, momentum
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del x, slope, intercept, expected_price, last_close_price
-        del processed_data, dominant_freq, peaks, troughs, energy, reversals_confirmations
-        del fast_price, medium_price, slow_price, dominant_trend, forecasted_price, results
+        del x, slope, intercept, expected_price, last_close_price, forecast_result
+        del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
 
         # Force garbage collection to free up memory
