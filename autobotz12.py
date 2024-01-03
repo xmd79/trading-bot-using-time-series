@@ -1500,22 +1500,23 @@ def main():
             close_prices = np.array(closes)
             sine, leadsine = talib.HT_SINE(close_prices)
             sine = -sine
-    
+
+            timeframes = ['1m', '3m', '5m']
+            
             # Call scale_to_sine() function   
-            #dist_from_close_to_min, dist_from_close_to_max = scale_to_sine('1m')
+            for timeframe in timeframes:
+                dist_min, dist_max = scale_to_sine(timeframe)
+                if dist_min < dist_max:
+                    print(f"For {timeframe} timeframe: Up")
+                else:
+                    print(f"For {timeframe} timeframe: Down")
 
-            #for timeframe in timeframes:
-                #dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
-
-                # Print results        
-                #print(f"On {timeframe} Close price value on sine is now at: {current_sine})")
-                #print(f"On {timeframe} Distance from close to min perc. is now at: {dist_from_close_to_min})")
-                #print(f"On {timeframe} Distance from close to max perc. is now at: {dist_from_close_to_max})")
-
-            ##################################################
-            ##################################################
+                print()
 
             print()
+
+            ##################################################
+            ##################################################
 
             url = "https://fapi.binance.com/fapi/v1/ticker/price"
 
@@ -1784,6 +1785,8 @@ def main():
             ##################################################
             ##################################################
 
+            timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
+
             # Calculate momentum for each timeframe
             momentum_values = {}
             for timeframe in timeframes:
@@ -1927,7 +1930,10 @@ def main():
                                                                         print("LONG condition 12: positive_count = negative_count")                              
                                                                     if momentum > 0:
                                                                         print("LONG condition 13: momentum > 0")
-                                                                        trigger_long = True
+                                                                        if timeframe == "1m" and dist_min < dist_max:
+                                                                            if timeframe == "3m" and dist_min < dist_max:
+                                                                                print("LONG condition 14: for 1min and 3min tfs dist_min < dist_max") 
+                                                                                trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -1959,7 +1965,10 @@ def main():
                                                                         print("SHORT condition 12: positive_count = negative_count")                                            
                                                                     if momentum < 0:
                                                                         print("SHORT condition 13: momentum < 0")
-                                                                        trigger_short = True
+                                                                        if timeframe == "1m" and dist_min > dist_max:
+                                                                            if timeframe == "3m" and dist_min > dist_max:
+                                                                                print("SHORT condition 14: for 1min and 3min tfs dist_min > dist_max") 
+                                                                                trigger_long = True
                     print()  
 
                     #message = f'Price: ${price}' 
