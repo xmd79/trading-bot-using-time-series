@@ -1541,13 +1541,6 @@ def main():
             ##################################################
             ##################################################
 
-            timeframe = '1m'
-            momentum = get_momentum(timeframe)
-            print("Momentum on 1min tf is at: ", momentum)
-
-            ##################################################
-            ##################################################
-
             # Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
             min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
 
@@ -1824,6 +1817,12 @@ def main():
             ##################################################
             ##################################################
 
+            timeframe = '1m'
+            momentum = get_momentum(timeframe)
+            print("Momentum on 1min tf is at: ", momentum)
+
+            ##################################################
+            ##################################################
             print()
 
             ##################################################
