@@ -1425,67 +1425,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-from scipy.stats import skew, kurtosis
-from statsmodels.tsa.stattools import adfuller
-import talib
-
-def adf_test(close):
-    """Perform Augmented Dickey-Fuller test for stationarity."""
-    result = adfuller(close)
-    return result[1]
-
-def analyze_financial_data(close):
-    # Convert close prices to a NumPy array to ensure consistent data type
-    close = np.array(close)
-
-    results = {}
-    
-    # Step 1: Test for stationarity using ADF test
-    results['stationarity_p_value'] = adf_test(close)
-    if results['stationarity_p_value'] > 0.05:
-        results['stationarity'] = "non-stationary"
-        close = np.diff(close)
-    else:
-        results['stationarity'] = "stationary"
-    
-    # Step 2: Assess skewness and kurtosis
-    results['skewness'] = skew(close)
-    results['kurtosis'] = kurtosis(close)
-    
-    # Step 3: Apply Fourier transform
-    results['fourier_transform'] = np.fft.fft(close)
-    
-    # Step 4: Calculate Fibonacci Retracement Levels
-    max_val = np.max(close)
-    min_val = np.min(close)
-    fibonacci_levels = [0.236, 0.382, 0.500, 0.618, 0.786]
-    results['fibonacci_levels'] = [(max_val - level * (max_val - min_val)) for level in fibonacci_levels]
-    
-    # Step 5: Calculate Golden Ratio Price
-    golden_ratio = 1.618  # Golden ratio value
-    results['golden_ratio_price'] = min_val + golden_ratio * (max_val - min_val)
-    
-    # Step 6: Calculate forecasted price
-    results['forecasted_price'] = np.mean(close[-5:])
-    
-    # Step 7: Calculate TALIB momentum indicators
-    results['talib_momentum'] = talib.MOM(close)
-    
-    # Step 8: Calculate deviation to mean ratio using SMA to close price
-    results['sma'] = talib.SMA(close)
-    results['deviation_to_mean_ratio'] = close / results['sma']
-    
-    return results
-
-
-analysis_results = analyze_financial_data(close)
-
-# Determine Market Mood
-market_mood_sin = "Up" if close[-1] > close[-2] else "Down"
-print(f"Market Mood: {market_mood_sin}")
-
-
 print()
 
 ##################################################
