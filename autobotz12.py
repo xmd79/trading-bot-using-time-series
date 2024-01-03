@@ -1968,7 +1968,7 @@ def main():
                                                                         if timeframe == "1m" and dist_min > dist_max:
                                                                             if timeframe == "3m" and dist_min > dist_max:
                                                                                 print("SHORT condition 14: for 1min and 3min tfs dist_min > dist_max") 
-                                                                                trigger_long = True
+                                                                                trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
