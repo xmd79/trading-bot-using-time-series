@@ -1496,28 +1496,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Calculate fresh sine wave  
-            close_prices = np.array(closes)
-            sine, leadsine = talib.HT_SINE(close_prices)
-            sine = -sine
-
-            timeframes = ['1m', '5m']
-            
-            # Call scale_to_sine() function   
-            for timeframe in timeframes:
-                dist_min, dist_max = scale_to_sine(timeframe)
-                if dist_min < dist_max:
-                    print(f"For {timeframe} timeframe: Up")
-                else:
-                    print(f"For {timeframe} timeframe: Down")
-
-                print()
-
-            print()
-
-            ##################################################
-            ##################################################
-
             url = "https://fapi.binance.com/fapi/v1/ticker/price"
 
             params = {
@@ -1824,8 +1802,28 @@ def main():
             momentum = get_momentum(timeframe)
             print("Momentum on 1min tf is at: ", momentum)
 
+            print()
+
             ##################################################
             ##################################################
+
+            # Calculate fresh sine wave  
+            close_prices = np.array(closes)
+            sine, leadsine = talib.HT_SINE(close_prices)
+            sine = -sine
+
+            timeframes = ['1m', '5m']
+            
+            # Call scale_to_sine() function   
+            for timeframe in timeframes:
+                dist_min, dist_max = scale_to_sine(timeframe)
+                if dist_min < dist_max:
+                    print(f"For {timeframe} timeframe: Up")
+                else:
+                    print(f"For {timeframe} timeframe: Down")
+
+                print()
+
             print()
 
             ##################################################
