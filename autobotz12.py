@@ -1501,7 +1501,7 @@ def main():
             sine, leadsine = talib.HT_SINE(close_prices)
             sine = -sine
 
-            timeframes = ['1m', '3m', '5m']
+            timeframes = ['1m', '5m']
             
             # Call scale_to_sine() function   
             for timeframe in timeframes:
@@ -1930,10 +1930,11 @@ def main():
                                                                         print("LONG condition 12: positive_count = negative_count")                              
                                                                     if momentum > 0:
                                                                         print("LONG condition 13: momentum > 0")
-                                                                        if timeframe == "1m" and dist_min < dist_max:
-                                                                            if timeframe == "5m" and dist_min < dist_max:
-                                                                                print("LONG condition 14: for 1min and 5min tfs dist_min < dist_max") 
-                                                                                trigger_long = True
+                                                                        for timeframe in timeframes:
+                                                                            if timeframe == "1m" and dist_min < dist_max:
+                                                                                if timeframe == "5m" and dist_min < dist_max:
+                                                                                    print("LONG condition 14: for 1min and 5min tfs dist_min < dist_max") 
+                                                                                    trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -1965,10 +1966,11 @@ def main():
                                                                         print("SHORT condition 12: positive_count = negative_count")                                            
                                                                     if momentum < 0:
                                                                         print("SHORT condition 13: momentum < 0")
-                                                                        if timeframe == "1m" and dist_min > dist_max:
-                                                                            if timeframe == "5m" and dist_min > dist_max:
-                                                                                print("SHORT condition 14: for 1min and 5min tfs dist_min > dist_max") 
-                                                                                trigger_short = True
+                                                                        for timeframe in timeframes:
+                                                                            if timeframe == "1m" and dist_min > dist_max:
+                                                                                if timeframe == "5m" and dist_min > dist_max:
+                                                                                    print("SHORT condition 14: for 1min and 5min tfs dist_min > dist_max") 
+                                                                                    trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
