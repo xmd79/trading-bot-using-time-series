@@ -1909,12 +1909,6 @@ def main():
             ##################################################
             ##################################################
 
-            analysis_results = analyze_financial_data(close)
-
-            # Determine Market Mood
-            market_mood_sin = "Up" if close[-1] > close[-2] else "Down"
-            print(f"Market Mood: {market_mood_sin}")
-
             print()
 
             ##################################################
@@ -2113,7 +2107,6 @@ def main():
         del processed_data, dominant_freq, peaks, troughs, energy, reversals_confirmations
         del fast_price, medium_price, slow_price, dominant_trend, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
-        del market_mood_sin
 
         # Force garbage collection to free up memory
         gc.collect()
