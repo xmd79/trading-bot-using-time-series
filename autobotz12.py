@@ -1542,23 +1542,6 @@ def analyze_market_mood(reversals):
     # Default to up if no reversals detected (for demonstration purposes)
     return "up"
 
-def price_forecast(min_threshold, max_threshold, market_mood):
-    """
-    Use the stationary object and market mood to forecast the future price.
-    
-    Parameters:
-        min_threshold (float): Current minimum threshold.
-        max_threshold (float): Current maximum threshold.
-        market_mood (str): Overall market mood ("up", "down").
-    
-    Returns:
-        float: Forecasted price based on the market mood.
-    """
-    # Implement your custom wave function or forecasting logic here
-    # For demonstration purposes, returning the average of min_threshold and max_threshold
-    return (min_threshold + max_threshold) / 2
-
-
 reversals = detect_reversals(close)
 
 for reversal in reversals:
@@ -1566,8 +1549,7 @@ for reversal in reversals:
 
 market_mood_type = analyze_market_mood(reversals)
 
-forecasted_price_new = price_forecast(min_threshold, max_threshold, market_mood)
-print(f"Market Mood: {market_mood_type}, Forecasted Price: {forecasted_price_new}")
+print(f"Market Mood: {market_mood_type}")
 
 
 print()
@@ -1892,22 +1874,6 @@ def main():
             ##################################################
             ##################################################
 
-            reversals = detect_reversals(close)
-
-            for reversal in reversals:
-                min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, reversal)
-
-            market_mood_type = analyze_market_mood(reversals)
-
-            forecasted_price_new = price_forecast(min_threshold, max_threshold, market_mood)
-
-            print(f"Market Mood: {market_mood_type}, Forecasted Price: {forecasted_price_new}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
             results = forecast_sma_targets(price)
 
             # Print each output string separately
@@ -1968,6 +1934,20 @@ def main():
 
             signal = impulse_momentum_overall_signal(closes)
             print("Overall Signal:", signal)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            reversals = detect_reversals(close)
+
+            for reversal in reversals:
+                min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, reversal)
+
+            market_mood_type = analyze_market_mood(reversals)
+
+            print(f"Market Mood: {market_mood_type}")
 
             print()
 
@@ -2064,8 +2044,8 @@ def main():
                                                         print("LONG condition 9: market_mood_fft == Bullish")  
                                                         if price < forecast:
                                                             print("LONG condition 10: price < forecast")
-                                                            if market_mood_type == "up" and price < forecasted_price_new:
-                                                                print("LONG condition 11: market_mood_type == up and price < forecasted_price_new")   
+                                                            if market_mood_type == "up":
+                                                                print("LONG condition 11: market_mood_type == up")   
                                                                 if price < fast_price:   
                                                                     print("LONG condition 12: price < fast_price")  
                                                                     if positive_count > negative_count or positive_count == negative_count:
@@ -2100,8 +2080,8 @@ def main():
                                                         print("SHORT condition 9: market_mood_fft == Bearish")
                                                         if price > forecast:
                                                             print("SHORT condition 10: price > forecast")
-                                                            if market_mood_type == "down" and price > forecasted_price_new:
-                                                                print("SHORT condition 11: market_mood_type == down and price > forecasted_price_new")   
+                                                            if market_mood_type == "down":
+                                                                print("SHORT condition 11: market_mood_type == down")   
                                                                 if price > fast_price:   
                                                                     print("SHORT condition 12: price > fast_price")
                                                                     if positive_count < negative_count or positive_count == negative_count:
@@ -2175,7 +2155,7 @@ def main():
         del x, slope, intercept, expected_price, last_close_price, forecast_result
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
-        del closes, close, candles
+        del closes, close, candles, reversals, market_mood_type
 
         # Force garbage collection to free up memory
         gc.collect()
