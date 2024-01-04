@@ -1955,7 +1955,7 @@ def main():
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -10.00
+            stop_loss = -25.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -2155,7 +2155,7 @@ def main():
         del x, slope, intercept, expected_price, last_close_price, forecast_result
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
-        del closes, close, candles, reversals, market_mood_type
+        del closes, signal, close, candles, reversals, market_mood_type
 
         # Force garbage collection to free up memory
         gc.collect()
