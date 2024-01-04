@@ -1557,6 +1557,70 @@ print()
 ##################################################
 ##################################################
 
+def analyze_gann_magic_rectangle(close):
+    """
+    Analyze Gann Magic Rectangle diagonals to identify reversals, determine market mood, 
+    and forecast prices based on the provided close prices.
+    
+    Parameters:
+        close (list): List of close prices for analysis.
+        
+    Returns:
+        dict: Dictionary containing detailed outputs for reversals, market mood, and price forecasts.
+    """
+    prev_direction = None
+    last_reversal_index = None
+    
+    for i in range(1, len(close)):
+        direction = None
+        if close[i] > close[i - 1]:
+            direction = 'bullish'
+        elif close[i] < close[i - 1]:
+            direction = 'bearish'
+        else:
+            direction = 'neutral'
+        
+        if direction != prev_direction:
+            last_reversal_index = i
+            prev_direction = direction
+    
+    output = {}
+    
+    if last_reversal_index:
+        output['reversal_info'] = f"Potential {prev_direction} reversal at index {last_reversal_index}, Close Price: {close[last_reversal_index]}"
+    else:
+        output['reversal_info'] = "No recent reversal detected."
+    
+    if close[-1] < close[0]:
+        output['market_mood'] = "Market mood is bullish."
+    elif close[-1] > close[0]:
+        output['market_mood'] = "Market mood is bearish."
+    else:
+        output['market_mood'] = "Market mood is neutral."
+        
+    if close[-1] > close[-2]:
+        output['forecast'] = "Forecast: Expect higher prices."
+    elif close[-1] < close[-2]:
+        output['forecast'] = "Forecast: Expect lower prices."
+    else:
+        output['forecast'] = "Forecast: Expect similar prices."
+        
+    return output
+
+# Call the function and get the output in a dictionary
+result_dict = analyze_gann_magic_rectangle(close)
+
+# Extract values from the dictionary and print them
+print(result_dict['reversal_info'])
+print(result_dict['market_mood'])
+print(result_dict['forecast'])
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -1954,6 +2018,20 @@ def main():
             ##################################################
             ##################################################
 
+            # Call the function and get the output in a dictionary
+            result_dict = analyze_gann_magic_rectangle(close)
+
+            # Extract values from the dictionary and print them
+            print(result_dict['reversal_info'])
+            print(result_dict['market_mood'])
+            print(result_dict['forecast'])
+
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 5.00
             stop_loss = -25.00
 
@@ -2156,6 +2234,7 @@ def main():
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type
+        del result_dict
 
         # Force garbage collection to free up memory
         gc.collect()
