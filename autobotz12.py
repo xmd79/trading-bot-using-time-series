@@ -1557,57 +1557,128 @@ print()
 ##################################################
 ##################################################
 
+import math
+
+def calculate_quadrant_and_mood(angle):
+    """
+    Calculate the quadrant on the unit circle based on the given angle and determine the market mood.
+    
+    Parameters:
+        angle (float): Angle in radians.
+        
+    Returns:
+        tuple: Quadrant and market mood.
+    """
+    quadrant = math.ceil((angle % (2 * math.pi)) / (math.pi / 2))
+    
+    if quadrant == 1:
+        mood = "Bullish"
+    elif quadrant == 2:
+        mood = "Bearish"
+    elif quadrant == 3:
+        mood = "Neutral"
+    else:
+        mood = "Volatility"
+    
+    return quadrant, mood
+
+def analyze_unit_circle_and_golden_rectangle(angle):
+    """
+    Analyze the relationship between the unit circle, golden rectangle, and market mood based on the given angle.
+    
+    Parameters:
+        angle (float): Angle in radians.
+        
+    Returns:
+        dict: Dictionary containing quadrant, market mood, and additional details.
+    """
+    golden_ratio = 1.618
+    fibo_phi = [0, 1]
+    
+    # Calculate the Fibonacci sequence up to a certain point (here we take 10 iterations)
+    for _ in range(8):
+        fibo_phi.append(fibo_phi[-1] + fibo_phi[-2])
+    
+    quadrant, mood = calculate_quadrant_and_mood(angle)
+    
+    # Assume that the angle relates to the golden ratio, so we map it within 0 to 2π for simplicity.
+    normalized_angle = angle % (2 * math.pi)
+    
+    # Check if the angle corresponds to a Fibonacci number in our sequence.
+    if int(normalized_angle / (2 * math.pi) * 10) in fibo_phi:
+        special_event = "Angle corresponds to a Fibonacci number!"
+    else:
+        special_event = "Regular trading condition."
+    
+    return {
+        "Quadrant": quadrant,
+        "Market Mood": mood,
+        "Special Event": special_event
+    }
+
 def analyze_gann_magic_rectangle(close):
     """
-    Analyze Gann Magic Rectangle diagonals to identify reversals, determine market mood, 
+    Analyze Gann Magic Rectangle diagonals to identify tops, dips, determine market mood, 
     and forecast prices based on the provided close prices.
     
     Parameters:
         close (list): List of close prices for analysis.
         
     Returns:
-        dict: Dictionary containing detailed outputs for reversals, market mood, and price forecasts.
+        dict: Dictionary containing detailed outputs for tops, dips, market mood, and price forecasts.
     """
     prev_direction = None
     last_reversal_index = None
+    last_reversal_price = None
     
     for i in range(1, len(close)):
         direction = None
         if close[i] > close[i - 1]:
-            direction = 'bullish'
+            direction = 'up'
         elif close[i] < close[i - 1]:
-            direction = 'bearish'
-        else:
-            direction = 'neutral'
+            direction = 'down'
         
         if direction != prev_direction:
             last_reversal_index = i
+            last_reversal_price = close[i]
             prev_direction = direction
     
     output = {}
     
     if last_reversal_index:
-        output['reversal_info'] = f"Potential {prev_direction} reversal at index {last_reversal_index}, Close Price: {close[last_reversal_index]}"
+        if prev_direction == 'up':
+            output['reversal_info'] = f"Potential top detected at index {last_reversal_index}, Price: {last_reversal_price}"
+        elif prev_direction == 'down':
+            output['reversal_info'] = f"Potential dip detected at index {last_reversal_index}, Price: {last_reversal_price}"
     else:
-        output['reversal_info'] = "No recent reversal detected."
+        output['reversal_info'] = "No recent top or dip detected."
     
     if close[-1] < close[0]:
-        output['market_mood'] = "Market mood is bullish."
-    elif close[-1] > close[0]:
         output['market_mood'] = "Market mood is bearish."
+    elif close[-1] > close[0]:
+        output['market_mood'] = "Market mood is bullish."
     else:
         output['market_mood'] = "Market mood is neutral."
         
-    if close[-1] > close[-2]:
-        output['forecast'] = "Forecast: Expect higher prices."
-    elif close[-1] < close[-2]:
-        output['forecast'] = "Forecast: Expect lower prices."
+    # Using Fibonacci Phi scale to determine forecast based on the last three prices
+    if len(close) >= 3:
+        a, b, c = close[-3], close[-2], close[-1]
+        if a < b > c:  # Potential bullish reversal
+            output['forecast'] = "Forecast: Expect higher prices."
+        elif a > b < c:  # Potential bearish reversal
+            output['forecast'] = "Forecast: Expect lower prices."
+        else:
+            output['forecast'] = "Forecast: Expect similar prices."
     else:
-        output['forecast'] = "Forecast: Expect similar prices."
+        output['forecast'] = "Insufficient data for forecast."
         
     return output
 
-# Call the function and get the output in a dictionary
+# Sample angle (in radians) - you can change this value to test different scenarios.
+angle = math.pi / 4  # This represents 45 degrees in radians.
+
+result = analyze_unit_circle_and_golden_rectangle(angle)
+
 result_dict = analyze_gann_magic_rectangle(close)
 
 # Extract values from the dictionary and print them
@@ -1615,6 +1686,9 @@ print(result_dict['reversal_info'])
 print(result_dict['market_mood'])
 print(result_dict['forecast'])
 
+print(f"Quadrant: {result['Quadrant']}")
+print(f"Market Mood: {result['Market Mood']}")
+print(f"Special Event: {result['Special Event']}")
 
 print()
 
@@ -2017,8 +2091,11 @@ def main():
 
             ##################################################
             ##################################################
+            # Sample angle (in radians) - you can change this value to test different scenarios.
+            angle = math.pi / 4  # This represents 45 degrees in radians.
 
-            # Call the function and get the output in a dictionary
+            result = analyze_unit_circle_and_golden_rectangle(angle)
+
             result_dict = analyze_gann_magic_rectangle(close)
 
             # Extract values from the dictionary and print them
@@ -2026,6 +2103,9 @@ def main():
             print(result_dict['market_mood'])
             print(result_dict['forecast'])
 
+            print(f"Quadrant: {result['Quadrant']}")
+            print(f"Market Mood: {result['Market Mood']}")
+            print(f"Special Event: {result['Special Event']}")
 
             print()
 
