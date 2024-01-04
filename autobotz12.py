@@ -1476,6 +1476,105 @@ print()
 ##################################################
 ##################################################
 
+def adjust_stationary_object(min_threshold, max_threshold, reversal):
+    """
+    Adjust the stationary object based on the reversal.
+    
+    Parameters:
+        min_threshold (float): Current minimum threshold.
+        max_threshold (float): Current maximum threshold.
+        reversal (str): Reversal value ("peak" or "dip").
+    
+    Returns:
+        tuple: Adjusted thresholds (min_threshold, max_threshold).
+    """
+    # Convert reversal values to numerical values for comparison
+    if reversal == "peak":
+        reversal_value = max_threshold  # Assuming 'peak' corresponds to the current max_threshold
+    elif reversal == "dip":
+        reversal_value = min_threshold  # Assuming 'dip' corresponds to the current min_threshold
+    else:
+        raise ValueError("Invalid reversal value")
+
+    if reversal_value > max_threshold:
+        max_threshold = reversal_value
+    elif reversal_value < min_threshold:
+        min_threshold = reversal_value
+    
+    # Adjust the current value to remain stationary between reversals
+    current_value = (min_threshold + max_threshold) / 2
+    return min_threshold, max_threshold
+
+def detect_reversals(close):
+    """
+    Detect peaks and troughs in the close prices to identify reversals.
+    
+    Parameters:
+        close (list): List of close prices.
+    
+    Returns:
+        list: List of detected reversals (peaks and dips).
+    """
+    reversals = []
+    for i in range(1, len(close) - 1):
+        if close[i] > close[i - 1] and close[i] > close[i + 1]:
+            reversals.append("peak")  # Peak
+        elif close[i] < close[i - 1] and close[i] < close[i + 1]:
+            reversals.append("dip")  # Dip
+    return reversals
+
+def analyze_market_mood(reversals):
+    """
+    Analyze the last reversal to determine the market mood.
+    
+    Parameters:
+        reversals (list): List of detected reversals (peaks and dips).
+    
+    Returns:
+        str: Overall market mood ("up", "down").
+    """
+    if reversals:
+        last_reversal = reversals[-1]
+        if last_reversal == "dip":
+            return "up"
+        elif last_reversal == "peak":
+            return "down"
+    # Default to up if no reversals detected (for demonstration purposes)
+    return "up"
+
+def price_forecast(min_threshold, max_threshold, market_mood):
+    """
+    Use the stationary object and market mood to forecast the future price.
+    
+    Parameters:
+        min_threshold (float): Current minimum threshold.
+        max_threshold (float): Current maximum threshold.
+        market_mood (str): Overall market mood ("up", "down").
+    
+    Returns:
+        float: Forecasted price based on the market mood.
+    """
+    # Implement your custom wave function or forecasting logic here
+    # For demonstration purposes, returning the average of min_threshold and max_threshold
+    return (min_threshold + max_threshold) / 2
+
+
+reversals = detect_reversals(close)
+
+for reversal in reversals:
+    min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, reversal)
+
+market_mood_type = analyze_market_mood(reversals)
+
+forecasted_price_new = price_forecast(min_threshold, max_threshold, market_mood)
+print(f"Market Mood: {market_mood_type}, Forecasted Price: {forecasted_price_new}")
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -1793,6 +1892,17 @@ def main():
             ##################################################
             ##################################################
 
+            reversals = detect_reversals(close)
+
+            for reversal in reversals:
+                min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, reversal)
+
+            market_mood_type = analyze_market_mood(reversals)
+
+            forecasted_price_new = price_forecast(min_threshold, max_threshold, market_mood)
+
+            print(f"Market Mood: {market_mood_type}, Forecasted Price: {forecasted_price_new}")
+
             print()
 
             ##################################################
@@ -1865,7 +1975,7 @@ def main():
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -25.00
+            stop_loss = -10.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -1953,19 +2063,21 @@ def main():
                                                     if market_mood_fft == "Bullish":
                                                         print("LONG condition 9: market_mood_fft == Bullish")  
                                                         if price < forecast:
-                                                            print("LONG condition 10: price < forecast")   
-                                                            if price < fast_price:   
-                                                                print("LONG condition 11: price < fast_price")  
-                                                                if positive_count > negative_count or positive_count == negative_count:
-                                                                    if positive_count > negative_count:
-                                                                        print("LONG condition 12: positive_count > negative_count")     
-                                                                    elif positive_count == negative_count:
-                                                                        print("LONG condition 12: positive_count = negative_count")
-                                                                    if signal == "BUY":
-                                                                        print("LONG condition 13: signal == BUY")                             
-                                                                        if momentum > 0:
-                                                                            print("LONG condition 14: momentum > 0")
-                                                                            trigger_long = True
+                                                            print("LONG condition 10: price < forecast")
+                                                            if market_mood_type == "up" and price < forecasted_price_new:
+                                                                print("LONG condition 11: market_mood_type == up and price < forecasted_price_new")   
+                                                                if price < fast_price:   
+                                                                    print("LONG condition 12: price < fast_price")  
+                                                                    if positive_count > negative_count or positive_count == negative_count:
+                                                                        if positive_count > negative_count:
+                                                                            print("LONG condition 13: positive_count > negative_count")     
+                                                                        elif positive_count == negative_count:
+                                                                            print("LONG condition 13: positive_count = negative_count")
+                                                                        if signal == "BUY":
+                                                                            print("LONG condition 14: signal == BUY")                             
+                                                                            if momentum > 0:
+                                                                                print("LONG condition 15: momentum > 0")
+                                                                                trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -1988,18 +2100,20 @@ def main():
                                                         print("SHORT condition 9: market_mood_fft == Bearish")
                                                         if price > forecast:
                                                             print("SHORT condition 10: price > forecast")
-                                                            if price > fast_price:   
-                                                                print("SHORT condition 11: price > fast_price")
-                                                                if positive_count < negative_count or positive_count == negative_count:
-                                                                    if positive_count < negative_count:
-                                                                        print("SHORT condition 12: positive_count < negative_count")     
-                                                                    elif positive_count == negative_count:
-                                                                        print("SHORT condition 12: positive_count = negative_count")   
-                                                                    if signal == "SELL":
-                                                                        print("SHORT condition 13: signal == SELL")                                          
-                                                                        if momentum < 0:
-                                                                            print("SHORT condition 14: momentum < 0")
-                                                                            trigger_short = True
+                                                            if market_mood_type == "down" and price > forecasted_price_new:
+                                                                print("SHORT condition 11: market_mood_type == down and price > forecasted_price_new")   
+                                                                if price > fast_price:   
+                                                                    print("SHORT condition 12: price > fast_price")
+                                                                    if positive_count < negative_count or positive_count == negative_count:
+                                                                        if positive_count < negative_count:
+                                                                            print("SHORT condition 13: positive_count < negative_count")     
+                                                                        elif positive_count == negative_count:
+                                                                            print("SHORT condition 13: positive_count = negative_count")   
+                                                                        if signal == "SELL":
+                                                                            print("SHORT condition 14: signal == SELL")                                          
+                                                                            if momentum < 0:
+                                                                                print("SHORT condition 15: momentum < 0")
+                                                                                trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
