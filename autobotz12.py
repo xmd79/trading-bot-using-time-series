@@ -1682,81 +1682,6 @@ print()
 ##################################################
 ##################################################
 
-def perform_fft_operations(close):
-    # Step 2: Apply Fast Fourier Transform (FFT) to close
-    fft_output = np.fft.fft(close)
-    
-    # Step 3: Calculate inner harmonics and octaves
-    n = len(fft_output)
-    inner_harmonics = fft_output[1:n//2]
-    octaves = fft_output[n//2:]
-    
-    # Step 4: Identify most negative and most positive frequencies from last 3 frequencies
-    last_three_freqs = np.abs(fft_output[-4:-1])  # considering the last 3 frequencies and the DC component
-    min_freq = np.argmin(last_three_freqs)
-    max_freq = np.argmax(last_three_freqs)
-    
-    # Step 5: Sine reversals between min and max frequencies
-    min_freq_value = fft_output[-4 + min_freq]
-    max_freq_value = fft_output[-4 + max_freq]
-    
-    # Generating sine reversals
-    sine_reversal_min_max = np.sin(np.linspace(0, 2*np.pi, len(close))) * (max_freq_value - min_freq_value) / 2 + (max_freq_value + min_freq_value) / 2
-    sine_reversal_max_min = np.sin(np.linspace(np.pi, 3*np.pi, len(close))) * (min_freq_value - max_freq_value) / 2 + (min_freq_value + max_freq_value) / 2
-    
-    # Step 6: Quadrature motion between frequency ranges
-    unit_circle = np.exp(1j * np.linspace(0, 2*np.pi, len(close)))
-    quadrature_motion = unit_circle * (max_freq_value - min_freq_value) / 2 + (max_freq_value + min_freq_value) / 2
-    
-    # Step 7: Symmetry between all logic operations
-    symmetry_operations = {
-        '360_degree': np.exp(1j * np.linspace(0, 2*np.pi, len(close))),
-        'pi': np.exp(1j * np.linspace(0, np.pi, len(close))),
-        'phi': np.exp(1j * np.linspace(0, np.pi/1.618, len(close))),
-        'pi/phi': np.exp(1j * np.linspace(0, np.pi * 1.618, len(close))),
-        'phi/pi': np.exp(1j * np.linspace(0, np.pi / 1.618, len(close)))
-    }
-    
-    # Print details
-    #print("Inner Harmonics:", inner_harmonics)
-    #print("Octaves:", octaves)
-    #print("Min and Max Frequencies:", min_freq_value, max_freq_value)
-    #print("Sine Reversals Min-Max:", sine_reversal_min_max)
-    #print("Sine Reversals Max-Min:", sine_reversal_max_min)
-    #print("Quadrature Motion:", quadrature_motion)
-    
-    # Returning for further use if needed
-    return {
-        'inner_harmonics': inner_harmonics,
-        'octaves': octaves,
-        'min_max_freqs': (min_freq_value, max_freq_value),
-        'sine_reversal_min_max': sine_reversal_min_max,
-        'sine_reversal_max_min': sine_reversal_max_min,
-        'quadrature_motion': quadrature_motion,
-        'symmetry_operations': symmetry_operations
-    }
-
-def determine_market_mood(min_freq_value, max_freq_value):
-    # Determine market mood based on the frequency values
-    if max_freq_value > min_freq_value:
-        return "Market mood: UP"
-    elif max_freq_value < min_freq_value:
-        return "Market mood: DOWN"
-    else:
-        return "Market mood: NEUTRAL"
-
-# Call your function to get the necessary results
-results = perform_fft_operations(close)
-
-# Extract the necessary values from the results
-min_freq_value, max_freq_value = results['min_max_freqs']
-
-# Determine the market mood
-market_mood = determine_market_mood(min_freq_value, max_freq_value)
-
-# Print the market mood
-print(market_mood)
-
 print()
 
 ##################################################
@@ -2181,18 +2106,6 @@ def main():
 
             ##################################################
             ##################################################
-
-            # Call your function to get the necessary results
-            result = perform_fft_operations(close)
-
-            # Extract the necessary values from the results
-            min_freq_value, max_freq_value = result['min_max_freqs']
-
-            # Determine the market mood
-            market_mood_cycle = determine_market_mood(min_freq_value, max_freq_value)
-
-            # Print the market mood
-            print(market_mood_cycle)
 
             print()
 
