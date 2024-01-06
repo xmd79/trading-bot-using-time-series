@@ -2161,7 +2161,7 @@ def main():
 
             market_mood_fastfft = fft_trading_signal(close)
 
-            print(f"Market Mood: {market_mood_fastfft}")
+            #print(f"Market Mood: {market_mood_fastfft}")
 
             print()
 
