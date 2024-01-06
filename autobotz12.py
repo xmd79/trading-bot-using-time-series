@@ -1630,9 +1630,9 @@ def check_cycle_trigger(last_three_frequencies):
 def find_last_reversal(frequencies):
     # Identify the last reversal based on the sign of the last frequency
     if frequencies[-1] < 0:
-        return "Dip Reversal"
+        return "TOP Reversal"
     elif frequencies[-1] > 0:
-        return "Top Reversal"
+        return "DIP Reversal"
     else:
         return "No significant reversal detected"
 
