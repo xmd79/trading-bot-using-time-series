@@ -2229,8 +2229,8 @@ def main():
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
                             if closest_threshold < price:  
                                 print("LONG condition 3: closest_threshold < price")
-                                if incoming_reversal == "Top": 
-                                    print("LONG condition 4: incoming_reversal == Top") 
+                                if market_mood_poly == "Bullish":
+                                    print("SHORT condition 4: market_mood_poly == Bullish")  
                                     if market_mood_fastfft == "long":
                                         print("LONG condition 5: market_mood_fastfft == long")        
                                         if price < fastest_target:
@@ -2247,8 +2247,8 @@ def main():
                                                                 print("LONG condition 11: market_mood_fft == Bullish")  
                                                                 if price < forecast:
                                                                     print("LONG condition 12: price < forecast")
-                                                                    if market_mood_poly == "Bullish":
-                                                                        print("LONG condition 13: market_mood_poly == Bullish")  
+                                                                    if incoming_reversal == "Top": 
+                                                                        print("LONG condition 13: incoming_reversal == Top") 
                                                                         if market_mood_type == "up":
                                                                             print("LONG condition 14: market_mood_type == up")   
                                                                             if price < fast_price:   
@@ -2271,8 +2271,8 @@ def main():
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")  
                             if closest_threshold > price:
                                 print("SHORT condition 3: closest_threshold > price")  
-                                if incoming_reversal == "Dip": 
-                                    print("SHORT condition 4: incoming_reversal == Dip") 
+                                if market_mood_poly == "Bearish":
+                                    print("SHORT condition 4: market_mood_poly == Bearish") 
                                     if market_mood_fastfft == "long":
                                         print("SHORT condition 5: market_mood_fastfft == short") 
                                         if price > fastest_target:
@@ -2289,8 +2289,8 @@ def main():
                                                                 print("SHORT condition 11: market_mood_fft == Bearish")
                                                                 if price > forecast:
                                                                     print("SHORT condition 12: price > forecast")
-                                                                    if market_mood_poly == "Bearish":
-                                                                        print("LONG condition 13: market_mood_poly == Bearish") 
+                                                                    if incoming_reversal == "Dip": 
+                                                                        print("SHORT condition 13: incoming_reversal == Dip") 
                                                                         if market_mood_type == "down":
                                                                             print("SHORT condition 14: market_mood_type == down")   
                                                                             if price > fast_price:   
