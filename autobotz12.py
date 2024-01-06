@@ -1675,7 +1675,6 @@ analysis_results = analyze_market_behavior(close)
 
 # Print the results separately
 print("Market Mood:", analysis_results["Market Mood"])
-print("Last Reversal:", analysis_results["Last Reversal"])
 print("Incoming Reversal:", analysis_results["Incoming Reversal"])
 
 print()
@@ -2094,7 +2093,6 @@ def main():
 
             # Print the results separately
             print("Market Mood:", analysis_results["Market Mood"])
-            print("Last Reversal:", analysis_results["Last Reversal"])
             print("Incoming Reversal:", analysis_results["Incoming Reversal"])
 
             incoming_reversal = analysis_results["Incoming Reversal"]
