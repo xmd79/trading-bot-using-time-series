@@ -1682,6 +1682,86 @@ print()
 ##################################################
 ##################################################
 
+def perform_fft_operations(close):
+    # Step 2: Apply Fast Fourier Transform (FFT) to close
+    fft_output = np.fft.fft(close)
+    
+    # Step 3: Calculate inner harmonics and octaves
+    n = len(fft_output)
+    inner_harmonics = fft_output[1:n//2]
+    octaves = fft_output[n//2:]
+    
+    # Step 4: Identify most negative and most positive frequencies from last 3 frequencies
+    last_three_freqs = np.abs(fft_output[-4:-1])  # considering the last 3 frequencies and the DC component
+    min_freq = np.argmin(last_three_freqs)
+    max_freq = np.argmax(last_three_freqs)
+    
+    # Step 5: Sine reversals between min and max frequencies
+    min_freq_value = fft_output[-4 + min_freq]
+    max_freq_value = fft_output[-4 + max_freq]
+    
+    # Generating sine reversals
+    sine_reversal_min_max = np.sin(np.linspace(0, 2*np.pi, len(close))) * (max_freq_value - min_freq_value) / 2 + (max_freq_value + min_freq_value) / 2
+    sine_reversal_max_min = np.sin(np.linspace(np.pi, 3*np.pi, len(close))) * (min_freq_value - max_freq_value) / 2 + (min_freq_value + max_freq_value) / 2
+    
+    # Step 6: Quadrature motion between frequency ranges
+    unit_circle = np.exp(1j * np.linspace(0, 2*np.pi, len(close)))
+    quadrature_motion = unit_circle * (max_freq_value - min_freq_value) / 2 + (max_freq_value + min_freq_value) / 2
+    
+    # Step 7: Symmetry between all logic operations
+    symmetry_operations = {
+        '360_degree': np.exp(1j * np.linspace(0, 2*np.pi, len(close))),
+        'pi': np.exp(1j * np.linspace(0, np.pi, len(close))),
+        'phi': np.exp(1j * np.linspace(0, np.pi/1.618, len(close))),
+        'pi/phi': np.exp(1j * np.linspace(0, np.pi * 1.618, len(close))),
+        'phi/pi': np.exp(1j * np.linspace(0, np.pi / 1.618, len(close)))
+    }
+    
+    # Print details
+    #print("Inner Harmonics:", inner_harmonics)
+    #print("Octaves:", octaves)
+    #print("Min and Max Frequencies:", min_freq_value, max_freq_value)
+    #print("Sine Reversals Min-Max:", sine_reversal_min_max)
+    #print("Sine Reversals Max-Min:", sine_reversal_max_min)
+    #print("Quadrature Motion:", quadrature_motion)
+    
+    # Returning for further use if needed
+    return {
+        'inner_harmonics': inner_harmonics,
+        'octaves': octaves,
+        'min_max_freqs': (min_freq_value, max_freq_value),
+        'sine_reversal_min_max': sine_reversal_min_max,
+        'sine_reversal_max_min': sine_reversal_max_min,
+        'quadrature_motion': quadrature_motion,
+        'symmetry_operations': symmetry_operations
+    }
+
+def determine_market_mood(min_freq_value, max_freq_value):
+    # Determine market mood based on the frequency values
+    if max_freq_value > min_freq_value:
+        return "Market mood: UP"
+    elif max_freq_value < min_freq_value:
+        return "Market mood: DOWN"
+    else:
+        return "Market mood: NEUTRAL"
+
+# Call your function to get the necessary results
+results = perform_fft_operations(close)
+
+# Extract the necessary values from the results
+min_freq_value, max_freq_value = results['min_max_freqs']
+
+# Determine the market mood
+market_mood = determine_market_mood(min_freq_value, max_freq_value)
+
+# Print the market mood
+print(market_mood)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2102,6 +2182,23 @@ def main():
             ##################################################
             ##################################################
 
+            # Call your function to get the necessary results
+            result = perform_fft_operations(close)
+
+            # Extract the necessary values from the results
+            min_freq_value, max_freq_value = result['min_max_freqs']
+
+            # Determine the market mood
+            market_mood_cycle = determine_market_mood(min_freq_value, max_freq_value)
+
+            # Print the market mood
+            print(market_mood_cycle)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -2197,19 +2294,21 @@ def main():
                                                                 if price < forecast:
                                                                     print("LONG condition 12: price < forecast")
                                                                     if market_mood_type == "up":
-                                                                        print("LONG condition 13: market_mood_type == up")   
-                                                                        if price < fast_price:   
-                                                                            print("LONG condition 14: price < fast_price")  
-                                                                            if positive_count > negative_count or positive_count == negative_count:
-                                                                                if positive_count > negative_count:
-                                                                                    print("LONG condition 15: positive_count > negative_count")     
-                                                                                elif positive_count == negative_count:
-                                                                                    print("LONG condition 15: positive_count = negative_count")
-                                                                                if signal == "BUY":
-                                                                                    print("LONG condition 16: signal == BUY")                             
-                                                                                    if momentum > 0:
-                                                                                        print("LONG condition 17: momentum > 0")
-                                                                                        trigger_long = True
+                                                                        print("LONG condition 13: market_mood_type == up")  
+                                                                        if market_mood_cycle == "UP":
+                                                                            print("LONG condition 14: market_mood_cycle == UP")  
+                                                                            if price < fast_price:   
+                                                                                print("LONG condition 15: price < fast_price")  
+                                                                                if positive_count > negative_count or positive_count == negative_count:
+                                                                                    if positive_count > negative_count:
+                                                                                        print("LONG condition 16: positive_count > negative_count")     
+                                                                                    elif positive_count == negative_count:
+                                                                                        print("LONG condition 16: positive_count = negative_count")
+                                                                                    if signal == "BUY":
+                                                                                        print("LONG condition 17: signal == BUY")                             
+                                                                                        if momentum > 0:
+                                                                                            print("LONG condition 18: momentum > 0")
+                                                                                            trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -2238,18 +2337,20 @@ def main():
                                                                     print("SHORT condition 12: price > forecast")
                                                                     if market_mood_type == "down":
                                                                         print("SHORT condition 13: market_mood_type == down")   
-                                                                        if price > fast_price:   
-                                                                            print("SHORT condition 14: price > fast_price")
-                                                                            if positive_count < negative_count or positive_count == negative_count:
-                                                                                if positive_count < negative_count:
-                                                                                    print("SHORT condition 15: positive_count < negative_count")     
-                                                                                elif positive_count == negative_count:
-                                                                                    print("SHORT condition 15: positive_count = negative_count")   
-                                                                                if signal == "SELL":
-                                                                                    print("SHORT condition 16: signal == SELL")                                          
-                                                                                    if momentum < 0:
-                                                                                        print("SHORT condition 17: momentum < 0")
-                                                                                        trigger_short = True
+                                                                        if market_mood_cycle == "DOWN":
+                                                                            print("LONG condition 14: market_mood_cycle == DOWN")
+                                                                            if price > fast_price:   
+                                                                                print("SHORT condition 15: price > fast_price")
+                                                                                if positive_count < negative_count or positive_count == negative_count:
+                                                                                    if positive_count < negative_count:
+                                                                                        print("SHORT condition 16: positive_count < negative_count")     
+                                                                                    elif positive_count == negative_count:
+                                                                                        print("SHORT condition 17: positive_count = negative_count")   
+                                                                                    if signal == "SELL":
+                                                                                        print("SHORT condition 17: signal == SELL")                                          
+                                                                                        if momentum < 0:
+                                                                                            print("SHORT condition 18: momentum < 0")
+                                                                                            trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
@@ -2312,7 +2413,7 @@ def main():
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type
-        del market_mood_fastfft, analysis_results
+        del market_mood_fastfft, analysis_results, result, min_freq_value, max_freq_value, market_mood_cycle
 
         # Force garbage collection to free up memory
         gc.collect()
