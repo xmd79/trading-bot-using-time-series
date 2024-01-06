@@ -1556,6 +1556,55 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import scipy.fft as fft
+
+def fft_trading_signal(close):
+    """
+    Perform FFT on the close prices and check the last three most significant frequencies for trading signals.
+    
+    Parameters:
+    - close (list or numpy array): List or array of close prices.
+    
+    Returns:
+    - forecast_price (float): Forecasted price based on the FFT.
+    - market_mood (str): 'long', 'short', or 'neutral' based on the FFT signals.
+    """
+    
+    # Compute the FFT of the close prices
+    fft_values = fft.fft(close)
+    
+    # Compute the frequencies corresponding to FFT values
+    frequencies = fft.fftfreq(len(close))
+    
+    # Sort indices of FFT values based on magnitude (excluding the first value which is DC component)
+    sorted_indices = np.argsort(np.abs(fft_values[1:]))[::-1] + 1  # +1 because we excluded the DC component
+    
+    # Get the three most significant frequencies and their corresponding values
+    top_three_indices = sorted_indices[:3]
+    top_three_frequencies = frequencies[top_three_indices]
+    top_three_values = fft_values[top_three_indices]
+    
+    # Check if the last three most significant frequencies are negative for long signal
+    if np.any(top_three_values < 0):
+        market_mood = 'long'
+    # Check if the last three most significant frequencies are positive for short signal
+    elif np.any(top_three_values > 0):
+        market_mood = 'short'
+    else:
+        market_mood = 'neutral'
+    
+    # Forecast the next price based on the inverse FFT of the top three frequencies
+    forecast_fft = np.zeros_like(fft_values)
+    forecast_fft[top_three_indices] = top_three_values
+    
+    return market_mood
+
+
+market_mood = fft_trading_signal(close)
+
+print(f"Market Mood: {market_mood}")
+
 print()
 
 ##################################################
@@ -1958,13 +2007,17 @@ def main():
             ##################################################
             ##################################################
 
+            market_mood = fft_trading_signal(close)
+
+            print(f"Market Mood: {market_mood}")
+
             print()
 
             ##################################################
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -25.00
+            stop_loss = -5.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
