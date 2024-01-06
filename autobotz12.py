@@ -2322,7 +2322,7 @@ def main():
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type
-        del market_mood_fastfft, analysis_results, result, min_freq_value, max_freq_value, market_mood_cycle
+        del market_mood_fastfft, analysis_results
 
         # Force garbage collection to free up memory
         gc.collect()
