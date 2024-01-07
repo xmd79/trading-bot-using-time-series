@@ -1620,18 +1620,18 @@ def calculate_frequencies(close):
 def check_cycle_trigger(last_three_frequencies):
     # Check if the average of the last three frequencies indicates an up or down cycle
     avg_frequency = np.mean(last_three_frequencies)
-    if avg_frequency > 0:
+    if avg_frequency < 0:
         return "Down Cycle"
-    elif avg_frequency < 0:
+    elif avg_frequency > 0:
         return "Up Cycle"
     else:
         return "Neutral"
 
 def find_last_reversal(frequencies):
     # Identify the last reversal based on the sign of the last frequency
-    if frequencies[-1] < 0:
+    if frequencies[-1] > 0:
         return "DIP Reversal"
-    elif frequencies[-1] > 0:
+    elif frequencies[-1] < 0:
         return "TOP Reversal"
     else:
         return "No significant reversal detected"
@@ -1709,9 +1709,9 @@ def forecast_price_and_mood(close):
     # Infer market mood based on the coefficient of the x^2 term
     a, _, _ = coeffs
     if a > 0:
-        market_mood = 'Bullish'
-    else:
         market_mood = 'Bearish'
+    else:
+        market_mood = 'Bullish'
     
     return market_mood
 
