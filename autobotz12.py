@@ -1708,7 +1708,7 @@ def forecast_price_and_mood(close):
     
     # Infer market mood based on the coefficient of the x^2 term
     a, _, _ = coeffs
-    if a > 0:
+    if a < 0:
         market_mood = 'Bullish'
     else:
         market_mood = 'Bearish'
