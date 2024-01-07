@@ -2230,7 +2230,7 @@ def main():
                             if closest_threshold < price:  
                                 print("LONG condition 3: closest_threshold < price")
                                 if market_mood_poly == "Bullish":
-                                    print("SHORT condition 4: market_mood_poly == Bullish")  
+                                    print("LONG condition 4: market_mood_poly == Bullish")  
                                     if market_mood_fastfft == "long":
                                         print("LONG condition 5: market_mood_fastfft == long")        
                                         if price < fastest_target:
