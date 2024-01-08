@@ -248,77 +248,6 @@ print()
 ##################################################
 ##################################################
 
-# Function to identify the last and incoming reversals, forecast market mood, and provide related details
-def analyze_reversals_and_forecast_mood(candles_by_timeframe):
-    reversal_details = {}
-    
-    for timeframe, candles in candles_by_timeframe.items():
-        close_prices = [c["close"] for c in candles]
-        
-        # Identify the last reversal (dip or top)
-        last_close = close_prices[-1]
-        previous_close = close_prices[-2]
-        last_reversal = "Dip" if last_close < previous_close else "Top"
-        
-        # Identify incoming reversal
-        incoming_reversal = "Dip" if last_reversal == "Top" else "Top"
-        
-        # Forecast market mood based on the last reversal
-        market_mood = "Bullish" if last_reversal == "Dip" else "Bearish"
-        
-        # Store details in the dictionary
-        reversal_details[timeframe] = {
-            "Last Reversal": last_reversal,
-            "Incoming Reversal": incoming_reversal,
-            "Forecast Market Mood": market_mood,
-            "Last Close Price": last_close,
-            "Previous Close Price": previous_close
-        }
-    
-    return reversal_details
-
-# Function to analyze reversals and forecast market mood for all timeframes
-def analyze_overall_sentiment(reversal_details):
-    bullish_count = 0
-    bearish_count = 0
-    
-    for timeframe, details in reversal_details.items():
-        if details["Forecast Market Mood"] == "Bullish":
-            bullish_count += 1
-        else:
-            bearish_count += 1
-    
-    # Determine overall sentiment based on the count of bullish vs bearish timeframes
-    overall_sentiment = "Bullish" if bullish_count > bearish_count else "Bearish"
-    
-    return overall_sentiment, bullish_count, bearish_count
-
-# Analyze reversals and forecast market mood using the candles organized by timeframe
-reversal_details = analyze_reversals_and_forecast_mood(candle_map)
-
-# Analyze overall sentiment across all timeframes
-overall_sentiment, bullish_count, bearish_count = analyze_overall_sentiment(reversal_details)
-
-# Print details outside the function for individual timeframes
-for timeframe, details in reversal_details.items():
-    print(f"Analyzing reversals and forecasting market mood for {timeframe} timeframe:")
-    print(f"Last Reversal: {details['Last Reversal']}")
-    print(f"Incoming Reversal: {details['Incoming Reversal']}")
-    print(f"Forecast Market Mood: {details['Forecast Market Mood']}")
-    print(f"Last Close Price: {details['Last Close Price']}")
-    print(f"Previous Close Price: {details['Previous Close Price']}")
-    print("\n")
-
-# Print overall sentiment analysis
-print(f"Overall Market Sentiment: {overall_sentiment}")
-print(f"Number of Bullish Timeframes: {bullish_count}")
-print(f"Number of Bearish Timeframes: {bearish_count}")
-
-print()
-
-##################################################
-##################################################
-
 # Scale current close price to sine wave       
 def scale_to_sine(timeframe):  
   
@@ -2224,32 +2153,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Analyze reversals and forecast market mood using the candles organized by timeframe
-            reversal_details = analyze_reversals_and_forecast_mood(candle_map)
-
-            # Analyze overall sentiment across all timeframes
-            overall_sentiment, bullish_count, bearish_count = analyze_overall_sentiment(reversal_details)
-
-            # Print details outside the function
-            #for timeframe, details in reversal_details.items():
-                #print(f"Analyzing reversals and forecasting market mood for {timeframe} timeframe:")
-                #print(f"Last Reversal: {details['Last Reversal']}")
-                #print(f"Incoming Reversal: {details['Incoming Reversal']}")
-                #print(f"Forecast Market Mood: {details['Forecast Market Mood']}")
-                #print(f"Last Close Price: {details['Last Close Price']}")
-                #print(f"Previous Close Price: {details['Previous Close Price']}")
-                #print("\n")
-
-            # Print overall sentiment analysis
-            print(f"Overall Market Sentiment: {overall_sentiment}")
-            print(f"Number of Bullish Timeframes: {bullish_count}")
-            print(f"Number of Bearish Timeframes: {bearish_count}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
             take_profit = 15.00
             stop_loss = -50.00
 
@@ -2351,10 +2254,10 @@ def main():
                                                                             if price < fast_price:   
                                                                                 print("LONG condition 15: price < fast_price")  
                                                                                 if positive_count > negative_count or positive_count == negative_count:
-                                                                                    if positive_count > negative_count and overall_sentiment == "Bullish":
-                                                                                        print("LONG condition 16: positive_count > negative_count and overall_sentiment == Bullish")     
-                                                                                    elif positive_count == negative_count and overall_sentiment == "Bullish":
-                                                                                        print("LONG condition 16: positive_count = negative_count and overall_sentiment == Bullish")
+                                                                                    if positive_count > negative_count:
+                                                                                        print("LONG condition 16: positive_count > negative_count")     
+                                                                                    elif positive_count == negative_count:
+                                                                                        print("LONG condition 16: positive_count = negative_count")
                                                                                     if signal == "BUY":
                                                                                         print("LONG condition 17: signal == BUY")                             
                                                                                         if momentum > 0:
@@ -2393,10 +2296,10 @@ def main():
                                                                             if price > fast_price:   
                                                                                 print("SHORT condition 15: price > fast_price")
                                                                                 if positive_count < negative_count or positive_count == negative_count:
-                                                                                    if positive_count < negative_count and overall_sentiment == "Bearish":
-                                                                                        print("SHORT condition 16: positive_count < negative_count and overall_sentiment == Bearish")     
-                                                                                    elif positive_count == negative_count and overall_sentiment == "Bearish":
-                                                                                        print("SHORT condition 16: positive_count = negative_count and overall_sentiment == Bearish")   
+                                                                                    if positive_count < negative_count:
+                                                                                        print("SHORT condition 16: positive_count < negative_count")     
+                                                                                    elif positive_count == negative_count:
+                                                                                        print("SHORT condition 16: positive_count = negative_count")   
                                                                                     if signal == "SELL":
                                                                                         print("SHORT condition 17: signal == SELL")                                          
                                                                                         if momentum < 0:
@@ -2465,7 +2368,6 @@ def main():
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type
         del market_mood_fastfft, analysis_results
-        del reversal_details, overall_sentiment, bullish_count, bearish_count 
 
         # Force garbage collection to free up memory
         gc.collect()
