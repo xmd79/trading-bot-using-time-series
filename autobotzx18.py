@@ -1724,6 +1724,66 @@ print()
 ##################################################
 ##################################################
 
+# Define the golden ratio as a constant
+GOLDEN_RATIO = 1.61803398875
+
+def calculate_phi_division():
+    circumference = 360  # Total degrees in a circle
+    division1 = circumference / GOLDEN_RATIO
+    division2 = circumference - division1
+    return division1, division2
+
+def calculate_forecast_price(current_price):
+    forecasted_price = current_price * GOLDEN_RATIO
+    return forecasted_price
+
+def calculate_intraday_target(current_price):
+    # Calculate smaller target based on phi_min and phi_max
+    phi_min = current_price - (0.001 * current_price)
+    phi_max = current_price + (0.001 * current_price)
+    intraday_target = (phi_min + phi_max) / 2  # Taking average of min and max
+    return intraday_target
+
+def calculate_momentum_target(current_price):
+    # Momentum target is slightly different, you can adjust this logic as needed
+    momentum_target = current_price * 1.01  # Example: 1% increase for simplicity
+    return momentum_target
+
+def determine_market_mood(current_price, target_price):
+    if target_price > current_price:
+        return "Bullish Market Mood: Price is expected to rise."
+    elif target_price < current_price:
+        return "Bearish Market Mood: Price is expected to fall."
+    else:
+        return "Neutral Market Mood: Price is expected to remain stable."
+
+# Hypothetical current price (you can replace this with the actual current price)
+current_price = price
+
+# Calculate division of the circle based on the golden ratio
+div1, div2 = calculate_phi_division()
+print(f"Dividing the circumference by phi ({GOLDEN_RATIO}) results in approximately {div1:.2f}° and {div2:.2f}°.")
+
+# Calculate the forecasted price using the golden ratio
+forecasted_price = calculate_forecast_price(current_price)
+print(f"The forecasted price based on the golden ratio is: ${forecasted_price:.2f}")
+
+# Determine the market mood based on the forecasted price and current price
+market_mood_forecast = determine_market_mood(current_price, forecasted_price)
+print(market_mood_forecast)
+
+# Calculate and print the intraday target and associated market mood
+intraday_target = calculate_intraday_target(current_price)
+market_mood_intraday = determine_market_mood(current_price, intraday_target)
+print(f"The intraday target price is: ${intraday_target:.2f}")
+print(market_mood_intraday)
+
+# Calculate and print the momentum target and associated market mood
+momentum_target = calculate_momentum_target(current_price)
+market_mood_momentum = determine_market_mood(current_price, momentum_target)
+print(f"The momentum target price is: ${momentum_target:.2f}")
+print(market_mood_momentum)
+
 print()
 
 ##################################################
@@ -2158,6 +2218,38 @@ def main():
             ##################################################
             ##################################################
 
+            # Hypothetical current price (you can replace this with the actual current price)
+            current_price = price
+
+            # Calculate division of the circle based on the golden ratio
+            div1, div2 = calculate_phi_division()
+            #print(f"Dividing the circumference by phi ({GOLDEN_RATIO}) results in approximately {div1:.2f}° and {div2:.2f}°.")
+
+            # Calculate the forecasted price using the golden ratio
+            forecasted_phi_price = calculate_forecast_price(current_price)
+            print(f"The forecasted price based on the golden ratio is: ${forecasted_phi_price:.2f}")
+
+            # Determine the market mood based on the forecasted price and current price
+            market_mood_phi = determine_market_mood(current_price, forecasted_phi_price)
+            print(market_mood_phi)
+
+            # Calculate and print the intraday target and associated market mood
+            intraday_target = calculate_intraday_target(current_price)
+            market_mood_intraday = determine_market_mood(current_price, intraday_target)
+            print(f"The intraday target price is: ${intraday_target:.2f}")
+            print(market_mood_intraday)
+
+            # Calculate and print the momentum target and associated market mood
+            momentum_target = calculate_momentum_target(current_price)
+            market_mood_momentum = determine_market_mood(current_price, momentum_target)
+            print(f"The momentum target price is: ${momentum_target:.2f}")
+            print(market_mood_momentum)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 15.00
             stop_loss = -50.00
 
@@ -2371,8 +2463,9 @@ def main():
         del x, slope, intercept, expected_price, last_close_price, forecast_result
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
-        del closes, signal, close, candles, reversals, market_mood_type
-        del market_mood_fastfft, analysis_results
+        del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
+        del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
+        del div1, div2
 
         # Force garbage collection to free up memory
         gc.collect()
