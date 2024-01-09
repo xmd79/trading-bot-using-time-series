@@ -1773,16 +1773,18 @@ market_mood_forecast = determine_market_mood(current_price, forecasted_price)
 print(market_mood_forecast)
 
 # Calculate and print the intraday target and associated market mood
-intraday_target = calculate_intraday_target(current_price)
-market_mood_intraday = determine_market_mood(current_price, intraday_target)
-print(f"The intraday target price is: ${intraday_target:.2f}")
-print(market_mood_intraday)
+momentum_target = calculate_intraday_target(current_price)
+market_mood_momentum = determine_market_mood(current_price, intraday_target)
 
-# Calculate and print the momentum target and associated market mood
-momentum_target = calculate_momentum_target(current_price)
-market_mood_momentum = determine_market_mood(current_price, momentum_target)
 print(f"The momentum target price is: ${momentum_target:.2f}")
 print(market_mood_momentum)
+
+# Calculate and print the momentum target and associated market mood
+intraday_target = calculate_momentum_target(current_price)
+market_mood_intraday = determine_market_mood(current_price, momentum_target)
+
+print(f"The intraday target price is: ${intraday_target:.2f}")
+print(market_mood_intraday)
 
 print()
 
@@ -2234,16 +2236,18 @@ def main():
             print(market_mood_phi)
 
             # Calculate and print the intraday target and associated market mood
-            intraday_target = calculate_intraday_target(current_price)
-            market_mood_intraday = determine_market_mood(current_price, intraday_target)
-            print(f"The intraday target price is: ${intraday_target:.2f}")
-            print(market_mood_intraday)
+            momentum_target = calculate_intraday_target(current_price)
+            market_mood_momentum = determine_market_mood(current_price, intraday_target)
 
-            # Calculate and print the momentum target and associated market mood
-            momentum_target = calculate_momentum_target(current_price)
-            market_mood_momentum = determine_market_mood(current_price, momentum_target)
             print(f"The momentum target price is: ${momentum_target:.2f}")
             print(market_mood_momentum)
+
+            # Calculate and print the momentum target and associated market mood
+            intraday_target = calculate_momentum_target(current_price)
+            market_mood_intraday = determine_market_mood(current_price, momentum_target)
+
+            print(f"The intraday target price is: ${intraday_target:.2f}")
+            print(market_mood_intraday)
 
             print()
 
