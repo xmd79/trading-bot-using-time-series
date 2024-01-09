@@ -2324,8 +2324,8 @@ def main():
                     print()
 
                     # Uptrend cycle trigger conditions 
-                    if normalized_distance_to_min < normalized_distance_to_max and normalized_distance_to_min < 25:
-                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max and normalized_distance_to_min < 25")                
+                    if normalized_distance_to_min < normalized_distance_to_max:
+                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")                
                         if closest_threshold == min_threshold and price < avg_mtf: 
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
                             if closest_threshold < price:  
@@ -2368,8 +2368,8 @@ def main():
                                                                                                 trigger_long = True
 
                     # Downtrend cycle trigger conditions
-                    if normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 25:
-                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min and normalized_distance_to_max < 25") 
+                    if normalized_distance_to_max < normalized_distance_to_min:
+                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min") 
                         if closest_threshold == max_threshold and price > avg_mtf:
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")  
                             if closest_threshold > price:
