@@ -1865,26 +1865,28 @@ def smart_money_concepts_probability(close):
                 pos = -2
                 liquidity_levels.append((i, dn))
                 
-    # Calculate market mood
+    # Calculate CHoCH and BMP percentages for support and resistance levels
+    choch_support = [(price, (price - dn) / (up - dn) * 100) for _, price in liquidity_levels if (price - dn) / (up - dn) * 100 > 70] or [(dn, 0)]
+    bmp_support = [(price, (price - dn) / (up - dn) * 100) for _, price in liquidity_levels if (price - dn) / (up - dn) * 100 < 30] or [(dn, 0)]
+    
+    choch_resistance = [(price, (up - price) / (up - dn) * 100) for _, price in liquidity_levels if (up - price) / (up - dn) * 100 > 70] or [(up, 100)]
+    bmp_resistance = [(price, (up - price) / (up - dn) * 100) for _, price in liquidity_levels if (up - price) / (up - dn) * 100 < 30] or [(up, 100)]
+    
+    # Determine market mood based on reversals
     if up > dn:
         market_mood = "Bullish"
-    elif up < dn:
-        market_mood = "Bearish"
+        forecasted_price = up  # Forecasted to go up
     else:
-        market_mood = "Neutral"
-    
-    # Forecasted price (Simple Forecast: Average of highest and lowest)
-    forecasted_price = (up + dn) / 2
-    
-    # Calculate support and resistance levels with percentage estimation
-    support_levels = [(price, (price - dn) / (up - dn) * 100) for _, price in liquidity_levels if price < forecasted_price]
-    resistance_levels = [(price, (up - price) / (up - dn) * 100) for _, price in liquidity_levels if price > forecasted_price]
+        market_mood = "Bearish"
+        forecasted_price = dn  # Forecasted to go down
     
     return {
         'reversals': reversals,
         'liquidity_levels': liquidity_levels,
-        'support_levels': support_levels,
-        'resistance_levels': resistance_levels,
+        'choch_support': choch_support,
+        'bmp_support': bmp_support,
+        'choch_resistance': choch_resistance,
+        'bmp_resistance': bmp_resistance,
         'market_mood': market_mood,
         'forecasted_price': forecasted_price
     }
@@ -1895,8 +1897,10 @@ result_smc = smart_money_concepts_probability(close)
 # Print the results
 print("Reversals:", result_smc['reversals'])
 print("Liquidity Levels:", result_smc['liquidity_levels'])
-print("Support Levels:", result_smc['support_levels'])
-print("Resistance Levels:", result_smc['resistance_levels'])
+print("CHoCH Support:", result_smc['choch_support'])
+print("BMP Support:", result_smc['bmp_support'])
+print("CHoCH Resistance:", result_smc['choch_resistance'])
+print("BMP Resistance:", result_smc['bmp_resistance'])
 print("Market Mood:", result_smc['market_mood'])
 print("Forecasted Price:", result_smc['forecasted_price'])
 
@@ -2396,8 +2400,10 @@ def main():
             # Print the results
             print("Reversals:", result_smc['reversals'])
             print("Liquidity Levels:", result_smc['liquidity_levels'])
-            print("Support Levels:", result_smc['support_levels'])
-            print("Resistance Levels:", result_smc['resistance_levels'])
+            print("CHoCH Support:", result_smc['choch_support'])
+            print("BMP Support:", result_smc['bmp_support'])
+            print("CHoCH Resistance:", result_smc['choch_resistance'])
+            print("BMP Resistance:", result_smc['bmp_resistance'])
             print("Market Mood:", result_smc['market_mood'])
             print("Forecasted Price:", result_smc['forecasted_price'])
 
