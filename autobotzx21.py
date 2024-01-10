@@ -2407,7 +2407,7 @@ def main():
             print("Market Mood:", result_smc['market_mood'])
             print("Forecasted Price:", result_smc['forecasted_price'])
 
-            smc_mood = result_smc['forecasted_price']
+            smc_mood = result_smc['market_mood']
 
             print()
 
