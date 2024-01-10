@@ -1807,9 +1807,9 @@ def classify_trend(close):
     future_close = close[-1]
     trend = log_model.predict([[future_close]])
     if trend == 1:
-        return "Market trend forecast: Up"
-    else:
         return "Market trend forecast: Down"
+    else:
+        return "Market trend forecast: Up"
 
 
 keypoints = find_reversal_keypoints(close)
@@ -2321,7 +2321,7 @@ def main():
             ##################################################
 
             take_profit = 15.00
-            stop_loss = -50.00
+            stop_loss = -5.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
