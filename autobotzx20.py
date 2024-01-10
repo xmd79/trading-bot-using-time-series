@@ -1807,9 +1807,9 @@ def classify_trend(close):
     future_close = close[-1]
     trend = log_model.predict([[future_close]])
     if trend == 1:
-        return "Market trend forecast: Down"
+        return "Down"
     else:
-        return "Market trend forecast: Up"
+        return "Up"
 
 
 keypoints = find_reversal_keypoints(close)
@@ -1827,7 +1827,7 @@ slope = coefficients[0]
 print("Regression slope: ", slope)
 
 regression_mood = classify_trend(close)
-print(regression_mood)
+print("Market trend forecast: ", regression_mood)
 
 print()
 
