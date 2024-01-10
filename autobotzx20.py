@@ -1807,9 +1807,9 @@ def classify_trend(close):
     future_close = close[-1]
     trend = log_model.predict([[future_close]])
     if trend == 1:
-        return "Down"
-    else:
         return "Up"
+    else:
+        return "Down"
 
 
 keypoints = find_reversal_keypoints(close)
