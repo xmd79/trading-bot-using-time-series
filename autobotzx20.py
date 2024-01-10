@@ -2420,8 +2420,8 @@ def main():
                                                                             print("LONG condition 14: regression_mood == Up") 
                                                                             if market_mood_type == "up":
                                                                                 print("LONG condition 15: market_mood_type == up") 
-                                                                                if price < momentum_target and price < intraday_target:
-                                                                                    print("LONG condition 16: price < momentum_target and price < intraday_target")
+                                                                                if price < intraday_target:
+                                                                                    print("LONG condition 16: price < intraday_target")
                                                                                     if price < fast_price:   
                                                                                         print("LONG condition 17: price < fast_price")  
                                                                                         if positive_count > negative_count or positive_count == negative_count:
@@ -2466,8 +2466,8 @@ def main():
                                                                             print("SHORT condition 14: regression_mood == Down") 
                                                                             if market_mood_type == "down":
                                                                                 print("SHORT condition 15: market_mood_type == down") 
-                                                                                if price > momentum_target and price > intraday_target:
-                                                                                    print("SHORT condition 16: price > momentum_target and price > intraday_target")  
+                                                                                if price > intraday_target:
+                                                                                    print("SHORT condition 16: price > intraday_target")  
                                                                                     if price > fast_price:   
                                                                                         print("SHORT condition 17: price > fast_price")
                                                                                         if positive_count < negative_count or positive_count == negative_count:
