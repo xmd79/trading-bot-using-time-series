@@ -1909,6 +1909,66 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+from scipy.signal import find_peaks
+import pywt
+from sklearn.cluster import AgglomerativeClustering
+import warnings
+import os
+
+def detect_sort_spikes(close):
+    """
+    Detect and sort financial 'spikes' using wavelet transform and clustering.
+    
+    Parameters:
+    - close (numpy array): Time series data representing closing prices.
+    
+    Returns:
+    - sorted_spikes (list of tuples): Sorted spikes based on their characteristics.
+    """
+    
+    # Apply wavelet transform
+    coeffs = pywt.wavedec(close, 'haar', level=5)
+    approx_coeffs = coeffs[0]
+    
+    # Suppress FutureWarning
+    with warnings.catch_warnings():
+        warnings.simplefilter(action='ignore', category=FutureWarning)
+        
+        # Clustering using AgglomerativeClustering as an alternative
+        clustering = AgglomerativeClustering(n_clusters=2).fit(approx_coeffs.reshape(-1, 1))
+    
+    labels = clustering.labels_
+    
+    # Identify peaks
+    peaks, _ = find_peaks(close, height=np.mean(close), distance=10)
+    
+    # Ensure indices are within bounds for both peaks and labels
+    valid_indices = np.where(peaks < len(labels))[0]
+    peaks = peaks[valid_indices]
+    
+    # Sort spikes
+    sorted_spikes = [(idx, close[idx], labels[idx]) for idx in peaks]
+    sorted_spikes.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    
+    return sorted_spikes
+
+# Set environment variable to avoid memory leak warning
+os.environ['OMP_NUM_THREADS'] = '1'
+
+sorted_spikes = detect_sort_spikes(close)
+
+print("Sorted Spikes (index, closing price, label):")
+for spike in sorted_spikes:
+    print(spike)
+
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2394,6 +2454,16 @@ def main():
             ##################################################
             ##################################################
 
+            # Set environment variable to avoid memory leak warning
+            os.environ['OMP_NUM_THREADS'] = '1'
+
+            sorted_spikes = detect_sort_spikes(close)
+
+            print("Sorted Spikes (index, closing price, label):")
+
+            for spike in sorted_spikes:
+                print(spike)
+
             print()
 
             ##################################################
@@ -2623,6 +2693,7 @@ def main():
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
+        del os.environ['OMP_NUM_THREADS'], sorted_spikes 
 
         # Force garbage collection to free up memory
         gc.collect()
