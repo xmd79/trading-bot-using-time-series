@@ -1035,11 +1035,6 @@ print()
 ##################################################
 ##################################################
 
-print()
-
-##################################################
-##################################################
-
 import numpy as np
 import talib  # Assuming you have the TA-Lib library installed and imported
 
@@ -1947,9 +1942,14 @@ def detect_sort_spikes(close):
     valid_indices = np.where(peaks < len(labels))[0]
     peaks = peaks[valid_indices]
     
-    # Sort spikes
-    sorted_spikes = [(idx, close[idx], labels[idx]) for idx in peaks]
-    sorted_spikes.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    # Calculate forecast prices based on adjacent closing prices
+    forecast_prices = [np.mean(close[peaks[i]-5:peaks[i]+6]) for i in range(len(peaks))]  # Taking an average of 5 preceding and succeeding prices
+    
+    # Combine peaks, closing prices, labels, and forecast prices
+    combined_data = [(peaks[i], close[peaks[i]], labels[peaks[i]], forecast_prices[i]) for i in range(len(peaks))]
+    
+    # Sort spikes based on forecast prices in descending order
+    sorted_spikes = sorted(combined_data, key=lambda x: x[3], reverse=True)
     
     return sorted_spikes
 
@@ -1958,10 +1958,66 @@ os.environ['OMP_NUM_THREADS'] = '1'
 
 sorted_spikes = detect_sort_spikes(close)
 
-print("Sorted Spikes (index, closing price, label):")
+print("Sorted Spikes (index, closing price, label, forecast price):")
 for spike in sorted_spikes:
     print(spike)
 
+print()
+
+##################################################
+##################################################
+
+import numpy as np
+
+def square_of_9(close):
+    """
+    Square of 9 calculator with Metatron concept for forecasting.
+    
+    Parameters:
+    - close (list or numpy array): List of historical closing prices.
+    
+    Returns:
+    - forecast_price (float): Forecasted price for the current cycle.
+    - market_mood (str): Market mood based on fast cycles (HFT).
+    - fast_cycle_forecast (float): Forecasted price for the next minute (faster cycle).
+    """
+    
+    # Calculate current min and max of close list
+    current_min = np.min(close)
+    current_max = np.max(close)
+    
+    # Calculate last_high and last_low
+    last_high = current_max
+    last_low = current_min
+    
+    # Calculate current micro cycle based on last high or last low
+    current_micro_cycle = last_high - last_low if last_high > last_low else last_low - last_high
+    
+    # Square of 9 calculations (simplified for illustration)
+    phi_pi_ratio = np.pi / np.e  # Using phi/pi as a simplified concept
+    pi_hi_ratio = np.pi / current_micro_cycle  # Using pi/hi as a simplified concept
+    
+    # Get the latest close price
+    latest_close = close[-1]
+    
+    # Metatron concept with reversals (simplified)
+    if current_micro_cycle > 0:
+        forecast_price = last_high + (phi_pi_ratio * current_micro_cycle)
+        market_mood = "Bullish" if forecast_price > latest_close else "Bearish"
+    else:
+        forecast_price = last_low - (pi_hi_ratio * current_micro_cycle)
+        market_mood = "Bearish" if forecast_price < latest_close else "Bullish"
+    
+    # Calculate SMA for a faster cycle (next minute)
+    fast_cycle_forecast = np.mean(close[-5:])  # Using a simple 5-period SMA as an example
+    
+    return forecast_price, market_mood, fast_cycle_forecast
+
+forecast_price, market_mood, fast_cycle_forecast = square_of_9(close)
+
+print(f"Forecasted Price (Current Cycle): {forecast_price}")
+print(f"Market Mood (Current Cycle): {market_mood}")
+print(f"Fast Cycle Forecast (Next Minute): {fast_cycle_forecast}")
 
 
 print()
@@ -2469,6 +2525,17 @@ def main():
             ##################################################
             ##################################################
 
+            forecast_price, market_mood, fast_cycle_forecast = square_of_9(close)
+
+            print(f"Forecasted Price (Current Cycle): {forecast_price}")
+            print(f"Market Mood (Current Cycle): {market_mood}")
+            print(f"Fast Cycle Forecast (Next Minute): {fast_cycle_forecast}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -2693,7 +2760,7 @@ def main():
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
-        del os.environ['OMP_NUM_THREADS'], sorted_spikes 
+        del os.environ['OMP_NUM_THREADS'], sorted_spikes, forecast_price, market_mood, fast_cycle_forecast 
 
         # Force garbage collection to free up memory
         gc.collect()
