@@ -2622,7 +2622,7 @@ def main():
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
-        del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood, result_smc
+        del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
 
         # Force garbage collection to free up memory
         gc.collect()
