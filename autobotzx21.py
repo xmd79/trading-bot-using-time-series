@@ -2394,21 +2394,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Call the function and get the result
-            result_smc = smart_money_concepts_probability(close)
-
-            # Print the results
-            print("Reversals:", result_smc['reversals'])
-            print("Liquidity Levels:", result_smc['liquidity_levels'])
-            print("CHoCH Support:", result_smc['choch_support'])
-            print("BMP Support:", result_smc['bmp_support'])
-            print("CHoCH Resistance:", result_smc['choch_resistance'])
-            print("BMP Resistance:", result_smc['bmp_resistance'])
-            print("Market Mood:", result_smc['market_mood'])
-            print("Forecasted Price:", result_smc['forecasted_price'])
-
-            smc_mood = result_smc['market_mood']
-
             print()
 
             ##################################################
