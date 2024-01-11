@@ -1979,7 +1979,8 @@ def square_of_9(close):
     Returns:
     - forecast_price (float): Forecasted price for the current cycle.
     - market_mood (str): Market mood based on fast cycles (HFT).
-    - fast_cycle_forecast (float): Forecasted price for the next minute (faster cycle).
+    - forecast_5min (float): Forecasted price for the next 5 minutes.
+    - forecast_15min (float): Forecasted price for the next 15 minutes.
     """
     
     # Calculate current min and max of close list
@@ -2008,17 +2009,18 @@ def square_of_9(close):
         forecast_price = last_low - (pi_hi_ratio * current_micro_cycle)
         market_mood = "Bearish" if forecast_price < latest_close else "Bullish"
     
-    # Calculate SMA for a faster cycle (next minute)
-    fast_cycle_forecast = np.mean(close[-5:])  # Using a simple 5-period SMA as an example
+    # Calculate SMA for faster cycle forecasts
+    forecast_5min = np.mean(close[-5:])  # 5-minute SMA forecast
+    forecast_15min = np.mean(close[-15:])  # 15-minute SMA forecast
     
-    return forecast_price, market_mood, fast_cycle_forecast
+    return forecast_price, market_mood, forecast_5min, forecast_15min
 
-forecast_price, market_mood, fast_cycle_forecast = square_of_9(close)
+forecast_price, market_mood, forecast_5min, forecast_15min = square_of_9(close)
 
 print(f"Forecasted Price (Current Cycle): {forecast_price}")
 print(f"Market Mood (Current Cycle): {market_mood}")
-print(f"Fast Cycle Forecast (Next Minute): {fast_cycle_forecast}")
-
+print(f"Forecast for Next 5 Minutes: {forecast_5min}")
+print(f"Forecast for Next 15 Minutes: {forecast_15min}")
 
 print()
 
@@ -2525,11 +2527,12 @@ def main():
             ##################################################
             ##################################################
 
-            forecast_price, market_mood, fast_cycle_forecast = square_of_9(close)
+            forecast_price, market_mood, forecast_5min, forecast_15min = square_of_9(close)
 
             print(f"Forecasted Price (Current Cycle): {forecast_price}")
             print(f"Market Mood (Current Cycle): {market_mood}")
-            print(f"Fast Cycle Forecast (Next Minute): {fast_cycle_forecast}")
+            print(f"Forecast for Next 5 Minutes: {forecast_5min}")
+            print(f"Forecast for Next 15 Minutes: {forecast_15min}")
 
             print()
 
@@ -2760,7 +2763,7 @@ def main():
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
-        del os.environ['OMP_NUM_THREADS'], sorted_spikes, forecast_price, market_mood, fast_cycle_forecast 
+        del os.environ['OMP_NUM_THREADS'], sorted_spikes, forecast_price, market_mood, forecast_5min, forecast_15min
 
         # Force garbage collection to free up memory
         gc.collect()
