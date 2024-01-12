@@ -1981,6 +1981,8 @@ def square_of_9(close):
     - market_mood (str): Market mood based on fast cycles (HFT).
     - forecast_5min (float): Forecasted price for the next 5 minutes.
     - forecast_15min (float): Forecasted price for the next 15 minutes.
+    - forecast_30min (float): Forecasted price for the next 30 minutes.
+    - forecast_1h (float): Forecasted price for the next 1 hour.
     """
     
     # Calculate current min and max of close list
@@ -2012,15 +2014,25 @@ def square_of_9(close):
     # Calculate SMA for faster cycle forecasts
     forecast_5min = np.mean(close[-5:])  # 5-minute SMA forecast
     forecast_15min = np.mean(close[-15:])  # 15-minute SMA forecast
+    forecast_30min = np.mean(close[-30:])  # 30-minute SMA forecast
+    forecast_1h = np.mean(close[-60:])  # 1-hour SMA forecast
     
-    return forecast_price, market_mood, forecast_5min, forecast_15min
+    return forecast_price, market_mood, forecast_5min, forecast_15min, forecast_30min, forecast_1h
 
-forecast_price, market_mood, forecast_5min, forecast_15min = square_of_9(close)
+forecast_price, market_mood, forecast_5min, forecast_15min, forecast_30min, forecast_1h = square_of_9(close)
 
 print(f"Forecasted Price (Current Cycle): {forecast_price}")
 print(f"Market Mood (Current Cycle): {market_mood}")
 print(f"Forecast for Next 5 Minutes: {forecast_5min}")
 print(f"Forecast for Next 15 Minutes: {forecast_15min}")
+print(f"Forecast for Next 30 Minutes: {forecast_30min}")
+print(f"Forecast for Next 1 Hour: {forecast_1h}")
+
+
+print()
+
+##################################################
+##################################################
 
 print()
 
@@ -2512,27 +2524,19 @@ def main():
             ##################################################
             ##################################################
 
-            # Set environment variable to avoid memory leak warning
-            os.environ['OMP_NUM_THREADS'] = '1'
-
-            sorted_spikes = detect_sort_spikes(close)
-
-            print("Sorted Spikes (index, closing price, label):")
-
-            for spike in sorted_spikes:
-                print(spike)
-
             print()
 
             ##################################################
             ##################################################
 
-            forecast_price, market_mood, forecast_5min, forecast_15min = square_of_9(close)
+            forecast_price, market_mood, forecast_5min, forecast_15min, forecast_30min, forecast_1h = square_of_9(close)
 
             print(f"Forecasted Price (Current Cycle): {forecast_price}")
             print(f"Market Mood (Current Cycle): {market_mood}")
             print(f"Forecast for Next 5 Minutes: {forecast_5min}")
             print(f"Forecast for Next 15 Minutes: {forecast_15min}")
+            print(f"Forecast for Next 30 Minutes: {forecast_30min}")
+            print(f"Forecast for Next 1 Hour: {forecast_1h}")
 
             print()
 
@@ -2763,7 +2767,7 @@ def main():
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
-        del os.environ['OMP_NUM_THREADS'], sorted_spikes, forecast_price, market_mood, forecast_5min, forecast_15min
+        del forecast_price, market_mood, forecast_5min, forecast_15min
 
         # Force garbage collection to free up memory
         gc.collect()
