@@ -509,12 +509,12 @@ def get_target(closes, n_components, target_distance=0.01):
     target9 = target_price + 4 * np.std(closes)
     target10 = target_price + 5 * np.std(closes)
     
-    return current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood
+    return current_time, entry_price, stop_loss, fastest_target, market_mood
 
 closes = get_closes("1m")     
 n_components = 5
 
-current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
+current_time, entry_price, stop_loss, fastest_target, market_mood = get_target(closes, n_components, target_distance=56)
 
 print("Current local Time is now at:", current_time)
 print("Market mood is:", market_mood)
@@ -526,22 +526,7 @@ print("Current close price is at:", current_close)
 
 print()
 
-print("Fast target 1 is:", fast_target4)
-print("Fast target 2 is:", fast_target3)
-print("Fast target 3 is:", fast_target2)
-print("Fast target 4 is:", fast_target1)
-
-print()
-
 print("Fastest target is:", fastest_target)
-
-print()
-
-print("Target 1 is:", target1)
-print("Target 2 is:", target2)
-print("Target 3 is:", target3)
-print("Target 4 is:", target4)
-print("Target 5 is:", target5)
 
 print()
 
@@ -1904,64 +1889,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-from scipy.signal import find_peaks
-import pywt
-from sklearn.cluster import AgglomerativeClustering
-import warnings
-import os
-
-def detect_sort_spikes(close):
-    """
-    Detect and sort financial 'spikes' using wavelet transform and clustering.
-    
-    Parameters:
-    - close (numpy array): Time series data representing closing prices.
-    
-    Returns:
-    - sorted_spikes (list of tuples): Sorted spikes based on their characteristics.
-    """
-    
-    # Apply wavelet transform
-    coeffs = pywt.wavedec(close, 'haar', level=5)
-    approx_coeffs = coeffs[0]
-    
-    # Suppress FutureWarning
-    with warnings.catch_warnings():
-        warnings.simplefilter(action='ignore', category=FutureWarning)
-        
-        # Clustering using AgglomerativeClustering as an alternative
-        clustering = AgglomerativeClustering(n_clusters=2).fit(approx_coeffs.reshape(-1, 1))
-    
-    labels = clustering.labels_
-    
-    # Identify peaks
-    peaks, _ = find_peaks(close, height=np.mean(close), distance=10)
-    
-    # Ensure indices are within bounds for both peaks and labels
-    valid_indices = np.where(peaks < len(labels))[0]
-    peaks = peaks[valid_indices]
-    
-    # Calculate forecast prices based on adjacent closing prices
-    forecast_prices = [np.mean(close[peaks[i]-5:peaks[i]+6]) for i in range(len(peaks))]  # Taking an average of 5 preceding and succeeding prices
-    
-    # Combine peaks, closing prices, labels, and forecast prices
-    combined_data = [(peaks[i], close[peaks[i]], labels[peaks[i]], forecast_prices[i]) for i in range(len(peaks))]
-    
-    # Sort spikes based on forecast prices in descending order
-    sorted_spikes = sorted(combined_data, key=lambda x: x[3], reverse=True)
-    
-    return sorted_spikes
-
-# Set environment variable to avoid memory leak warning
-os.environ['OMP_NUM_THREADS'] = '1'
-
-sorted_spikes = detect_sort_spikes(close)
-
-print("Sorted Spikes (index, closing price, label, forecast price):")
-for spike in sorted_spikes:
-    print(spike)
-
 print()
 
 ##################################################
@@ -2158,7 +2085,7 @@ def main():
             # closes = get_closes("1m")     
             n_components = 5
 
-            current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
+            current_time, entry_price, stop_loss, fastest_target, market_mood = get_target(closes, n_components, target_distance=56)
 
             print("Current local Time is now at: ", current_time)
             print("Market mood is: ", market_mood)
@@ -2170,22 +2097,9 @@ def main():
 
             print()
 
-            print("Fast target 1 is: ", fast_target4)
-            print("Fast target 2 is: ", fast_target3)
-            print("Fast target 3 is: ", fast_target2)
-            print("Fast target 4 is: ", fast_target1)
-
-            print()
-
             print("Fastest target is: ", fastest_target)
 
             print()
-
-            print("Target 1 is: ", target1)
-            print("Target 2 is: ", target2)
-            print("Target 3 is: ", target3)
-            print("Target 4 is: ", target4)
-            print("Target 5 is: ", target5)
 
             # Get the current price
             price = get_current_price()
@@ -2758,8 +2672,8 @@ def main():
         ##################################################
 
         # Delete variables and elements to clean up for the next iteration
-        del response, data, price, current_time, current_close, momentum
-        del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
+        del response, data, price, current_time, current_close, fastest_target
+        del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price, momentum
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
         del x, slope, intercept, expected_price, last_close_price, forecast_result
         del fast_price, medium_price, slow_price, forecasted_price, results
