@@ -1996,12 +1996,12 @@ def analyze_fft_for_hexagon(close):
     forecast_price = np.mean(close_array[-5:])  # Adjust the number of elements as needed
     
     # Determine market mood based on the imaginary part of the FFT at the most positive frequency
-    market_mood = "Up" if np.imag(fft_values[most_positive_index]) < 0 else "Down"
+    market_mood = "Up" if np.imag(fft_values[most_positive_index]) > 0 else "Down"
     
-    return forecast_price, market_mood
+    return market_mood
 
-forecasted_price_value, predicted_market_mood = analyze_fft_for_hexagon(close)
-print("Forecasted Price Value:", forecasted_price_value)
+predicted_market_mood = analyze_fft_for_hexagon(close)
+
 print("Predicted Market Mood:", predicted_market_mood)
 
 print()
@@ -2500,9 +2500,8 @@ def main():
             ##################################################
             ##################################################
 
-            forecasted_price_value, predicted_market_mood = analyze_fft_for_hexagon(close)
+            predicted_market_mood = analyze_fft_for_hexagon(close)
 
-            print("Forecasted Price Value:", forecasted_price_value)
             print("Predicted Market Mood:", predicted_market_mood)
 
             print()
