@@ -2635,7 +2635,7 @@ def main():
                                 print("SHORT condition 3: closest_threshold > price")  
                                 if market_mood_poly == "Bearish":
                                     print("SHORT condition 4: market_mood_poly == Bearish") 
-                                    if market_mood_fastfft == "long":
+                                    if market_mood_fastfft == "short":
                                         print("SHORT condition 5: market_mood_fastfft == short") 
                                         if price > fastest_target:
                                             print("SHORT condition 6: price > fastest_target") 
@@ -2737,7 +2737,7 @@ def main():
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
-        del forecast_price, market_mood, forecast_5min, forecast_15min, forecasted_price_value, predicted_market_mood 
+        del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood 
 
         # Force garbage collection to free up memory
         gc.collect()
