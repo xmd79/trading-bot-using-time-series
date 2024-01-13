@@ -1961,6 +1961,49 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def analyze_fft_for_hexagon(close):
+    """
+    Analyze the FFT of the price data to calculate hexagon symmetry, forecasted price, and market mood.
+    
+    Parameters:
+    - close (array-like): Input close price data.
+    
+    Returns:
+    - forecast_price (float): Forecasted price value.
+    - market_mood (str): Predicted market mood ("Up" or "Down").
+    """
+    
+    # Convert close to a NumPy array if it's not already an array-like structure
+    close_array = np.array(close) if hasattr(close, '__iter__') else np.array([close])
+    
+    # Check if the array has at least two elements for meaningful FFT analysis
+    if len(close_array) < 2:
+        raise ValueError("Close data should contain at least two elements for meaningful analysis.")
+    
+    # Compute FFT of the close data
+    fft_values = np.fft.fft(close_array)
+    
+    # Calculate the frequency components
+    freqs = np.fft.fftfreq(len(fft_values))
+    
+    # Find indices corresponding to the most negative and most positive frequencies
+    most_positive_index = np.argmax(freqs)
+    
+    # Calculate forecasted price based on a more realistic transformation
+    # For simplicity, let's take the mean of the last few closing prices as the forecasted price
+    forecast_price = np.mean(close_array[-5:])  # Adjust the number of elements as needed
+    
+    # Determine market mood based on the imaginary part of the FFT at the most positive frequency
+    market_mood = "Up" if np.imag(fft_values[most_positive_index]) < 0 else "Down"
+    
+    return forecast_price, market_mood
+
+forecasted_price_value, predicted_market_mood = analyze_fft_for_hexagon(close)
+print("Forecasted Price Value:", forecasted_price_value)
+print("Predicted Market Mood:", predicted_market_mood)
+
 print()
 
 ##################################################
@@ -2457,6 +2500,16 @@ def main():
             ##################################################
             ##################################################
 
+            forecasted_price_value, predicted_market_mood = analyze_fft_for_hexagon(close)
+
+            print("Forecasted Price Value:", forecasted_price_value)
+            print("Predicted Market Mood:", predicted_market_mood)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -2567,10 +2620,12 @@ def main():
                                                                                             elif positive_count == negative_count:
                                                                                                 print("LONG condition 18: positive_count = negative_count")
                                                                                             if signal == "BUY":
-                                                                                                print("LONG condition 19: signal == BUY")                             
-                                                                                                if momentum > 0:
-                                                                                                    print("LONG condition 20: momentum > 0")
-                                                                                                    trigger_long = True
+                                                                                                print("LONG condition 19: signal == BUY")  
+                                                                                                if predicted_market_mood == "Up":
+                                                                                                    print("LONG condition 20: predicted_market_mood == Up")                          
+                                                                                                    if momentum > 0:
+                                                                                                        print("LONG condition 21: momentum > 0")
+                                                                                                        trigger_long = True
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -2613,10 +2668,12 @@ def main():
                                                                                             elif positive_count == negative_count:
                                                                                                 print("SHORT condition 18: positive_count = negative_count")   
                                                                                             if signal == "SELL":
-                                                                                                print("SHORT condition 19: signal == SELL")                                          
-                                                                                                if momentum < 0:
-                                                                                                    print("SHORT condition 20: momentum < 0")
-                                                                                                    trigger_short = True
+                                                                                                print("SHORT condition 19: signal == SELL")   
+                                                                                                if predicted_market_mood == "Down":
+                                                                                                    print("SHORT condition 20: predicted_market_mood == Down")                                         
+                                                                                                    if momentum < 0:
+                                                                                                        print("SHORT condition 21: momentum < 0")
+                                                                                                        trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
@@ -2681,7 +2738,7 @@ def main():
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
-        del forecast_price, market_mood, forecast_5min, forecast_15min
+        del forecast_price, market_mood, forecast_5min, forecast_15min, forecasted_price_value, predicted_market_mood 
 
         # Force garbage collection to free up memory
         gc.collect()
