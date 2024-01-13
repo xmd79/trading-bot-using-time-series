@@ -2243,11 +2243,8 @@ def main():
             # Display the expected price on the 45-degree angle trend
             print(f"Expected price on the 45-degree angle trend: {expected_price}")
 
-            # Get the last close price from the list for forecasting
-            last_close_price = price
-
             # Generate forecast based on the 45-degree angle
-            forecast_result = forecast_45_degree_angle(last_close_price, expected_price)
+            forecast_result = forecast_45_degree_angle(price, expected_price)
 
             # Display the forecast result
             print(forecast_result)
@@ -2718,16 +2715,16 @@ def main():
         ##################################################
 
         # Delete variables and elements to clean up for the next iteration
-        del response, data, price, current_time, current_close, fastest_target
+        del response, data, current_time, current_close, fastest_target
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price, momentum
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del x, slope, intercept, expected_price, last_close_price, forecast_result
+        del x, slope, intercept, expected_price, forecast_result
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
-        del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood 
+        del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
 
         # Force garbage collection to free up memory
         gc.collect()
