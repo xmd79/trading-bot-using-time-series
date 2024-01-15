@@ -2595,7 +2595,7 @@ def main():
                     if market_mood_fft == "Bearish" and regression_mood == "Down":   
                         print("SHORT condition 1: market_mood_fft == Bearish and regression_mood == Down")  
                         if forecast_direction == "Down" and signal == "SELL":
-                            print("SHORT condition 2: signal == SELL")  
+                            print("SHORT condition 2: forecast_direction == Down and signal == SELL")  
                             if predicted_market_mood == "Down":
                                 print("SHORT condition 3: predicted_market_mood == Down")   
                                 if positive_count < negative_count or positive_count == negative_count:
