@@ -2578,8 +2578,8 @@ def main():
                     # Uptrend cycle trigger conditions                                      
                     if market_mood_fft == "Bullish" and regression_mood == "Up":   
                         print("LONG condition 1: market_mood_fft == Bullish and regression_mood == Up")  
-                        if signal == "BUY":
-                            print("LONG condition 2: signal == BUY")  
+                        if forecast_direction == "Up" and signal == "BUY":
+                            print("LONG condition 2: forecast_direction == Up and signal == BUY")  
                             if predicted_market_mood == "Up":
                                 print("LONG condition 3: predicted_market_mood == Up")   
                                 if positive_count > negative_count or positive_count == negative_count:
@@ -2594,7 +2594,7 @@ def main():
                     # Downtrend cycle trigger conditions 
                     if market_mood_fft == "Bearish" and regression_mood == "Down":   
                         print("SHORT condition 1: market_mood_fft == Bearish and regression_mood == Down")  
-                        if signal == "SELL":
+                        if forecast_direction == "Down" and signal == "SELL":
                             print("SHORT condition 2: signal == SELL")  
                             if predicted_market_mood == "Down":
                                 print("SHORT condition 3: predicted_market_mood == Down")   
