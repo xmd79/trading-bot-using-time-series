@@ -2577,7 +2577,7 @@ def main():
 
                     # Uptrend cycle trigger conditions                                      
                     if market_mood_fft == "Bullish" and regression_mood == "Up":   
-                        print("LONG condition 1: market_mood_fft == Bullish and regression_mood ==Up")  
+                        print("LONG condition 1: market_mood_fft == Bullish and regression_mood == Up")  
                         if signal == "BUY":
                             print("LONG condition 2: signal == BUY")  
                             if predicted_market_mood == "Up":
