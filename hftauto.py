@@ -2009,6 +2009,44 @@ print()
 ##################################################
 ##################################################
 
+import math
+
+def trend_forecast(close):
+    # Calculate fast cycle trend
+    fast_cycle_trend = 0
+    for i in range(2, len(close)):
+        fast_cycle_trend += (close[i] - close[i-1])
+    fast_cycle_trend /= (len(close) - 2)
+
+    # Calculate medium range trend
+    medium_range_trend = 0
+    for i in range(8, len(close)):
+        medium_range_trend += (close[i] - close[i-8])
+    medium_range_trend /= (len(close) - 8)
+
+    # Calculate big trend
+    big_trend = 0
+    for i in range(32, len(close)):
+        big_trend += (close[i] - close[i-32])
+    big_trend /= (len(close) - 32)
+
+    # Determine trend direction based on all three time scales
+    if fast_cycle_trend > 0 and medium_range_trend > 0 and big_trend > 0:
+        return "Up"
+    elif fast_cycle_trend < 0 and medium_range_trend < 0 and big_trend < 0:
+        return "Down"
+    else:
+        return None  # No neutral, just return None for cases other than Up or Down
+
+result_cycles = trend_forecast(close)
+
+print(result_cycles)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2234,20 +2272,20 @@ def main():
             ##################################################
 
             # Calculate the 45-degree angle (simple linear regression)
-            x = np.arange(len(close))
-            slope, intercept = np.polyfit(x, close, 1)
+            #x = np.arange(len(close))
+            #slope, intercept = np.polyfit(x, close, 1)
 
             # Calculate the expected trend line value for the last close price
-            expected_price = slope * len(close) + intercept
+            #expected_price = slope * len(close) + intercept
 
             # Display the expected price on the 45-degree angle trend
-            print(f"Expected price on the 45-degree angle trend: {expected_price}")
+            #print(f"Expected price on the 45-degree angle trend: {expected_price}")
 
             # Generate forecast based on the 45-degree angle
-            forecast_result = forecast_45_degree_angle(price, expected_price)
+            #forecast_result = forecast_45_degree_angle(price, expected_price)
 
             # Display the forecast result
-            print(forecast_result)
+            #print(forecast_result)
 
             print()
 
@@ -2506,6 +2544,15 @@ def main():
             ##################################################
             ##################################################
 
+            result_cycles = trend_forecast(close)
+
+            print(result_cycles)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -2564,6 +2611,7 @@ def main():
 
             ##################################################
             ##################################################
+
             # Cycles trigger conditions and bot autotrde sl and tp trigger conditions
             with open("signals.txt", "a") as f:
                 # Get data and calculate indicators here...
@@ -2576,12 +2624,12 @@ def main():
                     print()
 
                     # Uptrend cycle trigger conditions                                      
-                    if market_mood_fft == "Bullish" and regression_mood == "Up":   
-                        print("LONG condition 1: market_mood_fft == Bullish and regression_mood == Up")  
+                    if market_mood_fft == "Bullish" and regression_mood == "Up" and result_cycles == "Up":   
+                        print("LONG condition 1: market_mood_fft == Bullish and regression_mood == Up and result_cycles == Up")  
                         if forecast_direction == "Up" and signal == "BUY":
                             print("LONG condition 2: forecast_direction == Up and signal == BUY")  
-                            if predicted_market_mood == "Up":
-                                print("LONG condition 3: predicted_market_mood == Up")   
+                            if predicted_market_mood == "Up" and normalized_distance_to_min < normalized_distance_to_max:
+                                print("LONG condition 3: predicted_market_mood == Up and normalized_distance_to_min < normalized_distance_to_max")   
                                 if positive_count > negative_count or positive_count == negative_count:
                                     if positive_count > negative_count:
                                         print("LONG condition 4: positive_count > negative_count")     
@@ -2592,12 +2640,12 @@ def main():
                                         trigger_long = True
 
                     # Downtrend cycle trigger conditions 
-                    if market_mood_fft == "Bearish" and regression_mood == "Down":   
-                        print("SHORT condition 1: market_mood_fft == Bearish and regression_mood == Down")  
+                    if market_mood_fft == "Bearish" and regression_mood == "Down" and result_cycles == "Down":   
+                        print("SHORT condition 1: market_mood_fft == Bearish and regression_mood == Down and result_cycles == Down")  
                         if forecast_direction == "Down" and signal == "SELL":
                             print("SHORT condition 2: forecast_direction == Down and signal == SELL")  
-                            if predicted_market_mood == "Down":
-                                print("SHORT condition 3: predicted_market_mood == Down")   
+                            if predicted_market_mood == "Down" and normalized_distance_to_max < normalized_distance_to_min:
+                                print("SHORT condition 3: predicted_market_mood == Down and normalized_distance_to_max < normalized_distance_to_min")   
                                 if positive_count < negative_count or positive_count == negative_count:
                                     if positive_count < negative_count:
                                         print("SHORT condition 4: positive_count < negative_count")     
@@ -2664,7 +2712,7 @@ def main():
         del response, data, current_time, current_close, fastest_target
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price, momentum
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del x, slope, intercept, expected_price, forecast_result
+        #del x, slope, intercept, expected_price, forecast_result
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
