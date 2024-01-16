@@ -2623,37 +2623,53 @@ def main():
 
                     print()
 
-                    # Uptrend cycle trigger conditions                                      
-                    if market_mood_fft == "Bullish" and regression_mood == "Up" and result_cycles == "Up":   
-                        print("LONG condition 1: market_mood_fft == Bullish and regression_mood == Up and result_cycles == Up")  
-                        if forecast_direction == "Up" and signal == "BUY":
-                            print("LONG condition 2: forecast_direction == Up and signal == BUY")  
-                            if predicted_market_mood == "Up" and normalized_distance_to_min < normalized_distance_to_max:
-                                print("LONG condition 3: predicted_market_mood == Up and normalized_distance_to_min < normalized_distance_to_max")   
-                                if positive_count > negative_count or positive_count == negative_count:
-                                    if positive_count > negative_count:
-                                        print("LONG condition 4: positive_count > negative_count")     
-                                    elif positive_count == negative_count:
-                                        print("LONG condition 4: positive_count = negative_count")                       
-                                    if momentum > 0:
-                                        print("LONG condition 5: momentum > 0")
-                                        trigger_long = True
+                    # Uptrend cycle trigger conditions   
+                    if normalized_distance_to_min < normalized_distance_to_max:
+                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")
+                        if forecast_direction == "Up":
+                            print("LONG condition 2: forecast_direction == Up")
+                            if regression_mood == "Up":
+                                print("LONG condition 3: regression_mood == Up")
+                                if market_mood_fft == "Bullish":
+                                    print("LONG condition 4: market_mood_fft == Bullish")
+                                    if predicted_market_mood == "Up":
+                                        print("LONG condition 5: predicted_market_mood == Up")
+                                        if signal == "BUY":
+                                            print("LONG condition 6: signal == BUY")
+                                            if result_cycles == "Up":
+                                                print("LONG condition 7: result_cycles == Up")
+                                                if positive_count > negative_count or positive_count == negative_count:
+                                                    if positive_count > negative_count:
+                                                        print("LONG condition 8: positive_count > negative_count")     
+                                                    elif positive_count == negative_count:
+                                                        print("LONG condition 8: positive_count = negative_count")                       
+                                                    if momentum > 0:
+                                                        print("LONG condition 9: momentum > 0")
+                                                        trigger_long = True
 
                     # Downtrend cycle trigger conditions 
-                    if market_mood_fft == "Bearish" and regression_mood == "Down" and result_cycles == "Down":   
-                        print("SHORT condition 1: market_mood_fft == Bearish and regression_mood == Down and result_cycles == Down")  
-                        if forecast_direction == "Down" and signal == "SELL":
-                            print("SHORT condition 2: forecast_direction == Down and signal == SELL")  
-                            if predicted_market_mood == "Down" and normalized_distance_to_max < normalized_distance_to_min:
-                                print("SHORT condition 3: predicted_market_mood == Down and normalized_distance_to_max < normalized_distance_to_min")   
-                                if positive_count < negative_count or positive_count == negative_count:
-                                    if positive_count < negative_count:
-                                        print("SHORT condition 4: positive_count < negative_count")     
-                                    elif positive_count == negative_count:
-                                        print("SHORT condition 4: positive_count = negative_count")                       
-                                    if momentum < 0:
-                                        print("SHORT condition 5: momentum < 0")
-                                        trigger_short = True
+                    if normalized_distance_to_max < normalized_distance_to_min:
+                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")
+                        if forecast_direction == "Down":
+                            print("SHORT condition 2: forecast_direction == Down")
+                            if regression_mood == "Down":
+                                print("SHORT condition 3: regression_mood == Down")
+                                if market_mood_fft == "Bearish":
+                                    print("SHORT condition 4: market_mood_fft == Bearish")
+                                    if predicted_market_mood == "Down":
+                                        print("SHORT condition 5: predicted_market_mood == Down")
+                                        if signal == "SELL":
+                                            print("SHORT condition 6: signal == SELL")
+                                            if result_cycles == "Down":
+                                                print("SHORT condition 7: result_cycles == Down")
+                                                if positive_count < negative_count or positive_count == negative_count:
+                                                    if positive_count < negative_count:
+                                                        print("SHORT condition 8: positive_count < negative_count")     
+                                                    elif positive_count == negative_count:
+                                                        print("SHORT condition 8: positive_count = negative_count")                       
+                                                    if momentum < 0:
+                                                        print("SHORT condition 9: momentum < 0")
+                                                        trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
