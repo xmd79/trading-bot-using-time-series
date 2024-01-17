@@ -2623,43 +2623,91 @@ def main():
 
                     print()
 
-                    # Uptrend cycle trigger conditions   
+                    # Uptrend cycle trigger conditions 
                     if normalized_distance_to_min < normalized_distance_to_max:
-                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")
-                        if forecast_direction == "Up":
-                            print("LONG condition 2: forecast_direction == Up")
-                            if regression_mood == "Up":
-                                print("LONG condition 3: regression_mood == Up")
-                                if market_mood_fft == "Bullish":
-                                    print("LONG condition 4: market_mood_fft == Bullish")
-                                    if predicted_market_mood == "Up":
-                                        print("LONG condition 5: predicted_market_mood == Up")
-                                        if signal == "BUY":
-                                            print("LONG condition 6: signal == BUY")
-                                            if closest_threshold == min_threshold:
-                                                print("LONG condition 7: closest_threshold == min_threshold")                     
-                                                if momentum > 0:
-                                                    print("LONG condition 8: momentum > 0")
-                                                    trigger_long = True
+                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")                
+                        if closest_threshold == min_threshold and price < avg_mtf: 
+                            print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
+                            if closest_threshold < price:  
+                                print("LONG condition 3: closest_threshold < price")
+                                if market_mood_poly == "Bullish":
+                                    print("LONG condition 4: market_mood_poly == Bullish")  
+                                    if market_mood_fastfft == "long":
+                                        print("LONG condition 5: market_mood_fastfft == long") 
+                                        if forecast_direction == "Up":
+                                            print("LONG condition 6: forecast_direction == Up")        
+                                            if price < fastest_target:
+                                                print("LONG condition 7: price < fastest_target")                            
+                                                if future_price_regression > price:
+                                                    print("LONG condition 8: future_price_regression > price")
+                                                    if forecast_price_fft > price:
+                                                        print("LONG condition 9: forecast_price_fft > price")
+                                                        if price < expected_price:
+                                                            print("LONG condition 10: price < expected_price") 
+                                                            if market_mood_fft == "Bullish":
+                                                                print("LONG condition 11: market_mood_fft == Bullish")  
+                                                                if price < forecast:
+                                                                    print("LONG condition 12: price < forecast")
+                                                                    if incoming_reversal == "Top": 
+                                                                        print("LONG condition 13: incoming_reversal == Top") 
+                                                                        if regression_mood == "Up":
+                                                                            print("LONG condition 14: regression_mood == Up") 
+                                                                            if market_mood_type == "up":
+                                                                                print("LONG condition 15: market_mood_type == up") 
+                                                                                if price < intraday_target:
+                                                                                    print("LONG condition 16: price < intraday_target")
+                                                                                    if price < fast_price:   
+                                                                                        print("LONG condition 17: price < fast_price")  
+                                                                                        if signal == "BUY":
+                                                                                            print("LONG condition 18: signal == BUY")  
+                                                                                            if predicted_market_mood == "Up":
+                                                                                                print("LONG condition 19: predicted_market_mood == Up")                         
+                                                                                                if momentum > 0:
+                                                                                                    print("LONG condition 20: momentum > 0")
+                                                                                                    trigger_long = True
 
-                    # Downtrend cycle trigger conditions 
+                    # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
-                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")
-                        if forecast_direction == "Down":
-                            print("SHORT condition 2: forecast_direction == Down")
-                            if regression_mood == "Down":
-                                print("SHORT condition 3: regression_mood == Down")
-                                if market_mood_fft == "Bearish":
-                                    print("SHORT condition 4: market_mood_fft == Bearish")
-                                    if predicted_market_mood == "Down":
-                                        print("SHORT condition 5: predicted_market_mood == Down")
-                                        if signal == "SELL":
-                                            print("SHORT condition 6: signal == SELL")
-                                            if closest_threshold == max_threshold:
-                                                print("SHORT condition 7: closest_threshold == max_threshold")                     
-                                                if momentum < 0:
-                                                    print("SHORT condition 8: momentum < 0")
-                                                    trigger_short = True
+                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min") 
+                        if closest_threshold == max_threshold and price > avg_mtf:
+                            print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")  
+                            if closest_threshold > price:
+                                print("SHORT condition 3: closest_threshold > price")  
+                                if market_mood_poly == "Bearish":
+                                    print("SHORT condition 4: market_mood_poly == Bearish") 
+                                    if market_mood_fastfft == "short":
+                                        print("SHORT condition 5: market_mood_fastfft == short") 
+                                        if forecast_direction == "Down":
+                                            print("SHORT condition 6: forecast_direction == Down") 
+                                            if price > fastest_target:
+                                                print("SHORT condition 7: price > fastest_target") 
+                                                if future_price_regression < price:
+                                                    print("SHORT condition 8: future_price_regression < price")
+                                                    if forecast_price_fft < price:
+                                                        print("SHORT condition 9: forecast_price_fft < price")
+                                                        if price > expected_price:
+                                                            print("SHORT condition 10: price > expected_price") 
+                                                            if market_mood_fft == "Bearish":
+                                                                print("SHORT condition 11: market_mood_fft == Bearish")
+                                                                if price > forecast:
+                                                                    print("SHORT condition 12: price > forecast")
+                                                                    if incoming_reversal == "Dip": 
+                                                                        print("SHORT condition 13: incoming_reversal == Dip") 
+                                                                        if regression_mood == "Down":
+                                                                            print("SHORT condition 14: regression_mood == Down") 
+                                                                            if market_mood_type == "down":
+                                                                                print("SHORT condition 15: market_mood_type == down") 
+                                                                                if price > intraday_target:
+                                                                                    print("SHORT condition 16: price > intraday_target")  
+                                                                                    if price > fast_price:   
+                                                                                        print("SHORT condition 17: price > fast_price") 
+                                                                                        if signal == "SELL":
+                                                                                            print("SHORT condition 18: signal == SELL")   
+                                                                                            if predicted_market_mood == "Down":
+                                                                                                print("SHORT condition 19: predicted_market_mood == Down")                                          
+                                                                                                if momentum < 0:
+                                                                                                    print("SHORT condition 20: momentum < 0")
+                                                                                                    trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
