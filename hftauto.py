@@ -2553,8 +2553,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 10.00
-            stop_loss = -10.00
+            take_profit = 25.00
+            stop_loss = -25.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -2637,15 +2637,10 @@ def main():
                                         if signal == "BUY":
                                             print("LONG condition 6: signal == BUY")
                                             if closest_threshold == min_threshold:
-                                                print("LONG condition 7: closest_threshold == min_threshold")
-                                                if positive_count > negative_count or positive_count == negative_count:
-                                                    if positive_count > negative_count:
-                                                        print("LONG condition 8: positive_count > negative_count")     
-                                                    elif positive_count == negative_count:
-                                                        print("LONG condition 8: positive_count = negative_count")                       
-                                                    if momentum > 0:
-                                                        print("LONG condition 9: momentum > 0")
-                                                        trigger_long = True
+                                                print("LONG condition 7: closest_threshold == min_threshold")                     
+                                                if momentum > 0:
+                                                    print("LONG condition 8: momentum > 0")
+                                                    trigger_long = True
 
                     # Downtrend cycle trigger conditions 
                     if normalized_distance_to_max < normalized_distance_to_min:
@@ -2661,15 +2656,10 @@ def main():
                                         if signal == "SELL":
                                             print("SHORT condition 6: signal == SELL")
                                             if closest_threshold == max_threshold:
-                                                print("SHORT condition 7: closest_threshold == max_threshold")
-                                                if positive_count < negative_count or positive_count == negative_count:
-                                                    if positive_count < negative_count:
-                                                        print("SHORT condition 8: positive_count < negative_count")     
-                                                    elif positive_count == negative_count:
-                                                        print("SHORT condition 8: positive_count = negative_count")                       
-                                                    if momentum < 0:
-                                                        print("SHORT condition 9: momentum < 0")
-                                                        trigger_short = True
+                                                print("SHORT condition 7: closest_threshold == max_threshold")                     
+                                                if momentum < 0:
+                                                    print("SHORT condition 8: momentum < 0")
+                                                    trigger_short = True
                     print()  
 
                     #message = f'Price: ${price}' 
