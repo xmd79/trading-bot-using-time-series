@@ -2636,8 +2636,8 @@ def main():
                                         print("LONG condition 5: predicted_market_mood == Up")
                                         if signal == "BUY":
                                             print("LONG condition 6: signal == BUY")
-                                            if result_cycles == "Up":
-                                                print("LONG condition 7: result_cycles == Up")
+                                            if closest_threshold == min_threshold:
+                                                print("LONG condition 7: closest_threshold == min_threshold")
                                                 if positive_count > negative_count or positive_count == negative_count:
                                                     if positive_count > negative_count:
                                                         print("LONG condition 8: positive_count > negative_count")     
@@ -2660,8 +2660,8 @@ def main():
                                         print("SHORT condition 5: predicted_market_mood == Down")
                                         if signal == "SELL":
                                             print("SHORT condition 6: signal == SELL")
-                                            if result_cycles == "Down":
-                                                print("SHORT condition 7: result_cycles == Down")
+                                            if closest_threshold == max_threshold:
+                                                print("SHORT condition 7: closest_threshold == max_threshold")
                                                 if positive_count < negative_count or positive_count == negative_count:
                                                     if positive_count < negative_count:
                                                         print("SHORT condition 8: positive_count < negative_count")     
