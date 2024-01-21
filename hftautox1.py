@@ -2070,10 +2070,12 @@ def forecast_market_trends(close):
     # Step 5: Forecast market mood and price
     if above_45_degree:
         market_mood = "Bearish"
-        forecasted_price = resistance_level + (resistance_level - support_level)
+        forecasted_price = support_level - (resistance_level - support_level)
+
     elif below_45_degree:
         market_mood = "Bullish"
-        forecasted_price = support_level - (resistance_level - support_level)
+        forecasted_price = resistance_level + (resistance_level - support_level)
+
     else:
         market_mood = "Neutral"
         forecasted_price = (support_level + resistance_level) / 2
