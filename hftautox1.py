@@ -2663,7 +2663,7 @@ def main():
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")                
-                        if closest_threshold == min_threshold and price > avg_mtf: 
+                        if closest_threshold == max_threshold and price > avg_mtf: 
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")                                                   
                             if closest_threshold > price:  
                                 print("SHORT condition 3: closest_threshold > price") 
