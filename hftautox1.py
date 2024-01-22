@@ -2047,6 +2047,39 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def fft_market_analysis_mood(close):
+    # Perform Fast Fourier Transform (FFT)
+    fft_result = np.fft.fft(close)
+
+    # Identify dominant frequency
+    dominant_freq = np.abs(np.fft.fftfreq(len(fft_result)))[np.argmax(np.abs(fft_result))]
+
+    # Analyze market mood based on dominant frequency
+    if dominant_freq < 0.02:
+        market_mood = 'Bullish'
+    elif dominant_freq > 0.02:
+        market_mood = 'Bearish'
+    else:
+        market_mood = 'Neutral'
+
+    # Forecast next price
+    forecast_prices = np.fft.ifft(fft_result)
+    
+    # Adjust index to prevent IndexError
+    forecast_index = min(len(close), len(forecast_prices.real))
+    
+    forecast_price = forecast_prices.real[forecast_index - 1]
+
+    return market_mood, forecast_price
+
+market_fft_mood, forecast_fft_price = fft_market_analysis_mood(close)
+
+# Print market mood and forecasted price
+print(f'Market Mood: {market_fft_mood}')
+print(f'Forecasted Price: {forecast_fft_price}')
+
 print()
 
 ##################################################
@@ -2558,6 +2591,12 @@ def main():
             ##################################################
             ##################################################
 
+            market_fft_mood, forecast_fft_price = fft_market_analysis_mood(close)
+
+            # Print market mood and forecasted price
+            print(f'Market Mood: {market_fft_mood}')
+            print(f'Forecasted Price: {forecast_fft_price}')
+
             print()
 
             ##################################################
@@ -2640,8 +2679,8 @@ def main():
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
                             if closest_threshold < price and forecast_direction == "Up":  
                                 print("LONG condition 3: closest_threshold < price and forecast_direction == Up") 
-                                if market_mood_fft == "Bullish":
-                                    print("LONG condition 4: market_mood_fft == Bullish")
+                                if market_mood_fft == "Bullish" and market_fft_mood == "Bullish":
+                                    print("LONG condition 4: market_mood_fft == Bullish and market_fft_mood == Bullish")
                                     if price < expected_price:
                                         print("LONG condition 5: price < expected_price")  
                                         if price < forecast:
@@ -2663,10 +2702,10 @@ def main():
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")                                                   
                             if closest_threshold > price and forecast_direction == "Down":  
                                 print("SHORT condition 3: closest_threshold > price and forecast_direction == Down")      
-                                if market_mood_fft == "Bearish":
-                                    print("SHORT condition 4: market_mood_fft == Bearish")    
-                                    if price > expected_price:
-                                        print("SHORT condition 5: price > expected_price") 
+                                if market_mood_fft == "Bearish" and market_fft_mood == "Bearish":
+                                    print("SHORT condition 4: market_mood_fft == Bearish and market_fft_mood == Bearish")    
+                                    if price > expected_price and price > forecast_fft_price:
+                                        print("SHORT condition 5: price > expected_price and price > forecast_fft_price") 
                                         if price > forecast:
                                             print("SHORT condition 6: price > forecast")
                                             if incoming_reversal == "Dip": 
@@ -2746,7 +2785,7 @@ def main():
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
-        del result_cycles
+        del result_cycles, market_fft_mood, forecast_fft_price
 
         # Force garbage collection to free up memory
         gc.collect()
