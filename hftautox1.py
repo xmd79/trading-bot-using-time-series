@@ -2638,8 +2638,8 @@ def main():
                         print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")                
                         if closest_threshold == min_threshold and price < avg_mtf: 
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
-                            if closest_threshold < price:  
-                                print("LONG condition 3: closest_threshold < price") 
+                            if closest_threshold < price and forecast_direction == "Up":  
+                                print("LONG condition 3: closest_threshold < price and forecast_direction == Up") 
                                 if market_mood_fft == "Bullish":
                                     print("LONG condition 4: market_mood_fft == Bullish")
                                     if price < expected_price:
@@ -2661,8 +2661,8 @@ def main():
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")                
                         if closest_threshold == max_threshold and price > avg_mtf: 
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")                                                   
-                            if closest_threshold > price:  
-                                print("SHORT condition 3: closest_threshold > price")      
+                            if closest_threshold > price and forecast_direction == "Down":  
+                                print("SHORT condition 3: closest_threshold > price and forecast_direction == Down")      
                                 if market_mood_fft == "Bearish":
                                     print("SHORT condition 4: market_mood_fft == Bearish")    
                                     if price > expected_price:
