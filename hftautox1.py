@@ -2277,20 +2277,20 @@ def main():
             ##################################################
 
             # Calculate the 45-degree angle (simple linear regression)
-            #x = np.arange(len(close))
-            #slope, intercept = np.polyfit(x, close, 1)
+            x = np.arange(len(close))
+            slope, intercept = np.polyfit(x, close, 1)
 
             # Calculate the expected trend line value for the last close price
-            #expected_price = slope * len(close) + intercept
+            expected_price = slope * len(close) + intercept
 
             # Display the expected price on the 45-degree angle trend
-            #print(f"Expected price on the 45-degree angle trend: {expected_price}")
+            print(f"Expected price on the 45-degree angle trend: {expected_price}")
 
             # Generate forecast based on the 45-degree angle
-            #forecast_result = forecast_45_degree_angle(price, expected_price)
+            forecast_result = forecast_45_degree_angle(price, expected_price)
 
             # Display the forecast result
-            #print(forecast_result)
+            print(forecast_result)
 
             print()
 
@@ -2747,9 +2747,7 @@ def main():
         del response, data, current_time, current_close, fastest_target
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price, momentum
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-
-        #del x, slope, intercept, expected_price, forecast_result
-
+        del x, slope, intercept, expected_price, forecast_result
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
