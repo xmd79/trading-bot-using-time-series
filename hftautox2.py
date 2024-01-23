@@ -2634,36 +2634,32 @@ def main():
                     print()
 
                     # Uptrend cycle trigger conditions 
-                    if positive_count > negative_count or positive_count == negative_count:
-                        if positive_count > negative_count:
-                            print("LONG condition 1: positive_count > negative_count")     
-                        elif positive_count == negative_count:
-                            print("LONG condition 1: positive_count = negative_count")  
-                        if incoming_reversal == "Top": 
-                            print("LONG condition 2: incoming_reversal == Top")  
-                            if signal == "BUY":
-                                print("LONG condition 3: signal == BUY")  
-                                if predicted_market_mood == "Up":
-                                    print("LONG condition 4: predicted_market_mood == Up")  
-                                    if momentum > 0:
-                                        print("LONG condition 5: momentum > 0")
-                                        trigger_long = True
+                    if market_mood_fft == "Bullish":
+                        print("LONG condition 1: market_mood_fft == Bullish")
+                        if positive_count > negative_count or positive_count == negative_count:
+                            if positive_count > negative_count:
+                                print("LONG condition 2: positive_count > negative_count")     
+                            elif positive_count == negative_count:
+                                print("LONG condition 2: positive_count = negative_count")  
+                            if predicted_market_mood == "Up":
+                                print("LONG condition 3: predicted_market_mood == Up")  
+                                if momentum > 0:
+                                    print("LONG condition 4: momentum > 0")
+                                    trigger_long = True
 
                     # Downtrend cycle trigger conditions
-                    if positive_count < negative_count or positive_count == negative_count:
-                        if positive_count < negative_count:
-                            print("SHORT condition 1: positive_count < negative_count")     
-                        elif positive_count == negative_count:
-                            print("SHORT condition 1: positive_count = negative_count")  
-                        if incoming_reversal == "Dip": 
-                            print("SHORT condition 2: incoming_reversal == Dip")  
-                            if signal == "SELL":
-                                print("SHORT condition 3: signal == SELL")  
-                                if predicted_market_mood == "Down":
-                                    print("SHORT condition 4: predicted_market_mood == Down")  
-                                    if momentum < 0:
-                                        print("SHORT condition 5: momentum < 0")
-                                        trigger_short = True
+                    if market_mood_fft == "Bearish":
+                        print("SHORT condition 1: market_mood_fft == Bearish")
+                        if positive_count < negative_count or positive_count == negative_count:
+                            if positive_count < negative_count:
+                                print("SHORT condition 2: positive_count < negative_count")     
+                            elif positive_count == negative_count:
+                                print("SHORT condition 2: positive_count = negative_count")  
+                            if predicted_market_mood == "Down":
+                                print("SHORT condition 3: predicted_market_mood == Down")  
+                                if momentum < 0:
+                                    print("SHORT condition 4: momentum < 0")
+                                    trigger_short = True
 
                     print()  
 
