@@ -2052,6 +2052,54 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def forecast_market_trends(close):
+    # Step 1: Analyze market sentiment (considering price trend)
+    sentiment = np.sign(np.diff(close)[-1])
+    # Step 2: Determine market quadrant based on time geometry
+    time_phase = len(close) % 4  # Use the remainder to determine the phase
+    quadrant_mapping = {0: "Bullish", 1: "Transition to Bearish", 2: "Bearish", 3: "Transition to Bullish"}
+    market_quadrant = quadrant_mapping[time_phase]
+    # Step 3: Identify potential price levels
+    support_level = min(close)
+    resistance_level = max(close)
+    # Step 4: Determine if close is above or below 45-degree angle
+    angle_threshold = 45
+    above_45_degree = close[-1] > angle_threshold
+    below_45_degree = close[-1] < -angle_threshold
+    # Step 5: Forecast market mood and price
+    if above_45_degree:
+        market_mood = "Bearish"
+        forecasted_price = support_level - (resistance_level - support_level)
+    elif below_45_degree:
+        market_mood = "Bullish"
+        forecasted_price = resistance_level + (resistance_level - support_level)
+    else:
+        market_mood = "Neutral"
+        forecasted_price = (support_level + resistance_level) / 2
+    return sentiment, market_quadrant, support_level, resistance_level, market_mood, forecasted_price
+
+sentiment, market_quadrant, support_level, resistance_level, market_mood, forecasted_price = forecast_market_trends(close)
+
+# Print the results
+print(f"Market Sentiment: {sentiment}")
+print(f"Market Quadrant: {market_quadrant}")
+print(f"Support Level: {support_level}")
+print(f"Resistance Level: {resistance_level}")
+print(f"Market Mood: {market_mood}")
+print(f"Forecasted Price: {forecasted_price}")
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2558,6 +2606,16 @@ def main():
             ##################################################
             ##################################################
 
+            sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend = forecast_market_trends(close)
+
+            # Print the results
+            print(f"Market Sentiment: {sentiment}")
+            print(f"Market Quadrant: {market_quadrant}")
+            print(f"Support Level: {support_level}")
+            print(f"Resistance Level: {resistance_level}")
+            print(f"Market Mood: {market_mood_trend}")
+            print(f"Forecasted Price: {forecasted_price_trend}")
+
             print()
 
             ##################################################
@@ -2754,7 +2812,7 @@ def main():
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
-        del result_cycles
+        del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
 
         # Force garbage collection to free up memory
         gc.collect()
