@@ -2706,8 +2706,8 @@ def main():
                                             print("LONG condition 6: price < forecast")
                                             if incoming_reversal == "Top": 
                                                 print("LONG condition 7: incoming_reversal == Top")  
-                                                if signal == "BUY":
-                                                    print("LONG condition 8: signal == BUY")  
+                                                if signal == "BUY" and result_cycles == "Up":
+                                                    print("LONG condition 8: signal == BUY and result_cycles == Up")  
                                                     if predicted_market_mood == "Up":
                                                         print("LONG condition 9: predicted_market_mood == Up")  
                                                         if positive_count > negative_count:
@@ -2731,8 +2731,8 @@ def main():
                                             print("SHORT condition 6: price > forecast")
                                             if incoming_reversal == "Dip": 
                                                 print("SHORT condition 7: incoming_reversal == Dip")  
-                                                if signal == "SELL":
-                                                    print("SHORT condition 8: signal == SELL")  
+                                                if signal == "SELL" and result_cycles == "Down":
+                                                    print("SHORT condition 8: signal == SELL and result_cycles == Down")  
                                                     if predicted_market_mood == "Down":
                                                         print("SHORT condition 9: predicted_market_mood == Down")   
                                                         if positive_count < negative_count:
