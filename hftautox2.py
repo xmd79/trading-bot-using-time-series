@@ -2106,7 +2106,7 @@ def calculate_pivot_point_and_forecast(close):
     support_2 = pivot_point - (high - low)
     resistance_2 = pivot_point + (high - low)
 
-    market_mood = "Bullish" if close_price > pivot_point else "Bearish"
+    market_mood = "Bullish" if close_price < pivot_point else "Bearish"
 
     forecast_price = resistance_1 if market_mood == "Bullish" else support_1
 
