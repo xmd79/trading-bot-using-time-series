@@ -2095,6 +2095,39 @@ print()
 ##################################################
 ##################################################
 
+def calculate_pivot_point_and_forecast(close):
+    high = max(close)
+    low = min(close)
+    close_price = close[-1]
+
+    pivot_point = (high + low + close_price) / 3
+    support_1 = (pivot_point * 2) - high
+    resistance_1 = (pivot_point * 2) - low
+    support_2 = pivot_point - (high - low)
+    resistance_2 = pivot_point + (high - low)
+
+    market_mood = "Bullish" if close_price > pivot_point else "Bearish"
+
+    forecast_price = resistance_1 if market_mood == "Bullish" else support_1
+
+    result = {
+        'Pivot Point': pivot_point,
+        'Support 1': support_1,
+        'Resistance 1': resistance_1,
+        'Support 2': support_2,
+        'Resistance 2': resistance_2,
+        'Market Mood': market_mood,
+        'Forecast Price': forecast_price
+    }
+
+    return result
+
+pivot_and_forecast = calculate_pivot_point_and_forecast(close)
+
+# Print statements moved outside the function
+print(f"Market Mood: {pivot_and_forecast['Market Mood']}")
+print(f"Forecast Price: {pivot_and_forecast['Forecast Price']}")
+
 print()
 
 ##################################################
@@ -2621,6 +2654,20 @@ def main():
             ##################################################
             ##################################################
 
+            pivot_and_forecast = calculate_pivot_point_and_forecast(close)
+
+            # Print statements moved outside the function
+            pivot_mood = pivot_and_forecast['Market Mood']
+            pivot_forecast = pivot_and_forecast['Forecast Price']
+
+            print(f"Market Mood: {pivot_mood}")
+            print(f"Forecast Price: {pivot_forecast}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 15.00
             stop_loss = -15.00
 
@@ -2812,7 +2859,8 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-
+        del pivot_mood, pivot_forecast
+ 
         # Force garbage collection to free up memory
         gc.collect()
 
