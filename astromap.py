@@ -6,7 +6,7 @@ from astroquery.jplhorizons import Horizons
 from astropy.time import Time
 
 def get_moon_phase_momentum(current_time):
-    # Set up timezone information
+    # Set up timezone information  
     tz = pytz.timezone('Etc/GMT-3')  # Use 'Etc/GMT-3' for UTC+3
     current_time = tz.normalize(current_time.astimezone(tz))
     current_date = current_time.date()
@@ -246,7 +246,7 @@ moon_data = get_moon_phase_momentum(current_time)
 # Print the moon data
 print('Moon phase:', moon_data['moon_phase'])
 print('Moon age:', moon_data['moon_age'])
-print('Moon sign:', moon_data['moon_sign'])
+#print('Moon sign:', moon_data['moon_sign'])
 print('Moon right ascension:', moon_data['moon_ra'])
 print('Moon declination:', moon_data['moon_dec'])
 print('Moon distance from Earth (km):', moon_data['moon_distance_km'])
@@ -473,5 +473,117 @@ aspects = get_current_aspects()
 print("Current aspects:")
 for planet1, planet2, separation in aspects:
     print(f"{planet1} aspecting {planet2} at {separation}°")
+
+print()
+
+def get_predominant_frequencies(close):
+    # Calculate the periodogram to find predominant frequencies
+    import scipy.signal as signal
+    frequencies, power = signal.periodogram(close)
+    
+    # Find the 3 largest peaks in the periodogram
+    largest_peaks = np.argsort(power)[-3:][::-1] 
+    peaks = frequencies[largest_peaks]
+    
+    # Map frequencies to timeframes
+    timeframes = {
+        peaks[0]: 'fast cycle',  # Shortest period
+        peaks[1]: 'medium cycle',  
+        peaks[2]: 'long cycle'
+    } 
+    
+    return timeframes
+
+def get_market_mood(aspects):
+    moon_aspects = [a for a in aspects if a[0] == 'Moon']
+    
+    if moon_aspects:
+        moon_planets = [a[1] for a in moon_aspects]
+        if 'Mars' in moon_planets:
+            mood = 'aggressive'
+        elif 'Jupiter' in moon_planets:
+            mood = 'expansive'
+        else:
+            mood = 'neutral' 
+    else: 
+        mood = 'neutral'
+            
+    return mood  
+
+def get_possible_reversals(aspects):
+    reversals = []
+    
+    for a in aspects: 
+        if a[2] <= 5: # Within 5 degree orb
+            planet1 = a[0].lower()
+            planet2 = a[1].lower()
+            if planet1 == 'moon' or planet2 == 'moon':
+                reversals.append(a)
+            
+    return reversals
+  
+print()
+
+from datetime import datetime
+import ephem
+from geopy.geocoders import Nominatim
+
+def get_location():
+    geolocator = Nominatim(user_agent="geo_locator")
+    location = geolocator.geocode("Timisoara, Romania")  # Replace with your city and country
+    return location.latitude, location.longitude
+
+def get_planetary_element(hour, latitude, longitude):
+    observer = ephem.Observer()
+    observer.lat = str(latitude)
+    observer.lon = str(longitude)
+
+    planets = [ephem.Mars(), ephem.Venus(), ephem.Mercury(), ephem.Moon(), ephem.Sun(), ephem.Uranus(), ephem.Neptune()]
+
+    # Set the date and time for the observer
+    observer.date = datetime.utcnow()
+
+    # Compute the altitude of each planet
+    planetary_altitudes = {}
+    for planet in planets:
+        planet.compute(observer)
+        planetary_altitudes[planet.name] = planet.alt
+
+    # Identify the dominant planet
+    dominant_planet = max(planetary_altitudes, key=planetary_altitudes.get)
+
+    # Determine the associated element
+    if dominant_planet == 'Sun':
+        element = 'Fire'
+    elif dominant_planet == 'Earth':
+        element = 'Earth'
+    elif dominant_planet == 'Mercury' or dominant_planet == 'Uranus':
+        element = 'Air'
+    else:
+        element = 'Water'
+
+    return element
+
+# Get the current time and location
+current_time = datetime.now()
+latitude, longitude = get_location()
+
+# Example usage for the current time and detected location
+planetary_element = get_planetary_element(current_time.hour, latitude, longitude)
+
+# Print the result
+print(f'Current Hour: {current_time.hour}')
+print(f'Element for the current hour based on planetary cycles: {planetary_element}')
+
+print()
+
+#frequencies = get_predominant_frequencies(close)
+aspects = get_current_aspects()
+mood = get_market_mood(aspects)
+reversals = get_possible_reversals(aspects)
+
+
+
+
 
 
