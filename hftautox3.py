@@ -2133,6 +2133,46 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+from scipy.fft import fft, ifft
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+def generate_stationary_wave(close):
+    # Perform Fourier Transform
+    n = len(close)
+    yf = fft(close)
+    xf = np.fft.fftfreq(n, 1.0)  # Frequency values
+
+    # Identify dominant frequencies
+    dominant_frequencies = [period for period in [1 / freq for freq in xf if freq != 0]]
+
+    # Generate custom stationary wave with min and max reversals
+    stationary_wave = ifft(np.where((xf > 0.02) & (xf < 0.1), 0, yf))
+
+    # Time series decomposition
+    decomposition = seasonal_decompose(stationary_wave.real, period=100)
+    trend = decomposition.trend[~np.isnan(decomposition.trend)]  # Remove NaNs
+
+    # Calculate market mood based on the trend
+    market_mood = "Bullish" if trend[-1] < trend[0] else "Bearish"
+
+    # Single most relevant value for the forecast
+    forecast_value = trend[-1]
+
+    return market_mood, forecast_value
+
+# Example Usage:
+
+market_mood_tsd, forecast_value_tsd = generate_stationary_wave(close)
+
+print("Market Mood:", market_mood_tsd)
+print("Single Most Relevant Forecast Value:", forecast_value_tsd)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2368,10 +2408,10 @@ def main():
             print(f"Expected price on the 45-degree angle trend: {expected_price}")
 
             # Generate forecast based on the 45-degree angle
-            forecast_result = forecast_45_degree_angle(price, expected_price)
+            #forecast_result = forecast_45_degree_angle(price, expected_price)
 
             # Display the forecast result
-            print(forecast_result)
+            #print(forecast_result)
 
             print()
 
@@ -2668,6 +2708,16 @@ def main():
             ##################################################
             ##################################################
 
+            market_mood_tsd, forecast_value_tsd = generate_stationary_wave(close)
+
+            print("Market Mood:", market_mood_tsd)
+            print("Single Most Relevant Forecast Value:", forecast_value_tsd)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -2851,7 +2901,7 @@ def main():
         del response, data, current_time, current_close, fastest_target
         del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price, momentum
         del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del x, slope, intercept, expected_price, forecast_result
+        del x, slope, intercept, expected_price
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
         del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
@@ -2859,7 +2909,7 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast
+        del pivot_mood, pivot_forecast, market_mood_tsd, forecast_value_tsd
  
         # Force garbage collection to free up memory
         gc.collect()
