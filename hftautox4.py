@@ -2179,6 +2179,37 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def forecast_price_with_symmetry(close):
+    # Calculate the golden ratio and its reciprocal
+    phi = (1 + np.sqrt(5)) / 2
+    pi_over_phi = np.pi / phi
+    phi_over_pi = phi / np.pi
+
+    # Calculate the symmetry factor
+    symmetry_factor = (close[-1] - close[0]) / (pi_over_phi + phi_over_pi)
+
+    # Determine market mood based on the symmetry factor
+    market_mood = "Bullish" if symmetry_factor > 0 else "Bearish"
+
+    # Calculate forecasted price using the symmetry factor
+    forecasted_price = close[-1] + symmetry_factor
+
+    return market_mood, forecasted_price
+
+
+symmetry_mood, symmetry_price = forecast_price_with_symmetry(close)
+
+print("Market Mood:", symmetry_mood)
+print("Forecasted Price:", symmetry_price)
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2714,6 +2745,11 @@ def main():
             ##################################################
             ##################################################
 
+            symmetry_mood, symmetry_price = forecast_price_with_symmetry(close)
+
+            print("Market Mood:", symmetry_mood)
+            print("Forecasted Price:", symmetry_price)
+
             print()
 
             ##################################################
@@ -2802,12 +2838,12 @@ def main():
                                         print("LONG condition 5: price < expected_price  and price < pivot_forecast")  
                                         if price < forecast and price < intraday_target:
                                             print("LONG condition 6: price < forecast and price < intraday_target")
-                                            if incoming_reversal == "Top": 
-                                                print("LONG condition 7: incoming_reversal == Top")  
+                                            if incoming_reversal == "Top" and symmetry_mood == "Bullish": 
+                                                print("LONG condition 7: incoming_reversal == Top and symmetry_mood == Bullish")  
                                                 if signal == "BUY" and market_mood_type == "up":
                                                     print("LONG condition 8: signal == BUY and market_mood_type == up")  
-                                                    if predicted_market_mood == "Up":
-                                                        print("LONG condition 9: predicted_market_mood == Up")  
+                                                    if predicted_market_mood == "Up" and price < symmetry_price:
+                                                        print("LONG condition 9: predicted_market_mood == Up and price < symmetry_price")  
                                                         if positive_count > negative_count or positive_count == negative_count:
                                                             if positive_count > negative_count:
                                                                 print("LONG condition 10: positive_count > negative_count")     
@@ -2831,12 +2867,12 @@ def main():
                                         print("SHORT condition 5: price > expected_price and price > pivot_forecast") 
                                         if price > forecast and price > intraday_target:
                                             print("SHORT condition 6: price > forecast and price > intraday_target")
-                                            if incoming_reversal == "Dip": 
-                                                print("SHORT condition 7: incoming_reversal == Dip")  
+                                            if incoming_reversal == "Dip" and symmetry_mood == "Bearish": 
+                                                print("SHORT condition 7: incoming_reversal == Dip and symmetry_mood == Bearish")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
-                                                    if predicted_market_mood == "Down":
-                                                        print("SHORT condition 9: predicted_market_mood == Down")   
+                                                    if predicted_market_mood == "Down" and price > symmetry_price:
+                                                        print("SHORT condition 9: predicted_market_mood == Down and price > symmetry_price")   
                                                         if positive_count < negative_count or positive_count == negative_count:
                                                             if positive_count < negative_count:
                                                                 print("SHORT condition 10: positive_count < negative_count")     
@@ -2914,7 +2950,7 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast
+        del pivot_mood, pivot_forecast, symmetry_mood, symmetry_price
 
         # Force garbage collection to free up memory
         gc.collect()
