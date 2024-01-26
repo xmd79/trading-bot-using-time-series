@@ -2772,8 +2772,8 @@ def main():
                                                                 print("LONG condition 10: positive_count > negative_count")     
                                                             elif positive_count == negative_count:
                                                                 print("LONG condition 10: positive_count = negative_count") 
-                                                            if price < forecast_5min and price < forecast_15min and price < forecast_20min and price < forecast_1h:
-                                                                print("LONG condition 11: price < forecast_5min and price < forecast_15min and price < forecast_20min and price < forecast_1h")                                               
+                                                            if price < forecast_5min and price < forecast_15min and price < forecast_30min and price < forecast_1h:
+                                                                print("LONG condition 11: price < forecast_5min and price < forecast_15min and price < forecast_30min and price < forecast_1h")                                               
                                                                 if momentum > 0:
                                                                     print("LONG condition 12: momentum > 0")
                                                                     trigger_long = True
@@ -2801,8 +2801,8 @@ def main():
                                                                 print("SHORT condition 10: positive_count < negative_count")     
                                                             elif positive_count == negative_count:
                                                                 print("SHORT condition 10: positive_count = negative_count")                                                
-                                                            if price > forecast_5min and price > forecast_15min and price > forecast_20min and price > forecast_1h:
-                                                                print("SHORT condition 11: price > forecast_5min and price > forecast_15min and price > forecast_20min and price > forecast_1h")                                               
+                                                            if price > forecast_5min and price > forecast_15min and price > forecast_30min and price > forecast_1h:
+                                                                print("SHORT condition 11: price > forecast_5min and price > forecast_15min and price > forecast_30min and price > forecast_1h")                                               
                                                                 if momentum > 0:
                                                                     print("SHORT condition 12: momentum > 0")
                                                                     trigger_short = True
