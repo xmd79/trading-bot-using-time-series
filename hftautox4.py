@@ -2133,6 +2133,47 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+from scipy.signal import argrelextrema
+
+def calculate_trend_intensity_index(close_prices):
+    # Calculate the rate of price change
+    price_change = np.diff(close_prices)
+    
+    # Identify local maxima and minima
+    maxima_indices = argrelextrema(close_prices, np.greater)[0]
+    minima_indices = argrelextrema(close_prices, np.less)[0]
+    
+    # Calculate the trend intensity index (TII)
+    tii = np.sum(np.abs(price_change[maxima_indices])) / np.sum(np.abs(price_change[minima_indices]))
+    
+    return tii
+
+def generate_forecast(close_prices):
+    # Calculate TII
+    tii = calculate_trend_intensity_index(close_prices)
+
+    # Determine market mood based on TII
+    market_mood = "Bullish" if tii > 1 else "Bearish"
+
+    # Forecast for fast, medium, and large distances
+    forecast_fast = close_prices[-1] + 0.1 * tii
+    forecast_medium = close_prices[-1] + 1 * tii
+    forecast_large = close_prices[-1] + tii
+
+    return market_mood, forecast_fast, forecast_medium, forecast_large
+
+# Example Usage:
+
+# Assuming 'close_prices' is your array of closing prices
+market_mood, forecast_fast, forecast_medium, forecast_large = generate_forecast(close_prices)
+
+print("Market Mood:", market_mood)
+print("Forecast for Fast Distance:", forecast_fast)
+print("Forecast for Medium Distance:", forecast_medium)
+print("Forecast for Large Distance:", forecast_large)
+
+
 print()
 
 ##################################################
@@ -2759,8 +2800,8 @@ def main():
                                     print("LONG condition 4: market_mood_fft == Bullish and pivot_mood == Bullish")
                                     if price < expected_price and price < pivot_forecast:
                                         print("LONG condition 5: price < expected_price  and price < pivot_forecast")  
-                                        if price < forecast:
-                                            print("LONG condition 6: price < forecast")
+                                        if price < forecast and price < intraday_target:
+                                            print("LONG condition 6: price < forecast and price < intraday_target")
                                             if incoming_reversal == "Top": 
                                                 print("LONG condition 7: incoming_reversal == Top")  
                                                 if signal == "BUY" and market_mood_type == "up":
@@ -2788,8 +2829,8 @@ def main():
                                     print("SHORT condition 4: market_mood_fft == Bearish and pivot_mood == Bearish")    
                                     if price > expected_price and price > pivot_forecast:
                                         print("SHORT condition 5: price > expected_price and price > pivot_forecast") 
-                                        if price > forecast:
-                                            print("SHORT condition 6: price > forecast")
+                                        if price > forecast and price > intraday_target:
+                                            print("SHORT condition 6: price > forecast and price > intraday_target")
                                             if incoming_reversal == "Dip": 
                                                 print("SHORT condition 7: incoming_reversal == Dip")  
                                                 if signal == "SELL" and market_mood_type == "down":
