@@ -2808,12 +2808,12 @@ def main():
                                         print("LONG condition 5: price < expected_price  and price < pivot_forecast")  
                                         if price < forecast and price < forecast_price_fft:
                                             print("LONG condition 6: price < forecast and price < forecast_price_fft ")
-                                            if incoming_reversal == "Top" and result_cycles == "Up": 
-                                                print("LONG condition 7: incoming_reversal == Top and result_cycles == Up")  
+                                            if incoming_reversal == "Top" and price < future_price_regression: 
+                                                print("LONG condition 7: incoming_reversal == Top and price < future_price_regression")  
                                                 if signal == "BUY" and market_mood_type == "up":
                                                     print("LONG condition 8: signal == BUY and market_mood_type == up")  
-                                                    if predicted_market_mood == "Up" and price < future_price_regression:
-                                                        print("LONG condition 9: predicted_market_mood == Up and price < future_price_regression")  
+                                                    if predicted_market_mood == "Up" and result_cycles == "Up":
+                                                        print("LONG condition 9: predicted_market_mood == Up and result_cycles == Up")  
                                                         if positive_count > negative_count or positive_count == negative_count:
                                                             if positive_count > negative_count:
                                                                 print("LONG condition 10: positive_count > negative_count")     
@@ -2837,12 +2837,12 @@ def main():
                                         print("SHORT condition 5: price > expected_price and price > pivot_forecast") 
                                         if price > forecast and price > forecast_price_fft :
                                             print("SHORT condition 6: price > forecast and price > forecast_price_fft")
-                                            if incoming_reversal == "Dip" and result_cycles == "Down": 
-                                                print("SHORT condition 7: incoming_reversal == Dip and result_cycles == Down")  
+                                            if incoming_reversal == "Dip" and price > future_price_regression: 
+                                                print("SHORT condition 7: incoming_reversal == Dip and price > future_price_regression")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
-                                                    if predicted_market_mood == "Down" and price > future_price_regression:
-                                                        print("SHORT condition 9: predicted_market_mood == Down and price > future_price_regression")   
+                                                    if predicted_market_mood == "Down" and result_cycles == "Down":
+                                                        print("SHORT condition 9: predicted_market_mood == Down and result_cycles == Down")   
                                                         if positive_count < negative_count or positive_count == negative_count:
                                                             if positive_count < negative_count:
                                                                 print("SHORT condition 10: positive_count < negative_count")     
