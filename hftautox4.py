@@ -2271,6 +2271,54 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def gann_forecast_and_mood(close, price):
+    """
+    A fictional function combining WD Gann's progression scale and mystical elements for forecasting and market mood.
+
+    Args:
+        close (list): Historical close prices.
+        price (float): Current price.
+
+    Returns:
+        Tuple[float, str]: A tuple containing forecasted price and market mood.
+    """
+    # Numerological calculation (just a fictional example)
+    numerology_factor = sum(int(digit) for digit in str(price).replace('.', ''))
+
+    # Astrological calculation (just a fictional example)
+    planetary_influence = np.sin(np.radians(numerology_factor * 10))
+
+    # Gann's Progression Scale (just a fictional example)
+    gann_progression_factor = 1.5  # Adjust as needed
+    gann_scale = np.log(np.array(close) + 1) * gann_progression_factor
+    gann_change = gann_scale[-1] - gann_scale[-2]
+
+    # Secret Progression combining Gann's Scale with other factors
+    secret_progression_factor = 0.5  # Adjust as needed
+    forecasted_change = secret_progression_factor * (price - np.mean(close)) + gann_change
+
+    # Combine factors for forecasting
+    forecasted_price = price + numerology_factor + planetary_influence + forecasted_change
+
+    # Calculate market mood (just a fictional example)
+    mood_factor = 0.5 * (numerology_factor + planetary_influence)
+
+    # Determine market mood
+    market_mood = "Bullish" if mood_factor < 0 else "Bearish"
+
+    return forecasted_price, market_mood
+
+gann_forecast, gann_mood = gann_forecast_and_mood(close, price)
+print(f"Forecasted Price: {gann_forecast}")
+print(f"Market Mood: {gann_mood}")
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2830,6 +2878,16 @@ def main():
             ##################################################
             ##################################################
 
+            gann_forecast, gann_mood = gann_forecast_and_mood(close, price)
+
+            print(f"Forecasted Price: {gann_forecast}")
+            print(f"Market Mood: {gann_mood}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -2924,8 +2982,8 @@ def main():
                                                                 print("LONG condition 10: positive_count > negative_count")     
                                                             elif positive_count == negative_count:
                                                                 print("LONG condition 10: positive_count = negative_count") 
-                                                            if price < forecast_5min and price < forecast_15min and price < forecast_30min and price < forecast_1h:
-                                                                print("LONG condition 11: price < forecast_5min and price < forecast_15min and price < forecast_30min and price < forecast_1h")                                               
+                                                            if gann_mood == "Bullish" and price < forecast_1h:
+                                                                print("LONG condition 11: gann_mood == Bullish and price < forecast_1h")                                               
                                                                 if momentum > 0:
                                                                     print("LONG condition 12: momentum > 0")
                                                                     trigger_long = True
@@ -2953,8 +3011,8 @@ def main():
                                                                 print("SHORT condition 10: positive_count < negative_count")     
                                                             elif positive_count == negative_count:
                                                                 print("SHORT condition 10: positive_count = negative_count")                                                
-                                                            if price > forecast_5min and price > forecast_15min and price > forecast_30min and price > forecast_1h:
-                                                                print("SHORT condition 11: price > forecast_5min and price > forecast_15min and price > forecast_30min and price > forecast_1h")                                               
+                                                            if gann_mood == "Bearish" and price > forecast_1h:
+                                                                print("SHORT condition 11: gann_mood == Bearish and price > forecast_1h")                                               
                                                                 if momentum > 0:
                                                                     print("SHORT condition 12: momentum > 0")
                                                                     trigger_short = True
@@ -3025,7 +3083,7 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast, transform_mood, most_significant_forecast, forecast_radar, radar_mood
+        del pivot_mood, pivot_forecast, transform_mood, most_significant_forecast, forecast_radar, radar_mood, gann_forecast, gann_mood
 
         # Force garbage collection to free up memory
         gc.collect()
