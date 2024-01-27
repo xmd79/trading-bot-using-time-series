@@ -2982,8 +2982,8 @@ def main():
                                                                 print("LONG condition 10: positive_count > negative_count")     
                                                             elif positive_count == negative_count:
                                                                 print("LONG condition 10: positive_count = negative_count") 
-                                                            if gann_mood == "Bullish" and price < forecast_1h:
-                                                                print("LONG condition 11: gann_mood == Bullish and price < forecast_1h")                                               
+                                                            if gann_mood == "Bullish":
+                                                                print("LONG condition 11: gann_mood == Bullish")                                               
                                                                 if momentum > 0:
                                                                     print("LONG condition 12: momentum > 0")
                                                                     trigger_long = True
@@ -3011,8 +3011,8 @@ def main():
                                                                 print("SHORT condition 10: positive_count < negative_count")     
                                                             elif positive_count == negative_count:
                                                                 print("SHORT condition 10: positive_count = negative_count")                                                
-                                                            if gann_mood == "Bearish" and price > forecast_1h:
-                                                                print("SHORT condition 11: gann_mood == Bearish and price > forecast_1h")                                               
+                                                            if gann_mood == "Bearish":
+                                                                print("SHORT condition 11: gann_mood == Bearish")                                               
                                                                 if momentum > 0:
                                                                     print("SHORT condition 12: momentum > 0")
                                                                     trigger_short = True
