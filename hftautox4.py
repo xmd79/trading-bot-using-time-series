@@ -2912,8 +2912,8 @@ def main():
                                         print("SHORT condition 5: price > expected_price and price > fastest_target") 
                                         if price > forecast and price > future_price_regression:
                                             print("SHORT condition 6: price > forecast and price > future_price_regression")
-                                            if incoming_reversal == "Dip" and current_market_situation == "Bearish: 
-                                                print("SHORT condition 7: incoming_reversal == Dip and current_market_situation == "Bearish")  
+                                            if incoming_reversal == "Dip" and current_market_situation == "Bearish": 
+                                                print("SHORT condition 7: incoming_reversal == Dip and current_market_situation == Bearish")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
                                                     if predicted_market_mood == "Down":
