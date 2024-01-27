@@ -2179,31 +2179,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-
-def forecast_price_with_symmetry(close):
-    # Calculate the golden ratio and its reciprocal
-    phi = (1 + np.sqrt(5)) / 2
-    pi_over_phi = np.pi / phi
-    phi_over_pi = phi / np.pi
-
-    # Calculate the symmetry factor
-    symmetry_factor = (close[-1] - close[0]) / (pi_over_phi + phi_over_pi)
-
-    # Determine market mood based on the symmetry factor
-    market_mood = "Bullish" if symmetry_factor > 0 else "Bearish"
-
-    # Calculate forecasted price using the symmetry factor
-    forecasted_price = close[-1] + symmetry_factor
-
-    return market_mood, forecasted_price
-
-
-symmetry_mood, symmetry_price = forecast_price_with_symmetry(close)
-
-print("Market Mood:", symmetry_mood)
-print("Forecasted Price:", symmetry_price)
-
 
 print()
 
@@ -2745,11 +2720,6 @@ def main():
             ##################################################
             ##################################################
 
-            symmetry_mood, symmetry_price = forecast_price_with_symmetry(close)
-
-            print("Market Mood:", symmetry_mood)
-            print("Forecasted Price:", symmetry_price)
-
             print()
 
             ##################################################
@@ -2839,11 +2809,11 @@ def main():
                                         if price < forecast and price < intraday_target:
                                             print("LONG condition 6: price < forecast and price < intraday_target")
                                             if incoming_reversal == "Top" and symmetry_mood == "Bullish": 
-                                                print("LONG condition 7: incoming_reversal == Top and symmetry_mood == Bullish")  
+                                                print("LONG condition 7: incoming_reversal == Top")  
                                                 if signal == "BUY" and market_mood_type == "up":
                                                     print("LONG condition 8: signal == BUY and market_mood_type == up")  
                                                     if predicted_market_mood == "Up" and price < symmetry_price:
-                                                        print("LONG condition 9: predicted_market_mood == Up and price < symmetry_price")  
+                                                        print("LONG condition 9: predicted_market_mood == Up")  
                                                         if positive_count > negative_count or positive_count == negative_count:
                                                             if positive_count > negative_count:
                                                                 print("LONG condition 10: positive_count > negative_count")     
@@ -2868,11 +2838,11 @@ def main():
                                         if price > forecast and price > intraday_target:
                                             print("SHORT condition 6: price > forecast and price > intraday_target")
                                             if incoming_reversal == "Dip" and symmetry_mood == "Bearish": 
-                                                print("SHORT condition 7: incoming_reversal == Dip and symmetry_mood == Bearish")  
+                                                print("SHORT condition 7: incoming_reversal == Dip")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
                                                     if predicted_market_mood == "Down" and price > symmetry_price:
-                                                        print("SHORT condition 9: predicted_market_mood == Down and price > symmetry_price")   
+                                                        print("SHORT condition 9: predicted_market_mood == Down")   
                                                         if positive_count < negative_count or positive_count == negative_count:
                                                             if positive_count < negative_count:
                                                                 print("SHORT condition 10: positive_count < negative_count")     
