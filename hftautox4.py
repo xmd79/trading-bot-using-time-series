@@ -2179,6 +2179,92 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def generate_forecast(close):
+    # Perform Fast Fourier Transform (FFT) using numpy
+    yf = np.fft.fft(close)
+    n = len(close)
+    xf = np.fft.fftfreq(n, 1.0)  # Frequency values
+
+    # Identify dominant frequencies
+    dominant_frequencies = [period for period in [1 / freq for freq in xf if freq != 0]]
+
+    # Create a frequency array with logarithmically spaced frequencies
+    frequencies = np.logspace(-1, 1, n)
+
+    # Create an energy array with linearly spaced energy values
+    energies = np.linspace(-100, 375, n)
+
+    # Create a dictionary to store the energy values for each frequency
+    energy_per_frequency = {}
+
+    # Iterate over the frequencies and energies
+    for i, frequency in enumerate(frequencies):
+        energy_per_frequency[frequency] = energies[i]
+
+    # Calculate a metric (e.g., weighted sum) based on close prices and energy values
+    weighted_sum = np.sum(close * np.array(list(energy_per_frequency.values())))
+
+    # Determine market mood based on the metric
+    market_mood = "Bullish" if weighted_sum < 0 else "Bearish"
+
+    # Single most relevant value for the forecast
+    forecast_value = weighted_sum
+
+    # Convert forecast value back to the real price scale using Inverse FFT
+    forecast_prices = np.fft.ifft(yf)
+
+    return market_mood, forecast_prices.real[0]   # Return only the most significant value
+
+# Call the function to generate market mood and the most significant forecast value
+transform_mood, most_significant_forecast = generate_forecast(close_prices)
+
+# Print the results
+print("Market Mood:", transform_mood)
+print("Most Significant Forecast Value:", most_significant_forecast)
+
+print()
+
+##################################################
+##################################################
+
+import numpy as np
+
+def generate_radar(close, price):
+    # Constants
+    total_points = len(close)
+    angles = np.linspace(0, 2 * np.pi, total_points, endpoint=False)
+
+    # Convert close values to radians
+    normalized_closes = np.array(close) / price
+    distances = normalized_closes * 100  # Distance in percentages to the center
+
+    # Calculate forecast close based on the average distance
+    forecast_distance = np.mean(distances)
+    
+    # Make forecast close value even closer to the current price for HFT
+    forecast_close = price * (1 + 0.0001 * forecast_distance)
+
+    # Determine market mood based on forecast distance
+    market_mood = "Bullish" if forecast_distance < 0 else "Bearish"
+
+    # Calculate forecast close based on market mood and special triangles (adjust as needed)
+    if market_mood == "Bullish":
+        forecast_close = price * (1 + 0.0002 * forecast_distance)
+    elif market_mood == "Bearish":
+        forecast_close = price * (1 - 0.0002 * forecast_distance)
+
+    # Return values for further analysis if needed
+    return forecast_close, market_mood
+
+# Call the function
+forecast_radar, radar_mood = generate_radar(close, price)
+
+# Print the last two statements outside the function
+print(f"Forecast Close: {forecast_radar}")
+print(f"Market Mood: {radar_mood}")
+
 
 print()
 
@@ -2720,6 +2806,25 @@ def main():
             ##################################################
             ##################################################
 
+            # Call the function to generate market mood and the most significant forecast value
+            transform_mood, most_significant_forecast = generate_forecast(close_prices)
+
+            # Print the results
+            print("Market Mood:", transform_mood)
+            print("Most Significant Forecast Value:", most_significant_forecast)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Call the function
+            forecast_radar, radar_mood = generate_radar(close, price)
+
+            # Print the last two statements outside the function
+            print(f"Forecast Close: {forecast_radar}")
+            print(f"Market Mood: {radar_mood}")
+
             print()
 
             ##################################################
@@ -2812,8 +2917,8 @@ def main():
                                                 print("LONG condition 7: incoming_reversal == Top and price < future_price_regression")  
                                                 if signal == "BUY" and market_mood_type == "up":
                                                     print("LONG condition 8: signal == BUY and market_mood_type == up")  
-                                                    if predicted_market_mood == "Up" and result_cycles == "Up":
-                                                        print("LONG condition 9: predicted_market_mood == Up and result_cycles == Up")  
+                                                    if predicted_market_mood == "Up" and radar_mood == "Bullish":
+                                                        print("LONG condition 9: predicted_market_mood == Up and radar_mood == Bullish")  
                                                         if positive_count > negative_count or positive_count == negative_count:
                                                             if positive_count > negative_count:
                                                                 print("LONG condition 10: positive_count > negative_count")     
@@ -2841,8 +2946,8 @@ def main():
                                                 print("SHORT condition 7: incoming_reversal == Dip and price > future_price_regression")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
-                                                    if predicted_market_mood == "Down" and result_cycles == "Down":
-                                                        print("SHORT condition 9: predicted_market_mood == Down and result_cycles == Down")   
+                                                    if predicted_market_mood == "Down" and radar_mood == "Bullish":
+                                                        print("SHORT condition 9: predicted_market_mood == Down and radar_mood == Bullish")   
                                                         if positive_count < negative_count or positive_count == negative_count:
                                                             if positive_count < negative_count:
                                                                 print("SHORT condition 10: positive_count < negative_count")     
@@ -2920,7 +3025,7 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast
+        del pivot_mood, pivot_forecast, transform_mood, most_significant_forecast, forecast_radar, radar_mood
 
         # Force garbage collection to free up memory
         gc.collect()
