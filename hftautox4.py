@@ -2133,6 +2133,97 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def market_analysis(close):
+    # Calculate the FFT
+    fft_result = np.fft.fft(close)
+    n = len(fft_result)
+
+    # Frequency calculation
+    frequencies = np.fft.fftfreq(n)
+
+    # Identify dominant frequencies
+    dominant_freq_indices = np.argsort(np.abs(fft_result))[::-1][:25]  # Consider top 25 dominant frequencies
+
+    # Extract dominant frequencies and their corresponding amplitudes
+    dominant_frequencies = frequencies[dominant_freq_indices]
+    dominant_amplitudes = np.abs(fft_result[dominant_freq_indices])
+
+    return dominant_frequencies, dominant_amplitudes
+
+def calculate_market_situation(close, dominant_frequencies, dominant_amplitudes):
+    # Forecast based on dominant frequencies
+    forecast_values = np.zeros_like(close, dtype=float)
+
+    for freq, amp in zip(dominant_frequencies, dominant_amplitudes):
+        if amp > 0.05:  # Arbitrary threshold for considering dominant frequencies
+            # Generate forecast based on the identified frequency
+            forecast_values += amp * np.sin(2 * np.pi * freq * np.arange(len(close)) / len(close))
+
+    # Calculate whether dominant frequencies and amplitudes are mostly negative or mostly positive
+    dominant_freq_positivity = "Mostly Positive" if np.sum(dominant_frequencies > 0) > len(dominant_frequencies) / 2 else "Mostly Negative"
+    dominant_freq_negativity = "Mostly Negative" if np.sum(dominant_frequencies < 0) > len(dominant_frequencies) / 2 else "Mostly Positive"
+
+    dominant_amp_positivity = "Mostly Positive" if np.sum(dominant_amplitudes > 0) > len(dominant_amplitudes) / 2 else "Mostly Negative"
+    dominant_amp_negativity = "Mostly Negative" if np.sum(dominant_amplitudes < 0) > len(dominant_amplitudes) / 2 else "Mostly Positive"
+
+    # Calculate the current situation of the market
+    current_market_situation = "Bearish" if forecast_values[-1] < close[-1] else "Bullish"
+
+    # Calculate the percentage indication of the market mood (up or down)
+    market_mood_percentage = (np.sum(forecast_values > 0) / len(forecast_values)) * 100
+
+    # Calculate angular momentum angle related to the phi golden ratio between min and max of the current cycle
+    min_index = np.argmin(forecast_values)
+    max_index = np.argmax(forecast_values)
+
+    phi = (1 + np.sqrt(5)) / 2  # Golden ratio
+    angular_momentum_angle = np.arctan((max_index - min_index) / len(forecast_values) * 2 * np.pi / phi)
+
+    return (
+        current_market_situation,
+        market_mood_percentage,
+        angular_momentum_angle,
+        dominant_freq_positivity,
+        dominant_freq_negativity,
+        dominant_amp_positivity,
+        dominant_amp_negativity
+    )
+
+# Apply market analysis function
+dominant_frequencies, dominant_amplitudes = market_analysis(close)
+
+# Calculate market situation details
+(
+    current_market_situation,
+    market_mood_percentage,
+    angular_momentum_angle,
+    dominant_freq_positivity,
+    dominant_freq_negativity,
+    dominant_amp_positivity,
+    dominant_amp_negativity
+) = calculate_market_situation(close, dominant_frequencies, dominant_amplitudes)
+
+# Print FFT details
+print("FFT Analysis Details:")
+print("---------------------")
+print("Dominant Frequencies:", dominant_frequencies)
+print("Dominant Amplitudes:", dominant_amplitudes)
+
+# Print Market Situation Details
+print("\nMarket Situation:")
+print("-----------------")
+print("Current Market Situation:", current_market_situation)
+print("Market Mood Percentage:", market_mood_percentage)
+print("Angular Momentum Angle:", angular_momentum_angle)
+
+# Print Dominant Frequency and Amplitude Positivity/Negativity
+print("\nDominant Frequency Positivity:", dominant_freq_positivity)
+print("Dominant Frequency Negativity:", dominant_freq_negativity)
+print("Dominant Amplitude Positivity:", dominant_amp_positivity)
+print("Dominant Amplitude Negativity:", dominant_amp_negativity)
+
 print()
 
 ##################################################
@@ -2673,6 +2764,39 @@ def main():
             ##################################################
             ##################################################
 
+            # Apply market analysis function
+            dominant_frequencies, dominant_amplitudes = market_analysis(close)
+
+            # Calculate market situation details
+            (
+                current_market_situation,
+                market_mood_percentage,
+                angular_momentum_angle,
+                dominant_freq_positivity,
+                dominant_freq_negativity,
+                dominant_amp_positivity,
+                dominant_amp_negativity
+            ) = calculate_market_situation(close, dominant_frequencies, dominant_amplitudes)
+
+            # Print FFT details
+            print("FFT Analysis Details:")
+            print("---------------------")
+            print("Dominant Frequencies:", dominant_frequencies)
+            print("Dominant Amplitudes:", dominant_amplitudes)
+
+            # Print Market Situation Details
+            print("\nMarket Situation:")
+            print("-----------------")
+            print("Current Market Situation:", current_market_situation)
+            print("Market Mood Percentage:", market_mood_percentage)
+            print("Angular Momentum Angle:", angular_momentum_angle)
+
+            # Print Dominant Frequency and Amplitude Positivity/Negativity
+            print("\nDominant Frequency Positivity:", dominant_freq_positivity)
+            print("Dominant Frequency Negativity:", dominant_freq_negativity)
+            print("Dominant Amplitude Positivity:", dominant_amp_positivity)
+            print("Dominant Amplitude Negativity:", dominant_amp_negativity)
+
             print()
 
             ##################################################
@@ -2761,8 +2885,8 @@ def main():
                                         print("LONG condition 5: price < expected_price  and price < fastest_target")  
                                         if price < forecast and price < future_price_regression:
                                             print("LONG condition 6: price < forecast and price < future_price_regression")
-                                            if incoming_reversal == "Top": 
-                                                print("LONG condition 7: incoming_reversal == Top")  
+                                            if incoming_reversal == "Top" and current_market_situation == "Bullish": 
+                                                print("LONG condition 7: incoming_reversal == Top and current_market_situation == Bullish")  
                                                 if signal == "BUY" and market_mood_type == "up":
                                                     print("LONG condition 8: signal == BUY and market_mood_type == up")  
                                                     if predicted_market_mood == "Up":
@@ -2788,8 +2912,8 @@ def main():
                                         print("SHORT condition 5: price > expected_price and price > fastest_target") 
                                         if price > forecast and price > future_price_regression:
                                             print("SHORT condition 6: price > forecast and price > future_price_regression")
-                                            if incoming_reversal == "Dip": 
-                                                print("SHORT condition 7: incoming_reversal == Dip")  
+                                            if incoming_reversal == "Dip" and current_market_situation == "Bearish: 
+                                                print("SHORT condition 7: incoming_reversal == Dip and current_market_situation == "Bearish")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
                                                     if predicted_market_mood == "Down":
@@ -2869,7 +2993,8 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast
+        del pivot_mood, pivot_forecast, dominant_frequencies, dominant_amplitudes, current_market_situation, market_mood_percentage, angular_momentum_angle
+        del dominant_freq_positivity, dominant_freq_negativity, dominant_amp_positivity, dominant_amp_negativity 
 
         # Force garbage collection to free up memory
         gc.collect()
