@@ -2806,14 +2806,14 @@ def main():
                                     print("LONG condition 4: market_mood_fft == Bullish and pivot_mood == Bullish")
                                     if price < expected_price and price < pivot_forecast:
                                         print("LONG condition 5: price < expected_price  and price < pivot_forecast")  
-                                        if price < forecast and price < intraday_target:
-                                            print("LONG condition 6: price < forecast and price < intraday_target")
-                                            if incoming_reversal == "Top" and symmetry_mood == "Bullish": 
-                                                print("LONG condition 7: incoming_reversal == Top")  
+                                        if price < forecast and price < forecast_price_fft:
+                                            print("LONG condition 6: price < forecast and price < forecast_price_fft ")
+                                            if incoming_reversal == "Top" and result_cycles == "Up": 
+                                                print("LONG condition 7: incoming_reversal == Top and result_cycles == Up")  
                                                 if signal == "BUY" and market_mood_type == "up":
                                                     print("LONG condition 8: signal == BUY and market_mood_type == up")  
-                                                    if predicted_market_mood == "Up" and price < symmetry_price:
-                                                        print("LONG condition 9: predicted_market_mood == Up")  
+                                                    if predicted_market_mood == "Up" and price < future_price_regression:
+                                                        print("LONG condition 9: predicted_market_mood == Up and price < future_price_regression")  
                                                         if positive_count > negative_count or positive_count == negative_count:
                                                             if positive_count > negative_count:
                                                                 print("LONG condition 10: positive_count > negative_count")     
@@ -2835,14 +2835,14 @@ def main():
                                     print("SHORT condition 4: market_mood_fft == Bearish and pivot_mood == Bearish")    
                                     if price > expected_price and price > pivot_forecast:
                                         print("SHORT condition 5: price > expected_price and price > pivot_forecast") 
-                                        if price > forecast and price > intraday_target:
-                                            print("SHORT condition 6: price > forecast and price > intraday_target")
-                                            if incoming_reversal == "Dip" and symmetry_mood == "Bearish": 
-                                                print("SHORT condition 7: incoming_reversal == Dip")  
+                                        if price > forecast and price > forecast_price_fft :
+                                            print("SHORT condition 6: price > forecast and price > forecast_price_fft")
+                                            if incoming_reversal == "Dip" and result_cycles == "Down": 
+                                                print("SHORT condition 7: incoming_reversal == Dip and result_cycles == Down")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
-                                                    if predicted_market_mood == "Down" and price > symmetry_price:
-                                                        print("SHORT condition 9: predicted_market_mood == Down")   
+                                                    if predicted_market_mood == "Down" and price > future_price_regression:
+                                                        print("SHORT condition 9: predicted_market_mood == Down and price > future_price_regression")   
                                                         if positive_count < negative_count or positive_count == negative_count:
                                                             if positive_count < negative_count:
                                                                 print("SHORT condition 10: positive_count < negative_count")     
