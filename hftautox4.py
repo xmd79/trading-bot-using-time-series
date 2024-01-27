@@ -2946,8 +2946,8 @@ def main():
                                                 print("SHORT condition 7: incoming_reversal == Dip and price > future_price_regression")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
-                                                    if predicted_market_mood == "Down" and radar_mood == "Bullish":
-                                                        print("SHORT condition 9: predicted_market_mood == Down and radar_mood == Bullish")   
+                                                    if predicted_market_mood == "Down" and radar_mood == "Bearish":
+                                                        print("SHORT condition 9: predicted_market_mood == Down and radar_mood == Bearish")   
                                                         if positive_count < negative_count or positive_count == negative_count:
                                                             if positive_count < negative_count:
                                                                 print("SHORT condition 10: positive_count < negative_count")     
