@@ -2920,7 +2920,7 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast, symmetry_mood, symmetry_price
+        del pivot_mood, pivot_forecast
 
         # Force garbage collection to free up memory
         gc.collect()
