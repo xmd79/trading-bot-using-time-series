@@ -2133,187 +2133,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-from scipy.signal import argrelextrema
-
-def calculate_trend_intensity_index(close_prices):
-    # Calculate the rate of price change
-    price_change = np.diff(close_prices)
-    
-    # Identify local maxima and minima
-    maxima_indices = argrelextrema(close_prices, np.greater)[0]
-    minima_indices = argrelextrema(close_prices, np.less)[0]
-    
-    # Calculate the trend intensity index (TII)
-    tii = np.sum(np.abs(price_change[maxima_indices])) / np.sum(np.abs(price_change[minima_indices]))
-    
-    return tii
-
-def generate_forecast(close_prices):
-    # Calculate TII
-    tii = calculate_trend_intensity_index(close_prices)
-
-    # Determine market mood based on TII
-    market_mood = "Bullish" if tii > 1 else "Bearish"
-
-    # Forecast for fast, medium, and large distances
-    forecast_fast = close_prices[-1] + 0.1 * tii
-    forecast_medium = close_prices[-1] + 1 * tii
-    forecast_large = close_prices[-1] + tii
-
-    return market_mood, forecast_fast, forecast_medium, forecast_large
-
-# Example Usage:
-
-# Assuming 'close_prices' is your array of closing prices
-market_mood, forecast_fast, forecast_medium, forecast_large = generate_forecast(close_prices)
-
-print("Market Mood:", market_mood)
-print("Forecast for Fast Distance:", forecast_fast)
-print("Forecast for Medium Distance:", forecast_medium)
-print("Forecast for Large Distance:", forecast_large)
-
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-
-def generate_forecast(close):
-    # Perform Fast Fourier Transform (FFT) using numpy
-    yf = np.fft.fft(close)
-    n = len(close)
-    xf = np.fft.fftfreq(n, 1.0)  # Frequency values
-
-    # Identify dominant frequencies
-    dominant_frequencies = [period for period in [1 / freq for freq in xf if freq != 0]]
-
-    # Create a frequency array with logarithmically spaced frequencies
-    frequencies = np.logspace(-1, 1, n)
-
-    # Create an energy array with linearly spaced energy values
-    energies = np.linspace(-100, 375, n)
-
-    # Create a dictionary to store the energy values for each frequency
-    energy_per_frequency = {}
-
-    # Iterate over the frequencies and energies
-    for i, frequency in enumerate(frequencies):
-        energy_per_frequency[frequency] = energies[i]
-
-    # Calculate a metric (e.g., weighted sum) based on close prices and energy values
-    weighted_sum = np.sum(close * np.array(list(energy_per_frequency.values())))
-
-    # Determine market mood based on the metric
-    market_mood = "Bullish" if weighted_sum < 0 else "Bearish"
-
-    # Single most relevant value for the forecast
-    forecast_value = weighted_sum
-
-    # Convert forecast value back to the real price scale using Inverse FFT
-    forecast_prices = np.fft.ifft(yf)
-
-    return market_mood, forecast_prices.real[0]   # Return only the most significant value
-
-# Call the function to generate market mood and the most significant forecast value
-transform_mood, most_significant_forecast = generate_forecast(close_prices)
-
-# Print the results
-print("Market Mood:", transform_mood)
-print("Most Significant Forecast Value:", most_significant_forecast)
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-
-def generate_radar(close, price):
-    # Constants
-    total_points = len(close)
-    angles = np.linspace(0, 2 * np.pi, total_points, endpoint=False)
-
-    # Convert close values to radians
-    normalized_closes = np.array(close) / price
-    distances = normalized_closes * 100  # Distance in percentages to the center
-
-    # Calculate forecast close based on the average distance
-    forecast_distance = np.mean(distances)
-    
-    # Make forecast close value even closer to the current price for HFT
-    forecast_close = price * (1 + 0.0001 * forecast_distance)
-
-    # Determine market mood based on forecast distance
-    market_mood = "Bullish" if forecast_distance < 0 else "Bearish"
-
-    # Calculate forecast close based on market mood and special triangles (adjust as needed)
-    if market_mood == "Bullish":
-        forecast_close = price * (1 + 0.0002 * forecast_distance)
-    elif market_mood == "Bearish":
-        forecast_close = price * (1 - 0.0002 * forecast_distance)
-
-    # Return values for further analysis if needed
-    return forecast_close, market_mood
-
-# Call the function
-forecast_radar, radar_mood = generate_radar(close, price)
-
-# Print the last two statements outside the function
-print(f"Forecast Close: {forecast_radar}")
-print(f"Market Mood: {radar_mood}")
-
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-
-def gann_forecast_and_mood(close, price):
-    """
-    A fictional function combining WD Gann's progression scale and mystical elements for forecasting and market mood.
-
-    Args:
-        close (list): Historical close prices.
-        price (float): Current price.
-
-    Returns:
-        Tuple[float, str]: A tuple containing forecasted price and market mood.
-    """
-    # Numerological calculation (just a fictional example)
-    numerology_factor = sum(int(digit) for digit in str(price).replace('.', ''))
-
-    # Astrological calculation (just a fictional example)
-    planetary_influence = np.sin(np.radians(numerology_factor * 10))
-
-    # Gann's Progression Scale (just a fictional example)
-    gann_progression_factor = 1.5  # Adjust as needed
-    gann_scale = np.log(np.array(close) + 1) * gann_progression_factor
-    gann_change = gann_scale[-1] - gann_scale[-2]
-
-    # Secret Progression combining Gann's Scale with other factors
-    secret_progression_factor = 0.5  # Adjust as needed
-    forecasted_change = secret_progression_factor * (price - np.mean(close)) + gann_change
-
-    # Combine factors for forecasting
-    forecasted_price = price + numerology_factor + planetary_influence + forecasted_change
-
-    # Calculate market mood (just a fictional example)
-    mood_factor = 0.5 * (numerology_factor + planetary_influence)
-
-    # Determine market mood
-    market_mood = "Bullish" if mood_factor < 0 else "Bearish"
-
-    return forecasted_price, market_mood
-
-gann_forecast, gann_mood = gann_forecast_and_mood(close, price)
-print(f"Forecasted Price: {gann_forecast}")
-print(f"Market Mood: {gann_mood}")
-
 print()
 
 ##################################################
@@ -2854,35 +2673,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Call the function to generate market mood and the most significant forecast value
-            transform_mood, most_significant_forecast = generate_forecast(close_prices)
-
-            # Print the results
-            print("Market Mood:", transform_mood)
-            print("Most Significant Forecast Value:", most_significant_forecast)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Call the function
-            forecast_radar, radar_mood = generate_radar(close, price)
-
-            # Print the last two statements outside the function
-            print(f"Forecast Close: {forecast_radar}")
-            print(f"Market Mood: {radar_mood}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            gann_forecast, gann_mood = gann_forecast_and_mood(close, price)
-
-            print(f"Forecasted Price: {gann_forecast}")
-            print(f"Market Mood: {gann_mood}")
-
             print()
 
             ##################################################
@@ -2965,28 +2755,26 @@ def main():
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
                             if closest_threshold < price and forecast_direction == "Up":  
                                 print("LONG condition 3: closest_threshold < price and forecast_direction == Up") 
-                                if market_mood_fft == "Bullish" and pivot_mood == "Bullish":
-                                    print("LONG condition 4: market_mood_fft == Bullish and pivot_mood == Bullish")
-                                    if price < expected_price and price < pivot_forecast:
-                                        print("LONG condition 5: price < expected_price  and price < pivot_forecast")  
-                                        if price < forecast and price < forecast_price_fft:
-                                            print("LONG condition 6: price < forecast and price < forecast_price_fft ")
-                                            if incoming_reversal == "Top" and price < future_price_regression: 
-                                                print("LONG condition 7: incoming_reversal == Top and price < future_price_regression")  
+                                if market_mood_fft == "Bullish" and price < forecast_price_fft:
+                                    print("LONG condition 4: market_mood_fft == Bullish and price < forecast_price_fft")
+                                    if price < expected_price and price < fastest_target:
+                                        print("LONG condition 5: price < expected_price  and price < fastest_target")  
+                                        if price < forecast and price < future_price_regression:
+                                            print("LONG condition 6: price < forecast and price < future_price_regression")
+                                            if incoming_reversal == "Top": 
+                                                print("LONG condition 7: incoming_reversal == Top")  
                                                 if signal == "BUY" and market_mood_type == "up":
                                                     print("LONG condition 8: signal == BUY and market_mood_type == up")  
-                                                    if predicted_market_mood == "Up" and radar_mood == "Bullish":
-                                                        print("LONG condition 9: predicted_market_mood == Up and radar_mood == Bullish")  
+                                                    if predicted_market_mood == "Up":
+                                                        print("LONG condition 9: predicted_market_mood == Up")  
                                                         if positive_count > negative_count or positive_count == negative_count:
                                                             if positive_count > negative_count:
                                                                 print("LONG condition 10: positive_count > negative_count")     
                                                             elif positive_count == negative_count:
-                                                                print("LONG condition 10: positive_count = negative_count") 
-                                                            if gann_mood == "Bullish":
-                                                                print("LONG condition 11: gann_mood == Bullish")                                               
-                                                                if momentum > 0:
-                                                                    print("LONG condition 12: momentum > 0")
-                                                                    trigger_long = True
+                                                                print("LONG condition 10: positive_count = negative_count")                                                
+                                                            if momentum > 0:
+                                                                print("LONG condition 11: momentum > 0")
+                                                                trigger_long = True
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_max < normalized_distance_to_min:
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")                
@@ -2994,28 +2782,26 @@ def main():
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")                                                   
                             if closest_threshold > price and forecast_direction == "Down":  
                                 print("SHORT condition 3: closest_threshold > price and forecast_direction == Down")      
-                                if market_mood_fft == "Bearish" and pivot_mood == "Bearish":
-                                    print("SHORT condition 4: market_mood_fft == Bearish and pivot_mood == Bearish")    
-                                    if price > expected_price and price > pivot_forecast:
-                                        print("SHORT condition 5: price > expected_price and price > pivot_forecast") 
-                                        if price > forecast and price > forecast_price_fft :
-                                            print("SHORT condition 6: price > forecast and price > forecast_price_fft")
-                                            if incoming_reversal == "Dip" and price > future_price_regression: 
-                                                print("SHORT condition 7: incoming_reversal == Dip and price > future_price_regression")  
+                                if market_mood_fft == "Bearish" and price > forecast_price_fft:
+                                    print("SHORT condition 4: market_mood_fft == Bearish and price > forecast_price_fft")    
+                                    if price > expected_price and price > fastest_target:
+                                        print("SHORT condition 5: price > expected_price and price > fastest_target") 
+                                        if price > forecast and price > future_price_regression:
+                                            print("SHORT condition 6: price > forecast and price > future_price_regression")
+                                            if incoming_reversal == "Dip": 
+                                                print("SHORT condition 7: incoming_reversal == Dip")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
-                                                    if predicted_market_mood == "Down" and radar_mood == "Bearish":
-                                                        print("SHORT condition 9: predicted_market_mood == Down and radar_mood == Bearish")   
+                                                    if predicted_market_mood == "Down":
+                                                        print("SHORT condition 9: predicted_market_mood == Down")   
                                                         if positive_count < negative_count or positive_count == negative_count:
                                                             if positive_count < negative_count:
                                                                 print("SHORT condition 10: positive_count < negative_count")     
                                                             elif positive_count == negative_count:
                                                                 print("SHORT condition 10: positive_count = negative_count")                                                
-                                                            if gann_mood == "Bearish":
-                                                                print("SHORT condition 11: gann_mood == Bearish")                                               
-                                                                if momentum > 0:
-                                                                    print("SHORT condition 12: momentum > 0")
-                                                                    trigger_short = True
+                                                            if momentum < 0:
+                                                                print("SHORT condition 11: momentum < 0")
+                                                                trigger_short = True
 
                     print()  
 
@@ -3083,7 +2869,7 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast, transform_mood, most_significant_forecast, forecast_radar, radar_mood, gann_forecast, gann_mood
+        del pivot_mood, pivot_forecast
 
         # Force garbage collection to free up memory
         gc.collect()
