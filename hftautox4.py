@@ -2866,8 +2866,8 @@ def main():
                 print(f"Normalized RSI for {timeframe}: {normalized_value:.2f}%")
 
             # Calculate dominant ratio
-            positive_count = sum(1 for value in normalized_rsi.values() if value > 50)
-            negative_count = len(normalized_rsi) - positive_count
+            positive_rsi_count = sum(1 for value in normalized_rsi.values() if value > 50)
+            negative_rsi_count = len(normalized_rsi) - positive_count
 
             print(f"Positive RSI timeframes: {positive_count}/{len(normalized_rsi)}")
             print(f"Negative RSI timeframes: {negative_count}/{len(normalized_rsi)}")
@@ -2963,8 +2963,8 @@ def main():
                                 print("LONG condition 3: closest_threshold < price and forecast_direction == Up") 
                                 if market_mood_fft == "Bullish" and price < forecast_price_fft:
                                     print("LONG condition 4: market_mood_fft == Bullish and price < forecast_price_fft")
-                                    if price < expected_price and positive_count > negative_count:
-                                        print("LONG condition 5: price < expected_price and positive_count > negative_count")  
+                                    if price < expected_price and positive_rsi_count > negative_rsi_count:
+                                        print("LONG condition 5: price < expected_price and positive_rsi_count > negative_rsi_count")  
                                         if price < forecast and price < future_price_regression:
                                             print("LONG condition 6: price < forecast and price < future_price_regression")
                                             if incoming_reversal == "Top" and current_market_situation == "Bullish": 
@@ -2990,8 +2990,8 @@ def main():
                                 print("SHORT condition 3: closest_threshold > price and forecast_direction == Down")      
                                 if market_mood_fft == "Bearish" and price > forecast_price_fft:
                                     print("SHORT condition 4: market_mood_fft == Bearish and price > forecast_price_fft")    
-                                    if price > expected_price and positive_count < negative_count:
-                                        print("SHORT condition 5: price > expected_price and positive_count < negative_count") 
+                                    if price > expected_price and positive_rsi_count < negative_rsi_count:
+                                        print("SHORT condition 5: price > expected_price and positive_rsicount < negative_rsi_count") 
                                         if price > forecast and price > future_price_regression:
                                             print("SHORT condition 6: price > forecast and price > future_price_regression")
                                             if incoming_reversal == "Dip" and current_market_situation == "Bearish": 
