@@ -2277,7 +2277,7 @@ print()
 min_reversal = np.min(dominant_frequencies)
 max_reversal = np.max(dominant_frequencies)
 
-inner_stages = np.linspace(min_reversal, max_reversal, 15)
+inner_stages = np.linspace(min_reversal, max_reversal, 25)
 
 up_cycle = np.concatenate([inner_stages, inner_stages[::-1]])
 down_cycle = np.concatenate([inner_stages[::-1], inner_stages])
