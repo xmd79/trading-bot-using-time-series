@@ -3133,10 +3133,10 @@ def main():
                     print()
 
                     # Uptrend cycle trigger conditions 
-                    if normalized_distance_to_min < normalized_distance_to_max and price < forecast_ht_price and ht_mood == "Bullish":
-                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max and price < forecast_ht_price and ht_mood == Bullish")                
-                        if closest_threshold == min_threshold and price < avg_mtf: 
-                            print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
+                    if normalized_distance_to_min < normalized_distance_to_max and price < forecast_ht_price:
+                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max and price < forecast_ht_price")                
+                        if closest_threshold == min_threshold and price < avg_mtf and ht_mood == "Bullish": 
+                            print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf and ht_mood == Bullish")                                                   
                             if closest_threshold < price and forecast_direction == "Up":  
                                 print("LONG condition 3: closest_threshold < price and forecast_direction == Up") 
                                 if market_mood_fft == "Bullish" and price < forecast_price_fft:
@@ -3160,10 +3160,10 @@ def main():
                                                                 print("LONG condition 11: momentum > 0")
                                                                 trigger_long = True
                     # Downtrend cycle trigger conditions
-                    if normalized_distance_to_max < normalized_distance_to_min and price > forecast_ht_price and ht_mood == "Bearish":
-                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min and price > forecast_ht_price and ht_mood == Bearish")                
-                        if closest_threshold == max_threshold and price > avg_mtf: 
-                            print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")                                                   
+                    if normalized_distance_to_max < normalized_distance_to_min and price > forecast_ht_price:
+                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min and price > forecast_ht_price")                
+                        if closest_threshold == max_threshold and price > avg_mtf and ht_mood == "Bearish": 
+                            print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf and ht_mood == Bearish")                                                   
                             if closest_threshold > price and forecast_direction == "Down":  
                                 print("SHORT condition 3: closest_threshold > price and forecast_direction == Down")      
                                 if market_mood_fft == "Bearish" and price > forecast_price_fft:
