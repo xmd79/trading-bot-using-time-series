@@ -2426,6 +2426,55 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def calculate_rejections_and_forecast(close):
+    # Calculate differences between consecutive closing prices
+    price_diff = np.diff(close)
+
+    # Find indices where price differences change sign (indicating potential reversal points)
+    reversal_indices = np.where(np.diff(np.sign(price_diff)))[0]
+
+    # Initialize counters for dip and top rejections
+    dip_rejections = 0
+    top_rejections = 0
+
+    # Iterate through reversal indices to identify dips and tops
+    for index in reversal_indices:
+        if price_diff[index] > 0:
+            # Indicates a dip rejection (price going up after a dip)
+            dip_rejections += 1
+        elif price_diff[index] < 0:
+            # Indicates a top rejection (price going down after a top)
+            top_rejections += 1
+
+    # Determine market mood based on rejection counts
+    if dip_rejections > top_rejections:
+        market_mood = "Bullish"
+    elif dip_rejections < top_rejections:
+        market_mood = "Bearish"
+    else:
+        market_mood = "Neutral"
+
+    # Forecasted price based on the last closing price
+    forecasted_price = close[-1]
+
+    return dip_rejections, top_rejections, market_mood, forecasted_price
+
+# Calculate rejections and forecast
+dip_rejections, top_rejections, rejections_mood, rejections_price = calculate_rejections_and_forecast(close)
+
+# Print detailed information
+print("Number of Dip Rejections:", dip_rejections)
+print("Number of Top Rejections:", top_rejections)
+print("Market Mood:", rejections_mood)
+print("Forecasted Price:", rejections_price)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -3116,6 +3165,21 @@ def main():
 
             ##################################################
             ##################################################
+
+            # Calculate rejections and forecast
+            dip_rejections, top_rejections, rejections_mood, rejections_price = calculate_rejections_and_forecast(close)
+
+            # Print detailed information
+            print("Number of Dip Rejections:", dip_rejections)
+            print("Number of Top Rejections:", top_rejections)
+            print("Market Mood:", rejections_mood)
+            print("Forecasted Price:", rejections_price)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 5.00
             stop_loss = -5.00
 
@@ -3309,6 +3373,7 @@ def main():
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dominant_frequencies, dominant_amplitudes, current_market_situation, market_mood_percentage, angular_momentum_angle
         del dominant_freq_positivity, dominant_freq_negativity, dominant_amp_positivity, dominant_amp_negativity, forecast_ht_price, ht_mood  
+        del spectrum_mood, spectrum_price, dip_rejections, top_rejections, rejections_mood, rejections_price
 
         # Force garbage collection to free up memory
         gc.collect()
