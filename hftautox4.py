@@ -2283,6 +2283,7 @@ up_cycle = np.concatenate([inner_stages, inner_stages[::-1]])
 down_cycle = np.concatenate([inner_stages[::-1], inner_stages])
 
 full_sine_wave = np.concatenate([up_cycle, down_cycle])
+full_sine_wave = -full_sine_wave
 
 # Divide the full sine wave into quadrants
 quadrant_size = len(full_sine_wave) // 4
@@ -2951,7 +2952,8 @@ def main():
             down_cycle = np.concatenate([inner_stages[::-1], inner_stages])
 
             full_sine_wave = np.concatenate([up_cycle, down_cycle])
-
+            full_sine_wave = -full_sine_wave
+ 
             # Divide the full sine wave into quadrants
             quadrant_size = len(full_sine_wave) // 4
             q1 = full_sine_wave[:quadrant_size]
@@ -3090,8 +3092,8 @@ def main():
                                                 print("LONG condition 7: incoming_reversal == Top and current_market_situation == Bullish")  
                                                 if signal == "BUY" and market_mood_type == "up":
                                                     print("LONG condition 8: signal == BUY and market_mood_type == up")  
-                                                    if predicted_market_mood == "Up":
-                                                        print("LONG condition 9: predicted_market_mood == Up")  
+                                                    if predicted_market_mood == "Up" and current_cycle == "UP":
+                                                        print("LONG condition 9: predicted_market_mood == Up and current_cycle == UP")  
                                                         if positive_count > negative_count or positive_count == negative_count:
                                                             if positive_count > negative_count:
                                                                 print("LONG condition 10: positive_count > negative_count")     
@@ -3110,15 +3112,15 @@ def main():
                                 if market_mood_fft == "Bearish" and price > forecast_price_fft:
                                     print("SHORT condition 4: market_mood_fft == Bearish and price > forecast_price_fft")    
                                     if price > expected_price and positive_rsi_count < negative_rsi_count:
-                                        print("SHORT condition 5: price > expected_price and positive_rsicount < negative_rsi_count") 
+                                        print("SHORT condition 5: price > expected_price and positive_rsi_count < negative_rsi_count") 
                                         if price > forecast and price > future_price_regression:
                                             print("SHORT condition 6: price > forecast and price > future_price_regression")
                                             if incoming_reversal == "Dip" and current_market_situation == "Bearish": 
                                                 print("SHORT condition 7: incoming_reversal == Dip and current_market_situation == Bearish")  
                                                 if signal == "SELL" and market_mood_type == "down":
                                                     print("SHORT condition 8: signal == SELL and market_mood_type == down")  
-                                                    if predicted_market_mood == "Down":
-                                                        print("SHORT condition 9: predicted_market_mood == Down")   
+                                                    if predicted_market_mood == "Down" and current_cycle == "DOWN":
+                                                        print("SHORT condition 9: predicted_market_mood == Down and current_cycle == DOWN")   
                                                         if positive_count < negative_count or positive_count == negative_count:
                                                             if positive_count < negative_count:
                                                                 print("SHORT condition 10: positive_count < negative_count")     
