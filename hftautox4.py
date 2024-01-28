@@ -429,6 +429,50 @@ print()
 ##################################################
 ##################################################
 
+import talib
+import numpy as np
+
+def get_rsi(timeframe):
+    """Calculate RSI for a single timeframe"""
+    # Get candle data
+    candles = candle_map[timeframe][-100:]
+    # Calculate RSI using talib RSI
+    rsi = talib.RSI(np.array([c["close"] for c in candles]), timeperiod=14)
+    return rsi[-1]
+
+# Calculate RSI for each timeframe
+rsi_values = {}
+for timeframe in timeframes:
+    rsi = get_rsi(timeframe)
+    rsi_values[timeframe] = rsi
+    print(f"RSI for {timeframe}: {rsi}")
+
+# Convert RSI to a normalized scale and determine if it's positive or negative
+normalized_rsi = {}
+for timeframe, rsi in rsi_values.items():
+    normalized_value = (rsi - 30) / 70 * 100  # Normalize to a scale between 0 and 100
+    normalized_rsi[timeframe] = normalized_value
+    print(f"Normalized RSI for {timeframe}: {normalized_value:.2f}%")
+
+# Calculate dominant ratio
+positive_count = sum(1 for value in normalized_rsi.values() if value > 50)
+negative_count = len(normalized_rsi) - positive_count
+
+print(f"Positive RSI timeframes: {positive_count}/{len(normalized_rsi)}")
+print(f"Negative RSI timeframes: {negative_count}/{len(normalized_rsi)}")
+
+if positive_count > negative_count:
+    print("Overall dominant RSI: Positive")
+elif positive_count < negative_count:
+    print("Overall dominant RSI: Negative")
+else:
+    print("Overall dominant RSI: Balanced")
+
+print()
+
+##################################################
+##################################################
+
 # Define the current time and close price
 current_time = datetime.datetime.now()
 current_close = closes[-1]
@@ -2229,6 +2273,11 @@ print()
 ##################################################
 ##################################################
 
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2802,6 +2851,39 @@ def main():
             ##################################################
             ##################################################
 
+            # Calculate RSI for each timeframe
+            rsi_values = {}
+            for timeframe in timeframes:
+                rsi = get_rsi(timeframe)
+                rsi_values[timeframe] = rsi
+                print(f"RSI for {timeframe}: {rsi}")
+
+            # Convert RSI to a normalized scale and determine if it's positive or negative
+            normalized_rsi = {}
+            for timeframe, rsi in rsi_values.items():
+                normalized_value = (rsi - 30) / 70 * 100  # Normalize to a scale between 0 and 100
+                normalized_rsi[timeframe] = normalized_value
+                print(f"Normalized RSI for {timeframe}: {normalized_value:.2f}%")
+
+            # Calculate dominant ratio
+            positive_count = sum(1 for value in normalized_rsi.values() if value > 50)
+            negative_count = len(normalized_rsi) - positive_count
+
+            print(f"Positive RSI timeframes: {positive_count}/{len(normalized_rsi)}")
+            print(f"Negative RSI timeframes: {negative_count}/{len(normalized_rsi)}")
+
+            if positive_count > negative_count:
+                print("Overall dominant RSI: Positive")
+            elif positive_count < negative_count:
+                print("Overall dominant RSI: Negative")
+            else:
+                print("Overall dominant RSI: Balanced")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -2881,8 +2963,8 @@ def main():
                                 print("LONG condition 3: closest_threshold < price and forecast_direction == Up") 
                                 if market_mood_fft == "Bullish" and price < forecast_price_fft:
                                     print("LONG condition 4: market_mood_fft == Bullish and price < forecast_price_fft")
-                                    if price < expected_price and price < fastest_target:
-                                        print("LONG condition 5: price < expected_price  and price < fastest_target")  
+                                    if price < expected_price and positive_count > negative_count:
+                                        print("LONG condition 5: price < expected_price and positive_count > negative_count")  
                                         if price < forecast and price < future_price_regression:
                                             print("LONG condition 6: price < forecast and price < future_price_regression")
                                             if incoming_reversal == "Top" and current_market_situation == "Bullish": 
@@ -2908,8 +2990,8 @@ def main():
                                 print("SHORT condition 3: closest_threshold > price and forecast_direction == Down")      
                                 if market_mood_fft == "Bearish" and price > forecast_price_fft:
                                     print("SHORT condition 4: market_mood_fft == Bearish and price > forecast_price_fft")    
-                                    if price > expected_price and price > fastest_target:
-                                        print("SHORT condition 5: price > expected_price and price > fastest_target") 
+                                    if price > expected_price and positive_count < negative_count:
+                                        print("SHORT condition 5: price > expected_price and positive_count < negative_count") 
                                         if price > forecast and price > future_price_regression:
                                             print("SHORT condition 6: price > forecast and price > future_price_regression")
                                             if incoming_reversal == "Dip" and current_market_situation == "Bearish": 
