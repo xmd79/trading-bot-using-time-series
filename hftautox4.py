@@ -2510,6 +2510,9 @@ def main():
     ##################################################
     ##################################################
 
+    dip_rejections = 0
+    top_rejections = 0
+
     print()
 
     ##################################################
@@ -3166,12 +3169,20 @@ def main():
             ##################################################
             ##################################################
 
+            dip_rejections = 0
+            top_rejections = 0
+
             # Calculate rejections and forecast
             dip_rejections, top_rejections, rejections_mood, rejections_price = calculate_rejections_and_forecast(close)
 
             # Print detailed information
-            print("Number of Dip Rejections:", dip_rejections)
-            print("Number of Top Rejections:", top_rejections)
+            if dip_rejections > top_rejections:
+                print("dip_rejections > top_rejections")
+            elif dip_rejections < top_rejections:
+                print("dip_rejections < top_rejections")
+
+            print()
+
             print("Market Mood:", rejections_mood)
             print("Forecasted Price:", rejections_price)
 
