@@ -3006,7 +3006,7 @@ def main():
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -1.00
+            stop_loss = -5.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
