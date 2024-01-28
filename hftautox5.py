@@ -2825,7 +2825,7 @@ def main():
                                 if market_mood_fft == "Bullish" and pivot_mood == "Bullish":
                                     print("LONG condition 4: market_mood_fft == Bullish and pivot_mood == Bullish")
                                     if price < expected_price and price < pivot_forecast:
-                                        print("LONG condition 5: price < expected_price  and price < pivot_forecast")  
+                                        print("LONG condition 5: price < expected_price and price < pivot_forecast")  
                                         if positive_rsi_count > negative_rsi_count or positive_rsi_count == negative_rsi_count:
                                             if positive_rsi_count > negative_rsi_count:
                                                 print("LONG condition 6: positive_rsi_count > negative_rsi_count")
