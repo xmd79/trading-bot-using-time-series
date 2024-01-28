@@ -2273,6 +2273,63 @@ print()
 ##################################################
 ##################################################
 
+# Use market analysis details to create stationary circuit
+min_reversal = np.min(dominant_frequencies)
+max_reversal = np.max(dominant_frequencies)
+
+inner_stages = np.linspace(min_reversal, max_reversal, 8)
+
+up_cycle = np.concatenate([inner_stages, inner_stages[::-1]])
+down_cycle = np.concatenate([inner_stages[::-1], inner_stages])
+
+full_sine_wave = np.concatenate([up_cycle, down_cycle])
+
+# Divide the full sine wave into quadrants
+quadrant_size = len(full_sine_wave) // 4
+q1 = full_sine_wave[:quadrant_size]
+q2 = full_sine_wave[quadrant_size:2 * quadrant_size]
+q3 = full_sine_wave[2 * quadrant_size:3 * quadrant_size]
+q4 = full_sine_wave[3 * quadrant_size:]
+
+# Print Quadrants and Stationary Circuit
+print("\nQuadrants and Stationary Circuit:")
+print("---------------------------------")
+print("Quadrant 1:", q1)
+print("Quadrant 2:", q2)
+print("Quadrant 3:", q3)
+print("Quadrant 4:", q4)
+
+# Provide last, current, and next quadrant
+current_quadrant = np.argmax([q1, q2, q3, q4], axis=0)
+last_quadrant = np.roll(current_quadrant, 1)
+next_quadrant = np.roll(current_quadrant, -1)
+
+# Determine current cycle
+current_cycle = "UP" if current_quadrant[0] < current_quadrant[-1] else "DOWN"
+
+print("\nCycle and Quadrant Details:")
+print("----------------------------")
+print("Current Cycle:", current_cycle)
+print("Last Quadrant:", last_quadrant)
+print("Current Quadrant:", current_quadrant)
+print("Next Quadrant:", next_quadrant)
+
+# Additional information for specific quadrants
+print("\nSpecific Quadrant Details:")
+print("-------------------------")
+print("Last Quadrant (q1):", last_quadrant[0])
+print("Current Quadrant (q1):", current_quadrant[0])
+print("Next Quadrant (q1):", next_quadrant[0])
+print("Last Quadrant (q2):", last_quadrant[1])
+print("Current Quadrant (q2):", current_quadrant[1])
+print("Next Quadrant (q2):", next_quadrant[1])
+print("Last Quadrant (q3):", last_quadrant[2])
+print("Current Quadrant (q3):", current_quadrant[2])
+print("Next Quadrant (q3):", next_quadrant[2])
+print("Last Quadrant (q4):", last_quadrant[3])
+print("Current Quadrant (q4):", current_quadrant[3])
+print("Next Quadrant (q4):", next_quadrant[3])
+
 print()
 
 ##################################################
@@ -2884,8 +2941,70 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 10.00
-            stop_loss = -10.00
+            # Use market analysis details to create stationary circuit
+            min_reversal = np.min(dominant_frequencies)
+            max_reversal = np.max(dominant_frequencies)
+
+            inner_stages = np.linspace(min_reversal, max_reversal, 8)
+
+            up_cycle = np.concatenate([inner_stages, inner_stages[::-1]])
+            down_cycle = np.concatenate([inner_stages[::-1], inner_stages])
+
+            full_sine_wave = np.concatenate([up_cycle, down_cycle])
+
+            # Divide the full sine wave into quadrants
+            quadrant_size = len(full_sine_wave) // 4
+            q1 = full_sine_wave[:quadrant_size]
+            q2 = full_sine_wave[quadrant_size:2 * quadrant_size]
+            q3 = full_sine_wave[2 * quadrant_size:3 * quadrant_size]
+            q4 = full_sine_wave[3 * quadrant_size:]
+
+            # Print Quadrants and Stationary Circuit
+            print("\nQuadrants and Stationary Circuit:")
+            print("---------------------------------")
+            print("Quadrant 1:", q1)
+            print("Quadrant 2:", q2)
+            print("Quadrant 3:", q3)
+            print("Quadrant 4:", q4)
+
+            # Provide last, current, and next quadrant
+            current_quadrant = np.argmax([q1, q2, q3, q4], axis=0)
+            last_quadrant = np.roll(current_quadrant, 1)
+            next_quadrant = np.roll(current_quadrant, -1)
+
+            # Determine current cycle
+            current_cycle = "UP" if current_quadrant[0] < current_quadrant[-1] else "DOWN"
+
+            print("\nCycle and Quadrant Details:")
+            print("----------------------------")
+            print("Current Cycle:", current_cycle)
+            print("Last Quadrant:", last_quadrant)
+            print("Current Quadrant:", current_quadrant)
+            print("Next Quadrant:", next_quadrant)
+
+            # Additional information for specific quadrants
+            print("\nSpecific Quadrant Details:")
+            print("-------------------------")
+            print("Last Quadrant (q1):", last_quadrant[0])
+            print("Current Quadrant (q1):", current_quadrant[0])
+            print("Next Quadrant (q1):", next_quadrant[0])
+            print("Last Quadrant (q2):", last_quadrant[1])
+            print("Current Quadrant (q2):", current_quadrant[1])
+            print("Next Quadrant (q2):", next_quadrant[1])
+            print("Last Quadrant (q3):", last_quadrant[2])
+            print("Current Quadrant (q3):", current_quadrant[2])
+            print("Next Quadrant (q3):", next_quadrant[2])
+            print("Last Quadrant (q4):", last_quadrant[3])
+            print("Current Quadrant (q4):", current_quadrant[3])
+            print("Next Quadrant (q4):", next_quadrant[3])
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            take_profit = 5.00
+            stop_loss = -25.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
