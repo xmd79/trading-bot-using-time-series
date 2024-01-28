@@ -2336,6 +2336,51 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+from scipy.signal import hilbert
+
+def calculate_ht_trendline(close):
+    # Calculate the analytic signal using Hilbert Transform
+    analytic_signal = hilbert(close)
+    
+    # Instantaneous phase
+    phase = np.unwrap(np.angle(analytic_signal))
+
+    # Instantaneous period
+    period = 1 / np.imag(np.log(analytic_signal))
+
+    # Instantaneous frequency
+    frequency = np.diff(phase) / (2.0 * np.pi)
+
+    # Append a value to match lengths
+    frequency = np.append(frequency, frequency[-1])
+
+    # HT_TRENDLINE calculation
+    ht_trendline = np.real(analytic_signal * np.exp(2.0j * np.pi * frequency.cumsum()))
+
+    # Forecast Price (next value in the trendline)
+    forecast_price = ht_trendline[-1]
+
+    # Intensity Trend Index
+    intensity_trend_index = np.abs(np.imag(analytic_signal))
+
+    # Market Mood (you may customize this based on your criteria)
+    market_mood = "Bullish" if forecast_price > close[-1] else "Bearish"
+
+    return forecast_price, market_mood
+
+# Calculate HT_TRENDLINE
+forecast_ht_price, ht_mood = calculate_ht_trendline(close)
+
+# Print results
+print("Forecast Price:", forecast_ht_price)
+print("Market Mood:", ht_mood)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -3005,6 +3050,18 @@ def main():
             ##################################################
             ##################################################
 
+            # Calculate HT_TRENDLINE
+            forecast_ht_price, ht_mood = calculate_ht_trendline(close)
+
+            # Print results
+            print("Forecast Price:", forecast_ht_price)
+            print("Market Mood:", ht_mood)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 5.00
             stop_loss = -5.00
 
@@ -3076,8 +3133,8 @@ def main():
                     print()
 
                     # Uptrend cycle trigger conditions 
-                    if normalized_distance_to_min < normalized_distance_to_max:
-                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")                
+                    if normalized_distance_to_min < normalized_distance_to_max and price < forecast_ht_price and ht_mood == "Bullish":
+                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max and price < forecast_ht_price and ht_mood == Bullish")                
                         if closest_threshold == min_threshold and price < avg_mtf: 
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
                             if closest_threshold < price and forecast_direction == "Up":  
@@ -3103,8 +3160,8 @@ def main():
                                                                 print("LONG condition 11: momentum > 0")
                                                                 trigger_long = True
                     # Downtrend cycle trigger conditions
-                    if normalized_distance_to_max < normalized_distance_to_min:
-                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")                
+                    if normalized_distance_to_max < normalized_distance_to_min and price > forecast_ht_price and ht_mood == "Bearish":
+                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min and price > forecast_ht_price and ht_mood == Bearish")                
                         if closest_threshold == max_threshold and price > avg_mtf: 
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")                                                   
                             if closest_threshold > price and forecast_direction == "Down":  
@@ -3197,7 +3254,7 @@ def main():
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dominant_frequencies, dominant_amplitudes, current_market_situation, market_mood_percentage, angular_momentum_angle
-        del dominant_freq_positivity, dominant_freq_negativity, dominant_amp_positivity, dominant_amp_negativity 
+        del dominant_freq_positivity, dominant_freq_negativity, dominant_amp_positivity, dominant_amp_negativity, forecast_ht_price, ht_mood  
 
         # Force garbage collection to free up memory
         gc.collect()
