@@ -2381,6 +2381,51 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def perform_spectrum_analysis(close):
+    # Compute FFT of closing prices
+    fft_values = np.fft.fft(close)
+    fft_freq = np.fft.fftfreq(len(close))
+
+    # Sort FFT values and frequencies in ascending order
+    sorted_indices = np.argsort(fft_freq)
+    sorted_freq = fft_freq[sorted_indices]
+    sorted_values = fft_values[sorted_indices]
+
+    # Generate frequency range
+    num_frequencies = 25
+    lower_freqs = sorted_freq[:num_frequencies]
+    upper_freqs = sorted_freq[-num_frequencies+1:][::-1]  # Reversed array
+    freq_range = np.concatenate((lower_freqs, upper_freqs))
+
+    # Perform spectrum analysis on the frequency range
+    freq_indices = np.where(np.isin(sorted_freq, freq_range))[0]
+    spectrum_values = np.abs(sorted_values[freq_indices])
+
+    # Normalize spectrum values
+    min_value = np.min(spectrum_values)
+    max_value = np.max(spectrum_values)
+    normalized_spectrum = (spectrum_values - min_value) / (max_value - min_value)
+
+    # Determine market mood based on spectrum analysis
+    market_mood = "Bullish" if np.mean(normalized_spectrum) >= 0.5 else "Bearish"
+
+    # Forecasted price value
+    forecasted_price = np.mean(close) + np.mean(spectrum_values)
+
+    return market_mood, forecasted_price
+
+spectrum_mood, spectrum_price = perform_spectrum_analysis(close)
+
+print("Market Mood:", spectrum_mood)
+print("Forecasted Price:", spectrum_price)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -3062,6 +3107,15 @@ def main():
             ##################################################
             ##################################################
 
+            spectrum_mood, spectrum_price = perform_spectrum_analysis(close)
+
+            print("Market Mood:", spectrum_mood)
+            print("Forecasted Price:", spectrum_price)
+
+            print()
+
+            ##################################################
+            ##################################################
             take_profit = 5.00
             stop_loss = -5.00
 
@@ -3137,8 +3191,8 @@ def main():
                         print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max and price < forecast_ht_price")                
                         if closest_threshold == min_threshold and price < avg_mtf and ht_mood == "Bullish": 
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf and ht_mood == Bullish")                                                   
-                            if closest_threshold < price and forecast_direction == "Up":  
-                                print("LONG condition 3: closest_threshold < price and forecast_direction == Up") 
+                            if closest_threshold < price and forecast_direction == "Up" and spectrum_mood == "Bullish":  
+                                print("LONG condition 3: closest_threshold < price and forecast_direction == Up and spectrum_mood == Bullish") 
                                 if market_mood_fft == "Bullish" and price < forecast_price_fft:
                                     print("LONG condition 4: market_mood_fft == Bullish and price < forecast_price_fft")
                                     if price < expected_price and positive_rsi_count > negative_rsi_count:
@@ -3164,8 +3218,8 @@ def main():
                         print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min and price > forecast_ht_price")                
                         if closest_threshold == max_threshold and price > avg_mtf and ht_mood == "Bearish": 
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf and ht_mood == Bearish")                                                   
-                            if closest_threshold > price and forecast_direction == "Down":  
-                                print("SHORT condition 3: closest_threshold > price and forecast_direction == Down")      
+                            if closest_threshold > price and forecast_direction == "Down" and spectrum_mood == "Bearish":  
+                                print("SHORT condition 3: closest_threshold > price and forecast_direction == Down and spectrum_mood == Bearish")      
                                 if market_mood_fft == "Bearish" and price > forecast_price_fft:
                                     print("SHORT condition 4: market_mood_fft == Bearish and price > forecast_price_fft")    
                                     if price > expected_price and positive_rsi_count < negative_rsi_count:
