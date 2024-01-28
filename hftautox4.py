@@ -3268,8 +3268,8 @@ def main():
                             print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf and ht_mood == Bullish")                                                   
                             if closest_threshold < price and forecast_direction == "Up" and spectrum_mood == "Bullish":  
                                 print("LONG condition 3: closest_threshold < price and forecast_direction == Up and spectrum_mood == Bullish") 
-                                if market_mood_fft == "Bullish" and price < forecast_price_fft:
-                                    print("LONG condition 4: market_mood_fft == Bullish and price < forecast_price_fft")
+                                if market_mood_fft == "Bullish" and price < forecast_price_fft and rejections_mood == "Bullish":
+                                    print("LONG condition 4: market_mood_fft == Bullish and price < forecast_price_fft and rejections_mood == Bullish")
                                     if price < expected_price and positive_rsi_count > negative_rsi_count:
                                         print("LONG condition 5: price < expected_price and positive_rsi_count > negative_rsi_count")  
                                         if price < forecast and price < future_price_regression:
@@ -3295,8 +3295,8 @@ def main():
                             print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf and ht_mood == Bearish")                                                   
                             if closest_threshold > price and forecast_direction == "Down" and spectrum_mood == "Bearish":  
                                 print("SHORT condition 3: closest_threshold > price and forecast_direction == Down and spectrum_mood == Bearish")      
-                                if market_mood_fft == "Bearish" and price > forecast_price_fft:
-                                    print("SHORT condition 4: market_mood_fft == Bearish and price > forecast_price_fft")    
+                                if market_mood_fft == "Bearish" and price > forecast_price_fft and rejections_mood == "Bearish:
+                                    print("SHORT condition 4: market_mood_fft == Bearish and price > forecast_price_fft and rejections_mood == Bearish")    
                                     if price > expected_price and positive_rsi_count < negative_rsi_count:
                                         print("SHORT condition 5: price > expected_price and positive_rsi_count < negative_rsi_count") 
                                         if price > forecast and price > future_price_regression:
