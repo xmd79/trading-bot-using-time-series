@@ -2159,15 +2159,15 @@ for timeframe, rsi in rsi_values.items():
     print(f"Normalized RSI for {timeframe}: {normalized_value:.2f}%")
 
 # Calculate dominant ratio
-positive_count = sum(1 for value in normalized_rsi.values() if value > 50)
-negative_count = len(normalized_rsi) - positive_count
+positive_rsi_count = sum(1 for value in normalized_rsi.values() if value > 50)
+negative_rsi_count = len(normalized_rsi) - positive_count
 
-print(f"Positive RSI timeframes: {positive_count}/{len(normalized_rsi)}")
-print(f"Negative RSI timeframes: {negative_count}/{len(normalized_rsi)}")
+print(f"Positive RSI timeframes: {positive_rsi_count}/{len(normalized_rsi)}")
+print(f"Negative RSI timeframes: {negative_rsi_count}/{len(normalized_rsi)}")
 
-if positive_count > negative_count:
+if positive_rsi_count > negative_rsi_count:
     print("Overall dominant RSI: Positive")
-elif positive_count < negative_count:
+elif positive_rsi_count < negative_rsi_count:
     print("Overall dominant RSI: Negative")
 else:
     print("Overall dominant RSI: Balanced")
@@ -2730,12 +2730,12 @@ def main():
             positive_rsi_count = sum(1 for value in normalized_rsi.values() if value > 50)
             negative_rsi_count = len(normalized_rsi) - positive_count
 
-            print(f"Positive RSI timeframes: {positive_count}/{len(normalized_rsi)}")
-            print(f"Negative RSI timeframes: {negative_count}/{len(normalized_rsi)}")
+            print(f"Positive RSI timeframes: {positive_rsi_count}/{len(normalized_rsi)}")
+            print(f"Negative RSI timeframes: {negative_rsi_count}/{len(normalized_rsi)}")
 
-            if positive_count > negative_count:
+            if positive_rsi_count > negative_rsi_count:
                 print("Overall dominant RSI: Positive")
-            elif positive_count < negative_count:
+            elif positive_rsi_count < negative_rsi_count:
                 print("Overall dominant RSI: Negative")
             else:
                 print("Overall dominant RSI: Balanced")
@@ -2826,8 +2826,11 @@ def main():
                                     print("LONG condition 4: market_mood_fft == Bullish and pivot_mood == Bullish")
                                     if price < expected_price and price < pivot_forecast:
                                         print("LONG condition 5: price < expected_price  and price < pivot_forecast")  
-                                        if positive_count > negative_count:
-                                            print("LONG condition 6: positive_count > negative_count")
+                                        if positive_rsi_count > negative_rsi_count or positive_rsi_count == negative_rsi_count:
+                                            if positive_rsi_count > negative_rsi_count:
+                                                print("LONG condition 6: positive_rsi_count > negative_rsi_count")
+                                            elif positive_rsi_count == negative_rsi_count:
+                                                print("LONG condition 6: positive_rsi_count == negative_rsi_count")
                                             if incoming_reversal == "Top" and price < forecast: 
                                                 print("LONG condition 7: incoming_reversal == Top and price < forecast")  
                                                 if positive_count > negative_count or positive_count == negative_count:
@@ -2849,8 +2852,11 @@ def main():
                                     print("SHORT condition 4: market_mood_fft == Bearish and pivot_mood == Bearish")    
                                     if price > expected_price and price > pivot_forecast:
                                         print("SHORT condition 5: price > expected_price and price > pivot_forecast") 
-                                        if positive_count < negative_count:
-                                            print("SHORT condition 6: positive_count < negative_count")
+                                        if positive_rsi_count < negative_rsi_count or positive_rsi_count == negative_rsi_count:
+                                            if positive_rsi_count < negative_rsi_count:
+                                                print("SHORT condition 6: positive_rsi_count < negative_rsi_count")
+                                            elif positive_rsi_count == negative_rsi_count:
+                                                print("SHORT condition 6: positive_rsi_count == negative_rsi_count")
                                             if incoming_reversal == "Dip" and price > forecast: 
                                                 print("SHORT condition 7: incoming_reversal == Dip and price > forecast")    
                                                 if positive_count < negative_count or positive_count == negative_count:
