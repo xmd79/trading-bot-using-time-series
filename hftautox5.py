@@ -2877,56 +2877,60 @@ def main():
 
                     # Uptrend cycle trigger conditions 
                     if normalized_distance_to_min < normalized_distance_to_max:
-                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")                
-                        if closest_threshold == min_threshold and price < avg_mtf: 
-                            print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
-                            if closest_threshold < price and forecast_direction == "Up":  
-                                print("LONG condition 3: closest_threshold < price and forecast_direction == Up") 
-                                if market_mood_fft == "Bullish" and pivot_mood == "Bullish":
-                                    print("LONG condition 4: market_mood_fft == Bullish and pivot_mood == Bullish")
-                                    if price < expected_price and price < pivot_forecast:
-                                        print("LONG condition 5: price < expected_price and price < pivot_forecast")  
-                                        if positive_rsi_count > negative_rsi_count or positive_rsi_count == negative_rsi_count:
-                                            if positive_rsi_count > negative_rsi_count:
-                                                print("LONG condition 6: positive_rsi_count > negative_rsi_count")
-                                            elif positive_rsi_count == negative_rsi_count:
-                                                print("LONG condition 6: positive_rsi_count == negative_rsi_count")
+                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")     
+                        if dist_from_close_to_min < dist_from_close_to_max:
+                            print("LONG condition 2: dist_from_close_to_min < dist_from_close_to_max")           
+                            if closest_threshold == min_threshold and price < avg_mtf: 
+                                print("LONG condition 3: closest_threshold == min_threshold and price < avg_mtf")                                                   
+                                if closest_threshold < price and forecast_direction == "Up":  
+                                    print("LONG condition 4: closest_threshold < price and forecast_direction == Up") 
+                                    if market_mood_fft == "Bullish" and pivot_mood == "Bullish":
+                                        print("LONG condition 5: market_mood_fft == Bullish and pivot_mood == Bullish")
+                                        if price < expected_price and price < pivot_forecast:
+                                            print("LONG condition 6: price < expected_price and price < pivot_forecast")  
                                             if incoming_reversal == "Top" and price < forecast: 
                                                 print("LONG condition 7: incoming_reversal == Top and price < forecast")  
-                                                if positive_count > negative_count or positive_count == negative_count:
-                                                    if positive_count > negative_count:
-                                                        print("LONG condition 8: positive_count > negative_count")     
-                                                    elif positive_count == negative_count:
-                                                        print("LONG condition 8: positive_count = negative_count")                                                
-                                                    if momentum > 0:
-                                                        print("LONG condition 9: momentum > 0")
-                                                        trigger_long = True
+                                                if positive_rsi_count > negative_rsi_count or positive_rsi_count == negative_rsi_count:
+                                                    if positive_rsi_count > negative_rsi_count:
+                                                        print("LONG condition 8: positive_rsi_count > negative_rsi_count")
+                                                    elif positive_rsi_count == negative_rsi_count:
+                                                        print("LONG condition 8: positive_rsi_count == negative_rsi_count")
+                                                    if positive_count > negative_count or positive_count == negative_count:
+                                                        if positive_count > negative_count:
+                                                            print("LONG condition 9: positive_count > negative_count")     
+                                                        elif positive_count == negative_count:
+                                                            print("LONG condition 9: positive_count = negative_count")                                                
+                                                        if momentum > 0:
+                                                            print("LONG condition 10: momentum > 0")
+                                                            trigger_long = True
                     # Downtrend cycle trigger conditions
-                    if normalized_distance_to_max < normalized_distance_to_min:
-                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min")                
-                        if closest_threshold == max_threshold and price > avg_mtf: 
-                            print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")                                                   
-                            if closest_threshold > price and forecast_direction == "Down":  
-                                print("SHORT condition 3: closest_threshold > price and forecast_direction == Down")      
-                                if market_mood_fft == "Bearish" and pivot_mood == "Bearish":
-                                    print("SHORT condition 4: market_mood_fft == Bearish and pivot_mood == Bearish")    
-                                    if price > expected_price and price > pivot_forecast:
-                                        print("SHORT condition 5: price > expected_price and price > pivot_forecast") 
-                                        if positive_rsi_count < negative_rsi_count or positive_rsi_count == negative_rsi_count:
-                                            if positive_rsi_count < negative_rsi_count:
-                                                print("SHORT condition 6: positive_rsi_count < negative_rsi_count")
-                                            elif positive_rsi_count == negative_rsi_count:
-                                                print("SHORT condition 6: positive_rsi_count == negative_rsi_count")
+                    if normalized_distance_to_min > normalized_distance_to_max:
+                        print("SHORT condition 1: normalized_distance_to_min > normalized_distance_to_max")     
+                        if dist_from_close_to_min > dist_from_close_to_max:
+                            print("SHORT condition 2: dist_from_close_to_min > dist_from_close_to_max")           
+                            if closest_threshold == max_threshold and price > avg_mtf: 
+                                print("SHORT condition 3: closest_threshold == max_threshold and price > avg_mtf")                                                   
+                                if closest_threshold > price and forecast_direction == "Down":  
+                                    print("SHORT condition 4: closest_threshold > price and forecast_direction == Down") 
+                                    if market_mood_fft == "Bearish" and pivot_mood == "Bearish":
+                                        print("SHORT condition 5: market_mood_fft == Bearish and pivot_mood == Bearish")
+                                        if price > expected_price and price > pivot_forecast:
+                                            print("SHORT condition 6: price > expected_price and price > pivot_forecast")  
                                             if incoming_reversal == "Dip" and price > forecast: 
-                                                print("SHORT condition 7: incoming_reversal == Dip and price > forecast")    
-                                                if positive_count < negative_count or positive_count == negative_count:
-                                                    if positive_count < negative_count:
-                                                        print("SHORT condition 8: positive_count < negative_count")     
-                                                    elif positive_count == negative_count:
-                                                        print("SHORT condition 8: positive_count = negative_count")                                                
-                                                    if momentum < 0:
-                                                        print("SHORT condition 9: momentum < 0")
-                                                        trigger_short = True
+                                                print("SHORT condition 7: incoming_reversal == Dip and price > forecast")  
+                                                if positive_rsi_count < negative_rsi_count or positive_rsi_count == negative_rsi_count:
+                                                    if positive_rsi_count < negative_rsi_count:
+                                                        print("SHORT condition 8: positive_rsi_count < negative_rsi_count")
+                                                    elif positive_rsi_count == negative_rsi_count:
+                                                        print("SHORT condition 8: positive_rsi_count == negative_rsi_count")
+                                                    if positive_count < negative_count or positive_count == negative_count:
+                                                        if positive_count < negative_count:
+                                                            print("SHORT condition 9: positive_count > negative_count")     
+                                                        elif positive_count == negative_count:
+                                                            print("SHORT condition 9: positive_count = negative_count")                                                
+                                                        if momentum < 0:
+                                                            print("SHORT condition 10: momentum < 0")
+                                                            trigger_short = True
 
                     print()  
 
