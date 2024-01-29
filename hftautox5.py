@@ -2201,9 +2201,9 @@ def scale_list_to_sine(close):
     sine_wave_min = np.min(sine_wave)        
     sine_wave_max = np.max(sine_wave)
 
-    # Calculate % distances            
-    dist_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100            
-    dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
+    # Calculate % distances   
+    dist_min = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100         
+    dist_max = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100            
 
     return dist_min, dist_max, current_sine
       
@@ -2854,6 +2854,8 @@ def main():
 
             ##################################################
             ##################################################
+
+            close = get_close('5m')
 
             # Call the scale_list_to_sine function
             dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_list_to_sine(close)
