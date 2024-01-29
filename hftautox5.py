@@ -2238,7 +2238,7 @@ def analyze_market(close):
     highs = np.where(roc_values > 0)[0]
 
     # Determine the last reversal
-    last_reversal = "low" if lows[-1] > highs[-1] else "high"
+    last_reversal = "low" if lows[-1] < highs[-1] else "high"
 
     # Determine market mood
     market_mood = "bullish" if roc_values[-1] > 0 else "bearish"
@@ -3078,7 +3078,7 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine
+        del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine, analysis_result
 
         # Force garbage collection to free up memory
         gc.collect()
