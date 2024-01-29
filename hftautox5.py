@@ -2192,7 +2192,7 @@ def scale_list_to_sine(close):
             
     # Replace NaN values with 0        
     sine_wave = np.nan_to_num(sine_wave)
-    #sine_wave = -sine_wave
+    sine_wave = -sine_wave
         
     # Get the sine value for last close      
     current_sine = sine_wave[-1]
