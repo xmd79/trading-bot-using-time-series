@@ -2177,6 +2177,52 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import talib
+
+def scale_list_to_sine(close):
+    # Convert the close list to a NumPy array
+    close_np = np.array(close, dtype=float)
+    
+    # Get last close price 
+    current_close = close_np[-1]      
+        
+    # Calculate sine wave        
+    sine_wave, _ = talib.HT_SINE(close_np)
+            
+    # Replace NaN values with 0        
+    sine_wave = np.nan_to_num(sine_wave)
+    #sine_wave = -sine_wave
+        
+    # Get the sine value for last close      
+    current_sine = sine_wave[-1]
+            
+    # Calculate the min and max sine           
+    sine_wave_min = np.min(sine_wave)        
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate % distances            
+    dist_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100            
+    dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
+
+    return dist_min, dist_max, current_sine
+      
+
+# Call the scale_list_to_sine function
+dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_list_to_sine(close)
+
+# Print the results
+print("For the given close prices:")
+print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+print(f"Current Sine value: {current_sine}\n")
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2745,6 +2791,20 @@ def main():
             ##################################################
             ##################################################
 
+            # Call the scale_list_to_sine function
+            dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_list_to_sine(close)
+
+            # Print the results
+            print("For the given close prices:")
+            print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+            print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+            print(f"Current Sine value: {current_sine}\n")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -2934,7 +2994,7 @@ def main():
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
-        del pivot_mood, pivot_forecast
+        del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine
 
         # Force garbage collection to free up memory
         gc.collect()
