@@ -2223,6 +2223,70 @@ print()
 ##################################################
 ##################################################
 
+import talib
+import numpy as np
+
+def analyze_market(close):
+    # Convert close to numpy array
+    close = np.array(close)
+
+    # Calculate ROC
+    roc_values = talib.ROC(close, timeperiod=1)
+
+    # Identify lows and highs
+    lows = np.where(roc_values < 0)[0]
+    highs = np.where(roc_values > 0)[0]
+
+    # Determine the last reversal
+    last_reversal = "low" if lows[-1] > highs[-1] else "high"
+
+    # Determine market mood
+    market_mood = "bullish" if roc_values[-1] > 0 else "bearish"
+
+    # Calculate Gann progression for the future
+    fibo_scale = 0.618  # Fibonacci scale for Gann progression
+    angle_degrees = 45  # 45-degree angle for Gann progression
+
+    # Calculate projected ratio to mean into the future for HFT
+    hft_future_ratio = 1.2  # Adjust as needed for HFT
+    hft_projected_price = close[-1] * (1 + hft_future_ratio * roc_values[-1])
+
+    # Calculate projected ratio to mean into the future
+    standard_future_ratio = 1.618  # Standard ratio
+    last_reversal_price = close[lows[-1]] if last_reversal == "low" else close[highs[-1]]
+    standard_projected_price = last_reversal_price * standard_future_ratio
+
+    # ROC forecast price for even faster targets
+    faster_forecast_ratio = 0.8  # Adjust as needed for faster targets
+    roc_faster_forecast_price = close[-1] * (1 + faster_forecast_ratio * roc_values[-1])
+
+    # Return relevant information
+    return {
+        "roc_value": roc_values[-1],
+        "market_mood": market_mood,
+        "last_reversal": last_reversal,
+        "last_reversal_price": last_reversal_price,
+        "hft_projected_price": hft_projected_price,
+        "standard_projected_price": standard_projected_price,
+        "roc_faster_forecast_price": roc_faster_forecast_price
+    }
+
+# Example usage:
+analysis_result = analyze_market(close)
+
+# Print information outside the function
+print(f"Current ROC value: {analysis_result['roc_value']}")
+print(f"Current market mood: {analysis_result['market_mood']}")
+print(f"Last reversal was a {analysis_result['last_reversal']} at price: {analysis_result['last_reversal_price']}")
+print(f"HFT Projected price: {analysis_result['hft_projected_price']}")  # Added line for HFT projected price
+print(f"Standard Projected price: {analysis_result['standard_projected_price']}")  # Added line for standard projected price
+print(f"ROC forecast price for even faster targets: {analysis_result['roc_faster_forecast_price']}")
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2799,6 +2863,22 @@ def main():
             print(f"Distance to min: {dist_from_close_to_min:.2f}%")
             print(f"Distance to max: {dist_from_close_to_max:.2f}%")
             print(f"Current Sine value: {current_sine}\n")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Example usage:
+            analysis_result = analyze_market(close)
+
+            # Print information outside the function
+            print(f"Current ROC value: {analysis_result['roc_value']}")
+            print(f"Current market mood: {analysis_result['market_mood']}")
+            print(f"Last reversal was a {analysis_result['last_reversal']} at price: {analysis_result['last_reversal_price']}")
+            print(f"HFT Projected price: {analysis_result['hft_projected_price']}")  # Added line for HFT projected price
+            print(f"Standard Projected price: {analysis_result['standard_projected_price']}")  # Added line for standard projected price
+            print(f"ROC forecast price for even faster targets: {analysis_result['roc_faster_forecast_price']}")
 
             print()
 
