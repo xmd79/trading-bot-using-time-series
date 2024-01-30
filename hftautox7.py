@@ -3090,8 +3090,8 @@ def main():
                                             print("SHORT condition 6: market_mood_fft == Bearish")
                                             if pivot_mood == "Bearish":
                                                 print("SHORT condition 7: pivot_mood == Bearish")
-                                                if incoming_reversal == "Top":
-                                                    print("SHORT condition 8: incoming_reversal == Top") 
+                                                if incoming_reversal == "Dip":
+                                                    print("SHORT condition 8: incoming_reversal == Dip") 
                                                     if price > forecast:
                                                         print("SHORT condition 9: price > forecast") 
                                                         if positive_count < negative_count or positive_count == negative_count:
