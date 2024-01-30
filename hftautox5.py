@@ -3090,8 +3090,8 @@ def main():
                                             print("LONG condition 6: price < expected_price and price < pivot_forecast")  
                                             if incoming_reversal == "Top" and price < forecast: 
                                                 print("LONG condition 7: incoming_reversal == Top and price < forecast")  
-                                                if roc_mood == "bullish":
-                                                    print("LONG condition 8: roc_mood == bullish") 
+                                                if roc_mood == "bullish" and predicted_market_mood == "Up":
+                                                    print("LONG condition 8: roc_mood == bullish and predicted_market_mood == Up") 
                                                     if positive_count > negative_count or positive_count == negative_count:
                                                         if positive_count > negative_count:
                                                             print("LONG condition 9: positive_count > negative_count")     
@@ -3115,8 +3115,8 @@ def main():
                                             print("SHORT condition 6: price > expected_price and price > pivot_forecast")  
                                             if incoming_reversal == "Dip" and price > forecast: 
                                                 print("SHORT condition 7: incoming_reversal == Dip and price > forecast")  
-                                                if roc_mood == "bearish":
-                                                    print("SHORT condition 8: roc_mood == bearish") 
+                                                if roc_mood == "bearish" and predicted_market_mood == "Down":
+                                                    print("SHORT condition 8: roc_mood == bearish and predicted_market_mood == Down") 
                                                     if positive_count < negative_count or positive_count == negative_count:
                                                         if positive_count < negative_count:
                                                             print("SHORT condition 9: positive_count > negative_count")     
