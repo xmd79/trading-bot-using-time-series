@@ -2371,7 +2371,7 @@ def stationary_circuit(close):
     forecasted_price = np.mean(close) + market_mood
     
     # Determine if the market mood is bearish or bullish
-    market_sentiment = "Bullish" if market_mood > 0 else "Bearish"
+    market_sentiment = "Bullish" if market_mood < 0 else "Bearish"
     
     # Reversal keypoints as prices
     reversal_keypoints = [np.min(close), np.max(close)]
