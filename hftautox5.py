@@ -2159,8 +2159,8 @@ for timeframe, rsi in rsi_values.items():
     print(f"Normalized RSI for {timeframe}: {normalized_value:.2f}%")
 
 # Calculate dominant ratio
-positive_rsi_count = sum(1 for value in normalized_rsi.values() if value > 50)
-negative_rsi_count = len(normalized_rsi) - positive_count
+positive_rsi_count = sum(1 for value in normalized_rsi.values() if value < 30)
+negative_rsi_count = sum(1 for value in normalized_rsi.values() if value > 70)
 
 print(f"Positive RSI timeframes: {positive_rsi_count}/{len(normalized_rsi)}")
 print(f"Negative RSI timeframes: {negative_rsi_count}/{len(normalized_rsi)}")
@@ -2837,8 +2837,8 @@ def main():
                 print(f"Normalized RSI for {timeframe}: {normalized_value:.2f}%")
 
             # Calculate dominant ratio
-            positive_rsi_count = sum(1 for value in normalized_rsi.values() if value > 50)
-            negative_rsi_count = len(normalized_rsi) - positive_count
+            positive_rsi_count = sum(1 for value in normalized_rsi.values() if value < 30)
+            negative_rsi_count = sum(1 for value in normalized_rsi.values() if value > 70)
 
             print(f"Positive RSI timeframes: {positive_rsi_count}/{len(normalized_rsi)}")
             print(f"Negative RSI timeframes: {negative_rsi_count}/{len(normalized_rsi)}")
