@@ -3091,10 +3091,15 @@ def main():
                                             if incoming_reversal == "Top" and price < forecast: 
                                                 print("LONG condition 7: incoming_reversal == Top and price < forecast")  
                                                 if roc_mood == "bullish" and predicted_market_mood == "Up":
-                                                    print("LONG condition 8: roc_mood == bullish and predicted_market_mood == Up")                                                
-                                                    if momentum > 0:
-                                                        print("LONG condition 9: momentum > 0")
-                                                        trigger_long = True
+                                                    print("LONG condition 8: roc_mood == bullish and predicted_market_mood == Up") 
+                                                    if positive_count > negative_count or positive_count == negative_count:
+                                                        if positive_count > negative_count:
+                                                            print("LONG condition 9: positive_count > negative_count")     
+                                                        elif positive_count == negative_count:
+                                                            print("LONG condition 9: positive_count = negative_count")                                                                                              
+                                                        if momentum > 0:
+                                                            print("LONG condition 10: momentum > 0")
+                                                            trigger_long = True
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_min > normalized_distance_to_max:
                         print("SHORT condition 1: normalized_distance_to_min > normalized_distance_to_max")     
@@ -3111,10 +3116,15 @@ def main():
                                             if incoming_reversal == "Dip" and price > forecast: 
                                                 print("SHORT condition 7: incoming_reversal == Dip and price > forecast")  
                                                 if roc_mood == "bearish" and predicted_market_mood == "Down":
-                                                    print("SHORT condition 8: roc_mood == bearish and predicted_market_mood == Down")                                               
-                                                    if momentum < 0:
-                                                        print("SHORT condition 9: momentum < 0")
-                                                        trigger_short = True
+                                                    print("SHORT condition 8: roc_mood == bearish and predicted_market_mood == Down") 
+                                                    if positive_count < negative_count or positive_count == negative_count:
+                                                        if positive_count < negative_count:
+                                                            print("SHORT condition 9: positive_count > negative_count")     
+                                                        elif positive_count == negative_count:
+                                                            print("SHORT condition 9: positive_count = negative_count")                                                
+                                                        if momentum < 0:
+                                                            print("SHORT condition 10: momentum < 0")
+                                                            trigger_short = True
 
                     print()  
 
