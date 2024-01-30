@@ -2318,9 +2318,9 @@ def market_dom_analysis(close):
 def determine_dom_market_mood(dc_period, dc_phase, trend_mode):
     # Add your logic to determine market mood based on the given conditions
     # You can customize these conditions based on your strategy
-    if np.any(trend_mode == 1):
+    if np.any(trend_mode == -1):
         return "Bullish"
-    elif np.any(trend_mode == -1):
+    elif np.any(trend_mode == 1):
         return "Bearish"
     else:
         return "Neutral"
