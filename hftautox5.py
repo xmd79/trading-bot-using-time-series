@@ -2350,49 +2350,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-
-def generate_custom_wave(time_points, amplitude, frequency):
-    return amplitude * np.sin(2 * np.pi * frequency * time_points)
-
-def stationary_circuit(close):
-    # Assuming close is a time series
-    time_points = np.arange(len(close))
-    
-    # Generate a custom compound wave using the provided function
-    compound_wave = generate_custom_wave(time_points, amplitude=1, frequency=0.05)
-    compound_wave = -compound_wave
-
-    # Apply Fourier Transform to the compound wave
-    compound_wave_fft = np.fft.fft(compound_wave)
-    
-    # Use other provided equations to simulate market mood, forecast price, and calculate distance to min and max of close
-    market_mood = np.sum(np.gradient(close) * compound_wave)  # Example equation, can be more sophisticated
-    forecasted_price = np.mean(close) + market_mood
-    
-    # Determine if the market mood is bearish or bullish
-    market_sentiment = "Bullish" if market_mood < 0 else "Bearish"
-    
-    # Reversal keypoints as prices
-    reversal_keypoints = [np.min(close), np.max(close)]
-    
-    # Distances to min and max as percentages from 0 to 100%
-    distance_to_min_percent = np.mean((np.max(close) - close) / (np.max(close) - np.min(close)) * 100)
-    distance_to_max_percent = np.mean((close - np.min(close)) / (np.max(close) - np.min(close)) * 100)
-
-    return market_sentiment, forecasted_price, reversal_keypoints, distance_to_min_percent, distance_to_max_percent
-
-
-# Example usage
-market_sentiment, forecasted_price, reversal_keypoints, distance_to_min_percent, distance_to_max_percent = stationary_circuit(close)
-
-print("Market Sentiment:", market_sentiment)
-print("Forecasted Price:", forecasted_price)
-print("Reversal Keypoints (Prices):", reversal_keypoints)
-print("Distance to Min Close (%):", distance_to_min_percent)
-print("Distance to Max Close (%):", distance_to_max_percent)
-
-
 print()
 
 ##################################################
@@ -2984,6 +2941,7 @@ def main():
 
             # Example usage:
             analysis_result = analyze_market(close)
+            roc_mood = analysis_result['market_mood']
 
             # Print information outside the function
             print(f"Current ROC value: {analysis_result['roc_value']}")
@@ -3009,15 +2967,6 @@ def main():
 
             ##################################################
             ##################################################
-
-            # Example usage
-            time_sentiment, time_price, time_keypoints, time_distance_to_min_percent, time_distance_to_max_percent = stationary_circuit(close)
-
-            print("Market Sentiment:", time_sentiment)
-            print("Forecasted Price:", time_price)
-            print("Reversal Keypoints (Prices):", time_keypoints)
-            print("Distance to Min Close (%):", time_distance_to_min_percent)
-            print("Distance to Max Close (%):", time_distance_to_max_percent)
 
             print()
 
@@ -3109,11 +3058,8 @@ def main():
                                             print("LONG condition 6: price < expected_price and price < pivot_forecast")  
                                             if incoming_reversal == "Top" and price < forecast: 
                                                 print("LONG condition 7: incoming_reversal == Top and price < forecast")  
-                                                if positive_rsi_count > negative_rsi_count or positive_rsi_count == negative_rsi_count:
-                                                    if positive_rsi_count > negative_rsi_count:
-                                                        print("LONG condition 8: positive_rsi_count > negative_rsi_count")
-                                                    elif positive_rsi_count == negative_rsi_count:
-                                                        print("LONG condition 8: positive_rsi_count == negative_rsi_count")
+                                                if roc_mood == "bullish":
+                                                    print("LONG condition 8: roc_mood == bullish") 
                                                     if positive_count > negative_count or positive_count == negative_count:
                                                         if positive_count > negative_count:
                                                             print("LONG condition 9: positive_count > negative_count")     
@@ -3137,11 +3083,8 @@ def main():
                                             print("SHORT condition 6: price > expected_price and price > pivot_forecast")  
                                             if incoming_reversal == "Dip" and price > forecast: 
                                                 print("SHORT condition 7: incoming_reversal == Dip and price > forecast")  
-                                                if positive_rsi_count < negative_rsi_count or positive_rsi_count == negative_rsi_count:
-                                                    if positive_rsi_count < negative_rsi_count:
-                                                        print("SHORT condition 8: positive_rsi_count < negative_rsi_count")
-                                                    elif positive_rsi_count == negative_rsi_count:
-                                                        print("SHORT condition 8: positive_rsi_count == negative_rsi_count")
+                                                if roc_mood == "bearish":
+                                                    print("SHORT condition 8: roc_mood == bearish") 
                                                     if positive_count < negative_count or positive_count == negative_count:
                                                         if positive_count < negative_count:
                                                             print("SHORT condition 9: positive_count > negative_count")     
@@ -3218,7 +3161,7 @@ def main():
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine, analysis_result
-        del dom_mood, dom_forecast, time_sentiment, time_price, time_keypoints, time_distance_to_min_percent, time_distance_to_max_percent
+        del dom_mood, dom_forecast
 
         # Force garbage collection to free up memory
         gc.collect()
