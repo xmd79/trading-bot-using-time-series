@@ -3050,16 +3050,16 @@ def main():
                     # Uptrend cycle trigger conditions 
                     if normalized_distance_to_min < normalized_distance_to_max:
                         print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")     
-                        if dist_from_close_to_min < dist_from_close_to_max and signal == "BUY":
-                            print("LONG condition 2: dist_from_close_to_min < dist_from_close_to_max and signal == BUY")           
+                        if dist_from_close_to_min < dist_from_close_to_max:
+                            print("LONG condition 2: dist_from_close_to_min < dist_from_close_to_max")           
                             if closest_threshold == min_threshold and price < avg_mtf: 
                                 print("LONG condition 3: closest_threshold == min_threshold and price < avg_mtf")                                                   
                                 if closest_threshold < price and forecast_direction == "Up":  
                                     print("LONG condition 4: closest_threshold < price and forecast_direction == Up") 
                                     if market_mood_fft == "Bullish" and pivot_mood == "Bullish":
                                         print("LONG condition 5: market_mood_fft == Bullish and pivot_mood == Bullish")
-                                        if price < expected_price and price < pivot_forecast:
-                                            print("LONG condition 6: price < expected_price and price < pivot_forecast")  
+                                        if price < expected_price and signal == "BUY":
+                                            print("LONG condition 6: price < expected_price and signal == BUY")  
                                             if incoming_reversal == "Top" and price < forecast: 
                                                 print("LONG condition 7: incoming_reversal == Top and price < forecast")  
                                                 if price < future_price_regression and price < forecast_price_fft:
@@ -3075,7 +3075,7 @@ def main():
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_min > normalized_distance_to_max:
                         print("SHORT condition 1: normalized_distance_to_min > normalized_distance_to_max")     
-                        if dist_from_close_to_min > dist_from_close_to_max and signal == "SELL":
+                        if dist_from_close_to_min > dist_from_close_to_max:
                             print("SHORT condition 2: dist_from_close_to_min > dist_from_close_to_max and signal == SELL")           
                             if closest_threshold == max_threshold and price > avg_mtf: 
                                 print("SHORT condition 3: closest_threshold == max_threshold and price > avg_mtf")                                                   
@@ -3083,8 +3083,8 @@ def main():
                                     print("SHORT condition 4: closest_threshold > price and forecast_direction == Down") 
                                     if market_mood_fft == "Bearish" and pivot_mood == "Bearish":
                                         print("SHORT condition 5: market_mood_fft == Bearish and pivot_mood == Bearish")
-                                        if price > expected_price and price > pivot_forecast:
-                                            print("SHORT condition 6: price > expected_price and price > pivot_forecast")  
+                                        if price > expected_price  and signal == "SELL":
+                                            print("SHORT condition 6: price > expected_price and signal == SELL")  
                                             if incoming_reversal == "Dip" and price > forecast: 
                                                 print("SHORT condition 7: incoming_reversal == Dip and price > forecast")  
                                                 if price > future_price_regression and price > forecast_price_fft:
