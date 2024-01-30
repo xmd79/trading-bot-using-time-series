@@ -3060,7 +3060,7 @@ def main():
                                         print("LONG condition 5: forecast_direction == Up")
                                         if market_mood_fft == "Bullish": 
                                             print("LONG condition 6: market_mood_fft == Bullish")
-                                            if pivot_mood == Bullish:
+                                            if pivot_mood == "Bullish":
                                                 print("LONG condition 7: pivot_mood == Bullish")
                                                 if incoming_reversal == "Top":
                                                     print("LONG condition 8: incoming_reversal == Top") 
@@ -3088,7 +3088,7 @@ def main():
                                         print("SHORT condition 5: forecast_direction == Down")
                                         if market_mood_fft == "Bearish": 
                                             print("SHORT condition 6: market_mood_fft == Bearish")
-                                            if pivot_mood == Bearish:
+                                            if pivot_mood == "Bearish":
                                                 print("SHORT condition 7: pivot_mood == Bearish")
                                                 if incoming_reversal == "Top":
                                                     print("SHORT condition 8: incoming_reversal == Top") 
