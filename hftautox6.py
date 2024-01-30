@@ -2916,34 +2916,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Calculate RSI for each timeframe
-            rsi_values = {}
-            for timeframe in timeframes:
-                rsi = get_rsi(timeframe)
-                rsi_values[timeframe] = rsi
-                print(f"RSI for {timeframe}: {rsi}")
-
-            # Convert RSI to a normalized scale and determine if it's positive or negative
-            normalized_rsi = {}
-            for timeframe, rsi in rsi_values.items():
-                normalized_value = (rsi - 30) / 70 * 100  # Normalize to a scale between 0 and 100
-                normalized_rsi[timeframe] = normalized_value
-                print(f"Normalized RSI for {timeframe}: {normalized_value:.2f}%")
-
-            # Calculate dominant ratio
-            positive_rsi_count = sum(1 for value in normalized_rsi.values() if value < 30)
-            negative_rsi_count = sum(1 for value in normalized_rsi.values() if value > 70)
-
-            print(f"Positive RSI timeframes: {positive_rsi_count}/{len(normalized_rsi)}")
-            print(f"Negative RSI timeframes: {negative_rsi_count}/{len(normalized_rsi)}")
-
-            if positive_rsi_count > negative_rsi_count:
-                print("Overall dominant RSI: Positive")
-            elif positive_rsi_count < negative_rsi_count:
-                print("Overall dominant RSI: Negative")
-            else:
-                print("Overall dominant RSI: Balanced")
-
             print()
 
             ##################################################
