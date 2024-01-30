@@ -2352,7 +2352,7 @@ print()
 
 import numpy as np
 
-def forecast_price(close):
+def forecast_unit_price(close):
     center = np.mean(close)
     min_close = np.min(close)
     max_close = np.max(close)
@@ -2363,15 +2363,15 @@ def forecast_price(close):
     
     if quadrant in [0, 2]:
         forecasted_price = center + radius * np.sin(adjusted_angle)
-        market_mood = "Upward Cycle"
+        market_mood = "Down"
     else:
         forecasted_price = center + radius * np.cos(adjusted_angle)
-        market_mood = "Downward Cycle"
+        market_mood = "Up"
     
     return forecasted_price, market_mood
 
 # Example usage:
-unitcircle_price, unitcircle_mood = forecast_price(close)
+unitcircle_price, unitcircle_mood = forecast_unit_price(close)
 
 print(f"Forecasted Price: {unitcircle_price:.2f}")
 print(f"Market Mood: {unitcircle_mood}")
@@ -2995,7 +2995,7 @@ def main():
             ##################################################
 
             # Example usage:
-            unitcircle_price, unitcircle_mood = forecast_price(close)
+            unitcircle_price, unitcircle_mood = forecast_unit_price(close)
 
             print(f"Forecasted Price: {unitcircle_price:.2f}")
             print(f"Market Mood: {unitcircle_mood}")
