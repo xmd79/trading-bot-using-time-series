@@ -2287,6 +2287,69 @@ print()
 ##################################################
 ##################################################
 
+import talib
+import numpy as np
+
+def market_dom_analysis(close):
+    close_np = np.array(close)  # Convert to numpy array
+    # Hilbert Transform - Dominant Cycle Period
+    dc_period = talib.HT_DCPERIOD(close_np)
+    
+    # Hilbert Transform - Dominant Cycle Phase
+    dc_phase = talib.HT_DCPHASE(close_np)
+    
+    # Hilbert Transform - Phasor Components
+    inphase, quadrature = talib.HT_PHASOR(close_np)
+    
+    # Hilbert Transform - SineWave
+    sine, leadsine = talib.HT_SINE(close_np)
+    
+    # Hilbert Transform - Trend vs Cycle Mode
+    trend_mode = talib.HT_TRENDMODE(close_np)
+    
+    # Combine conditions to determine market mood
+    market_mood = determine_dom_market_mood(dc_period, dc_phase, trend_mode)
+    
+    # Forecasting logic based on conditions
+    price_forecast = forecast_price(dc_period, dc_phase, inphase, quadrature, sine, leadsine, trend_mode)
+    
+    return market_mood, price_forecast
+
+def determine_dom_market_mood(dc_period, dc_phase, trend_mode):
+    # Add your logic to determine market mood based on the given conditions
+    # You can customize these conditions based on your strategy
+    if np.any(trend_mode == 1):
+        return "Bullish"
+    elif np.any(trend_mode == -1):
+        return "Bearish"
+    else:
+        return "Neutral"
+
+def forecast_price(dc_period, dc_phase, inphase, quadrature, sine, leadsine, trend_mode):
+    # Add your logic to forecast price based on the given conditions
+    # You can customize these conditions based on your strategy
+    if np.any(trend_mode == 1):
+        # Bullish forecast logic
+        return "Expect higher prices"
+    elif np.any(trend_mode == -1):
+        # Bearish forecast logic
+        return "Expect lower prices"
+    else:
+        # Neutral forecast logic
+        return "No clear price trend"
+
+# Example usage
+market_mood, price_forecast = market_dom_analysis(close)
+
+# Print results outside the function
+print(f"Market Mood: {market_mood}")
+print(f"Price Forecast: {price_forecast}")
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2887,6 +2950,18 @@ def main():
             ##################################################
             ##################################################
 
+            # Example usage
+            dom_mood, dom_forecast = market_dom_analysis(close)
+
+            # Print results outside the function
+            print(f"Market Mood: {dom_mood}")
+            print(f"Price Forecast: {dom_forecast}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -3081,6 +3156,7 @@ def main():
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine, analysis_result
+        del dom_mood, dom_forecast
 
         # Force garbage collection to free up memory
         gc.collect()
