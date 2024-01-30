@@ -2350,6 +2350,32 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def forecast_price(close):
+    center = np.mean(close)
+    min_close = np.min(close)
+    max_close = np.max(close)
+    radius = (max_close - center) if abs(max_close - center) > abs(center - min_close) else (center - min_close)
+    angle = np.arctan2(center - close[-1], radius)
+    quadrant = int(np.floor((angle + np.pi/4) / (np.pi/2))) % 4
+    adjusted_angle = angle - quadrant * (np.pi/2)
+    
+    if quadrant in [0, 2]:
+        forecasted_price = center + radius * np.sin(adjusted_angle)
+        market_mood = "Upward Cycle"
+    else:
+        forecasted_price = center + radius * np.cos(adjusted_angle)
+        market_mood = "Downward Cycle"
+    
+    return forecasted_price, market_mood
+
+# Example usage:
+unitcircle_price, unitcircle_mood = forecast_price(close)
+
+print(f"Forecasted Price: {unitcircle_price:.2f}")
+print(f"Market Mood: {unitcircle_mood}")
+
 print()
 
 ##################################################
@@ -2968,6 +2994,12 @@ def main():
             ##################################################
             ##################################################
 
+            # Example usage:
+            unitcircle_price, unitcircle_mood = forecast_price(close)
+
+            print(f"Forecasted Price: {unitcircle_price:.2f}")
+            print(f"Market Mood: {unitcircle_mood}")
+
             print()
 
             ##################################################
@@ -3161,7 +3193,7 @@ def main():
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine, analysis_result
-        del dom_mood, dom_forecast
+        del dom_mood, dom_forecast, unitcircle_price, unitcircle_mood
 
         # Force garbage collection to free up memory
         gc.collect()
