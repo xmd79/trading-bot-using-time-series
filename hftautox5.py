@@ -2328,10 +2328,10 @@ def determine_dom_market_mood(dc_period, dc_phase, trend_mode):
 def forecast_price(dc_period, dc_phase, inphase, quadrature, sine, leadsine, trend_mode):
     # Add your logic to forecast price based on the given conditions
     # You can customize these conditions based on your strategy
-    if np.any(trend_mode == 1):
+    if np.any(trend_mode == -1):
         # Bullish forecast logic
         return "Expect higher prices"
-    elif np.any(trend_mode == -1):
+    elif np.any(trend_mode == 1):
         # Bearish forecast logic
         return "Expect lower prices"
     else:
@@ -2339,11 +2339,59 @@ def forecast_price(dc_period, dc_phase, inphase, quadrature, sine, leadsine, tre
         return "No clear price trend"
 
 # Example usage
-market_mood, price_forecast = market_dom_analysis(close)
+dom_mood, dom_forecast = market_dom_analysis(close)
 
 # Print results outside the function
-print(f"Market Mood: {market_mood}")
-print(f"Price Forecast: {price_forecast}")
+print(f"Market Mood: {dom_mood}")
+print(f"Price Forecast: {dom_forecast}")
+
+print()
+
+##################################################
+##################################################
+
+import numpy as np
+
+def generate_custom_wave(time_points, amplitude, frequency):
+    return amplitude * np.sin(2 * np.pi * frequency * time_points)
+
+def stationary_circuit(close):
+    # Assuming close is a time series
+    time_points = np.arange(len(close))
+    
+    # Generate a custom compound wave using the provided function
+    compound_wave = generate_custom_wave(time_points, amplitude=1, frequency=0.05)
+    compound_wave = -compound_wave
+
+    # Apply Fourier Transform to the compound wave
+    compound_wave_fft = np.fft.fft(compound_wave)
+    
+    # Use other provided equations to simulate market mood, forecast price, and calculate distance to min and max of close
+    market_mood = np.sum(np.gradient(close) * compound_wave)  # Example equation, can be more sophisticated
+    forecasted_price = np.mean(close) + market_mood
+    
+    # Determine if the market mood is bearish or bullish
+    market_sentiment = "Bullish" if market_mood > 0 else "Bearish"
+    
+    # Reversal keypoints as prices
+    reversal_keypoints = [np.min(close), np.max(close)]
+    
+    # Distances to min and max as percentages from 0 to 100%
+    distance_to_min_percent = np.mean((np.max(close) - close) / (np.max(close) - np.min(close)) * 100)
+    distance_to_max_percent = np.mean((close - np.min(close)) / (np.max(close) - np.min(close)) * 100)
+
+    return market_sentiment, forecasted_price, reversal_keypoints, distance_to_min_percent, distance_to_max_percent
+
+
+# Example usage
+market_sentiment, forecasted_price, reversal_keypoints, distance_to_min_percent, distance_to_max_percent = stationary_circuit(close)
+
+print("Market Sentiment:", market_sentiment)
+print("Forecasted Price:", forecasted_price)
+print("Reversal Keypoints (Prices):", reversal_keypoints)
+print("Distance to Min Close (%):", distance_to_min_percent)
+print("Distance to Max Close (%):", distance_to_max_percent)
+
 
 print()
 
@@ -2962,6 +3010,20 @@ def main():
             ##################################################
             ##################################################
 
+            # Example usage
+            time_sentiment, time_price, time_keypoints, time_distance_to_min_percent, time_distance_to_max_percent = stationary_circuit(close)
+
+            print("Market Sentiment:", time_sentiment)
+            print("Forecasted Price:", time_price)
+            print("Reversal Keypoints (Prices):", time_keypoints)
+            print("Distance to Min Close (%):", time_distance_to_min_percent)
+            print("Distance to Max Close (%):", time_distance_to_max_percent)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 10.00
             stop_loss = -10.00
 
@@ -3156,7 +3218,7 @@ def main():
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine, analysis_result
-        del dom_mood, dom_forecast
+        del dom_mood, dom_forecast, time_sentiment, time_price, time_keypoints, time_distance_to_min_percent, time_distance_to_max_percent
 
         # Force garbage collection to free up memory
         gc.collect()
