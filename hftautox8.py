@@ -3249,8 +3249,8 @@ def main():
                                                                                             print("SHORT condition 17: positive_sine_count < negative_sine_count")     
                                                                                         elif positive_sine_count == negative_sine_count:
                                                                                             print("SHORT condition 17: positive_sine_count == negative_sine_count")                                                                               
-                                                                                        if momentum > 0:
-                                                                                            print("SHORT condition 18: momentum > 0")
+                                                                                        if momentum < 0:
+                                                                                            print("SHORT condition 18: momentum < 0")
                                                                                             trigger_long = True
 
                     print()  
