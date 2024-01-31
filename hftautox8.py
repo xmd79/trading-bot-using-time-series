@@ -3152,131 +3152,198 @@ def main():
             ##################################################
             ##################################################
 
-            if normalized_distance_to_min < normalized_distance_to_max:
-                print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")  
- 
-            if closest_threshold == min_threshold:
-                print("LONG condition 2: closest_threshold == min_threshold") 
-
-            if closest_threshold < price: 
-                print("LONG condition 3: closest_threshold < price")
-
-            if price < expected_price: 
-                print("LONG condition 4: price < expected_price")
-
-            if price < forecast_5min:
-                print("LONG condition 5: price < forecast_5min")
-
-            if price < forecast_15min:
-                print("LONG condition 6: price < forecast_15min")
-
-            if price < forecast_30min:
-                print("LONG condition 7: price < forecast_30min")
-
-            if price < forecast_1h:
-                print("LONG condition 8: price < forecast_1h")
-
-            if signal == "BUY": 
-                print("LONG condition 9: signal == BUY")
-
-            if market_mood_type == "up":
-                print("LONG condition 10: market_mood_type == up")
-
-            if forecast_direction == "Up":
-                print("LONG condition 11: forecast_direction == Up")
-
-            if market_mood_fft == "Bullish": 
-                print("LONG condition 12: market_mood_fft == Bullish")
-
-            if pivot_mood == "Bullish":
-                print("LONG condition 13: pivot_mood == Bullish")
-
-            if incoming_reversal == "Top":
-                print("LONG condition 14: incoming_reversal == Top")
-
-            if price < forecast:
-                print("LONG condition 15: price < forecast") 
-
-            if positive_count > negative_count or positive_count == negative_count:
-                if positive_count > negative_count:
-                    print("LONG condition 16: positive_count > negative_count")     
-                elif positive_count == negative_count:
-                    print("LONG condition 16: positive_count = negative_count") 
-
-            if positive_sine_count > negative_sine_count or positive_sine_count == negative_sine_count:
-                if positive_sine_count > negative_sine_count:
-                    print("LONG condition 17: positive_sine_count > negative_sine_count")     
-                elif positive_sine_count == negative_sine_count:
-                    print("LONG condition 17: positive_sine_count == negative_sine_count") 
-
-            if momentum > 0:
-                print("LONG condition 18: momentum > 0")
+            # Initialize counters
+            long_conditions_met = 0
+            short_conditions_met = 0
 
             print()
 
             ##################################################
             ##################################################
 
+            # LONG conditions
+            if normalized_distance_to_min < normalized_distance_to_max:
+                print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")  
+                long_conditions_met += 1
+
+            if closest_threshold == min_threshold:
+                print("LONG condition 2: closest_threshold == min_threshold") 
+                long_conditions_met += 1
+
+            if closest_threshold < price: 
+                print("LONG condition 3: closest_threshold < price")
+                long_conditions_met += 1
+
+            if price < expected_price: 
+                print("LONG condition 4: price < expected_price")
+                long_conditions_met += 1
+
+            if price < forecast_5min:
+                print("LONG condition 5: price < forecast_5min")
+                long_conditions_met += 1
+
+            if price < forecast_15min:
+                print("LONG condition 6: price < forecast_15min")
+                long_conditions_met += 1
+
+            if price < forecast_30min:
+                print("LONG condition 7: price < forecast_30min")
+                long_conditions_met += 1
+
+            if price < forecast_1h:
+                print("LONG condition 8: price < forecast_1h")
+                long_conditions_met += 1
+
+            if signal == "BUY": 
+                print("LONG condition 9: signal == BUY")
+                long_conditions_met += 1
+
+            if market_mood_type == "up":
+                print("LONG condition 10: market_mood_type == up")
+                long_conditions_met += 1
+
+            if forecast_direction == "Up":
+                print("LONG condition 11: forecast_direction == Up")
+                long_conditions_met += 1
+
+            if market_mood_fft == "Bullish": 
+                print("LONG condition 12: market_mood_fft == Bullish")
+                long_conditions_met += 1
+
+            if pivot_mood == "Bullish":
+                print("LONG condition 13: pivot_mood == Bullish")
+                long_conditions_met += 1
+
+            if incoming_reversal == "Top":
+                print("LONG condition 14: incoming_reversal == Top")
+                long_conditions_met += 1
+
+            if price < forecast:
+                print("LONG condition 15: price < forecast") 
+                long_conditions_met += 1
+
+            if positive_count > negative_count or positive_count == negative_count:
+                if positive_count > negative_count:
+                    print("LONG condition 16: positive_count > negative_count")
+                    long_conditions_met += 1
+                elif positive_count == negative_count:
+                    print("LONG condition 16: positive_count = negative_count") 
+                    long_conditions_met += 1
+
+            if positive_sine_count > negative_sine_count or positive_sine_count == negative_sine_count:
+                if positive_sine_count > negative_sine_count:
+                    print("LONG condition 17: positive_sine_count > negative_sine_count")
+                    long_conditions_met += 1
+                elif positive_sine_count == negative_sine_count:
+                    print("LONG condition 17: positive_sine_count == negative_sine_count") 
+                    long_conditions_met += 1
+
+            if momentum > 0:
+                print("LONG condition 18: momentum > 0")
+                long_conditions_met += 1
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # SHORT conditions
             if normalized_distance_to_min > normalized_distance_to_max:
                 print("SHORT condition 1: normalized_distance_to_min > normalized_distance_to_max") 
+                short_conditions_met += 1
 
             if closest_threshold == max_threshold:
                 print("SHORT condition 2: closest_threshold == max_threshold")
+                short_conditions_met += 1
 
             if closest_threshold > price: 
                 print("SHORT condition 3: closest_threshold > price")
+                short_conditions_met += 1
 
             if price > expected_price: 
                 print("SHORT condition 4: price > expected_price")
+                short_conditions_met += 1
 
             if price > forecast_5min:
                 print("SHORT condition 5: price > forecast_5min")
+                short_conditions_met += 1
 
             if price > forecast_15min:
                 print("SHORT condition 6: price > forecast_15min")
+                short_conditions_met += 1
 
             if price > forecast_30min:
                 print("SHORT condition 7: price > forecast_30min")
+                short_conditions_met += 1
 
             if price > forecast_1h:
                 print("SHORT condition 8: price > forecast_1h")
+                short_conditions_met += 1
 
             if signal == "SELL": 
                 print("SHORT condition 9: signal == SELL")
+                short_conditions_met += 1
 
             if market_mood_type == "down":
                 print("SHORT condition 10: market_mood_type == down")
+                short_conditions_met += 1
 
             if forecast_direction == "Down":
                 print("SHORT condition 11: forecast_direction == Down")
+                short_conditions_met += 1
 
             if market_mood_fft == "Bearish": 
                 print("SHORT condition 12: market_mood_fft == Bearish")
+                short_conditions_met += 1
 
             if pivot_mood == "Bearish":
                 print("SHORT condition 13: pivot_mood == Bearish")
+                short_conditions_met += 1
 
             if incoming_reversal == "Dip":
                 print("SHORT condition 14: incoming_reversal == Dip")
+                short_conditions_met += 1
 
             if price > forecast:
                 print("SHORT condition 15: price > forecast")
+                short_conditions_met += 1
 
             if positive_count < negative_count or positive_count == negative_count:
                 if positive_count < negative_count:
-                    print("SHORT condition 16: positive_count < negative_count")     
+                    print("SHORT condition 16: positive_count < negative_count")
+                    short_conditions_met += 1
                 elif positive_count == negative_count:
                     print("SHORT condition 16: positive_count = negative_count") 
+                    short_conditions_met += 1
 
             if positive_sine_count < negative_sine_count or positive_sine_count == negative_sine_count:
                 if positive_sine_count > negative_sine_count:
-                    print("SHORT condition 17: positive_sine_count < negative_sine_count")     
+                    print("SHORT condition 17: positive_sine_count < negative_sine_count") 
+                    short_conditions_met += 1
                 elif positive_sine_count == negative_sine_count:
                     print("SHORT condition 17: positive_sine_count == negative_sine_count")
+                    short_conditions_met += 1
 
             if momentum < 0:
                 print("SHORT condition 18: momentum < 0")
-                                                                                            
+                short_conditions_met += 1
+                                                                                           
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Checker and counter results
+            if long_conditions_met > short_conditions_met:
+                print("Overall Result: LONG conditions met more than SHORT conditions")
+            elif long_conditions_met < short_conditions_met:
+                print("Overall Result: SHORT conditions met more than LONG conditions")
+            else:
+                print("Overall Result: Equal number of LONG and SHORT conditions met")
+
+            print(f"Total LONG conditions met: {long_conditions_met}")
+            print(f"Total SHORT conditions met: {short_conditions_met}")
+
             print()
 
             ##################################################
