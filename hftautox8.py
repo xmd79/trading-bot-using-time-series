@@ -3093,8 +3093,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 10.00
-            stop_loss = -5.00
+            take_profit = 5.00
+            stop_loss = -25.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3152,6 +3152,136 @@ def main():
             ##################################################
             ##################################################
 
+            if normalized_distance_to_min < normalized_distance_to_max:
+                print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")  
+ 
+            if closest_threshold == min_threshold:
+                print("LONG condition 2: closest_threshold == min_threshold") 
+
+            if closest_threshold < price: 
+                print("LONG condition 3: closest_threshold < price")
+
+            if price < expected_price: 
+                print("LONG condition 4: price < expected_price")
+
+            if price < forecast_5min:
+                print("LONG condition 5: price < forecast_5min")
+
+            if price < forecast_15min:
+                print("LONG condition 6: price < forecast_15min")
+
+            if price < forecast_30min:
+                print("LONG condition 7: price < forecast_30min")
+
+            if price < forecast_1h:
+                print("LONG condition 8: price < forecast_1h")
+
+            if signal == "BUY": 
+                print("LONG condition 9: signal == BUY")
+
+            if market_mood_type == "up":
+                print("LONG condition 10: market_mood_type == up")
+
+            if forecast_direction == "Up":
+                print("LONG condition 11: forecast_direction == Up")
+
+            if market_mood_fft == "Bullish": 
+                print("LONG condition 12: market_mood_fft == Bullish")
+
+            if pivot_mood == "Bullish":
+                print("LONG condition 13: pivot_mood == Bullish")
+
+            if incoming_reversal == "Top":
+                print("LONG condition 14: incoming_reversal == Top")
+
+            if price < forecast:
+                print("LONG condition 15: price < forecast") 
+
+            if positive_count > negative_count or positive_count == negative_count:
+                if positive_count > negative_count:
+                    print("LONG condition 16: positive_count > negative_count")     
+                elif positive_count == negative_count:
+                    print("LONG condition 16: positive_count = negative_count") 
+
+            if positive_sine_count > negative_sine_count or positive_sine_count == negative_sine_count:
+                if positive_sine_count > negative_sine_count:
+                    print("LONG condition 17: positive_sine_count > negative_sine_count")     
+                elif positive_sine_count == negative_sine_count:
+                    print("LONG condition 17: positive_sine_count == negative_sine_count") 
+
+            if momentum > 0:
+                print("LONG condition 18: momentum > 0")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            if normalized_distance_to_min > normalized_distance_to_max:
+                print("SHORT condition 1: normalized_distance_to_min > normalized_distance_to_max") 
+
+            if closest_threshold == max_threshold:
+                print("SHORT condition 2: closest_threshold == max_threshold")
+
+            if closest_threshold > price: 
+                print("SHORT condition 3: closest_threshold > price")
+
+            if price > expected_price: 
+                print("SHORT condition 4: price > expected_price")
+
+            if price > forecast_5min:
+                print("SHORT condition 5: price > forecast_5min")
+
+            if price > forecast_15min:
+                print("SHORT condition 6: price > forecast_15min")
+
+            if price > forecast_30min:
+                print("SHORT condition 7: price > forecast_30min")
+
+            if price > forecast_1h:
+                print("SHORT condition 8: price > forecast_1h")
+
+            if signal == "SELL": 
+                print("SHORT condition 9: signal == SELL")
+
+            if market_mood_type == "down":
+                print("SHORT condition 10: market_mood_type == down")
+
+            if forecast_direction == "Down":
+                print("SHORT condition 11: forecast_direction == Down")
+
+            if market_mood_fft == "Bearish": 
+                print("SHORT condition 12: market_mood_fft == Bearish")
+
+            if pivot_mood == "Bearish":
+                print("SHORT condition 13: pivot_mood == Bearish")
+
+            if incoming_reversal == "Dip":
+                print("SHORT condition 14: incoming_reversal == Dip")
+
+            if price > forecast:
+                print("SHORT condition 15: price > forecast")
+
+            if positive_count < negative_count or positive_count == negative_count:
+                if positive_count < negative_count:
+                    print("SHORT condition 16: positive_count < negative_count")     
+                elif positive_count == negative_count:
+                    print("SHORT condition 16: positive_count = negative_count") 
+
+            if positive_sine_count < negative_sine_count or positive_sine_count == negative_sine_count:
+                if positive_sine_count > negative_sine_count:
+                    print("SHORT condition 17: positive_sine_count < negative_sine_count")     
+                elif positive_sine_count == negative_sine_count:
+                    print("SHORT condition 17: positive_sine_count == negative_sine_count")
+
+            if momentum < 0:
+                print("SHORT condition 18: momentum < 0")
+                                                                                            
+            print()
+
+            ##################################################
+            ##################################################
+
             # Cycles trigger conditions and bot autotrde sl and tp trigger conditions
             with open("signals.txt", "a") as f:
                 # Get data and calculate indicators here...
@@ -3162,6 +3292,9 @@ def main():
                     print("Now not in a trade, seeking entry conditions")
 
                     print()
+
+                    ##################################################
+                    ##################################################
 
                     # Uptrend cycle trigger conditions 
                     if normalized_distance_to_min < normalized_distance_to_max:
@@ -3207,6 +3340,9 @@ def main():
                                                                                         if momentum > 0:
                                                                                             print("LONG condition 18: momentum > 0")
                                                                                             trigger_long = True
+
+                    ##################################################
+                    ##################################################
 
                     # Downtrend cycle trigger conditions
                     if normalized_distance_to_min > normalized_distance_to_max:
@@ -3255,6 +3391,9 @@ def main():
 
                     print()  
 
+                    ##################################################
+                    ##################################################
+
                     #message = f'Price: ${price}' 
                     #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message)
                     #response = webhook.execute()
@@ -3283,6 +3422,9 @@ def main():
                         trigger_short = False
 
                     print()
+
+                    ##################################################
+                    ##################################################
 
                 # Check stop loss and take profit conditions
                 if un_realized_profit != 0:
