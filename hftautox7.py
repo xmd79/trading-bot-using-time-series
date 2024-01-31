@@ -3079,7 +3079,7 @@ def main():
                     if normalized_distance_to_min > normalized_distance_to_max:
                         print("SHORT condition 1: normalized_distance_to_min > normalized_distance_to_max")               
                         if closest_threshold == max_threshold and closest_threshold > price: 
-                            print("SHORT condition 2: closest_threshold == min_threshold and closest_threshold > price")                                                  
+                            print("SHORT condition 2: closest_threshold == max_threshold and closest_threshold > price")                                                  
                             if price > expected_price:  
                                 print("SHORT condition 3: price > expected_price") 
                                 if signal == "SELL":
