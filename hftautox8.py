@@ -3461,6 +3461,18 @@ def main():
                     ##################################################
                     ##################################################
 
+                    if long_conditions_met > short_conditions_met and long_conditions_met >= 13:
+                        print("Overall LONG conditions met more than SHORT conditions") 
+                        trigger_long = True
+                    elif short_conditions_met > long_conditions_met and short_conditions_met >= 13:
+                        print("Overall SHORT conditions met more than LONG conditions") 
+                        trigger_short = True
+
+                    print()  
+
+                    ##################################################
+                    ##################################################
+
                     #message = f'Price: ${price}' 
                     #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message)
                     #response = webhook.execute()
