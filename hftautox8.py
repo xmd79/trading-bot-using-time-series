@@ -3461,11 +3461,12 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if long_conditions_met > short_conditions_met and long_conditions_met >= 13:
-                        print("Overall LONG conditions met more than SHORT conditions") 
+                    if signal == "BUY" and market_mood_type == "up" and momentum > 0 and long_conditions_met > short_conditions_met:
+                        print("HFT LONG signal triggered!") 
                         trigger_long = True
-                    elif short_conditions_met > long_conditions_met and short_conditions_met >= 13:
-                        print("Overall SHORT conditions met more than LONG conditions") 
+
+                    elif signal == "SELL" and market_mood_type == "down" and momentum < 0 and long_conditions_met < short_conditions_met:
+                        print("HFT SHORT signal triggered!") 
                         trigger_short = True
 
                     print()  
