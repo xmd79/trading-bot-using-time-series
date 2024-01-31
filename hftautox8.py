@@ -3461,11 +3461,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if closest_threshold == min_threshold and forecast_direction == "Up" and signal == "BUY" and market_mood_type == "up" and momentum > 0 and positive_count > negative_count and price < expected_price and long_conditions_met > short_conditions_met:
+                    if closest_threshold == min_threshold and forecast_direction == "Up" and signal == "BUY" and market_mood_type == "up" and price < expected_price and long_conditions_met > short_conditions_met:
                         print("HFT LONG signal triggered!") 
                         trigger_long = True
 
-                    elif closest_threshold == max_threshold and forecast_direction == "Down" and signal == "SELL" and market_mood_type == "down" and momentum < 0 and positive_count < negative_count and price > expected_price and long_conditions_met < short_conditions_met:
+                    elif closest_threshold == max_threshold and forecast_direction == "Down" and signal == "SELL" and market_mood_type == "down" and price > expected_price and long_conditions_met < short_conditions_met:
                         print("HFT SHORT signal triggered!") 
                         trigger_short = True
 
