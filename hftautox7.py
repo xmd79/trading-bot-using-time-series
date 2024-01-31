@@ -2381,6 +2381,80 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import talib
+import concurrent.futures
+
+def scale_to_sine(timeframe, close_prices):
+    current_close = close_prices[-1]
+
+    sine_wave, leadsine = talib.HT_SINE(close_prices)
+    sine_wave = np.nan_to_num(sine_wave)
+    #sine_wave = -sine_wave
+
+    current_sine = sine_wave[-1]
+    sine_wave_min, sine_wave_max = np.min(sine_wave), np.max(sine_wave)
+
+    # Calculate distances as percentages
+    dist_from_close_to_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+    dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
+
+    # Determine sentiment based on conditions
+    if dist_from_close_to_min < dist_from_close_to_max and dist_from_close_to_min < 50:
+        sentiment = 'Positive'
+    else:
+        sentiment = 'Negative'
+
+    return timeframe, dist_from_close_to_min, dist_from_close_to_max, current_sine, sentiment
+
+# Initialize overall_sentiments_sine dictionary
+overall_sentiments_sine = {'Positive': 0, 'Negative': 0}
+
+# Define a function to process a single timeframe
+def process_timeframe(timeframe):
+    close_prices = np.array(get_close(timeframe))
+    return scale_to_sine(timeframe, close_prices)
+
+# Create a ThreadPoolExecutor for parallel execution
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    # Create a list of futures for each timeframe
+    futures = {executor.submit(process_timeframe, timeframe): timeframe for timeframe in timeframes}
+
+    # Iterate over completed futures to process results
+    for future in concurrent.futures.as_completed(futures):
+        timeframe, dist_from_close_to_min, dist_from_close_to_max, current_sine, sentiment = future.result()
+
+        # Update overall sentiment count
+        overall_sentiments_sine[sentiment] += 1
+
+        # Print the results for each timeframe
+        print(f"For {timeframe} timeframe:")
+        print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+        print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+        print(f"Current Sine value: {current_sine}")
+        print(f"Sentiment: {sentiment}\n")
+
+# Print overall sentiment analysis
+for sentiment, count in overall_sentiments_sine.items():
+    print(f"Overall Market Sentiment for {sentiment}: {count}")
+
+# Determine the overall dominant sentiment for the Sine Wave
+positive_sine_count = overall_sentiments_sine['Positive']
+negative_sine_count = overall_sentiments_sine['Negative']
+
+if positive_sine_count > negative_sine_count:
+    print("Overall dominant Sine Wave: Positive")
+elif positive_sine_count < negative_sine_count:
+    print("Overall dominant Sine Wave: Negative")
+else:
+    print("Overall dominant Sine Wave: Balanced")
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -2921,7 +2995,7 @@ def main():
             ##################################################
             ##################################################
 
-            #close = get_close('1h')
+            close = get_close('1h')
 
             # Call the scale_list_to_sine function
             dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_list_to_sine(close)
@@ -2971,6 +3045,48 @@ def main():
 
             print(f"Forecasted Price: {unitcircle_price:.2f}")
             print(f"Market Mood: {unitcircle_mood}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Initialize overall_sentiments_sine dictionary
+            overall_sentiments_sine = {'Positive': 0, 'Negative': 0}
+
+            # Create a ThreadPoolExecutor for parallel execution
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # Create a list of futures for each timeframe
+                futures = {executor.submit(process_timeframe, timeframe): timeframe for timeframe in timeframes}
+
+            # Iterate over completed futures to process results
+            for future in concurrent.futures.as_completed(futures):
+                timeframe, dist_from_close_to_min, dist_from_close_to_max, current_sine, sentiment = future.result()
+
+                # Update overall sentiment count
+                overall_sentiments_sine[sentiment] += 1
+
+                # Print the results for each timeframe
+                print(f"For {timeframe} timeframe:")
+                print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+                print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+                print(f"Current Sine value: {current_sine}")
+                print(f"Sentiment: {sentiment}\n")
+
+            # Print overall sentiment analysis
+            for sentiment, count in overall_sentiments_sine.items():
+                print(f"Overall Market Sentiment for {sentiment}: {count}")
+
+            # Determine the overall dominant sentiment for the Sine Wave
+            positive_sine_count = overall_sentiments_sine['Positive']
+            negative_sine_count = overall_sentiments_sine['Negative']
+
+            if positive_sine_count > negative_sine_count:
+                print("Overall dominant Sine Wave: Positive")
+            elif positive_sine_count < negative_sine_count:
+                print("Overall dominant Sine Wave: Negative")
+            else:
+                print("Overall dominant Sine Wave: Balanced")
 
             print()
 
@@ -3170,7 +3286,7 @@ def main():
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine, analysis_result
-        del dom_mood, dom_forecast, unitcircle_price, unitcircle_mood
+        del dom_mood, dom_forecast, unitcircle_price, unitcircle_mood, overall_sentiments_sine, positive_sine_count, negative_sine_count
 
         # Force garbage collection to free up memory
         gc.collect()
