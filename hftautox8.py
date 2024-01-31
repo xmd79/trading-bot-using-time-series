@@ -3156,6 +3156,9 @@ def main():
             long_conditions_met = 0
             short_conditions_met = 0
 
+            # Determine overall majority
+            overall_majority = "LONG" if long_conditions_met > short_conditions_met else "SHORT" if long_conditions_met < short_conditions_met else "EQUAL"
+
             print()
 
             ##################################################
@@ -3222,24 +3225,30 @@ def main():
                 print("LONG condition 15: price < forecast") 
                 long_conditions_met += 1
 
-            if positive_count > negative_count or positive_count == negative_count:
-                if positive_count > negative_count:
-                    print("LONG condition 16: positive_count > negative_count")
-                    long_conditions_met += 1
-                elif positive_count == negative_count:
-                    print("LONG condition 16: positive_count = negative_count") 
-                    long_conditions_met += 1
-
-            if positive_sine_count > negative_sine_count or positive_sine_count == negative_sine_count:
-                if positive_sine_count > negative_sine_count:
-                    print("LONG condition 17: positive_sine_count > negative_sine_count")
-                    long_conditions_met += 1
-                elif positive_sine_count == negative_sine_count:
-                    print("LONG condition 17: positive_sine_count == negative_sine_count") 
-                    long_conditions_met += 1
-
             if momentum > 0:
-                print("LONG condition 18: momentum > 0")
+                print("LONG condition 16: momentum > 0")
+                long_conditions_met += 1
+
+            print()
+
+            if positive_count < negative_count:
+                print("SHORT condition 17: positive_count < negative_count")
+                short_conditions_met += 1
+            elif positive_count == negative_count and overall_majority == "SHORT":
+                print("SHORT condition 17: positive_count = negative_count (assigned based on overall majority)")
+                short_conditions_met += 1
+            elif positive_count > negative_count and overall_majority == "LONG":
+                print("LONG condition 17: positive_count > negative_count (assigned based on overall majority)")
+                long_conditions_met += 1
+
+            if positive_sine_count < negative_sine_count:
+                print("SHORT condition 18: positive_sine_count < negative_sine_count") 
+                short_conditions_met += 1
+            elif positive_sine_count == negative_sine_count and overall_majority == "SHORT":
+                print("SHORT condition 18: positive_sine_count = negative_sine_count (assigned based on overall majority)")
+                short_conditions_met += 1
+            elif positive_sine_count > negative_sine_count and overall_majority == "LONG":
+                print("LONG condition 18: positive_sine_count > negative_sine_count (assigned based on overall majority)")
                 long_conditions_met += 1
 
             print()
@@ -3308,65 +3317,36 @@ def main():
                 print("SHORT condition 15: price > forecast")
                 short_conditions_met += 1
 
-            if positive_count < negative_count or positive_count == negative_count:
-                if positive_count < negative_count:
-                    print("SHORT condition 16: positive_count < negative_count")
-                    short_conditions_met += 1
-                elif positive_count == negative_count:
-                    print("SHORT condition 16: positive_count = negative_count") 
-                    short_conditions_met += 1
-
-            if positive_sine_count < negative_sine_count or positive_sine_count == negative_sine_count:
-                if positive_sine_count > negative_sine_count:
-                    print("SHORT condition 17: positive_sine_count < negative_sine_count") 
-                    short_conditions_met += 1
-                elif positive_sine_count == negative_sine_count:
-                    print("SHORT condition 17: positive_sine_count == negative_sine_count")
-                    short_conditions_met += 1
-
             if momentum < 0:
-                print("SHORT condition 18: momentum < 0")
+                print("SHORT condition 16: momentum < 0")
                 short_conditions_met += 1
-                                                                                           
+
+            print()
+
+            if positive_count > negative_count:
+                print("LONG condition 17: positive_count > negative_count")
+                long_conditions_met += 1
+            elif positive_count == negative_count and overall_majority == "LONG":
+                print("LONG condition 17: positive_count = negative_count (assigned based on overall majority)")
+                long_conditions_met += 1
+            elif positive_count < negative_count and overall_majority == "SHORT":
+                print("SHORT condition 17: positive_count < negative_count (assigned based on overall majority)")
+                short_conditions_met += 1
+
+            if positive_sine_count > negative_sine_count:
+                print("LONG condition 18: positive_sine_count > negative_sine_count")
+                long_conditions_met += 1
+            elif positive_sine_count == negative_sine_count and overall_majority == "LONG":
+                print("LONG condition 18: positive_sine_count = negative_sine_count (assigned based on overall majority)")
+                long_conditions_met += 1
+            elif positive_sine_count < negative_sine_count and overall_majority == "SHORT":
+                print("SHORT condition 18: positive_sine_count < negative_sine_count (assigned based on overall majority)")
+                short_conditions_met += 1
+                                                                           
             print()
 
             ##################################################
             ##################################################
-
-            # Determine overall majority
-            overall_majority = "LONG" if long_conditions_met > short_conditions_met else "SHORT" if long_conditions_met < short_conditions_met else "EQUAL"
-
-            if positive_count > negative_count or positive_count == negative_count:
-                if positive_count > negative_count:
-                    print("LONG condition 16: positive_count > negative_count")
-                    long_conditions_met += 1
-                elif positive_count == negative_count and overall_majority == "LONG":
-                    print("LONG condition 16: positive_count = negative_count") 
-                    long_conditions_met += 1
-
-            if positive_sine_count > negative_sine_count or positive_sine_count == negative_sine_count:
-                if positive_sine_count > negative_sine_count:
-                    print("LONG condition 17: positive_sine_count > negative_sine_count")
-                    long_conditions_met += 1
-                elif positive_sine_count == negative_sine_count and overall_majority == "LONG":
-                    print("LONG condition 17: positive_sine_count == negative_sine_count") 
-                    long_conditions_met += 1
-
-            if positive_count < negative_count or positive_count == negative_count:
-                if positive_count < negative_count:
-                    print("SHORT condition 16: positive_count < negative_count")
-                    short_conditions_met += 1
-                elif positive_count == negative_count and overall_majority == "SHORT":
-                    print("SHORT condition 16: positive_count = negative_count") 
-                    short_conditions_met += 1
-
-            if positive_sine_count < negative_sine_count or positive_sine_count == negative_sine_count:
-                if positive_sine_count > negative_sine_count:
-                    print("SHORT condition 17: positive_sine_count < negative_sine_count") 
-                    short_conditions_met += 1
-                elif positive_sine_count == negative_sine_count and overall_majority == "SHORT":
-                    print("SHORT condition 17: positive_sine_count == negative_sine_count")
-                    short_conditions_met += 1
 
             # Checker and counter results
             if long_conditions_met > short_conditions_met:
@@ -3501,6 +3481,14 @@ def main():
                         trigger_long = True
 
                     elif closest_threshold == max_threshold and forecast_direction == "Down" and signal == "SELL" and market_mood_type == "down" and price > expected_price and negative_count > positive_count and long_conditions_met < short_conditions_met:
+                        print("HFT SHORT signal triggered!") 
+                        trigger_short = True
+
+                    if closest_threshold == min_threshold and forecast_direction == "Up" and signal == "BUY" and market_mood_type == "up" and price < expected_price and positive_count > negative_count and long_conditions_met == short_conditions_met:
+                        print("HFT LONG signal triggered!") 
+                        trigger_long = True
+
+                    elif closest_threshold == max_threshold and forecast_direction == "Down" and signal == "SELL" and market_mood_type == "down" and price > expected_price and negative_count > positive_count and long_conditions_met == short_conditions_met:
                         print("HFT SHORT signal triggered!") 
                         trigger_short = True
 
