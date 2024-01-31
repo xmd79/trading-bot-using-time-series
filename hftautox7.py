@@ -3216,7 +3216,7 @@ def main():
                                                             elif positive_count == negative_count:
                                                                 print("SHORT condition 10: positive_count = negative_count")                                                                                              
                                                             if momentum < 0:
-                                                                print("SHORT condition 11: momentum > 0")
+                                                                print("SHORT condition 11: momentum < 0")
                                                                 trigger_short = True
 
                     print()  
