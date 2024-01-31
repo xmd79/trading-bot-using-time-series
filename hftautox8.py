@@ -3222,7 +3222,7 @@ def main():
                                                                 print("SHORT condition 10: positive_count = negative_count")                                                                                              
                                                             if positive_sine_count < negative_sine_count or positive_sine_count == negative_sine_count:
                                                                 if positive_sine_count < negative_sine_count:
-                                                                    print("SHORT condition 11: positive_sine_count > negative_sine_count")     
+                                                                    print("SHORT condition 11: positive_sine_count < negative_sine_count")     
                                                                 elif positive_sine_count == negative_sine_count:
                                                                     print("SHORT condition 11: positive_sine_count == negative_sine_count")                                                                               
                                                                 if momentum < 0:
