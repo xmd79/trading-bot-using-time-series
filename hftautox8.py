@@ -3093,7 +3093,7 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 5.00
+            take_profit = 10.00
             stop_loss = -5.00
 
             # Current timestamp in milliseconds
@@ -3168,10 +3168,10 @@ def main():
                         print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")               
                         if closest_threshold == min_threshold and closest_threshold < price: 
                             print("LONG condition 2: closest_threshold == min_threshold and closest_threshold < price")                                                  
-                            if price < expected_price:  
-                                print("LONG condition 3: price < expected_price") 
-                                if signal == "BUY":
-                                    print("LONG condition 4: signal == BUY")
+                            if price < expected_price and price < forecast_5min and price < forecast_15min and price < forecast_30min and price < forecast_1h:  
+                                print("LONG condition 3: price < expected_price and price < forecast_5min and price < forecast_15min and price < forecast_30min and price < forecast_1h") 
+                                if signal == "BUY" and market_mood_type == "up":
+                                    print("LONG condition 4: signal == BUY and market_mood_type == up")
                                     if forecast_direction == "Up":
                                         print("LONG condition 5: forecast_direction == Up")
                                         if market_mood_fft == "Bullish": 
@@ -3201,10 +3201,10 @@ def main():
                         print("SHORT condition 1: normalized_distance_to_min > normalized_distance_to_max")               
                         if closest_threshold == max_threshold and closest_threshold > price: 
                             print("SHORT condition 2: closest_threshold == max_threshold and closest_threshold > price")                                                  
-                            if price > expected_price:  
-                                print("SHORT condition 3: price > expected_price") 
-                                if signal == "SELL":
-                                    print("SHORT condition 4: signal == SELL")
+                            if price > expected_price and price > forecast_5min and price > forecast_15min and price > forecast_30min and price > forecast_1h:  
+                                print("SHORT condition 3: price > expected_price and price > forecast_5min and price > forecast_15min and price > forecast_30min and price > forecast_1h") 
+                                if signal == "SELL" and market_mood_type == "down":
+                                    print("SHORT condition 4: signal == SELL and market_mood_type == down")
                                     if forecast_direction == "Down":
                                         print("SHORT condition 5: forecast_direction == Down")
                                         if market_mood_fft == "Bearish": 
