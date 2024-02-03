@@ -2465,21 +2465,21 @@ def calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold):
     sequence_max = np.linspace(max_threshold - 10, max_threshold + 10, 100)  # Adjust range and number as needed
     
     # Compute HT_SINE for both sequences
-    ht_sine_min, _ = talib.HT_SINE(sequence_max)
-    ht_sine_max, _ = talib.HT_SINE(sequence_min)
+    ht_sine_min, _ = talib.HT_SINE(sequence_min)
+    ht_sine_max, _ = talib.HT_SINE(sequence_max)
 
     market_sine_mood = None
     forecast_sine_price = None
 
     # Check for uptrend based on the last reversal being the min_threshold
     if ht_sine_min[-1] < ht_sine_min[-2] and closes[-1] > min_threshold:
-        market_sine_mood = "Uptrend"
-        forecast_sine_price = max_threshold - (np.max(ht_sine_max[-10:]) - ht_sine_max[-1])        
-    
-    # Check for downtrend based on the last reversal being the max_threshold
-    elif ht_sine_max[-1] > ht_sine_max[-2] and closes[-1] < max_threshold:
         market_sine_mood = "Downtrend"
         forecast_sine_price = min_threshold + (ht_sine_min[-1] - np.min(ht_sine_min[-10:]))
+
+    # Check for downtrend based on the last reversal being the max_threshold
+    elif ht_sine_max[-1] > ht_sine_max[-2] and closes[-1] < max_threshold:
+        market_sine_mood = "Uptrend"
+        forecast_sine_price = max_threshold - (np.max(ht_sine_max[-10:]) - ht_sine_max[-1]) 
 
     return market_sine_mood, forecast_sine_price
 
@@ -2488,6 +2488,12 @@ market_sine_mood, forecast_sine_price = calculate_sine_wave_and_forecast(closes,
 
 print(f"Market Mood: {market_sine_mood}")
 print(f"Forecast price: {forecast_sine_price}")
+
+print()
+
+##################################################
+##################################################
+
 
 print()
 
