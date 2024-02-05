@@ -2494,6 +2494,73 @@ print()
 ##################################################
 ##################################################
 
+import talib
+import numpy as np
+
+def custom_freq_sinewave(close, frequency, freq_amplitude=1.0, phase=0.0):
+    t = np.linspace(0, 1, len(close))
+    return freq_amplitude * np.sin(2 * np.pi * frequency * t + phase)
+
+def determine_freq_market_mood(freq_signal):
+    if all(val > 0 for val in freq_signal):
+        return "Bullish"
+    elif all(val < 0 for val in freq_signal):
+        return "Bearish"
+    else:
+        return "Neutral"
+
+# Define parameters
+min_freq = min(custom_freq_sinewave(close, frequency=5))
+max_freq = max(custom_freq_sinewave(close, frequency=5))
+
+freq_amplitude = 1.0
+
+# Create a custom sinewave
+length = len(close)
+
+freq_signal = custom_freq_sinewave(close, frequency=5, freq_amplitude=freq_amplitude)
+
+# Determine market mood
+market_freq_mood = determine_freq_market_mood(freq_signal)
+
+# Print results
+print("Energy, Frequency, Vibration Trinity:")
+print(f"Energy: {freq_amplitude}")
+print(f"Min Frequency: {min_freq}")
+print(f"Max Frequency: {max_freq}")
+print(f"Vibration (Amplitude x Frequency): {freq_amplitude * (max_freq - min_freq)}")
+print(f"Market Mood: {market_freq_mood}")
+
+# Find reversal keypoints (zero-crossings)
+reversal_keypoints = np.where(np.diff(np.sign(freq_signal)))[0] + 1  # Adjust index to prevent out of bounds error
+
+# Print Bullish or Bearish between reversal keypoints
+for i in range(len(reversal_keypoints) - 1):
+    start_index = reversal_keypoints[i]
+    end_index = reversal_keypoints[i + 1]
+    mood_between_reversals = determine_freq_market_mood(freq_signal[start_index:end_index])
+    print(f"Mood between reversal {i + 1} and {i + 2}: {mood_between_reversals}")
+
+# Print current reversal keypoints as price values
+current_reversal_prices = np.take(close, reversal_keypoints)
+
+print("\nCurrent Reversal Keypoints as Price Values:")
+
+for i, price in enumerate(current_reversal_prices):
+    print(f"Reversal {i + 1} Price: {price}")
+
+# First incoming target and market mood for the first target
+first_target_price = close[reversal_keypoints[0] + 1] if len(reversal_keypoints) > 0 else None
+market_mood_first_target = determine_freq_market_mood(close[:reversal_keypoints[0] + 1]) if len(reversal_keypoints) > 0 else None
+
+print(f"\nFirst Incoming Target: {first_target_price}")
+print(f"Market Mood for First Target: {market_mood_first_target}")
+
+print()
+
+##################################################
+##################################################
+
 print()
 
 ##################################################
@@ -3148,13 +3215,60 @@ def main():
             ##################################################
             ##################################################
 
+            # Define parameters
+            min_freq = min(custom_freq_sinewave(close, frequency=5))
+            max_freq = max(custom_freq_sinewave(close, frequency=5))
+
+            freq_amplitude = 1.0
+
+            # Create a custom sinewave
+            length = len(close)
+
+            freq_signal = custom_freq_sinewave(close, frequency=5, freq_amplitude=freq_amplitude)
+
+            # Determine market mood
+            market_freq_mood = determine_freq_market_mood(freq_signal)
+
+            # Print results
+            print("Energy, Frequency, Vibration Trinity:")
+            print(f"Energy: {freq_amplitude}")
+            print(f"Min Frequency: {min_freq}")
+            print(f"Max Frequency: {max_freq}")
+            print(f"Vibration (Amplitude x Frequency): {freq_amplitude * (max_freq - min_freq)}")
+            print(f"Market Mood: {market_freq_mood}")
+
+            # Find reversal keypoints (zero-crossings)
+            reversal_keypoints = np.where(np.diff(np.sign(freq_signal)))[0] + 1  # Adjust index to prevent out of bounds error
+
+            # Print Bullish or Bearish between reversal keypoints
+            for i in range(len(reversal_keypoints) - 1):
+                start_index = reversal_keypoints[i]
+                end_index = reversal_keypoints[i + 1]
+                mood_between_reversals = determine_freq_market_mood(freq_signal[start_index:end_index])
+                print(f"Mood between reversal {i + 1} and {i + 2}: {mood_between_reversals}")
+
+            # Print current reversal keypoints as price values
+            current_reversal_prices = np.take(close, reversal_keypoints)
+
+            print("\nCurrent Reversal Keypoints as Price Values:")
+
+            for i, price in enumerate(current_reversal_prices):
+                print(f"Reversal {i + 1} Price: {price}")
+
+            # First incoming target and market mood for the first target
+            first_target_price = close[reversal_keypoints[0] + 1] if len(reversal_keypoints) > 0 else None
+            market_mood_first_target = determine_freq_market_mood(close[:reversal_keypoints[0] + 1]) if len(reversal_keypoints) > 0 else None
+
+            print(f"\nFirst Incoming Target: {first_target_price}")
+            print(f"Market Mood for First Target: {market_mood_first_target}")
+
             print()
 
             ##################################################
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -5.00
+            stop_loss = -50.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
