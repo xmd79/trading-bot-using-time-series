@@ -2455,106 +2455,10 @@ print()
 ##################################################
 ##################################################
 
-def calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold):
-    """
-    Determine market mood and forecast price movement based on sine wave reversals.
-    """
-    
-    # Create a sequence of close prices centered around the thresholds to compute the sine wave
-    sequence_min = np.linspace(min_threshold - 10, min_threshold + 10, 100)  # Adjust range and number as needed
-    sequence_max = np.linspace(max_threshold - 10, max_threshold + 10, 100)  # Adjust range and number as needed
-    
-    # Compute HT_SINE for both sequences
-    ht_sine_min, _ = talib.HT_SINE(sequence_min)
-    ht_sine_max, _ = talib.HT_SINE(sequence_max)
-
-    market_sine_mood = None
-    forecast_sine_price = None
-
-    # Check for uptrend based on the last reversal being the min_threshold
-    if ht_sine_min[-1] < ht_sine_min[-2] and closes[-1] > min_threshold:
-        market_sine_mood = "Uptrend"
-        forecast_sine_price = max_threshold - (np.max(ht_sine_max[-10:]) - ht_sine_max[-1]) 
-
-    # Check for downtrend based on the last reversal being the max_threshold
-    elif ht_sine_max[-1] > ht_sine_max[-2] and closes[-1] < max_threshold:
-        market_sine_mood = "Downtrend"
-        forecast_sine_price = min_threshold + (ht_sine_min[-1] - np.min(ht_sine_min[-10:]))
-
-    return market_sine_mood, forecast_sine_price
-
-# Use the calculate_sine_wave_and_forecast function with the calculated thresholds
-market_sine_mood, forecast_sine_price = calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold)
-
-print(f"Market Mood: {market_sine_mood}")
-print(f"Forecast price: {forecast_sine_price}")
-
 print()
 
 ##################################################
 ##################################################
-
-import talib
-import numpy as np
-
-def custom_freq_sinewave(close, frequency, freq_amplitude=1.0, phase=0.0):
-    t = np.linspace(0, 1, len(close))
-    return freq_amplitude * np.sin(2 * np.pi * frequency * t + phase)
-
-def determine_freq_market_mood(freq_signal):
-    if all(val > 0 for val in freq_signal):
-        return "Bullish"
-    elif all(val < 0 for val in freq_signal):
-        return "Bearish"
-    else:
-        return "Neutral"
-
-# Define parameters
-min_freq = min(custom_freq_sinewave(close, frequency=5))
-max_freq = max(custom_freq_sinewave(close, frequency=5))
-
-freq_amplitude = 1.0
-
-# Create a custom sinewave
-length = len(close)
-
-freq_signal = custom_freq_sinewave(close, frequency=5, freq_amplitude=freq_amplitude)
-
-# Determine market mood
-market_freq_mood = determine_freq_market_mood(freq_signal)
-
-# Print results
-print("Energy, Frequency, Vibration Trinity:")
-print(f"Energy: {freq_amplitude}")
-print(f"Min Frequency: {min_freq}")
-print(f"Max Frequency: {max_freq}")
-print(f"Vibration (Amplitude x Frequency): {freq_amplitude * (max_freq - min_freq)}")
-print(f"Market Mood: {market_freq_mood}")
-
-# Find reversal keypoints (zero-crossings)
-reversal_keypoints = np.where(np.diff(np.sign(freq_signal)))[0] + 1  # Adjust index to prevent out of bounds error
-
-# Print Bullish or Bearish between reversal keypoints
-for i in range(len(reversal_keypoints) - 1):
-    start_index = reversal_keypoints[i]
-    end_index = reversal_keypoints[i + 1]
-    mood_between_reversals = determine_freq_market_mood(freq_signal[start_index:end_index])
-    print(f"Mood between reversal {i + 1} and {i + 2}: {mood_between_reversals}")
-
-# Print current reversal keypoints as price values
-current_reversal_prices = np.take(close, reversal_keypoints)
-
-print("\nCurrent Reversal Keypoints as Price Values:")
-
-for i, price in enumerate(current_reversal_prices):
-    print(f"Reversal {i + 1} Price: {price}")
-
-# First incoming target and market mood for the first target
-first_target_price = close[reversal_keypoints[0] + 1] if len(reversal_keypoints) > 0 else None
-market_mood_first_target = determine_freq_market_mood(close[:reversal_keypoints[0] + 1]) if len(reversal_keypoints) > 0 else None
-
-print(f"\nFirst Incoming Target: {first_target_price}")
-print(f"Market Mood for First Target: {market_mood_first_target}")
 
 print()
 
@@ -3204,63 +3108,11 @@ def main():
             ##################################################
             ##################################################
 
-            # Use the calculate_sine_wave_and_forecast function with the calculated thresholds
-            market_sine_mood, forecast_sine_price = calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold)
-
-            print(f"Market Mood: {market_sine_mood}")
-            print(f"Forecast price: {forecast_sine_price}")
-
             print()
 
             ##################################################
             ##################################################
 
-            # Define parameters
-            min_freq = min(custom_freq_sinewave(close, frequency=5))
-            max_freq = max(custom_freq_sinewave(close, frequency=5))
-
-            freq_amplitude = 1.0
-
-            # Create a custom sinewave
-            length = len(close)
-
-            freq_signal = custom_freq_sinewave(close, frequency=5, freq_amplitude=freq_amplitude)
-
-            # Determine market mood
-            market_freq_mood = determine_freq_market_mood(freq_signal)
-
-            # Print results
-            print("Energy, Frequency, Vibration Trinity:")
-            print(f"Energy: {freq_amplitude}")
-            print(f"Min Frequency: {min_freq}")
-            print(f"Max Frequency: {max_freq}")
-            print(f"Vibration (Amplitude x Frequency): {freq_amplitude * (max_freq - min_freq)}")
-            print(f"Market Mood: {market_freq_mood}")
-
-            # Find reversal keypoints (zero-crossings)
-            reversal_keypoints = np.where(np.diff(np.sign(freq_signal)))[0] + 1  # Adjust index to prevent out of bounds error
-
-            # Print Bullish or Bearish between reversal keypoints
-            for i in range(len(reversal_keypoints) - 1):
-                start_index = reversal_keypoints[i]
-                end_index = reversal_keypoints[i + 1]
-                mood_between_reversals = determine_freq_market_mood(freq_signal[start_index:end_index])
-                print(f"Mood between reversal {i + 1} and {i + 2}: {mood_between_reversals}")
-
-            # Print current reversal keypoints as price values
-            current_reversal_prices = np.take(close, reversal_keypoints)
-
-            print("\nCurrent Reversal Keypoints as Price Values:")
-
-            for i, price in enumerate(current_reversal_prices):
-                print(f"Reversal {i + 1} Price: {price}")
-
-            # First incoming target and market mood for the first target
-            first_target_price = close[reversal_keypoints[0] + 1] if len(reversal_keypoints) > 0 else None
-            market_mood_first_target = determine_freq_market_mood(close[:reversal_keypoints[0] + 1]) if len(reversal_keypoints) > 0 else None
-
-            print(f"\nFirst Incoming Target: {first_target_price}")
-            print(f"Market Mood for First Target: {market_mood_first_target}")
 
             print()
 
@@ -3650,19 +3502,19 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and price < fastest_target and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count > negative_count and long_conditions_met > short_conditions_met:
+                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and price < fastest_target and price < fast_price and price < forecast_5min and price < forecast_5min and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count > negative_count and long_conditions_met > short_conditions_met:
                         print("HFT LONG signal triggered!") 
                         trigger_long = True
 
-                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and forecast_direction == "Down" and  market_mood_fft == "Bearish" and price > fastest_target and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count < negative_count and long_conditions_met < short_conditions_met:
+                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and forecast_direction == "Down" and  market_mood_fft == "Bearish" and price > fastest_target and price > fast_price and price > forecast_5min and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count < negative_count and long_conditions_met < short_conditions_met:
                         print("HFT SHORT signal triggered!")  
                         trigger_short = True
 
-                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and price < fastest_target  and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count == negative_count and long_conditions_met > short_conditions_met:
+                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and price < fastest_target and price < fast_price and price < forecast_5min and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count == negative_count and long_conditions_met > short_conditions_met:
                         print("HFT LONG signal triggered!") 
                         trigger_long = True
 
-                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and forecast_direction == "Down" and  market_mood_fft == "Bearish" and price > fastest_target  and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count == negative_count and long_conditions_met < short_conditions_met:
+                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and forecast_direction == "Down" and  market_mood_fft == "Bearish" and price > fastest_target and price > fast_price and price > forecast_5min and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count == negative_count and long_conditions_met < short_conditions_met:
                         print("HFT SHORT signal triggered!")  
                         trigger_short = True
 
@@ -3745,7 +3597,6 @@ def main():
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine, analysis_result
         del dom_mood, dom_forecast, unitcircle_price, unitcircle_mood, overall_sentiments_sine, positive_sine_count, negative_sine_count
-        del  market_sine_mood, forecast_sine_price 
 
         # Force garbage collection to free up memory
         gc.collect()
