@@ -2613,165 +2613,14 @@ print("Sell Volume (5min tf):", sell_volume_5min)
 
 print()
 
-
 print("Buy Volume (1min tf):", buy_volume_1min)
 print("Sell Volume (1min tf):", sell_volume_1min)
 
 print()
 
-# Print support and resistance levels for the 5-minute timeframe
-print("Support Levels (5min tf):", support_levels_5min[-1])
-print("Resistance Levels (5min tf):", resistance_levels_5min[-1])
-
-# Print support and resistance levels for the 3-minute timeframe
-print("Support Levels (3min tf):", support_levels_3min[-1])
-print("Resistance Levels (3min tf):", resistance_levels_3min[-1])
-
-# Calculate and print support and resistance levels for the 1-minute timeframe
-print("Support Levels (1min tf):", support_levels_1min[-1])
-print("Resistance Levels (1min tf):", resistance_levels_1min[-1])
-
-support_levels_modified = [min(support, candles[-1]["close"]) for support in support_levels_5min]
-resistance_levels_modified = [max(resistance, candles[-1]["close"]) for resistance in resistance_levels_5min]
-
-# Calculate Bollinger Bands and Poly Channel for 5-minute timeframe
-upper_bb_5min, lower_bb_5min = calculate_bollinger_bands(candles)
-upper_poly_5min, lower_poly_5min = calculate_poly_channel(candles)
-
-# Calculate the spread factor and number of levels
-spread_factor = 0.02
-num_levels = 5
-
-# Calculate modified support and resistance levels with spread and additional levels
-price = candles[-1]["close"]
-support_spread = price * spread_factor
-resistance_spread = price * spread_factor
-
-# Select the appropriate support and resistance levels based on the desired timeframe
-desired_timeframe = "5m"
-
-if desired_timeframe == "1m":
-    support_levels_selected, resistance_levels_selected = support_levels_1min, resistance_levels_1min
-elif desired_timeframe == "3m":
-    support_levels_selected, resistance_levels_selected = support_levels_3min, resistance_levels_3min
-else:
-    support_levels_selected, resistance_levels_selected = support_levels_5min, resistance_levels_5min
-
-# Modify the selected support and resistance levels
-support_levels_modified = [min(support, candles[-1]["close"]) for support in support_levels_selected]
-resistance_levels_modified = [max(resistance, candles[-1]["close"]) for resistance in resistance_levels_selected]
-
-# Calculate modified support and resistance levels with spread and additional levels
-modified_support_levels = [price - i * support_spread for i in range(num_levels, 0, -1)]
-modified_resistance_levels = [price + i * resistance_spread for i in range(num_levels)]
-
-# Rule for identifying reversal dips and tops
-if price <= lower_bb_5min[-1] and buy_volume_5min > sell_volume_5min and modified_support_levels and modified_resistance_levels:
-    if all(level < small_lvrg_levels_5min[0] for level in modified_support_levels) and all(level < medium_lvrg_levels_5min[0] for level in modified_support_levels) and all(level < large_lvrg_levels_5min[0] for level in modified_support_levels):
-        print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band and More Buy Volume at Support")
-    elif buy_volume_5min > sell_volume_5min:
-        print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band")
-
-if price >= upper_bb_5min[-1] and sell_volume_5min > buy_volume_5min and modified_support_levels and modified_resistance_levels:
-    if all(level > small_lvrg_levels_5min[0] for level in modified_resistance_levels) and all(level > medium_lvrg_levels_5min[0] for level in modified_resistance_levels) and all(level > large_lvrg_levels_5min[0] for level in modified_resistance_levels):
-        print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band and More Sell Volume at Resistance")
-    elif sell_volume_5min > buy_volume_5min:
-        print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band")
-
-# Calculate overall bulls vs bears volume
-overall_bulls_vol, overall_bears_vol = check_bulls_vs_bears_vol(candles)
-
-# Print results outside the function
-print("\nOverall Analysis:")
-if overall_bulls_vol > overall_bears_vol:
-    print(f"Overall sentiment is bullish. Bulls Volume: {overall_bulls_vol}, Bears Volume: {overall_bears_vol}")
-elif overall_bulls_vol < overall_bears_vol:
-    print(f"Overall sentiment is bearish. Bulls Volume: {overall_bulls_vol}, Bears Volume: {overall_bears_vol}")
-else:
-    print("Overall sentiment is neutral. Bulls Volume equals Bears Volume.")
-
-print()
-
 ##################################################
 ##################################################
 
-def calculate_bulls_vs_bears_ratio_all_tfs(candles):
-    """
-    Calculate bulls vs bears volume ratio for each timeframe and determine the dominant part for overall analysis.
-
-    Parameters:
-    - candles (list): List of dictionaries containing candlestick data with keys 'timeframe', 'volume', 'close', and 'open'.
-
-    Returns:
-    - dict: A dictionary containing bulls vs bears volume ratio and the dominant part for each timeframe, and overall analysis.
-    """
-    result_dict = {}
-    overall_bulls_vol = 0
-    overall_bears_vol = 0
-    timeframes = set(candle["timeframe"] for candle in candles)
-
-    for timeframe in timeframes:
-        bulls_vol = sum(candle["volume"] for candle in candles if candle["timeframe"] == timeframe and candle["close"] > candle["open"])
-        bears_vol = sum(candle["volume"] for candle in candles if candle["timeframe"] == timeframe and candle["close"] < candle["open"])
-
-        overall_bulls_vol += bulls_vol
-        overall_bears_vol += bears_vol
-
-        total_volume = bulls_vol + bears_vol
-        bulls_ratio = bulls_vol / total_volume * 100 if total_volume > 0 else 0
-        bears_ratio = bears_vol / total_volume * 100 if total_volume > 0 else 0
-
-        result_dict[timeframe] = {
-            "bulls_volume": bulls_vol,
-            "bears_volume": bears_vol,
-            "bulls_ratio": bulls_ratio,
-            "bears_ratio": bears_ratio,
-            "dominant_part": "Bulls" if bulls_ratio > bears_ratio else "Bears" if bears_ratio > bulls_ratio else "Equal"
-        }
-
-    # Overall analysis
-    overall_bulls_ratio = overall_bulls_vol / (overall_bulls_vol + overall_bears_vol) * 100 if overall_bulls_vol + overall_bears_vol > 0 else 0
-    overall_bears_ratio = overall_bears_vol / (overall_bulls_vol + overall_bears_vol) * 100 if overall_bulls_vol + overall_bears_vol > 0 else 0
-    overall_dominant_part = "Bulls" if overall_bulls_ratio > overall_bears_ratio else "Bears" if overall_bears_ratio > overall_bulls_ratio else "Equal"
-
-    # Average percentages
-    average_bulls_ratio = overall_bulls_ratio / len(timeframes)
-    average_bears_ratio = overall_bears_ratio / len(timeframes)
-
-    # Percentage difference
-    percentage_diff = abs(average_bulls_ratio - average_bears_ratio)
-
-    result_dict["overall"] = {
-        "bulls_volume": overall_bulls_vol,
-        "bears_volume": overall_bears_vol,
-        "bulls_ratio": overall_bulls_ratio,
-        "bears_ratio": overall_bears_ratio,
-        "dominant_part": overall_dominant_part,
-        "average_bulls_ratio": average_bulls_ratio,
-        "average_bears_ratio": average_bears_ratio,
-        "percentage_diff": percentage_diff
-    }
-
-    return result_dict
-
-result_all_tfs = calculate_bulls_vs_bears_ratio_all_tfs(candles)
-
-# Print results
-for timeframe, values in result_all_tfs.items():
-    if timeframe == "overall":
-        print("\nOverall Analysis:")
-    else:
-        print(f"\n{timeframe} Analysis:")
-    print(f"Bulls Volume: {values['bulls_volume']}, Bears Volume: {values['bears_volume']}")
-    print(f"Bulls Ratio: {values['bulls_ratio']:.2f}%, Bears Ratio: {values['bears_ratio']:.2f}%")
-    print(f"Dominant Part: {values['dominant_part']}")
-
-# Print overall analysis
-print("\nOverall Analysis:")
-print(f"Overall Bulls Ratio: {result_all_tfs['overall']['bulls_ratio']:.2f}%, Overall Bears Ratio: {result_all_tfs['overall']['bears_ratio']:.2f}%")
-print(f"Average Bulls Ratio: {result_all_tfs['overall']['average_bulls_ratio']:.2f}%, Average Bears Ratio: {result_all_tfs['overall']['average_bears_ratio']:.2f}%")
-print(f"Percentage Difference: {result_all_tfs['overall']['percentage_diff']:.2f}%")
-print(f"Dominant Part: {result_all_tfs['overall']['dominant_part']}")
 
 print()
 
@@ -3563,42 +3412,10 @@ def main():
             ##################################################
             ##################################################
 
-            # Calculate overall bulls vs bears volume
-            overall_bulls_vol, overall_bears_vol = check_bulls_vs_bears_vol(candles)
-
-            # Print results outside the function
-            print("\nOverall Analysis:")
-
-            if overall_bulls_vol > overall_bears_vol:
-                print(f"Overall sentiment is bullish. Bulls Volume: {overall_bulls_vol}, Bears Volume: {overall_bears_vol}")
-            elif overall_bulls_vol < overall_bears_vol:
-                print(f"Overall sentiment is bearish. Bulls Volume: {overall_bulls_vol}, Bears Volume: {overall_bears_vol}")
-            else:
-                print("Overall sentiment is neutral. Bulls Volume equals Bears Volume.")
-
             print()
 
             ##################################################
             ##################################################
-
-            result_all_tfs = calculate_bulls_vs_bears_ratio_all_tfs(candles)
-
-            # Print results
-            for timeframe, values in result_all_tfs.items():
-                if timeframe == "overall":
-                    print("\nOverall Analysis:")
-                else:
-                    print(f"\n{timeframe} Analysis:")
-                    print(f"Bulls Volume: {values['bulls_volume']}, Bears Volume: {values['bears_volume']}")
-                    print(f"Bulls Ratio: {values['bulls_ratio']:.2f}%, Bears Ratio: {values['bears_ratio']:.2f}%")
-                    print(f"Dominant Part: {values['dominant_part']}")
-
-            # Print overall analysis
-            print("\nOverall Analysis:")
-            print(f"Overall Bulls Ratio: {result_all_tfs['overall']['bulls_ratio']:.2f}%, Overall Bears Ratio: {result_all_tfs['overall']['bears_ratio']:.2f}%")
-            print(f"Average Bulls Ratio: {result_all_tfs['overall']['average_bulls_ratio']:.2f}%, Average Bears Ratio: {result_all_tfs['overall']['average_bears_ratio']:.2f}%")
-            print(f"Percentage Difference: {result_all_tfs['overall']['percentage_diff']:.2f}%")
-            print(f"Dominant Part: {result_all_tfs['overall']['dominant_part']}")
 
             print()
 
