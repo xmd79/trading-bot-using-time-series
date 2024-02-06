@@ -2565,6 +2565,21 @@ def calculate_poly_channel(candles, window=20):
     lower_channel = channel - np.std(channel) * window
     return upper_channel.tolist(), lower_channel.tolist()
 
+def check_bulls_vs_bears_vol(candles):
+    timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
+    overall_bulls_vol = 0
+    overall_bears_vol = 0
+
+    for timeframe in timeframes:
+        bulls_vol = sum(candle["volume"] for candle in candles if candle["timeframe"] == timeframe and candle["close"] > candle["open"])
+        bears_vol = sum(candle["volume"] for candle in candles if candle["timeframe"] == timeframe and candle["close"] < candle["open"])
+
+        overall_bulls_vol += bulls_vol
+        overall_bears_vol += bears_vol
+
+    return overall_bulls_vol, overall_bears_vol
+
+
 total_volume = calculate_volume(candles)
 buy_volume_5min, sell_volume_5min, buy_volume_3min, sell_volume_3min , buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
 
@@ -2662,6 +2677,18 @@ if price >= upper_bb_5min[-1] and sell_volume_5min > buy_volume_5min and modifie
         print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band and More Sell Volume at Resistance")
     elif sell_volume_5min > buy_volume_5min:
         print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band")
+
+# Calculate overall bulls vs bears volume
+overall_bulls_vol, overall_bears_vol = check_bulls_vs_bears_vol(candles)
+
+# Print results outside the function
+print("\nOverall Analysis:")
+if overall_bulls_vol > overall_bears_vol:
+    print(f"Overall sentiment is bullish. Bulls Volume: {overall_bulls_vol}, Bears Volume: {overall_bears_vol}")
+elif overall_bulls_vol < overall_bears_vol:
+    print(f"Overall sentiment is bearish. Bulls Volume: {overall_bulls_vol}, Bears Volume: {overall_bears_vol}")
+else:
+    print("Overall sentiment is neutral. Bulls Volume equals Bears Volume.")
 
 print()
 
@@ -3457,6 +3484,19 @@ def main():
 
             ##################################################
             ##################################################
+
+            # Calculate overall bulls vs bears volume
+            overall_bulls_vol, overall_bears_vol = check_bulls_vs_bears_vol(candles)
+
+            # Print results outside the function
+            print("\nOverall Analysis:")
+
+            if overall_bulls_vol > overall_bears_vol:
+                print(f"Overall sentiment is bullish. Bulls Volume: {overall_bulls_vol}, Bears Volume: {overall_bears_vol}")
+            elif overall_bulls_vol < overall_bears_vol:
+                print(f"Overall sentiment is bearish. Bulls Volume: {overall_bulls_vol}, Bears Volume: {overall_bears_vol}")
+            else:
+                print("Overall sentiment is neutral. Bulls Volume equals Bears Volume.")
 
             print()
 
