@@ -2455,6 +2455,214 @@ print()
 ##################################################
 ##################################################
 
+def calculate_volume(candles):
+    total_volume = sum(candle["volume"] for candle in candles)
+    return total_volume
+
+def get_volume_5min(candles):
+    total_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m")
+    return total_volume_5min
+
+def get_volume_3min(candles):
+    total_volume_3min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "3m")
+    return total_volume_3min
+
+def get_volume_1min(candles):
+    total_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m")
+    return total_volume_1min
+
+def calculate_buy_sell_volume(candles):
+    buy_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m" and candle["close"] > candle["open"])
+    sell_volume_5min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "5m" and candle["close"] < candle["open"])
+    buy_volume_3min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "3m" and candle["close"] > candle["open"])
+    sell_volume_3min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "3m" and candle["close"] < candle["open"])
+    buy_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m" and candle["close"] > candle["open"])
+    sell_volume_1min = sum(candle["volume"] for candle in candles if candle["timeframe"] == "1m" and candle["close"] < candle["open"])
+
+    return buy_volume_5min, sell_volume_5min, buy_volume_3min, sell_volume_3min , buy_volume_1min, sell_volume_1min 
+
+def calculate_support_resistance(candles):
+    support_levels_1min = []
+    resistance_levels_1min = []
+    support_levels_3min = []
+    resistance_levels_3min = []
+    support_levels_5min = []
+    resistance_levels_5min = []
+
+    timeframes = ["1m", "3m", "5m"]
+    for timeframe in timeframes:
+        close_prices = [candle["close"] for candle in candles if candle["timeframe"] == timeframe]
+        min_close = min(close_prices)
+        max_close = max(close_prices)
+        price_range = max_close - min_close
+        support_spread = price_range / 11  # Divide the price range into 11 equal parts for 10 support and resistance levels
+        resistance_spread = price_range / 11
+
+        if timeframe == "1m":
+            support_levels_1min.append(min_close - support_spread)
+            resistance_levels_1min.append(max_close + resistance_spread)
+            for _ in range(4):
+                support_levels_1min.append(support_levels_1min[-1] - support_spread)
+                resistance_levels_1min.append(resistance_levels_1min[-1] + resistance_spread)
+        elif timeframe == "3m":
+            support_levels_3min.append(min_close - support_spread)
+            resistance_levels_3min.append(max_close + resistance_spread)
+            for _ in range(4):
+                support_levels_3min.append(support_levels_3min[-1] - support_spread)
+                resistance_levels_3min.append(resistance_levels_3min[-1] + resistance_spread)
+        else:
+            support_levels_5min.append(min_close - support_spread)
+            resistance_levels_5min.append(max_close + resistance_spread)
+            for _ in range(4):
+                support_levels_5min.append(support_levels_5min[-1] - support_spread)
+                resistance_levels_5min.append(resistance_levels_5min[-1] + resistance_spread)
+
+    return support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min
+
+def calculate_reversal_keypoints(levels, leverage):
+    reversal_points = []
+    for level in levels:
+        reversal = level * (1 - 0.1 * leverage)
+        reversal_points.append(reversal)
+    return reversal_points
+
+def get_higher_timeframe_data(symbol, higher_timeframe):
+    higher_candles = get_candles(symbol, [higher_timeframe])
+
+    if not higher_candles or higher_timeframe not in higher_candles:
+        return [], []
+
+    higher_support_levels, higher_resistance_levels = calculate_support_resistance(higher_candles[higher_timeframe])
+    return higher_support_levels, higher_resistance_levels
+
+def calculate_bollinger_bands(candles, window=20, num_std_dev=2):
+    close_prices = [candle["close"] for candle in candles if candle["timeframe"] == "5m"]
+    rolling_mean = calculate_rolling_mean(close_prices, window)
+    rolling_std = calculate_rolling_std(close_prices, window)
+    upper_band = [mean + (std_dev * num_std_dev) for mean, std_dev in zip(rolling_mean, rolling_std)]
+    lower_band = [mean - (std_dev * num_std_dev) for mean, std_dev in zip(rolling_mean, rolling_std)]
+    return upper_band, lower_band
+
+def calculate_rolling_mean(data, window):
+    rolling_sum = [sum(data[i - window + 1:i + 1]) for i in range(window - 1, len(data))]
+    return [sum / window for sum in rolling_sum]
+
+def calculate_rolling_std(data, window):
+    rolling_std = []
+    for i in range(window - 1, len(data)):
+        window_data = data[i - window + 1:i + 1]
+        mean = sum(window_data) / window
+        squared_diffs = [(x - mean) ** 2 for x in window_data]
+        std_dev = (sum(squared_diffs) / window) ** 0.5
+        rolling_std.append(std_dev)
+    return rolling_std
+
+def calculate_poly_channel(candles, window=20):
+    close_prices = [candle["close"] for candle in candles if candle["timeframe"] == "1m"]
+    poly_channel = np.polyfit(range(len(close_prices)), close_prices, 1)
+    channel = np.polyval(poly_channel, range(len(close_prices)))
+    upper_channel = channel + np.std(channel) * window
+    lower_channel = channel - np.std(channel) * window
+    return upper_channel.tolist(), lower_channel.tolist()
+
+total_volume = calculate_volume(candles)
+buy_volume_5min, sell_volume_5min, buy_volume_3min, sell_volume_3min , buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
+
+(support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min) = calculate_support_resistance(candles)
+
+total_volume_5min = get_volume_5min(candles)
+total_volume_3min = get_volume_3min(candles)
+total_volume_1min = get_volume_1min(candles)
+
+small_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 2)
+medium_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 5)
+large_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 10)
+
+small_lvrg_levels_3min = calculate_reversal_keypoints(support_levels_3min, 2)
+medium_lvrg_levels_3min = calculate_reversal_keypoints(support_levels_3min, 5)
+large_lvrg_levels_3min = calculate_reversal_keypoints(support_levels_3min, 10)
+
+small_lvrg_levels_5min = calculate_reversal_keypoints(support_levels_5min, 2)
+medium_lvrg_levels_5min = calculate_reversal_keypoints(support_levels_5min, 5)
+large_lvrg_levels_5min = calculate_reversal_keypoints(support_levels_5min, 10)
+
+higher_support_5min, higher_resistance_5min = get_higher_timeframe_data(TRADE_SYMBOL, "5m")
+
+print("Total Volume:", total_volume)
+print("Total Volume (5min tf):", total_volume_5min)
+
+print()
+
+print("Buy Volume (5min tf):", buy_volume_5min)
+print("Sell Volume (5min tf):", sell_volume_5min)
+
+print()
+
+
+print("Buy Volume (1min tf):", buy_volume_1min)
+print("Sell Volume (1min tf):", sell_volume_1min)
+
+print()
+
+# Print support and resistance levels for the 5-minute timeframe
+print("Support Levels (5min tf):", support_levels_5min[-1])
+print("Resistance Levels (5min tf):", resistance_levels_5min[-1])
+
+# Print support and resistance levels for the 3-minute timeframe
+print("Support Levels (3min tf):", support_levels_3min[-1])
+print("Resistance Levels (3min tf):", resistance_levels_3min[-1])
+
+# Calculate and print support and resistance levels for the 1-minute timeframe
+print("Support Levels (1min tf):", support_levels_1min[-1])
+print("Resistance Levels (1min tf):", resistance_levels_1min[-1])
+
+support_levels_modified = [min(support, candles[-1]["close"]) for support in support_levels_5min]
+resistance_levels_modified = [max(resistance, candles[-1]["close"]) for resistance in resistance_levels_5min]
+
+# Calculate Bollinger Bands and Poly Channel for 5-minute timeframe
+upper_bb_5min, lower_bb_5min = calculate_bollinger_bands(candles)
+upper_poly_5min, lower_poly_5min = calculate_poly_channel(candles)
+
+# Calculate the spread factor and number of levels
+spread_factor = 0.02
+num_levels = 5
+
+# Calculate modified support and resistance levels with spread and additional levels
+price = candles[-1]["close"]
+support_spread = price * spread_factor
+resistance_spread = price * spread_factor
+
+# Select the appropriate support and resistance levels based on the desired timeframe
+desired_timeframe = "5m"
+
+if desired_timeframe == "1m":
+    support_levels_selected, resistance_levels_selected = support_levels_1min, resistance_levels_1min
+elif desired_timeframe == "3m":
+    support_levels_selected, resistance_levels_selected = support_levels_3min, resistance_levels_3min
+else:
+    support_levels_selected, resistance_levels_selected = support_levels_5min, resistance_levels_5min
+
+# Modify the selected support and resistance levels
+support_levels_modified = [min(support, candles[-1]["close"]) for support in support_levels_selected]
+resistance_levels_modified = [max(resistance, candles[-1]["close"]) for resistance in resistance_levels_selected]
+
+# Calculate modified support and resistance levels with spread and additional levels
+modified_support_levels = [price - i * support_spread for i in range(num_levels, 0, -1)]
+modified_resistance_levels = [price + i * resistance_spread for i in range(num_levels)]
+
+# Rule for identifying reversal dips and tops
+if price <= lower_bb_5min[-1] and buy_volume_5min > sell_volume_5min and modified_support_levels and modified_resistance_levels:
+    if all(level < small_lvrg_levels_5min[0] for level in modified_support_levels) and all(level < medium_lvrg_levels_5min[0] for level in modified_support_levels) and all(level < large_lvrg_levels_5min[0] for level in modified_support_levels):
+        print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band and More Buy Volume at Support")
+    elif buy_volume_5min > sell_volume_5min:
+        print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band")
+
+if price >= upper_bb_5min[-1] and sell_volume_5min > buy_volume_5min and modified_support_levels and modified_resistance_levels:
+    if all(level > small_lvrg_levels_5min[0] for level in modified_resistance_levels) and all(level > medium_lvrg_levels_5min[0] for level in modified_resistance_levels) and all(level > large_lvrg_levels_5min[0] for level in modified_resistance_levels):
+        print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band and More Sell Volume at Resistance")
+    elif sell_volume_5min > buy_volume_5min:
+        print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band")
+
 print()
 
 ##################################################
@@ -3102,6 +3310,148 @@ def main():
                 print("Overall dominant Sine Wave: Negative")
             else:
                 print("Overall dominant Sine Wave: Balanced")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            total_volume = calculate_volume(candles)
+            buy_volume_5min, sell_volume_5min, buy_volume_3min, sell_volume_3min , buy_volume_1min, sell_volume_1min = calculate_buy_sell_volume(candles)
+
+            (support_levels_1min, resistance_levels_1min, support_levels_3min, resistance_levels_3min, support_levels_5min, resistance_levels_5min) = calculate_support_resistance(candles)
+
+            total_volume_5min = get_volume_5min(candles)
+            total_volume_1min = get_volume_1min(candles)
+
+            small_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 2)
+            medium_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 5)
+            large_lvrg_levels_1min = calculate_reversal_keypoints(support_levels_1min, 10)
+
+            small_lvrg_levels_3min = calculate_reversal_keypoints(support_levels_3min, 2)
+            medium_lvrg_levels_3min = calculate_reversal_keypoints(support_levels_3min, 5)
+            large_lvrg_levels_3min = calculate_reversal_keypoints(support_levels_3min, 10)
+
+            small_lvrg_levels_5min = calculate_reversal_keypoints(support_levels_5min, 2)
+            medium_lvrg_levels_5min = calculate_reversal_keypoints(support_levels_5min, 5)
+            large_lvrg_levels_5min = calculate_reversal_keypoints(support_levels_5min, 10)
+
+            higher_support_5min, higher_resistance_5min = get_higher_timeframe_data(TRADE_SYMBOL, "5m")
+
+            print("Total Volume:", total_volume)
+            print("Total Volume (5min tf):", total_volume_5min)
+
+            print()
+
+            print("Buy Volume (5min tf):", buy_volume_5min)
+            print("Sell Volume (5min tf):", sell_volume_5min)
+
+            print()
+
+            print("Buy Volume (3min tf):", buy_volume_3min)
+            print("Sell Volume (3min tf):", sell_volume_3min)
+
+            print()
+
+            print("Buy Volume (1min tf):", buy_volume_1min)
+            print("Sell Volume (1min tf):", sell_volume_1min)
+
+            print()
+
+            # Print support and resistance levels for the 5-minute timeframe
+            print("Support Levels (5min tf):", support_levels_5min[-1])
+            print("Resistance Levels (5min tf):", resistance_levels_5min[-1])
+
+            # Print support and resistance levels for the 3-minute timeframe
+            print("Support Levels (3min tf):", support_levels_3min[-1])
+            print("Resistance Levels (3min tf):", resistance_levels_3min[-1])
+
+            # Calculate and print support and resistance levels for the 1-minute timeframe
+            print("Support Levels (1min tf):", support_levels_1min[-1])
+            print("Resistance Levels (1min tf):", resistance_levels_1min[-1])
+
+            support_levels_modified = [min(support, candles[-1]["close"]) for support in support_levels_5min]
+            resistance_levels_modified = [max(resistance, candles[-1]["close"]) for resistance in resistance_levels_5min]
+
+            # Calculate Bollinger Bands and Poly Channel for 5-minute timeframe
+            upper_bb_5min, lower_bb_5min = calculate_bollinger_bands(candles)
+            upper_poly_5min, lower_poly_5min = calculate_poly_channel(candles)
+
+            # Calculate the spread factor and number of levels
+            spread_factor = 0.02
+            num_levels = 5
+
+            # Calculate modified support and resistance levels with spread and additional levels
+            #price = candles[-1]["close"]
+            support_spread = price * spread_factor
+            resistance_spread = price * spread_factor
+
+            # Select the appropriate support and resistance levels based on the desired timeframe
+            desired_timeframe = "5m"
+
+            if desired_timeframe == "1m":
+                support_levels_selected, resistance_levels_selected = support_levels_1min, resistance_levels_1min
+            elif desired_timeframe == "3m":
+                support_levels_selected, resistance_levels_selected = support_levels_3min, resistance_levels_3min
+            else:
+                support_levels_selected, resistance_levels_selected = support_levels_5min, resistance_levels_5min
+
+            # Modify the selected support and resistance levels
+            support_levels_modified = [min(support, candles[-1]["close"]) for support in support_levels_selected]
+            resistance_levels_modified = [max(resistance, candles[-1]["close"]) for resistance in resistance_levels_selected]
+
+            # Calculate modified support and resistance levels with spread and additional levels
+            modified_support_levels = [price - i * support_spread for i in range(num_levels, 0, -1)]
+            modified_resistance_levels = [price + i * resistance_spread for i in range(num_levels)]
+
+            # Rule for identifying reversal dips and tops
+            if price <= lower_bb_5min[-1] and buy_volume_5min > sell_volume_5min and modified_support_levels and modified_resistance_levels:
+                if all(level < small_lvrg_levels_5min[0] for level in modified_support_levels) and all(level < medium_lvrg_levels_5min[0] for level in modified_support_levels) and all(level < large_lvrg_levels_5min[0] for level in modified_support_levels):
+                    print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band and More Buy Volume at Support")
+                #elif buy_volume_5min > sell_volume_5min:
+                    #print("Potential Reversal Dip (5min): Close at or below Bollinger Bands Lower Band")
+
+            if price >= upper_bb_5min[-1] and sell_volume_5min > buy_volume_5min and modified_support_levels and modified_resistance_levels:
+                if all(level > small_lvrg_levels_5min[0] for level in modified_resistance_levels) and all(level > medium_lvrg_levels_5min[0] for level in modified_resistance_levels) and all(level > large_lvrg_levels_5min[0] for level in modified_resistance_levels):
+                    print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band and More Sell Volume at Resistance")
+                #elif sell_volume_5min > buy_volume_5min:
+                    #print("Potential Reversal Top (5min): Close at or above Bollinger Bands Upper Band")
+
+            print()
+
+            print("Lower BB is now at: ", lower_bb_5min[-1])
+            print("Upper BB is now at: ", upper_bb_5min[-1])
+            print("Lower Poly is now at: ", lower_poly_5min[-1])
+            print("Upper Poly is now at: ", upper_poly_5min[-1])
+
+            print()
+
+            distance_to_lower = abs(price - lower_bb_5min[-1])
+            distance_to_upper = abs(price - upper_bb_5min[-1])
+    
+            if distance_to_lower < distance_to_upper:
+                print("Price is closer to the Lower Bollinger Band")
+            elif distance_to_upper < distance_to_lower:
+                print("Price is closer to the upper Bollinger Band")
+            else:
+                print("Price is equidistant to both Bollinger Bands")
+
+            print()
+
+            if buy_volume_5min > sell_volume_5min:
+                print("Buy vol on 5min tf is higher then sell vol: BULLISH")
+            elif sell_volume_5min > buy_volume_5min:
+                print("Sell vol on 5min tf is higher then buy vol: BEARISH")
+
+            if buy_volume_3min > sell_volume_3min:
+                print("Buy vol on 3min tf is higher then sell vol: BULLISH")
+            elif sell_volume_3min > buy_volume_3min:
+                print("Sell vol on 3min tf is higher then buy vol: BEARISH")
+
+            if buy_volume_1min > sell_volume_1min:
+                print("Buy vol on 1min tf is higher then sell vol: BULLISH")
+            elif sell_volume_1min > buy_volume_1min:
+                print("Sell vol on 1min tf is higher then buy vol: BEARISH")
 
             print()
 
