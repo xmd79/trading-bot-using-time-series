@@ -3523,6 +3523,27 @@ def main():
                     ##################################################
                     ##################################################
 
+                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and price < fastest_target and price < fast_price and price < medium_price and price < slow_price and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count > negative_count and long_conditions_met > short_conditions_met:
+                        print("HFT LONG signal triggered!") 
+                        trigger_long = True
+
+                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and forecast_direction == "Down" and  market_mood_fft == "Bearish" and price > fast_price and price > medium_price and price > slow_price and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count < negative_count and long_conditions_met < short_conditions_met:
+                        print("HFT SHORT signal triggered!")  
+                        trigger_short = True
+
+                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and price < fast_price and price < medium_price and price < slow_price and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count == negative_count and long_conditions_met > short_conditions_met:
+                        print("HFT LONG signal triggered!") 
+                        trigger_long = True
+
+                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and forecast_direction == "Down" and  market_mood_fft == "Bearish" and price > fast_price and price > medium_price and price > slow_price and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count == negative_count and long_conditions_met < short_conditions_met:
+                        print("HFT SHORT signal triggered!")  
+                        trigger_short = True
+
+                    print()  
+
+                    ##################################################
+                    ##################################################
+
                     print()  
 
                     ##################################################
