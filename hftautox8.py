@@ -2621,6 +2621,60 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def market_analysis(close, closest_threshold, min_threshold, max_threshold):
+    q1_range = [0, 0.25]
+    q2_range = [0.25, 0.5]
+    q3_range = [0.5, 0.75]
+    q4_range = [0.75, 1.0]
+
+    # Determine current quadrant and percentage to min and max reversals
+    if min_threshold <= closest_threshold <= max_threshold:
+        percentage_to_reversal = (closest_threshold - min_threshold) / (max_threshold - min_threshold)
+        if closest_threshold <= min_threshold + (max_threshold - min_threshold) * q1_range[1]:
+            current_quadrant = 'Quadrant I'
+        elif min_threshold + (max_threshold - min_threshold) * q2_range[0] < closest_threshold <= min_threshold + (max_threshold - min_threshold) * q2_range[1]:
+            current_quadrant = 'Quadrant II'
+        elif min_threshold + (max_threshold - min_threshold) * q3_range[0] < closest_threshold <= min_threshold + (max_threshold - min_threshold) * q3_range[1]:
+            current_quadrant = 'Quadrant III'
+        elif min_threshold + (max_threshold - min_threshold) * q4_range[0] < closest_threshold <= min_threshold + (max_threshold - min_threshold) * q4_range[1]:
+            current_quadrant = 'Quadrant IV'
+    else:
+        raise ValueError("Close value is outside the specified thresholds.")
+
+    # Determine if the last reversal was at the minimum threshold
+    last_reversal_at_min_threshold = closest_threshold <= min_threshold + (max_threshold - min_threshold) * 0.5
+
+    # Calculate degree to mean ratio related to a 45-degree angle
+    close_range = np.max(close) - np.min(close)
+    mean_price = np.mean(close)
+    degree_to_mean_ratio = close_range / mean_price
+
+    # Use the new logic for market mood and forecast using the hybrid wave
+    average_price = np.mean(close)
+    price_change = np.diff(close)
+    mid_point = (percentage_to_reversal + 0.5) / 2
+
+    if last_reversal_at_min_threshold:
+        current_cycle = np.where(close <= mid_point, 0, 1)  # 0 for 'Down Cycle', 1 for 'Up Cycle'
+    else:
+        current_cycle = np.where(close <= mid_point, 1, 0)  # 1 for 'Up Cycle', 0 for 'Down Cycle'
+
+    majority_cycle = np.argmax(np.bincount(current_cycle.astype(int)))
+
+    mood_factor = degree_to_mean_ratio * np.mean(price_change) * (1 - percentage_to_reversal)
+    forecast_price = average_price + mood_factor
+
+    return majority_cycle, current_quadrant, mood_factor, forecast_price
+
+current_cycle, current_quadrant, mood_factor, forecasted_price = market_analysis(close_prices, closest_threshold, min_threshold, max_threshold)
+
+# Print results
+print(f"Current Cycle: {current_cycle}")
+print(f"Current Quadrant: {current_quadrant}")
+print(f"Mood Factor: {mood_factor}")
+print(f"Forecasted Price: {forecasted_price}")
 
 print()
 
@@ -3412,6 +3466,14 @@ def main():
             ##################################################
             ##################################################
 
+            current_cycle, current_quadrant, mood_factor, forecasted_cycle_price = market_analysis(close_prices, closest_threshold, min_threshold, max_threshold)
+
+            # Print results
+            print(f"Current Cycle: {current_cycle}")
+            print(f"Current Quadrant: {current_quadrant}")
+            print(f"Mood Factor: {mood_factor}")
+            print(f"Forecasted Price: {forecasted_cycle_price}")
+
             print()
 
             ##################################################
@@ -3423,7 +3485,7 @@ def main():
             ##################################################
 
             take_profit = 5.00
-            stop_loss = -50.00
+            stop_loss = -5.00
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3707,19 +3769,19 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count > negative_count and long_conditions_met > short_conditions_met:
+                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < forecasted_cycle_price and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count > negative_count and long_conditions_met > short_conditions_met:
                         print("HFT LONG signal triggered!") 
                         trigger_long = True
 
-                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and forecast_direction == "Down" and market_mood_fft == "Bearish" and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count < negative_count and long_conditions_met < short_conditions_met:
+                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > forecasted_cycle_price and price > avg_mtf and forecast_direction == "Down" and market_mood_fft == "Bearish" and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count < negative_count and long_conditions_met < short_conditions_met:
                         print("HFT SHORT signal triggered!")  
                         trigger_short = True
 
-                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count == negative_count and long_conditions_met > short_conditions_met:
+                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < forecasted_cycle_price and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and signal == "BUY" and market_mood_type == "up" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and positive_count == negative_count and long_conditions_met > short_conditions_met:
                         print("HFT LONG signal triggered!") 
                         trigger_long = True
 
-                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and forecast_direction == "Down" and market_mood_fft == "Bearish" and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count == negative_count and long_conditions_met < short_conditions_met:
+                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > forecasted_cycle_price and price > avg_mtf and forecast_direction == "Down" and market_mood_fft == "Bearish" and signal == "SELL" and market_mood_type == "down" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and positive_count == negative_count and long_conditions_met < short_conditions_met:
                         print("HFT SHORT signal triggered!")  
                         trigger_short = True
 
