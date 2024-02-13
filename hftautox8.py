@@ -3604,8 +3604,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 5
-            stop_loss = -5
+            take_profit = 2.23
+            stop_loss = -2.23
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3910,35 +3910,35 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and market_mood_type == "up" and price < target_45_quad_1 and price < target_45_quad_2 and price < target_45_quad_3 and price < target_45_quad_4 and price < forecast_1h and market_mood == "Bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count > negative_sine_count and long_conditions_met > short_conditions_met:
+                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and forecast_direction == "Up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count > negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    elif momentum < 0 and market_mood_type == "down" and price > target_45_quad_1 and price > target_45_quad_2 and price > target_45_quad_3 and price > target_45_quad_4 and price > forecast_1h and market_mood == "Bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count < negative_sine_count and long_conditions_met < short_conditions_met:
+                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and forecast_direction == "Down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count < negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and price < target_45_quad_1 and price < target_45_quad_2 and price < target_45_quad_3 and price < target_45_quad_4 and price < forecast_1h and market_mood == "Bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count == negative_sine_count and long_conditions_met > short_conditions_met:
+                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and forecast_direction == "Up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    elif momentum < 0 and market_mood_type == "down" and price > target_45_quad_1 and price > target_45_quad_2 and price > target_45_quad_3 and price > target_45_quad_4 and price > forecast_1h and market_mood == "Bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count == negative_sine_count and long_conditions_met < short_conditions_met:
+                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and forecast_direction == "Down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and price < target_45_quad_1 and price < target_45_quad_2 and price < target_45_quad_3 and price < target_45_quad_4 and price < forecast_1h and market_mood == "Bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count and long_conditions_met > short_conditions_met:
+                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and forecast_direction == "Up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    elif momentum < 0 and market_mood_type == "down" and price > target_45_quad_1 and price > target_45_quad_2 and price > target_45_quad_3 and price > target_45_quad_4 and price > forecast_1h and market_mood == "Bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count and long_conditions_met < short_conditions_met:
+                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and forecast_direction == "Down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and price < target_45_quad_1 and price < target_45_quad_2 and price < target_45_quad_3 and price < target_45_quad_4 and price < forecast_1h and market_mood == "Bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count and long_conditions_met > short_conditions_met:
+                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and forecast_direction == "Up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    elif momentum < 0 and market_mood_type == "down" and price > target_45_quad_1 and price > target_45_quad_2 and price > target_45_quad_3 and price > target_45_quad_4 and price > forecast_1h and market_mood == "Bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count and long_conditions_met < short_conditions_met:
+                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and forecast_direction == "Down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
@@ -3946,6 +3946,12 @@ def main():
 
                     ##################################################
                     ##################################################
+
+                    print()  
+
+                    ##################################################
+                    ##################################################
+
 
                     #message = f'Price: ${price}' 
                     #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message)
