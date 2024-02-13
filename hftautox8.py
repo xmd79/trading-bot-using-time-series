@@ -3820,6 +3820,22 @@ def main():
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
+                    if momentum > 0 and market_mood_type == "up" and current_quadrant == "1" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count:
+                        print("Ultra HFT LONG signal triggered!") 
+                        trigger_long = True                
+
+                    elif momentum < 0 and market_mood_type == "down" and current_quadrant == "4" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count:
+                        print("Ultra HFT SHORT signal triggered!") 
+                        trigger_short = True 
+
+                    if momentum > 0 and market_mood_type == "up" and current_quadrant == "1" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
+                        print("Ultra HFT LONG signal triggered!") 
+                        trigger_long = True                
+
+                    elif momentum < 0 and market_mood_type == "down" and current_quadrant == "4" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
+                        print("Ultra HFT SHORT signal triggered!") 
+                        trigger_short = True 
+
                     print()  
 
                     ##################################################
