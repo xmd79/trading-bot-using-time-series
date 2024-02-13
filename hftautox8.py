@@ -720,6 +720,8 @@ def forecast_sma_targets(price):
     (PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed) = calculate_elements()
 
     output_data = []
+    target_variables = {}  # Dictionary to store target and target_45 for each quadrant
+    
     output_data.append(f"Given Close Price (Center of Unit Circle): {price}\n")
     
     for quadrant, _ in unit_circle_degrees.items():
@@ -737,13 +739,31 @@ def forecast_sma_targets(price):
         output_data.append(f"Forecasted 45Degree_Target_Quad_{quadrant}: Price - {target_45:.2f}")
         output_data.append("-" * 50)
 
-    return output_data
+        # Store target and target_45 in the dictionary
+        target_variables[f"target_quad_{quadrant}"] = target
+        target_variables[f"target_45_quad_{quadrant}"] = target_45
 
-results = forecast_sma_targets(price)
+    return output_data, target_variables
+
+# Capture the targets when calling the function
+results, targets = forecast_sma_targets(price)
 
 # Print each output string separately
 for result in results:
     print(result)
+
+# Assign each target_45 value to a separate variable
+target_45_quad_1 = targets['target_45_quad_1']
+target_45_quad_2 = targets['target_45_quad_2']
+target_45_quad_3 = targets['target_45_quad_3']
+target_45_quad_4 = targets['target_45_quad_4']
+
+# Print each variable
+print(f"Target_45 for Quadrant 1: {target_45_quad_1:.2f}")
+print(f"Target_45 for Quadrant 2: {target_45_quad_2:.2f}")
+print(f"Target_45 for Quadrant 3: {target_45_quad_3:.2f}")
+print(f"Target_45 for Quadrant 4: {target_45_quad_4:.2f}")
+print("-" * 50)
 
 print()
 
@@ -3001,11 +3021,25 @@ def main():
             ##################################################
             ##################################################
 
-            results = forecast_sma_targets(price)
+            # Capture the targets when calling the function
+            results, targets = forecast_sma_targets(price)
 
             # Print each output string separately
             for result in results:
                 print(result)
+
+            # Assign each target_45 value to a separate variable
+            target_45_quad_1 = targets['target_45_quad_1']
+            target_45_quad_2 = targets['target_45_quad_2']
+            target_45_quad_3 = targets['target_45_quad_3']
+            target_45_quad_4 = targets['target_45_quad_4']
+
+            # Print each variable
+            print(f"Target_45 for Quadrant 1: {target_45_quad_1:.2f}")
+            print(f"Target_45 for Quadrant 2: {target_45_quad_2:.2f}")
+            print(f"Target_45 for Quadrant 3: {target_45_quad_3:.2f}")
+            print(f"Target_45 for Quadrant 4: {target_45_quad_4:.2f}")
+            print("-" * 50)
 
             print()
 
@@ -3498,8 +3532,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 2.23
-            stop_loss = -2.23
+            take_profit = 5
+            stop_loss = -5
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3804,35 +3838,35 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and market_mood_type == "up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count > negative_sine_count and long_conditions_met > short_conditions_met:
+                    if momentum > 0 and market_mood_type == "up" and price < target_45_quad_1 and price < target_45_quad_2 and price < target_45_quad_3 and price < target_45_quad_4 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count > negative_sine_count and long_conditions_met > short_conditions_met:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    elif momentum < 0 and market_mood_type == "down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count < negative_sine_count and long_conditions_met < short_conditions_met:
+                    elif momentum < 0 and market_mood_type == "down" and price > target_45_quad_1 and price > target_45_quad_2 and price > target_45_quad_3 and price > target_45_quad_4 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count < negative_sine_count and long_conditions_met < short_conditions_met:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count == negative_sine_count and long_conditions_met > short_conditions_met:
+                    if momentum > 0 and market_mood_type == "up" and price < target_45_quad_1 and price < target_45_quad_2 and price < target_45_quad_3 and price < target_45_quad_4 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count == negative_sine_count and long_conditions_met > short_conditions_met:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    elif momentum < 0 and market_mood_type == "down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count == negative_sine_count and long_conditions_met < short_conditions_met:
+                    elif momentum < 0 and market_mood_type == "down" and price > target_45_quad_1 and price > target_45_quad_2 and price > target_45_quad_3 and price > target_45_quad_4 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count == negative_sine_count and long_conditions_met < short_conditions_met:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count and long_conditions_met > short_conditions_met:
+                    if momentum > 0 and market_mood_type == "up" and price < target_45_quad_1 and price < target_45_quad_2 and price < target_45_quad_3 and price < target_45_quad_4 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count and long_conditions_met > short_conditions_met:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    elif momentum < 0 and market_mood_type == "down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count and long_conditions_met < short_conditions_met:
+                    elif momentum < 0 and market_mood_type == "down" and price > target_45_quad_1 and price > target_45_quad_2 and price > target_45_quad_3 and price > target_45_quad_4 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count and long_conditions_met < short_conditions_met:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count and long_conditions_met > short_conditions_met:
+                    if momentum > 0 and market_mood_type == "up" and price < target_45_quad_1 and price < target_45_quad_2 and price < target_45_quad_3 and price < target_45_quad_4 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count and long_conditions_met > short_conditions_met:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    elif momentum < 0 and market_mood_type == "down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count and long_conditions_met < short_conditions_met:
+                    elif momentum < 0 and market_mood_type == "down" and price > target_45_quad_1 and price > target_45_quad_2 and price > target_45_quad_3 and price > target_45_quad_4 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count and long_conditions_met < short_conditions_met:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
