@@ -2742,7 +2742,7 @@ def calculate_impulse_energy_momentum(close):
 
     return result
 
-def forecast_price(current_price, calculated_momentum):
+def forecast_hft_price(current_price, calculated_momentum):
     """
     Forecast the next price based on current price and calculated momentum.
 
@@ -2757,7 +2757,7 @@ def forecast_price(current_price, calculated_momentum):
     return forecasted_price
 
 # Calculate impulse, energy, momentum, and market mood
-calculations = calculate_impulse_energy_momentum(historical_close)
+calculations = calculate_impulse_energy_momentum(close)
 print("Impulse:", calculations['impulse'])
 print("Energy:", calculations['energy'])
 print("Momentum:", calculations['momentum'])
@@ -2765,7 +2765,7 @@ print("Market Mood:", calculations['market_mood'])
 
 # Forecast the next price
 current_price = price
-forecasted_price = forecast_price(current_price, calculations['momentum'])
+forecasted_price = forecast_hft_price(current_price, calculations['momentum'])
 print("Forecasted Price:", forecasted_price)
 
 
@@ -3596,7 +3596,7 @@ def main():
 
             # Forecast the next price
             current_price = price
-            forecasted_price = forecast_price(current_price, calculations['momentum'])
+            forecasted_price = forecast_hft_price(current_price, calculations['momentum'])
             print("Forecasted Price:", forecasted_price)
 
             print()
