@@ -2703,12 +2703,72 @@ print(f"Mood Factor: {mood_factor}")
 print(f"Forecasted Price: {forecasted_price}")
 
 
-
-
 print()
 
 ##################################################
 ##################################################
+
+def calculate_impulse_energy_momentum(close):
+    """
+    Calculate impulse, energy, and momentum based on close prices.
+
+    Parameters:
+    close (list or numpy array): List or array containing historical closing prices.
+
+    Returns:
+    dict: Dictionary containing calculated impulse, energy, momentum, and market mood.
+    """
+    if len(close) < 2:
+        raise ValueError("Insufficient data for calculations. At least two data points required.")
+
+    # Calculate impulse
+    impulse = close[-1] - close[-2]
+
+    # Determine market mood
+    market_mood = "Up" if impulse > 0 else "Down" if impulse < 0 else "Neutral"
+
+    # Calculate energy (squared impulse)
+    energy = impulse ** 2
+
+    # Calculate momentum (normalized impulse)
+    momentum = impulse / close[-2]
+
+    result = {
+        'impulse': impulse,
+        'energy': energy,
+        'momentum': momentum,
+        'market_mood': market_mood
+    }
+
+    return result
+
+def forecast_price(current_price, calculated_momentum):
+    """
+    Forecast the next price based on current price and calculated momentum.
+
+    Parameters:
+    current_price (float): Current market price.
+    calculated_momentum (float): Calculated momentum.
+
+    Returns:
+    float: Forecasted next price.
+    """
+    forecasted_price = current_price + calculated_momentum * current_price
+    return forecasted_price
+
+# Calculate impulse, energy, momentum, and market mood
+calculations = calculate_impulse_energy_momentum(historical_close)
+print("Impulse:", calculations['impulse'])
+print("Energy:", calculations['energy'])
+print("Momentum:", calculations['momentum'])
+print("Market Mood:", calculations['market_mood'])
+
+# Forecast the next price
+current_price = price
+forecasted_price = forecast_price(current_price, calculations['momentum'])
+print("Forecasted Price:", forecasted_price)
+
+
 
 print()
 
@@ -3526,6 +3586,18 @@ def main():
 
             ##################################################
             ##################################################
+
+            # Calculate impulse, energy, and momentum
+            calculations = calculate_impulse_energy_momentum(close)
+            print("Impulse:", calculations['impulse'])
+            print("Energy:", calculations['energy'])
+            print("Momentum:", calculations['momentum'])
+            print("Market Mood:", calculations['market_mood'])
+
+            # Forecast the next price
+            current_price = price
+            forecasted_price = forecast_price(current_price, calculations['momentum'])
+            print("Forecasted Price:", forecasted_price)
 
             print()
 
