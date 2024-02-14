@@ -3901,11 +3901,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and current_quadrant == "1" and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and incoming_reversal == "Top" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and long_conditions_met > short_conditions_met:
+                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and current_quadrant == "1" and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and long_conditions_met > short_conditions_met:
                         print("HFT LONG signal triggered!") 
                         trigger_long = True
 
-                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and current_quadrant == "4" and price > avg_mtf and forecast_direction == "Down" and market_mood_fft == "Bearish" and incoming_reversal == "Dip" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and long_conditions_met < short_conditions_met:
+                    elif normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and current_quadrant == "4" and price > avg_mtf and forecast_direction == "Down" and market_mood_fft == "Bearish" and price > forecast and price > expected_price and pivot_mood == "Bearish" and momentum < 0 and long_conditions_met < short_conditions_met:
                         print("HFT SHORT signal triggered!")  
                         trigger_short = True
 
