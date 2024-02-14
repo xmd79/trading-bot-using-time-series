@@ -3593,19 +3593,26 @@ def main():
             print("Energy:", calculations['energy'])
             print("Momentum:", calculations['momentum'])
             print("Market Mood:", calculations['market_mood'])
+            hft_momentum = calculations['market_mood']
 
             # Forecast the next price
             current_price = price
-            forecasted_price = forecast_hft_price(current_price, calculations['momentum'])
-            print("Forecasted Price:", forecasted_price)
+            forecasted_hft_price = forecast_hft_price(current_price, calculations['momentum'])
+            print("Forecasted Price:", forecasted_hft_price)
 
             print()
 
             ##################################################
             ##################################################
 
-            take_profit = 12.33
-            stop_loss = -12.33
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            take_profit = 15
+            stop_loss = -15
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3910,35 +3917,35 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and forecast_direction == "Up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count > negative_sine_count:
+                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and hft_momentum == "Up" and forecast_direction == "Up" and predicted_market_mood == "Up" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count > negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and forecast_direction == "Down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count < negative_sine_count:
+                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and hft_momentum == "Down" and forecast_direction == "Down" and predicted_market_mood == "Down" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count < negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and forecast_direction == "Up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count == negative_sine_count:
+                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and hft_momentum == "Up" and forecast_direction == "Up" and predicted_market_mood == "Up" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and forecast_direction == "Down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count == negative_sine_count:
+                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and hft_momentum == "Down" and forecast_direction == "Down" and predicted_market_mood == "Down" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and forecast_direction == "Up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count:
+                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and hft_momentum == "Up" and forecast_direction == "Up" and predicted_market_mood == "Up" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and forecast_direction == "Down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count:
+                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and hft_momentum == "Down" and forecast_direction == "Down" and predicted_market_mood == "Down" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and forecast_direction == "Up" and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
+                    if momentum > 0 and market_mood_type == "up" and market_mood == "Bullish" and hft_momentum == "Up" and forecast_direction == "Up" and predicted_market_mood == "Up" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and forecast_direction == "Down" and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
+                    if momentum < 0 and market_mood_type == "down" and market_mood == "Bearish" and hft_momentum == "Down" and forecast_direction == "Down" and predicted_market_mood == "Down" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
