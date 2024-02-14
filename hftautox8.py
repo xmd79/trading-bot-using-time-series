@@ -3611,8 +3611,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 3.66
-            stop_loss = -6.33
+            take_profit = 2.33
+            stop_loss = -2.33
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3917,35 +3917,35 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and market_mood_type == "up" and incoming_reversal == "Top" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count > negative_sine_count:
+                    if momentum > 0 and market_mood_type == "up" and incoming_reversal == "Top" and signal == "BUY" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count > negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    if momentum < 0 and market_mood_type == "down" and incoming_reversal == "Dip" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count < negative_sine_count:
+                    if momentum < 0 and market_mood_type == "down" and incoming_reversal == "Dip" and signal == "SELL" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count < negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and incoming_reversal == "Top" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count == negative_sine_count:
+                    if momentum > 0 and market_mood_type == "up" and incoming_reversal == "Top" and signal == "BUY" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    if momentum < 0 and market_mood_type == "down" and incoming_reversal == "Dip" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count == negative_sine_count:
+                    if momentum < 0 and market_mood_type == "down" and incoming_reversal == "Dip" and signal == "SELL" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and incoming_reversal == "Top" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count:
+                    if momentum > 0 and market_mood_type == "up" and incoming_reversal == "Top" and signal == "BUY" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count > negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    if momentum < 0 and market_mood_type == "down" and incoming_reversal == "Dip" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count:
+                    if momentum < 0 and market_mood_type == "down" and incoming_reversal == "Dip" and signal == "SELL" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count < negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
-                    if momentum > 0 and market_mood_type == "up" and incoming_reversal == "Top" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
+                    if momentum > 0 and market_mood_type == "up" and incoming_reversal == "Top" and signal == "BUY" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT LONG signal triggered!") 
                         trigger_long = True                
 
-                    if momentum < 0 and market_mood_type == "down" and incoming_reversal == "Dip" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
+                    if momentum < 0 and market_mood_type == "down" and incoming_reversal == "Dip" and signal == "SELL" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count == negative_count and positive_sine_count == negative_sine_count:
                         print("Ultra HFT SHORT signal triggered!") 
                         trigger_short = True 
 
