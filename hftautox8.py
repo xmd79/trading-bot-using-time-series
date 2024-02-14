@@ -3901,7 +3901,7 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and incoming_reversal == "Top" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and long_conditions_met > short_conditions_met:
+                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < avg_mtf and forecast_direction == "Up" and market_mood_fft == "Bullish" and incoming_reversal == "Top" and price < forecast and price < expected_price and pivot_mood == "Bullish" and momentum > 0 and long_conditions_met > short_conditions_met:
                         print("HFT LONG signal triggered!") 
                         trigger_long = True
 
