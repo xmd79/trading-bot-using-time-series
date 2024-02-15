@@ -3962,11 +3962,11 @@ def main():
                     ##################################################
 
                     if momentum > 0 and buy_volume_1min > sell_volume_1min and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top":
-                        print("LONG condition 12: momentum > 0")
+                        print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
                     if momentum < 0 and buy_volume_1min < sell_volume_1min and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip":
-                        print("LONG condition 12: momentum > 0")
+                        print("LONG ultra HFT momentum triggered")
                         trigger_short = True
 
                     print()  
