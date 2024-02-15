@@ -3611,7 +3611,7 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 50
+            take_profit = 5
             stop_loss = -50
 
             # Current timestamp in milliseconds
