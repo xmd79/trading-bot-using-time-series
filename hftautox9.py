@@ -2775,6 +2775,7 @@ print()
 ##################################################
 ##################################################
 
+
 print()
 
 ##################################################
@@ -3924,11 +3925,16 @@ def main():
                                                             print("LONG condition 10: market_mood_type == up")   
                                                             if signal == "BUY":
                                                                 print("LONG condition 11: signal == BUY") 
-                                                                if long_conditions_met > short_conditions_met:
-                                                                    print("LONG condition 12: Overall Result: LONG conditions met more than SHORT conditions")                            
-                                                                    if momentum > 0:
-                                                                        print("LONG condition 13: momentum > 0")
-                                                                        trigger_long = True
+                                                                if  positive_count > negative_count or positive_count == negative_count:     
+                                                                    if positive_count > negative_count:
+                                                                        print("LONG condition 12: positive_count > negative_count")      
+                                                                    elif long_conditions_met == short_conditions_met:
+                                                                        print("LONG condition 12: positive_count == negative_count") 
+                                                                    if long_conditions_met > short_conditions_met:
+                                                                        print("LONG condition 13: Overall LONG conditions met more than SHORT conditions")                         
+                                                                        if momentum > 0:
+                                                                            print("LONG condition 14: momentum > 0")
+                                                                            trigger_long = True
 
 
                     # Downtrend cycle trigger conditions
@@ -3954,11 +3960,16 @@ def main():
                                                             print("SHORT condition 10: market_mood_type == down")   
                                                             if signal == "SELL":
                                                                 print("SHORT condition 11: signal == SELL") 
-                                                                if long_conditions_met < short_conditions_met:
-                                                                    print("SHORT condition 12: Overall Result: SHORT conditions met more than LONG conditions")                            
-                                                                    if momentum < 0:
-                                                                        print("SHORT condition 13: momentum < 0")
-                                                                        trigger_long = True
+                                                                if  positive_count < negative_count or positive_count == negative_count:     
+                                                                    if positive_count < negative_count:
+                                                                        print("SHORT condition 12: positive_count > negative_count")      
+                                                                    elif long_conditions_met == short_conditions_met:
+                                                                        print("SHORT condition 12: positive_count == negative_count") 
+                                                                    if long_conditions_met < short_conditions_met:
+                                                                        print("SHORT condition 13: Overall SHORT conditions met more than LONG conditions")                         
+                                                                        if momentum > 0:
+                                                                            print("SHORT condition 14: momentum > 0")
+                                                                            trigger_short = True
                     print()  
 
                     ##################################################
