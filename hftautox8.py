@@ -3966,8 +3966,8 @@ def main():
                                                                         print("SHORT condition 12: positive_count == negative_count") 
                                                                     if long_conditions_met < short_conditions_met:
                                                                         print("SHORT condition 13: Overall SHORT conditions met more than LONG conditions")                         
-                                                                        if momentum > 0:
-                                                                            print("SHORT condition 14: momentum > 0")
+                                                                        if momentum < 0:
+                                                                            print("SHORT condition 14: momentum < 0")
                                                                             trigger_short = True
 
                     print()  
