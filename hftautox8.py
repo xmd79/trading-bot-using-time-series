@@ -4106,7 +4106,15 @@ def main():
                     ##################################################
                     ##################################################
 
-                    print()  
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_5min > sell_volume_5min and price < expected_price and price < hft_target and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top":
+                        print("LONG ultra HFT momentum triggered")
+                        trigger_long = True
+
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_5min < sell_volume_5min and price > expected_price and price > hft_target and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip":
+                        print("SHORT ultra HFT momentum triggered")
+                        trigger_short = True
+
+                    print()
 
                     ##################################################
                     ##################################################
