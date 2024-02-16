@@ -2768,6 +2768,101 @@ current_price = price
 forecasted_price = forecast_hft_price(current_price, calculations['momentum'])
 print("Forecasted Price:", forecasted_price)
 
+print()
+
+##################################################
+##################################################
+
+import requests
+
+def get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=60):
+    base_url = "https://fapi.binance.com"
+    endpoint = "/fapi/v1/depth"
+
+    params = {
+        "symbol": symbol,
+        "limit": limit
+    }
+
+    try:
+        response = requests.get(base_url + endpoint, params=params)
+        response.raise_for_status()
+        order_book = response.json()
+
+        # Get relevant information
+        bids = order_book["bids"]
+        asks = order_book["asks"]
+        spread = float(asks[0][0]) - float(bids[0][0])
+
+        close_price = (float(bids[0][0]) + float(asks[0][0])) / 2
+
+        # Calculate support and resistance levels
+        support_level = float(bids[0][0])
+        resistance_level = float(asks[0][0])
+
+        # Assess market mood for small range (next 5 minutes)
+        small_range_mood = "Unknown"
+        if spread > 0:
+            small_range_forecasted_price = close_price + spread
+            small_range_mood = "Bullish" if small_range_forecasted_price > close_price else "Bearish"
+
+        # Assess market mood for large range (next 30 minutes)
+        large_range_mood = "Unknown"
+        if spread > 0:
+            large_range_forecasted_price = close_price + spread * 6  # Forecast for 30 minutes
+            large_range_mood = "Bullish" if large_range_forecasted_price > close_price else "Bearish"
+
+        # Calculate a basic forecasted price for the next 60 minutes
+        forecasted_price = (support_level + resistance_level) / 2
+
+        # Calculate the forecasted price for the most distant future (maximum duration)
+        max_forecast_minutes = forecast_minutes
+        forecasted_price_max_duration = forecasted_price + spread * max_forecast_minutes
+
+        return {
+            "buy_order_price": float(bids[0][0]),
+            "buy_order_quantity": float(bids[0][1]),
+            "sell_order_price": float(asks[0][0]),
+            "sell_order_quantity": float(asks[0][1]),
+            "spread": spread,
+            "support_level": support_level,
+            "resistance_level": resistance_level,
+            "small_range_mood": small_range_mood,
+            "large_range_mood": large_range_mood,
+            "forecasted_price_max_duration": forecasted_price_max_duration,
+            "max_forecast_minutes": max_forecast_minutes
+        }
+
+    except requests.exceptions.HTTPError as errh:
+        print("HTTP Error:", errh)
+    except requests.exceptions.ConnectionError as errc:
+        print("Error Connecting:", errc)
+    except requests.exceptions.Timeout as errt:
+        print("Timeout Error:", errt)
+    except requests.exceptions.RequestException as err:
+        print("Error:", err)
+
+# Example usage without a while loop
+order_book_data = get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=1440)
+
+# Print information separately
+if order_book_data:
+    print("Buy Order:")
+    print(f"Price: {order_book_data['buy_order_price']}, Quantity: {order_book_data['buy_order_quantity']}")
+
+    print("\nSell Order:")
+    print(f"Price: {order_book_data['sell_order_price']}, Quantity: {order_book_data['sell_order_quantity']}")
+
+    print("\nSpread:", order_book_data['spread'])
+
+    print("\nSupport Level:", order_book_data['support_level'])
+    print("Resistance Level:", order_book_data['resistance_level'])
+
+    print("\nSmall Range Market Mood:", order_book_data['small_range_mood'])
+    print("Large Range Market Mood:", order_book_data['large_range_mood'])
+
+    print("\nForecasted Price for Max Duration (", order_book_data['max_forecast_minutes'], " minutes):", order_book_data['forecasted_price_max_duration'])
+
 
 
 print()
@@ -2775,6 +2870,15 @@ print()
 ##################################################
 ##################################################
 
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
 
 print()
 
@@ -3335,7 +3439,7 @@ def main():
             ##################################################
             ##################################################
 
-            close = get_close('1h')
+            close = get_close('15m')
 
             # Call the scale_list_to_sine function
             dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_list_to_sine(close)
@@ -3606,14 +3710,36 @@ def main():
             ##################################################
             ##################################################
 
+            order_book_data = get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=1440)
 
-            print()
+            # Print information separately
+            if order_book_data:
+                print("Buy Order:")
+                print(f"Price: {order_book_data['buy_order_price']}, Quantity: {order_book_data['buy_order_quantity']}")
+
+                print("\nSell Order:")
+                print(f"Price: {order_book_data['sell_order_price']}, Quantity: {order_book_data['sell_order_quantity']}")
+
+                print("\nSpread:", order_book_data['spread'])
+
+                print("\nSupport Level:", order_book_data['support_level'])
+                print("Resistance Level:", order_book_data['resistance_level'])
+
+                print("\nSmall Range Market Mood:", order_book_data['small_range_mood'])
+                print("Large Range Market Mood:", order_book_data['large_range_mood'])
+
+                print("\nForecasted Price for Max Duration (", order_book_data['max_forecast_minutes'], " minutes):", order_book_data['forecasted_price_max_duration'])
+
+
+            hft_target = order_book_data['forecasted_price_max_duration']
+
+            print(hft_target)
 
             ##################################################
             ##################################################
 
-            take_profit = 2.33
-            stop_loss = -2.33
+            take_profit = 5
+            stop_loss = -50
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -3912,29 +4038,31 @@ def main():
                                 if closest_threshold < price:  
                                     print("LONG condition 4: closest_threshold < price")        
                                     if forecast_direction == "Up":
-                                        print("LONG condition 5: forecast_direction == Up")                             
-                                        if price < expected_price:
-                                            print("LONG condition 6: price < expected_price") 
-                                            if market_mood_fft == "Bullish":
-                                                print("LONG condition 7: market_mood_fft == Bullish")  
-                                                if price < forecast:
-                                                    print("LONG condition 8: price < forecast")
-                                                    if incoming_reversal == "Top": 
-                                                        print("LONG condition 9: incoming_reversal == Top") 
-                                                        if market_mood_type == "up":
-                                                            print("LONG condition 10: market_mood_type == up")   
-                                                            if signal == "BUY":
-                                                                print("LONG condition 11: signal == BUY") 
-                                                                if  positive_count > negative_count or positive_count == negative_count:     
-                                                                    if positive_count > negative_count:
-                                                                        print("LONG condition 12: positive_count > negative_count")      
-                                                                    elif long_conditions_met == short_conditions_met:
-                                                                        print("LONG condition 12: positive_count == negative_count") 
-                                                                    if long_conditions_met > short_conditions_met:
-                                                                        print("LONG condition 13: Overall LONG conditions met more than SHORT conditions")                         
-                                                                        if momentum > 0:
-                                                                            print("LONG condition 14: momentum > 0")
-                                                                            trigger_long = True
+                                        print("LONG condition 5: forecast_direction == Up") 
+                                        if price < hft_target:  
+                                            print("LONG condition 6: price < hft_target")                           
+                                            if price < expected_price:
+                                                print("LONG condition 7: price < expected_price") 
+                                                if market_mood_fft == "Bullish":
+                                                    print("LONG condition 8: market_mood_fft == Bullish")  
+                                                    if price < forecast:
+                                                        print("LONG condition 9: price < forecast")
+                                                        if incoming_reversal == "Top": 
+                                                            print("LONG condition 10: incoming_reversal == Top") 
+                                                            if market_mood_type == "up":
+                                                                print("LONG condition 11: market_mood_type == up")   
+                                                                if signal == "BUY":
+                                                                    print("LONG condition 12: signal == BUY") 
+                                                                    if  positive_count > negative_count or positive_count == negative_count:     
+                                                                        if positive_count > negative_count:
+                                                                            print("LONG condition 13: positive_count > negative_count")      
+                                                                        elif long_conditions_met == short_conditions_met:
+                                                                            print("LONG condition 13: positive_count == negative_count") 
+                                                                        if long_conditions_met > short_conditions_met:
+                                                                            print("LONG condition 14: Overall LONG conditions met more than SHORT conditions")                         
+                                                                            if momentum > 0:
+                                                                                print("LONG condition 15: momentum > 0")
+                                                                                trigger_long = True
 
 
                     # Downtrend cycle trigger conditions
@@ -3947,43 +4075,46 @@ def main():
                                 if closest_threshold > price:  
                                     print("SHORT condition 4: closest_threshold > price")        
                                     if forecast_direction == "Down":
-                                        print("SHORT condition 5: forecast_direction == Down")                             
-                                        if price > expected_price:
-                                            print("SHORT condition 6: price > expected_price") 
-                                            if market_mood_fft == "Bearish":
-                                                print("SHORT condition 7: market_mood_fft == Bearish")  
-                                                if price > forecast:
-                                                    print("SHORT condition 8: price > forecast")
-                                                    if incoming_reversal == "Dip": 
-                                                        print("SHORT condition 9: incoming_reversal == Dip") 
-                                                        if market_mood_type == "down":
-                                                            print("SHORT condition 10: market_mood_type == down")   
-                                                            if signal == "SELL":
-                                                                print("SHORT condition 11: signal == SELL") 
-                                                                if  positive_count < negative_count or positive_count == negative_count:     
-                                                                    if positive_count < negative_count:
-                                                                        print("SHORT condition 12: positive_count > negative_count")      
-                                                                    elif long_conditions_met == short_conditions_met:
-                                                                        print("SHORT condition 12: positive_count == negative_count") 
-                                                                    if long_conditions_met < short_conditions_met:
-                                                                        print("SHORT condition 13: Overall SHORT conditions met more than LONG conditions")                         
-                                                                        if momentum < 0:
-                                                                            print("SHORT condition 14: momentum < 0")
-                                                                            trigger_short = True
+                                        print("SHORT condition 5: forecast_direction == Down")       
+                                        if price > hft_target:  
+                                            print("SHORT condition 6: price > hft_target")                          
+                                            if price > expected_price:
+                                                print("SHORT condition 7: price > expected_price") 
+                                                if market_mood_fft == "Bearish":
+                                                    print("SHORT condition 8: market_mood_fft == Bearish")  
+                                                    if price > forecast:
+                                                        print("SHORT condition 9: price > forecast")
+                                                        if incoming_reversal == "Dip": 
+                                                            print("SHORT condition 10: incoming_reversal == Dip") 
+                                                            if market_mood_type == "down":
+                                                                print("SHORT condition 11: market_mood_type == down")   
+                                                                if signal == "SELL":
+                                                                    print("SHORT condition 12: signal == SELL") 
+                                                                    if  positive_count < negative_count or positive_count == negative_count:     
+                                                                        if positive_count < negative_count:
+                                                                            print("SHORT condition 13: positive_count > negative_count")      
+                                                                        elif long_conditions_met == short_conditions_met:
+                                                                            print("SHORT condition 13: positive_count == negative_count") 
+                                                                        if long_conditions_met < short_conditions_met:
+                                                                            print("SHORT condition 14: Overall SHORT conditions met more than LONG conditions")                         
+                                                                            if momentum < 0:
+                                                                                print("SHORT condition 15: momentum < 0")
+                                                                                trigger_short = True
+
                     print()  
 
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top":
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_5min > sell_volume_5min and price > hft_target and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top":
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip":
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_5min < sell_volume_5min and price > hft_target and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip":
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
-                    print()  
+                    print()
 
                     ##################################################
                     ##################################################
