@@ -2768,7 +2768,112 @@ current_price = price
 forecasted_price = forecast_hft_price(current_price, calculations['momentum'])
 print("Forecasted Price:", forecasted_price)
 
+print()
 
+##################################################
+##################################################
+
+import requests
+
+def get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=60):
+    base_url = "https://fapi.binance.com"
+    endpoint = "/fapi/v1/depth"
+
+    params = {
+        "symbol": symbol,
+        "limit": limit
+    }
+
+    try:
+        response = requests.get(base_url + endpoint, params=params)
+        response.raise_for_status()
+        order_book = response.json()
+
+        # Get relevant information
+        bids = order_book["bids"]
+        asks = order_book["asks"]
+        spread = float(asks[0][0]) - float(bids[0][0])
+
+        close_price = (float(bids[0][0]) + float(asks[0][0])) / 2
+
+        # Calculate support and resistance levels
+        support_level = float(bids[0][0])
+        resistance_level = float(asks[0][0])
+
+        # Assess market mood for small range (next 5 minutes)
+        small_range_mood = "Unknown"
+        if spread > 0:
+            small_range_forecasted_price = close_price + spread
+            small_range_mood = "Bullish" if small_range_forecasted_price > close_price else "Bearish"
+
+        # Assess market mood for large range (next 30 minutes)
+        large_range_mood = "Unknown"
+        if spread > 0:
+            large_range_forecasted_price = close_price + spread * 6  # Forecast for 30 minutes
+            large_range_mood = "Bullish" if large_range_forecasted_price > close_price else "Bearish"
+
+        # Calculate a basic forecasted price for the next 60 minutes
+        forecasted_price = (support_level + resistance_level) / 2
+
+        # Calculate the forecasted price for the most distant future (maximum duration)
+        max_forecast_minutes = forecast_minutes
+        forecasted_price_max_duration = forecasted_price + spread * max_forecast_minutes
+
+        return {
+            "buy_order_price": float(bids[0][0]),
+            "buy_order_quantity": float(bids[0][1]),
+            "sell_order_price": float(asks[0][0]),
+            "sell_order_quantity": float(asks[0][1]),
+            "spread": spread,
+            "support_level": support_level,
+            "resistance_level": resistance_level,
+            "small_range_mood": small_range_mood,
+            "large_range_mood": large_range_mood,
+            "forecasted_price_max_duration": forecasted_price_max_duration,
+            "max_forecast_minutes": max_forecast_minutes
+        }
+
+    except requests.exceptions.HTTPError as errh:
+        print("HTTP Error:", errh)
+    except requests.exceptions.ConnectionError as errc:
+        print("Error Connecting:", errc)
+    except requests.exceptions.Timeout as errt:
+        print("Timeout Error:", errt)
+    except requests.exceptions.RequestException as err:
+        print("Error:", err)
+
+# Example usage without a while loop
+order_book_data = get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=1440)
+
+# Print information separately
+if order_book_data:
+    print("Buy Order:")
+    print(f"Price: {order_book_data['buy_order_price']}, Quantity: {order_book_data['buy_order_quantity']}")
+
+    print("\nSell Order:")
+    print(f"Price: {order_book_data['sell_order_price']}, Quantity: {order_book_data['sell_order_quantity']}")
+
+    print("\nSpread:", order_book_data['spread'])
+
+    print("\nSupport Level:", order_book_data['support_level'])
+    print("Resistance Level:", order_book_data['resistance_level'])
+
+    print("\nSmall Range Market Mood:", order_book_data['small_range_mood'])
+    print("Large Range Market Mood:", order_book_data['large_range_mood'])
+
+    print("\nForecasted Price for Max Duration (", order_book_data['max_forecast_minutes'], " minutes):", order_book_data['forecasted_price_max_duration'])
+
+
+
+print()
+
+##################################################
+##################################################
+
+print()
+
+##################################################
+##################################################
 
 print()
 
@@ -3605,6 +3710,25 @@ def main():
             ##################################################
             ##################################################
 
+            order_book_data = get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=1440)
+
+            # Print information separately
+            if order_book_data:
+                print("Buy Order:")
+                print(f"Price: {order_book_data['buy_order_price']}, Quantity: {order_book_data['buy_order_quantity']}")
+
+                print("\nSell Order:")
+                print(f"Price: {order_book_data['sell_order_price']}, Quantity: {order_book_data['sell_order_quantity']}")
+
+                print("\nSpread:", order_book_data['spread'])
+
+                print("\nSupport Level:", order_book_data['support_level'])
+                print("Resistance Level:", order_book_data['resistance_level'])
+
+                print("\nSmall Range Market Mood:", order_book_data['small_range_mood'])
+                print("Large Range Market Mood:", order_book_data['large_range_mood'])
+
+                print("\nForecasted Price for Max Duration (", order_book_data['max_forecast_minutes'], " minutes):", order_book_data['forecasted_price_max_duration'])
 
             print()
 
