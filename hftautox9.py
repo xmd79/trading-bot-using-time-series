@@ -3733,7 +3733,7 @@ def main():
 
             hft_target = order_book_data['forecasted_price_max_duration']
 
-            print(hft_target)
+            print()
 
             ##################################################
             ##################################################
