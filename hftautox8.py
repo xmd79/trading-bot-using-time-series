@@ -3334,7 +3334,7 @@ def main():
             ##################################################
             ##################################################
 
-            close = get_close('1h')
+            close = get_close('15m')
 
             # Call the scale_list_to_sine function
             dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_list_to_sine(close)
