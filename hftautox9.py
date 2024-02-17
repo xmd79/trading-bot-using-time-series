@@ -2644,6 +2644,179 @@ print()
 ##################################################
 ##################################################
 
+def check_volume_trend(candles):
+    timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
+    
+    volume_trend_data = {}
+
+    for timeframe in timeframes:
+        volume_data = [candle["volume"] for candle in candles if candle["timeframe"] == timeframe]
+
+        if len(volume_data) > 1:
+            current_volume = volume_data[-1]
+            previous_volume = volume_data[-2]
+
+            if current_volume > previous_volume:
+                trend = "Increasing"
+            elif current_volume < previous_volume:
+                trend = "Decreasing"
+            else:
+                trend = "Stable"
+
+            volume_trend_data[timeframe] = {
+                "current_volume": current_volume,
+                "previous_volume": previous_volume,
+                "trend": trend
+            }
+        else:
+            volume_trend_data[timeframe] = {
+                "current_volume": 0,
+                "previous_volume": 0,
+                "trend": "N/A (Insufficient Data)"
+            }
+
+    return volume_trend_data
+
+# Add this function call after obtaining the candles data
+volume_trend_data = check_volume_trend(candles)
+
+# Print the volume trend data
+print("Volume Trend Data:")
+for timeframe, data in volume_trend_data.items():
+    print(f"{timeframe} timeframe:")
+    print(f"Current Volume: {data['current_volume']}")
+    print(f"Previous Volume: {data['previous_volume']}")
+    print(f"Trend: {data['trend']}")
+    print()
+
+print()
+
+##################################################
+##################################################
+
+def check_price_trend(candles):
+    timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
+    
+    price_trend_data = {}
+
+    for timeframe in timeframes:
+        close_prices = [candle["close"] for candle in candles if candle["timeframe"] == timeframe]
+
+        if len(close_prices) > 1:
+            current_close = close_prices[-1]
+            previous_close = close_prices[-2]
+
+            if current_close > previous_close:
+                trend = "Increasing"
+            elif current_close < previous_close:
+                trend = "Decreasing"
+            else:
+                trend = "Stable"
+
+            price_trend_data[timeframe] = {
+                "current_close": current_close,
+                "previous_close": previous_close,
+                "trend": trend
+            }
+        else:
+            price_trend_data[timeframe] = {
+                "current_close": 0,
+                "previous_close": 0,
+                "trend": "N/A (Insufficient Data)"
+            }
+
+    return price_trend_data
+
+# Add this function call after obtaining the candles data
+price_trend_data = check_price_trend(candles)
+
+# Print the price trend data
+print("Price Trend Data:")
+for timeframe, data in price_trend_data.items():
+    print(f"{timeframe} timeframe:")
+    print(f"Current Close: {data['current_close']}")
+    print(f"Previous Close: {data['previous_close']}")
+    print(f"Trend: {data['trend']}")
+    print()
+
+print()
+
+##################################################
+##################################################
+
+def check_overall_trend(candles):
+    volume_trend_data = check_volume_trend(candles)
+    price_trend_data = check_price_trend(candles)
+
+    overall_trend_data = {}
+
+    up_count = 0
+    down_count = 0
+    same_direction_count = 0
+
+    for timeframe in volume_trend_data.keys():
+        if timeframe not in price_trend_data:
+            continue
+
+        volume_trend = volume_trend_data[timeframe]["trend"]
+        price_trend = price_trend_data[timeframe]["trend"]
+
+        overall_trend = "Up" if (volume_trend == "Increasing" and price_trend == "Increasing") or (volume_trend == "Decreasing" and price_trend == "Decreasing") else "Down" if (volume_trend == "Decreasing" and price_trend == "Increasing") or (volume_trend == "Increasing" and price_trend == "Decreasing") else "Stable"
+
+        overall_trend_data[timeframe] = {
+            "volume_trend": volume_trend,
+            "price_trend": price_trend,
+            "overall_trend": overall_trend
+        }
+
+        # Count trends
+        if overall_trend == "Up":
+            up_count += 1
+        elif overall_trend == "Down":
+            down_count += 1
+
+        # Check if volume and price trends are in the same direction
+        if volume_trend == price_trend:
+            same_direction_count += 1
+
+    # Calculate overall trend for all timeframes
+    overall_volume_trend = "Up" if all("volume_trend" in data and data["volume_trend"] == "Increasing" for data in volume_trend_data.values()) else "Down" if all("volume_trend" in data and data["volume_trend"] == "Decreasing" for data in volume_trend_data.values()) else "Stable"
+    overall_price_trend = "Up" if all("price_trend" in data and data["price_trend"] == "Increasing" for data in price_trend_data.values()) else "Down" if all("price_trend" in data and data["price_trend"] == "Decreasing" for data in price_trend_data.values()) else "Stable"
+
+    overall_trend_data["Overall"] = {
+        "volume_trend": overall_volume_trend,
+        "price_trend": overall_price_trend,
+        "overall_trend": "Up" if (overall_volume_trend == "Up" and overall_price_trend == "Up") or (overall_volume_trend == "Down" and overall_price_trend == "Down") else "Down"
+    }
+
+    # Print counts
+    print(f"Number of Timeframes in Up Direction: {up_count}")
+    print(f"Number of Timeframes in Down Direction: {down_count}")
+    print(f"Number of Timeframes with Both Volume and Price in Same Direction: {same_direction_count}")
+
+    return overall_trend_data
+
+# Add this function call after obtaining the candles data
+overall_trend_data = check_overall_trend(candles)
+
+# Print the volume and price trends separately for each timeframe
+print("\nVolume and Price Trend Data:")
+for timeframe, data in overall_trend_data.items():
+    print(f"{timeframe} timeframe:")
+    
+    # Volume Trend
+    print(f"Volume Trend: {data.get('volume_trend', 'N/A')}")
+
+    # Price Trend
+    print(f"Price Trend: {data.get('price_trend', 'N/A')}")
+
+    # Overall Trend
+    print(f"Overall Trend: {data['overall_trend']}")
+    
+    print()
+
+print()
+
 ##################################################
 ##################################################
 
@@ -2994,8 +3167,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-
 def dynamic_momentum_gauge(close, price, length=100, normalization_length=100):
     if len(close) <= 1:
         print("Error: Insufficient data for calculation.")
@@ -3004,21 +3175,44 @@ def dynamic_momentum_gauge(close, price, length=100, normalization_length=100):
     m = 0.0
     r = (price / close[-2] - 1) * 100
     m = ((length - 1) / length) * m + r / length
-    s = np.abs(m)
+    s = abs(m)
+
+    # Calculate historical s values
+    historical_s = [abs((close[i] / close[i-1] - 1) * 100) for i in range(1, len(close))]
 
     # Min-Max normalization
-    historical_s = np.abs((np.diff(close) / close[:-1]) * 100)  # Calculate historical s values
-    s_normalized = (s - np.min(historical_s[-normalization_length:])) / (np.max(historical_s[-normalization_length:]) - np.min(historical_s[-normalization_length:]))
+    min_historical_s = min(historical_s[-normalization_length:])
+    max_historical_s = max(historical_s[-normalization_length:])
+    s_normalized = (s - min_historical_s) / (max_historical_s - min_historical_s) if max_historical_s != min_historical_s else 0
+
+    # Initialize variables with default values
+    market_mood = "Neutral"
+    forecast_price = 0
 
     # Determine Market Mood and Forecast Price
-    market_mood = "Bullish" if s_normalized > 0.5 else "Bearish"
-    forecast_price = price * (1 + s_normalized)
+    if len(historical_s) > 1:
+        previous_s = historical_s[-2]  # Previous value of s
+        previous_s_normalized = (previous_s - min_historical_s) / (max_historical_s - min_historical_s) if max_historical_s != min_historical_s else 0
+
+        if s_normalized > 0.5 and previous_s_normalized <= 0.5:
+            market_mood = "Bearish"
+        elif s_normalized <= 0.5 and previous_s_normalized > 0.5:
+            market_mood = "Bullish"
+
+        # Check if the current and previous momentum gauges are different
+        if s_normalized != previous_s_normalized:
+            forecast_price = price * (1 + s_normalized)
+        else:
+            forecast_price = price  # Keep the same forecast price
+
+        print("Previous momentum gauge at: ", previous_s_normalized)
+        print("Current momentum gauge at: ", s_normalized)
 
     return market_mood, forecast_price
 
 mom_market_mood, mom_forecast_price = dynamic_momentum_gauge(close, price)
 
-if market_mood is not None and forecast_price is not None:
+if mom_market_mood is not None and mom_forecast_price is not None:
     print(f"Market Mood: {mom_market_mood}")
     print(f"Forecast Price: {mom_forecast_price}")
 
@@ -3518,7 +3712,7 @@ def main():
 
             mood_mom, mom_forecast = dynamic_momentum_gauge(close, price)
 
-            if market_mood is not None and forecast_price is not None:
+            if mood_mom is not None and forecast_price is not None:
                 print(f"Market Mood: {mood_mom}")
                 print(f"Forecast Price: {mom_forecast}")
 
@@ -3917,6 +4111,25 @@ def main():
             ##################################################
             ##################################################
 
+            # Add this function call after obtaining the candles data
+            overall_trend_data = check_overall_trend(candles)
+
+            # Print the volume and price trends separately for each timeframe
+            print("\nVolume and Price Trend Data:")
+            for timeframe, data in overall_trend_data.items():
+                print(f"{timeframe} timeframe:")
+    
+                # Volume Trend
+                print(f"Volume Trend: {data.get('volume_trend', 'N/A')}")
+
+                # Price Trend
+                print(f"Price Trend: {data.get('price_trend', 'N/A')}")
+
+                # Overall Trend
+                print(f"Overall Trend: {data['overall_trend']}")
+    
+                print()
+
             print()
 
             ##################################################
@@ -4290,11 +4503,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and roc_mood == "bullish" and mood_mom == "Bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top" and order_book_data['macd'] < 0 and order_book_data['rsi'] < 30  and order_book_data['buy_order_quantity'] > order_book_data['sell_order_quantity']:
+                    if momentum > 0 and roc_mood == "bullish" and price < mom_forecast and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top" and order_book_data['macd'] < 0 and order_book_data['rsi'] < 30  and order_book_data['buy_order_quantity'] > order_book_data['sell_order_quantity']:
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and roc_mood == "bearish" and mood_mom == "Bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip" and order_book_data['macd'] > 0 and order_book_data['rsi'] > 70 and order_book_data['buy_order_quantity'] < order_book_data['sell_order_quantity']:
+                    if momentum < 0 and roc_mood == "bearish" and price > mom_forecast and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip" and order_book_data['macd'] > 0 and order_book_data['rsi'] > 70 and order_book_data['buy_order_quantity'] < order_book_data['sell_order_quantity']:
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
