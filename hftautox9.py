@@ -2994,6 +2994,35 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def dynamic_momentum_gauge(close, price, length=100, normalization_length=100):
+    if len(close) <= 1:
+        print("Error: Insufficient data for calculation.")
+        return None, None
+
+    m = 0.0
+    r = (price / close[-2] - 1) * 100
+    m = ((length - 1) / length) * m + r / length
+    s = np.abs(m)
+
+    # Min-Max normalization
+    historical_s = np.abs((np.diff(close) / close[:-1]) * 100)  # Calculate historical s values
+    s_normalized = (s - np.min(historical_s[-normalization_length:])) / (np.max(historical_s[-normalization_length:]) - np.min(historical_s[-normalization_length:]))
+
+    # Determine Market Mood and Forecast Price
+    market_mood = "Bullish" if s_normalized > 0.5 else "Bearish"
+    forecast_price = price * (1 + s_normalized)
+
+    return market_mood, forecast_price
+
+market_mood, forecast_price = dynamic_momentum_gauge(close, price)
+
+if market_mood is not None and forecast_price is not None:
+    print(f"Market Mood: {market_mood}")
+    print(f"Forecast Price: {forecast_price}")
+
+
 print()
 
 ##################################################
@@ -3876,6 +3905,17 @@ def main():
             print("WD Gann Fans from Last Reversal:", details["WD Gann Fans"])
             print("Market Mood:", details["Market Mood"])
             print("Next Fan Incoming:", details["Next Fan Incoming"])
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            market_mood_mom, mom_forecast_price = dynamic_momentum_gauge(close, price)
+
+            if market_mood is not None and forecast_price is not None:
+                print(f"Market Mood: {market_mood_mom}")
+                print(f"Forecast Price: {mom_forecast_price}")
 
             print()
 
