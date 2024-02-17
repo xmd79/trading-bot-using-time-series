@@ -2863,12 +2863,92 @@ if order_book_data:
 
     print("\nForecasted Price for Max Duration (", order_book_data['max_forecast_minutes'], " minutes):", order_book_data['forecasted_price_max_duration'])
 
-
-
 print()
 
 ##################################################
 ##################################################
+
+import numpy as np
+
+def calculate_gann_fans(price, close):
+    # Find highs and lows
+    highs = np.maximum.accumulate(close)
+    lows = np.minimum.accumulate(close)
+
+    # Calculate Gann fans
+    fan_angles = [1, 1/2, 1/3, 1/4, 1/8, 1/16]
+    fans = []
+
+    for angle in fan_angles:
+        fan = price / angle
+        fans.append(fan)
+
+    # Identify last support and resistance
+    last_support = lows[-1]
+    last_resistance = highs[-1]
+
+    # Identify last high and last low
+    last_high = np.max(highs)
+    last_low = np.min(lows)
+
+    # Check if current close breaks support or resistance
+    current_close = price
+
+    # Set default values
+    market_mood = "None"
+
+    if current_close > last_resistance:
+        market_mood = "Bullish"
+    elif current_close < last_support:
+        market_mood = "Bearish"
+
+    # Determine whether overall highs are greater, smaller, or equal to lows
+    if np.max(highs) > np.min(lows):
+        highs_vs_lows = "Highs are greater than Lows"
+    elif np.max(highs) < np.min(lows):
+        highs_vs_lows = "Lows are greater than Highs"
+    else:
+        highs_vs_lows = "Lows are equal to Highs"
+
+    # WD Gann fans from last reversal
+    wd_gann_fans = [last_low + i * (last_high - last_low) for i in fan_angles]
+
+    # Determine market mood based on the current close and last reversal fan range
+    lower_fan = wd_gann_fans[-2]
+    upper_fan = wd_gann_fans[-1]
+
+    if lower_fan <= current_close <= upper_fan:
+        market_mood = "Bullish"
+    else:
+        market_mood = "Bearish"
+
+    # Calculate next fan incoming
+    next_fan = price / (fan_angles[-1] + 1)
+
+    # Return details
+    return {
+        "Gann Fans": fans,
+        "Last Support": last_support,
+        "Last Resistance": last_resistance,
+        "Last High": last_high,
+        "Last Low": last_low,
+        "WD Gann Fans": wd_gann_fans,
+        "Market Mood": market_mood,
+        "Next Fan Incoming": next_fan
+    }
+
+
+details = calculate_gann_fans(price, close_prices)
+
+# Print details
+print("Gann Fans:", details["Gann Fans"])
+print("Last Support:", details["Last Support"])
+print("Last Resistance:", details["Last Resistance"])
+print("Last High:", details["Last High"])
+print("Last Low:", details["Last Low"])
+print("WD Gann Fans from Last Reversal:", details["WD Gann Fans"])
+print("Market Mood:", details["Market Mood"])
+print("Next Fan Incoming:", details["Next Fan Incoming"])
 
 print()
 
@@ -3738,6 +3818,23 @@ def main():
             ##################################################
             ##################################################
 
+            details = calculate_gann_fans(price, close_prices)
+
+            # Print details
+            print("Gann Fans:", details["Gann Fans"])
+            print("Last Support:", details["Last Support"])
+            print("Last Resistance:", details["Last Resistance"])
+            print("Last High:", details["Last High"])
+            print("Last Low:", details["Last Low"])
+            print("WD Gann Fans from Last Reversal:", details["WD Gann Fans"])
+            print("Market Mood:", details["Market Mood"])
+            print("Next Fan Incoming:", details["Next Fan Incoming"])
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 5
             stop_loss = -50
 
@@ -4106,11 +4203,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and roc_mood == "bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top":
+                    if momentum > 0 and roc_mood == "bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top":
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and roc_mood == "bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip":
+                    if momentum < 0 and roc_mood == "bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip":
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
