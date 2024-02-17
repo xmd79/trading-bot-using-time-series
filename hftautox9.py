@@ -3011,16 +3011,16 @@ def dynamic_momentum_gauge(close, price, length=100, normalization_length=100):
     s_normalized = (s - np.min(historical_s[-normalization_length:])) / (np.max(historical_s[-normalization_length:]) - np.min(historical_s[-normalization_length:]))
 
     # Determine Market Mood and Forecast Price
-    market_mood = "Bullish" if s_normalized < 0.5 else "Bearish"
+    market_mood = "Bullish" if s_normalized > 0.5 else "Bearish"
     forecast_price = price * (1 + s_normalized)
 
     return market_mood, forecast_price
 
-market_mood, forecast_price = dynamic_momentum_gauge(close, price)
+mom_market_mood, mom_forecast_price = dynamic_momentum_gauge(close, price)
 
 if market_mood is not None and forecast_price is not None:
-    print(f"Market Mood: {market_mood}")
-    print(f"Forecast Price: {forecast_price}")
+    print(f"Market Mood: {mom_market_mood}")
+    print(f"Forecast Price: {mom_forecast_price}")
 
 
 print()
@@ -3516,6 +3516,12 @@ def main():
             ##################################################
             ##################################################
 
+            mood_mom, mom_forecast = dynamic_momentum_gauge(close, price)
+
+            if market_mood is not None and forecast_price is not None:
+                print(f"Market Mood: {mood_mom}")
+                print(f"Forecast Price: {mom_forecast}")
+
             print()
 
             ##################################################
@@ -3911,12 +3917,6 @@ def main():
             ##################################################
             ##################################################
 
-            market_mood_mom, mom_forecast_price = dynamic_momentum_gauge(close, price)
-
-            if market_mood is not None and forecast_price is not None:
-                print(f"Market Mood: {market_mood_mom}")
-                print(f"Forecast Price: {mom_forecast_price}")
-
             print()
 
             ##################################################
@@ -4290,11 +4290,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and roc_mood == "bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top" and order_book_data['macd'] < 0 and order_book_data['rsi'] < 30  and order_book_data['buy_order_quantity'] > order_book_data['sell_order_quantity']:
+                    if momentum > 0 and roc_mood == "bullish" and mood_mom == "Bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top" and order_book_data['macd'] < 0 and order_book_data['rsi'] < 30  and order_book_data['buy_order_quantity'] > order_book_data['sell_order_quantity']:
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and roc_mood == "bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip" and order_book_data['macd'] > 0 and order_book_data['rsi'] > 70 and order_book_data['buy_order_quantity'] < order_book_data['sell_order_quantity']:
+                    if momentum < 0 and roc_mood == "bearish" and mood_mom == "Bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip" and order_book_data['macd'] > 0 and order_book_data['rsi'] > 70 and order_book_data['buy_order_quantity'] < order_book_data['sell_order_quantity']:
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
