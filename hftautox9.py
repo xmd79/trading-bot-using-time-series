@@ -3011,7 +3011,7 @@ def dynamic_momentum_gauge(close, price, length=100, normalization_length=100):
     s_normalized = (s - np.min(historical_s[-normalization_length:])) / (np.max(historical_s[-normalization_length:]) - np.min(historical_s[-normalization_length:]))
 
     # Determine Market Mood and Forecast Price
-    market_mood = "Bullish" if s_normalized > 0.5 else "Bearish"
+    market_mood = "Bullish" if s_normalized < 0.5 else "Bearish"
     forecast_price = price * (1 + s_normalized)
 
     return market_mood, forecast_price
