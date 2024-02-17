@@ -2773,9 +2773,7 @@ print()
 ##################################################
 ##################################################
 
-import requests
-
-def get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=60):
+def get_binance_futures_order_book_with_indicators(symbol="btcusdt", limit=5, forecast_minutes=60):
     base_url = "https://fapi.binance.com"
     endpoint = "/fapi/v1/depth"
 
@@ -2792,13 +2790,24 @@ def get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=6
         # Get relevant information
         bids = order_book["bids"]
         asks = order_book["asks"]
-        spread = float(asks[0][0]) - float(bids[0][0])
 
+        # Combine bids and asks to form a single list of prices
+        close_prices = np.array([float(price[0]) for price in bids + asks])
+
+        # Check for NaN values in the combined prices
+        if any(np.isnan(close_prices)):
+            raise ValueError("Input data contains NaN values.")
+
+        spread = float(asks[0][0]) - float(bids[0][0])
         close_price = (float(bids[0][0]) + float(asks[0][0])) / 2
 
         # Calculate support and resistance levels
         support_level = float(bids[0][0])
         resistance_level = float(asks[0][0])
+
+        # Calculate MACD and RSI
+        macd, signal, _ = talib.MACD(close_prices)
+        rsi = talib.RSI(close_prices)
 
         # Assess market mood for small range (next 5 minutes)
         small_range_mood = "Unknown"
@@ -2819,6 +2828,17 @@ def get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=6
         max_forecast_minutes = forecast_minutes
         forecasted_price_max_duration = forecasted_price + spread * max_forecast_minutes
 
+        # Calculate buy and sell orders for gradually bigger spreads
+        spread_sizes = [1.0, 50, 100.0]  # Example spread sizes, you can adjust as needed
+
+        orders = {}
+        for spread_size in spread_sizes:
+            buy_order_price = support_level - spread_size
+            sell_order_price = resistance_level + spread_size
+
+            orders[f'buy_order_price_{spread_size}'] = buy_order_price
+            orders[f'sell_order_price_{spread_size}'] = sell_order_price
+
         return {
             "buy_order_price": float(bids[0][0]),
             "buy_order_quantity": float(bids[0][1]),
@@ -2830,7 +2850,10 @@ def get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=6
             "small_range_mood": small_range_mood,
             "large_range_mood": large_range_mood,
             "forecasted_price_max_duration": forecasted_price_max_duration,
-            "max_forecast_minutes": max_forecast_minutes
+            "max_forecast_minutes": max_forecast_minutes,
+            "macd": macd[-1],  # Use the latest MACD value for signal enforcement
+            "rsi": rsi[-1],    # Use the latest RSI value for signal enforcement
+            "spread_orders": orders  # Include the calculated buy and sell orders
         }
 
     except requests.exceptions.HTTPError as errh:
@@ -2843,7 +2866,7 @@ def get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=6
         print("Error:", err)
 
 # Example usage without a while loop
-order_book_data = get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=1440)
+order_book_data = get_binance_futures_order_book_with_indicators(symbol="btcusdt", limit=5, forecast_minutes=1440)
 
 # Print information separately
 if order_book_data:
@@ -2862,6 +2885,22 @@ if order_book_data:
     print("Large Range Market Mood:", order_book_data['large_range_mood'])
 
     print("\nForecasted Price for Max Duration (", order_book_data['max_forecast_minutes'], " minutes):", order_book_data['forecasted_price_max_duration'])
+
+    # Enforce signals using MACD and RSI
+    if order_book_data['macd'] > 0 and order_book_data['rsi'] > 70:
+        print("\nSignal: SHORT")
+
+    elif order_book_data['macd'] < 0 and order_book_data['rsi'] < 30:
+        print("\nSignal: LONG")
+    else:
+        print("\nSignal: NONE")
+
+    # Print calculated buy and sell orders for gradually bigger spreads
+    spread_orders = order_book_data.get("spread_orders", {})
+    for key, value in spread_orders.items():
+        print(f"\n{key}: {value}")
+
+
 
 print()
 
@@ -3790,7 +3829,8 @@ def main():
             ##################################################
             ##################################################
 
-            order_book_data = get_binance_futures_order_book(symbol="btcusdt", limit=5, forecast_minutes=1440)
+            # Example usage without a while loop
+            order_book_data = get_binance_futures_order_book_with_indicators(symbol="btcusdt", limit=5, forecast_minutes=1440)
 
             # Print information separately
             if order_book_data:
@@ -3810,8 +3850,15 @@ def main():
 
                 print("\nForecasted Price for Max Duration (", order_book_data['max_forecast_minutes'], " minutes):", order_book_data['forecasted_price_max_duration'])
 
+                # Enforce signals using MACD and RSI
+                if order_book_data['macd'] < 0 and order_book_data['rsi'] < 30  and order_book_data['buy_order_quantity'] > order_book_data['sell_order_quantity']:
+                    print("\nSignal: LONG")
 
-            hft_target = order_book_data['forecasted_price_max_duration']
+                elif order_book_data['macd'] > 0 and order_book_data['rsi'] > 70 and order_book_data['buy_order_quantity'] < order_book_data['sell_order_quantity']:
+                    print("\nSignal: SHORT")
+
+                else:
+                    print("\nSignal: NONE")
 
             print()
 
@@ -4203,11 +4250,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and roc_mood == "bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top":
+                    if momentum > 0 and roc_mood == "bullish" and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top" and order_book_data['macd'] < 0 and order_book_data['rsi'] < 30  and order_book_data['buy_order_quantity'] > order_book_data['sell_order_quantity']:
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and roc_mood == "bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip":
+                    if momentum < 0 and roc_mood == "bearish" and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip" and order_book_data['macd'] > 0 and order_book_data['rsi'] > 70 and order_book_data['buy_order_quantity'] < order_book_data['sell_order_quantity']:
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
