@@ -118,7 +118,7 @@ TRADE_SYMBOL = "BTCUSDT"
 
 timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
 
-def get_candles(symbol, timeframes):
+def get_candles(TRADE_SYMBOL, timeframes):
     candles = []
     for timeframe in timeframes:
         limit = 10000  # default limit
@@ -126,7 +126,7 @@ def get_candles(symbol, timeframes):
         if tf_value >= 4:  # check if timeframe is 4h or above
             limit = 20000  # increase limit for 4h timeframe and above
         klines = client.get_klines(
-            symbol=symbol,
+            symbol=TRADE_SYMBOL,
             interval=timeframe,
             limit=limit
         )
@@ -159,12 +159,12 @@ for candle in candles:
 ##################################################
 ##################################################
 
-def get_latest_candle(symbol, interval, start_time=None):
+def get_latest_candle(TRADE_SYMBOL, interval, start_time=None):
     """Retrieve the latest candle for a given symbol and interval"""
     if start_time is None:
-        klines = client.futures_klines(symbol=symbol, interval=interval, limit=1)
+        klines = client.futures_klines(symbol=TRADE_SYMBOL, interval=interval, limit=1)
     else:
-        klines = client.futures_klines(symbol=symbol, interval=interval, startTime=start_time, limit=1)
+        klines = client.futures_klines(symbol=TRADE_SYMBOL, interval=interval, startTime=start_time, limit=1)
     candle = {
         "time": klines[0][0],
         "open": float(klines[0][1]),
@@ -175,6 +175,18 @@ def get_latest_candle(symbol, interval, start_time=None):
         "timeframe": interval
     }
     return candle
+
+for interval in timeframes:
+    latest_candle = get_latest_candle(TRADE_SYMBOL, interval)
+    print(f"Latest Candle ({interval}):")
+    print(f"Time: {latest_candle['time']}")
+    print(f"Open: {latest_candle['open']}")
+    print(f"High: {latest_candle['high']}")
+    print(f"Low: {latest_candle['low']}")
+    print(f"Close: {latest_candle['close']}")
+    print(f"Volume: {latest_candle['volume']}")
+    print(f"Timeframe: {latest_candle['timeframe']}")
+    print("\n" + "="*30 + "\n")
 
 ##################################################
 ##################################################
@@ -3297,6 +3309,122 @@ print()
 ##################################################
 ##################################################
 
+import talib
+import numpy as np
+
+def remove_nan(value):
+    if isinstance(value, np.ndarray):
+        return value[~np.isnan(value)] if len(value) > 0 else value
+    else:
+        return value if not np.isnan(value) else None
+
+def generate_technical_indicators(close, high_prices, low_prices, open_prices, volume, timeframe):
+    # Remove NaN values from input arrays
+    close = remove_nan(close)
+    high_prices = remove_nan(high_prices)
+    low_prices = remove_nan(low_prices)
+    open_prices = remove_nan(open_prices)
+    volume = remove_nan(volume)
+
+    # Check if there are still valid data points after removing NaN values
+    if len(close) == 0:
+        raise ValueError("No valid data points after removing NaN values.")
+
+    # Calculate technical indicators using TA-Lib
+    upper_band, middle_band, lower_band = talib.BBANDS(close.flatten())
+    ema = talib.EMA(close.flatten())
+    sma = talib.SMA(close.flatten())
+    rsi = talib.RSI(close.flatten())
+    macd, signal, hist = talib.MACD(close.flatten())
+
+    # Ensure that the length of volume matches the length of close
+    if len(volume.flatten()) != len(close.flatten()):
+        raise ValueError("Length of 'volume' must match the length of 'close'")
+
+    obv = talib.OBV(close.flatten(), volume.flatten())
+    atr = talib.ATR(high_prices.flatten(), low_prices.flatten(), close.flatten())
+    engulfing = talib.CDL3OUTSIDE(open_prices.flatten(), high_prices.flatten(), low_prices.flatten(), close.flatten())
+    beta = talib.BETA(high_prices.flatten(), low_prices.flatten())
+    correlation = talib.CORREL(close.flatten(), volume.flatten())
+    linear_reg = talib.LINEARREG(close.flatten())
+    acos = talib.ACOS(close.flatten())
+    asin = talib.ASIN(close.flatten())
+    add = talib.ADD(close.flatten(), volume.flatten())
+    sub = talib.SUB(close.flatten(), volume.flatten())
+    mult = talib.MULT(close.flatten(), volume.flatten())
+    div = talib.DIV(close.flatten(), volume.flatten())
+    sum_result = talib.SUM(close.flatten())
+
+    # Generate compound trigger for forecasting prices
+    compound_trigger = (
+        (rsi > 70) & (macd > 0) |  # Example: Bullish condition based on RSI and MACD
+        (rsi < 30) & (macd < 0)    # Example: Bearish condition based on RSI and MACD
+    )
+
+    # Generate forecasted prices based on the compound trigger
+    forecast_prices = close.flatten() * (1 + 0.01 * compound_trigger)  # Replace this with your forecasting logic
+
+    # Determine market mood for each indicator
+    market_mood = {
+        "BBANDS": "Bullish" if len(upper_band) > 0 and close[-1] > upper_band[-1] else "Bearish",
+        "EMA": "Bullish" if len(ema) > 0 and close[-1] > ema[-1] else "Bearish",
+        "SMA": "Bullish" if len(sma) > 0 and close[-1] > sma[-1] else "Bearish",
+        "RSI": "Bullish" if len(rsi) > 0 and rsi[-1] > 70 else "Bearish" if len(rsi) > 0 and rsi[-1] < 30 else "Neutral",
+        "MACD": "Bullish" if len(macd) > 0 and macd[-1] > 0 else "Bearish" if len(macd) > 0 and macd[-1] < 0 else "Neutral",
+        # Add similar conditions for other indicators
+    }
+
+    return {
+        "Timeframe": f"{timeframe}",
+        "BBANDS": (remove_nan(upper_band[-1]), remove_nan(middle_band[-1]), remove_nan(lower_band[-1])),
+        "EMA": remove_nan(ema[-1]),
+        "SMA": remove_nan(sma[-1]),
+        "RSI": remove_nan(rsi[-1]),
+        "MACD": (remove_nan(macd[-1]), remove_nan(signal[-1]), remove_nan(hist[-1])),
+        "OBV": remove_nan(obv[-1]),
+        "ATR": remove_nan(atr[-1]),
+        "Engulfing": remove_nan(engulfing[-1]),
+        "Beta": remove_nan(beta[-1]),
+        "Correlation": remove_nan(correlation[-1]),
+        "LinearReg": remove_nan(linear_reg[-1]),
+        "ACOS": remove_nan(acos[-1]),
+        "ASIN": remove_nan(asin[-1]),
+        "ADD": remove_nan(add[-1]),
+        "SUB": remove_nan(sub[-1]),
+        "MULT": remove_nan(mult[-1]),
+        "DIV": remove_nan(div[-1]),
+        "SUM": remove_nan(sum_result[-1]),
+        "ForecastPrices": remove_nan(forecast_prices[-1]),
+        "MarketMood": market_mood
+    }
+
+# Example data (replace this with your financial data)
+timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
+candles = get_candles(TRADE_SYMBOL, timeframes)
+
+# Iterate over each timeframe and call the generate_technical_indicators function
+for timeframe in timeframes:
+    # Extract relevant data for the current timeframe
+    close_prices = np.array([candle['close'] for candle in candles if candle['timeframe'] == timeframe])
+    high_prices = np.array([candle['high'] for candle in candles if candle['timeframe'] == timeframe])
+    low_prices = np.array([candle['low'] for candle in candles if candle['timeframe'] == timeframe])
+    open_prices = np.array([candle['open'] for candle in candles if candle['timeframe'] == timeframe])
+    volume = np.array([candle['volume'] for candle in candles if candle['timeframe'] == timeframe])
+
+    # Generate technical indicators, forecast prices, and market mood for the current timeframe
+    indicators_data = generate_technical_indicators(close_prices, high_prices, low_prices, open_prices, volume, timeframe)
+
+    # Print the results (replace this with your preferred output)
+    print(f"Results for {timeframe} timeframe:")
+    for indicator, value in indicators_data.items():
+        print(f"{indicator}:", value)
+    print("-" * 40)
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -4232,6 +4360,31 @@ def main():
             print("\nFixed Target Prices for the Next Reversal:")
             print(f"Target Price for Upward Reversal: {target_up:.5f}")
             print(f"Target Price for Downward Reversal: {target_down:.5f}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            candles = get_candles(TRADE_SYMBOL, timeframes)
+
+            # Iterate over each timeframe and call the generate_technical_indicators function
+            for timeframe in timeframes:
+                # Extract relevant data for the current timeframe
+                close_prices = np.array([candle['close'] for candle in candles if candle['timeframe'] == timeframe])
+                high_prices = np.array([candle['high'] for candle in candles if candle['timeframe'] == timeframe])
+                low_prices = np.array([candle['low'] for candle in candles if candle['timeframe'] == timeframe])
+                open_prices = np.array([candle['open'] for candle in candles if candle['timeframe'] == timeframe])
+                volume = np.array([candle['volume'] for candle in candles if candle['timeframe'] == timeframe])
+
+                # Generate technical indicators, forecast prices, and market mood for the current timeframe
+                indicators_data = generate_technical_indicators(close_prices, high_prices, low_prices, open_prices, volume, timeframe)
+
+                # Print the results (replace this with your preferred output)
+                print(f"Results for {timeframe} timeframe:")
+                for indicator, value in indicators_data.items():
+                    print(f"{indicator}:", value)
+                print("-" * 40)
 
             print()
 
