@@ -3469,6 +3469,59 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+from scipy.optimize import curve_fit
+
+def regression_channel(close, price):
+    # Function to fit a linear regression
+    def linear_fit(x, a, b):
+        return a * x + b
+
+    # Generating x values for the regression
+    x_values = np.arange(len(close))
+
+    # Fitting linear regression to the close prices
+    params, covariance = curve_fit(linear_fit, x_values, close)
+    a, b = params
+
+    # Building the regression channel
+    regression_channel_upper = a * x_values + b + np.std(close)
+    regression_channel_lower = a * x_values + b - np.std(close)
+
+    # Enforcing with sine wave stationary reversals time series
+    time_series = np.linspace(0, 2 * np.pi, len(close))
+    sinewave = np.sin(time_series)
+    regression_channel_upper += np.std(close) * sinewave
+    regression_channel_lower -= np.std(close) * sinewave
+
+    # Projecting forecasted price and market mood
+    forecasted_price = a * (len(close) + 1) + b
+    market_mood = "Bullish" if forecasted_price > price else "Bearish"
+
+    # Return results as a dictionary
+    results = {
+        "Regression Channel Upper": regression_channel_upper.tolist(),
+        "Regression Channel Lower": regression_channel_lower.tolist(),
+        "Forecasted Price": forecasted_price,
+        "Market Mood": market_mood
+    }
+
+    return results
+
+# Calling the function and printing the results outside
+regression_results = regression_channel(close, price)
+
+# Printing the results
+print("Regression Channel Upper:", regression_results["Regression Channel Upper"][-1])
+print("Regression Channel Lower:", regression_results["Regression Channel Lower"][-1])
+print("Forecasted Price:", regression_results["Forecasted Price"])
+print("Market Mood:", regression_results["Market Mood"])
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -4469,6 +4522,20 @@ def main():
             print("LinearReg Forecast Price 8h:", results_by_timeframe['8h']['LinearReg'])
             print("LinearReg Forecast Price 12h:", results_by_timeframe['12h']['LinearReg'])
             print("LinearReg Forecast Price 1d:", results_by_timeframe['1d']['LinearReg'])
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Calling the function and printing the results outside
+            regression_results = regression_channel(close, price)
+
+            # Printing the results
+            print("Regression Channel Upper:", regression_results["Regression Channel Upper"][-1])
+            print("Regression Channel Lower:", regression_results["Regression Channel Lower"][-1])
+            print("Forecasted Price:", regression_results["Forecasted Price"])
+            print("Market Mood:", regression_results["Market Mood"])
 
             print()
 
