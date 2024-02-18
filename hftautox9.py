@@ -3370,12 +3370,12 @@ def generate_technical_indicators(close, high_prices, low_prices, open_prices, v
         "EMA": "Bearish" if len(ema) > 0 and close[-1] > ema[-1] else "Bullish",
         "SMA": "Bearish" if len(sma) > 0 and close[-1] > sma[-1] else "Bullish",
         "RSI": "Bearish" if len(rsi) > 0 and rsi[-1] > 70 else "Bullish" if len(rsi) > 0 and rsi[-1] < 30 else "Neutral",
-        "MACD": "Bearish" if len(macd) > 0 and macd[-1] > 0 else "Bullish" if len(macd) > 0 and macd[-1] < 0 else "Neutral",
+        "MACD": "Bearish" if len(macd) > 0 and macd[-1] < 0 else "Bullish" if len(macd) > 0 and macd[-1] > 0 else "Neutral",
         # Add similar conditions for other indicators
     }
 
     return {
-        "Timeframe": f"{timeframe}m",
+        "Timeframe": f"{timeframe}",
         "BBANDS": (remove_nan(upper_band[-1]), remove_nan(middle_band[-1]), remove_nan(lower_band[-1])),
         "EMA": remove_nan(ema[-1]),
         "SMA": remove_nan(sma[-1]),
@@ -3421,11 +3421,15 @@ for timeframe in timeframes:
     # Store the results for the current timeframe
     results_by_timeframe[timeframe] = indicators_data
 
-    # Print the results (replace this with your preferred output)
-    print(f"Results for {timeframe} timeframe:")
-    for indicator, value in indicators_data.items():
-        print(f"{indicator}:", value)
-    print("-" * 40)
+    # Print the results for the specific timeframes (1m and 5m)
+    if timeframe == '1m' or timeframe == '5m':
+        print(f"Results for {timeframe} timeframe:")
+        for indicator, value in indicators_data.items():
+            print(f"{indicator}:", value)
+        print("-" * 40)
+
+        # Print LinearReg Forecast Price for each timeframe
+        print("LinearReg Forecast Price:", results_by_timeframe[timeframe]['LinearReg'])
 
 # Assess overall bullish/bearish for each indicator across all timeframes
 overall_market_mood = {}
@@ -3439,26 +3443,26 @@ for indicator in results_by_timeframe['1m']['MarketMood'].keys():
         'Neutral': neutral_count
     }
 
-# Assess overall compound signals for each timeframe and across all timeframes
-overall_compound_signals = {}
-for timeframe in timeframes:
-    compound_signals = [results_by_timeframe[tf][
-        'CompoundTrigger'] for tf in results_by_timeframe if tf != timeframe]  # Exclude the current timeframe
-    overall_compound_signals[timeframe] = {
-        'Bullish': sum(1 for signal in compound_signals if signal),
-        'Bearish': sum(1 for signal in compound_signals if not signal),
-    }
-
 # Print overall assessment
 print("\nOverall Market Mood:")
 for indicator, mood_counts in overall_market_mood.items():
     print(f"{indicator}: Bullish={mood_counts['Bullish']}, Bearish={mood_counts['Bearish']}, Neutral={mood_counts['Neutral']}")
 
-print("\nOverall Compound Signals:")
-for timeframe, signal_counts in overall_compound_signals.items():
-    print(f"{timeframe} timeframe: Bullish={signal_counts['Bullish']}, Bearish={signal_counts['Bearish']}")
+print()
 
-
+# Print LinearReg Forecast Price for each timefram
+print("LinearReg Forecast Price 1m:", results_by_timeframe['1m']['LinearReg'])
+print("LinearReg Forecast Price 3m:", results_by_timeframe['3m']['LinearReg'])
+print("LinearReg Forecast Price 5m:", results_by_timeframe['5m']['LinearReg'])
+print("LinearReg Forecast Price 15m:", results_by_timeframe['15m']['LinearReg'])
+print("LinearReg Forecast Price 30m:", results_by_timeframe['30m']['LinearReg'])
+print("LinearReg Forecast Price 1h:", results_by_timeframe['1h']['LinearReg'])
+print("LinearReg Forecast Price 2h:", results_by_timeframe['2h']['LinearReg'])
+print("LinearReg Forecast Price 4h:", results_by_timeframe['4h']['LinearReg'])
+print("LinearReg Forecast Price 6h:", results_by_timeframe['6h']['LinearReg'])
+print("LinearReg Forecast Price 8h:", results_by_timeframe['8h']['LinearReg'])
+print("LinearReg Forecast Price 12h:", results_by_timeframe['12h']['LinearReg'])
+print("LinearReg Forecast Price 1d:", results_by_timeframe['1d']['LinearReg'])
 
 print()
 
@@ -4426,11 +4430,12 @@ def main():
                 # Store the results for the current timeframe
                 results_by_timeframe[timeframe] = indicators_data
 
-                # Print the results (replace this with your preferred output)
-                print(f"Results for {timeframe} timeframe:")
-                for indicator, value in indicators_data.items():
-                    print(f"{indicator}:", value)
-                    print("-" * 40)
+                # Print the results for the specific timeframes (1m and 5m)
+                if timeframe == '1m' or timeframe == '5m':
+                    print(f"Results for {timeframe} timeframe:")
+                    for indicator, value in indicators_data.items():
+                        print(f"{indicator}:", value)
+                        print("-" * 40)
 
             # Assess overall bullish/bearish for each indicator across all timeframes
             overall_market_mood = {}
@@ -4444,24 +4449,26 @@ def main():
                     'Neutral': neutral_count
                 }
 
-            # Assess overall compound signals for each timeframe and across all timeframes
-            overall_compound_signals = {}
-            for timeframe in timeframes:
-                compound_signals = [results_by_timeframe[tf][
-                    'CompoundTrigger'] for tf in results_by_timeframe if tf != timeframe]  # Exclude the current timeframe
-                overall_compound_signals[timeframe] = {
-                    'Bullish': sum(1 for signal in compound_signals if signal),
-                    'Bearish': sum(1 for signal in compound_signals if not signal),
-                    }
-
             # Print overall assessment
             print("\nOverall Market Mood:")
             for indicator, mood_counts in overall_market_mood.items():
                 print(f"{indicator}: Bullish={mood_counts['Bullish']}, Bearish={mood_counts['Bearish']}, Neutral={mood_counts['Neutral']}")
 
-            print("\nOverall Compound Signals:")
-            for timeframe, signal_counts in overall_compound_signals.items():
-                print(f"{timeframe} timeframe: Bullish={signal_counts['Bullish']}, Bearish={signal_counts['Bearish']}")
+            print()
+
+            # Print LinearReg Forecast Price for each timefram
+            print("LinearReg Forecast Price 1m:", results_by_timeframe['1m']['LinearReg'])
+            print("LinearReg Forecast Price 3m:", results_by_timeframe['3m']['LinearReg'])
+            print("LinearReg Forecast Price 5m:", results_by_timeframe['5m']['LinearReg'])
+            print("LinearReg Forecast Price 15m:", results_by_timeframe['15m']['LinearReg'])
+            print("LinearReg Forecast Price 30m:", results_by_timeframe['30m']['LinearReg'])
+            print("LinearReg Forecast Price 1h:", results_by_timeframe['1h']['LinearReg'])
+            print("LinearReg Forecast Price 2h:", results_by_timeframe['2h']['LinearReg'])
+            print("LinearReg Forecast Price 4h:", results_by_timeframe['4h']['LinearReg'])
+            print("LinearReg Forecast Price 6h:", results_by_timeframe['6h']['LinearReg'])
+            print("LinearReg Forecast Price 8h:", results_by_timeframe['8h']['LinearReg'])
+            print("LinearReg Forecast Price 12h:", results_by_timeframe['12h']['LinearReg'])
+            print("LinearReg Forecast Price 1d:", results_by_timeframe['1d']['LinearReg'])
 
             print()
 
