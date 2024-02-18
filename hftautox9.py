@@ -3526,21 +3526,16 @@ def dan_stationary_circuit(close):
     q4 = q4[:min_length]
     q1 = q1[:min_length]
 
-    # Check the cycle stage and set the next quadrant accordingly
-    if last_quadrant == "Q2" and current_quadrant == "Q1":
-        next_quadrant = dip_key_points[2][(np.argmax(q2) + len(q2) // 4) % len(q2)] if len(q2) > len(q3) else dip_key_points[2][(len(q2) // 4) % len(dip_key_points[2])]
-    elif last_quadrant == "Q1" and current_quadrant == "Q2":
-        next_quadrant = dip_key_points[2][(np.argmax(q3) + len(q3) // 4) % len(q3)] if len(q3) > len(q4) else dip_key_points[2][(len(q3) // 4) % len(dip_key_points[2])]
-    elif last_quadrant == "Q2" and current_quadrant == "Q3":
-        next_quadrant = dip_key_points[2][(np.argmax(q4) + len(q4) // 4) % len(q4)] if len(q4) > 0 else dip_key_points[2][0]
-    elif last_quadrant == "Q3" and current_quadrant == "Q4":
-        next_quadrant = top_key_points[0][np.argmax(q4)]
-    elif last_quadrant == "Q4" and current_quadrant == "Q3":
-        next_quadrant = top_key_points[1][np.argmax(q3)]
-    elif last_quadrant == "Q3" and current_quadrant == "Q2":
-        next_quadrant = top_key_points[2][np.argmax(q2)]
-    elif last_quadrant == "Q2" and current_quadrant == "Q1":
-        next_quadrant = top_key_points[3][np.argmax(q1)]
+    # Use np.vstack after ensuring equal lengths
+    max_indices = np.unravel_index(np.argmax(np.vstack([q2, q3, q4, q1]), axis=0), q2.shape)
+
+    # Calculate the index for the next quadrant based on the cycle direction
+    if cycle_direction == "Up":
+        next_quadrant_index = (max_indices[0][0] + len(q2) // 4) % len(dip_key_points[2])
+    else:
+        next_quadrant_index = (max_indices[0][0] + len(q2) // 4) % len(dip_key_points[2])
+
+    next_quadrant = dip_key_points[2][next_quadrant_index]
 
     # Calculate forecast factor based on the stage of the cycle
     try:
