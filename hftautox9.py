@@ -3469,70 +3469,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-import numpy.fft as fft
-
-def regression_channel(close, cycle_multiplier=1.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5):
-    # Function to fit a linear regression
-    def linear_fit(x, a, b):
-        return a * x + b
-
-    # Generating x values for the regression
-    x_values = np.arange(len(close))
-
-    # Fitting linear regression to the close prices
-    params = np.polyfit(x_values, close, deg=1)
-    a, b = params
-
-    # Building the regression channel
-    regression_channel_upper = a * x_values + b + reversal_multiplier * np.std(close)
-    regression_channel_lower = a * x_values + b - reversal_multiplier * np.std(close)
-
-    # Check if the last reversal was high or low for stability
-    last_reversal = "Dip" if close[-1] < close[-2] else "Top" if close[-1] > close[-2] else None
-
-    # Projecting forecasted price
-    forecasted_price = a * (len(close) + 1) * cycle_multiplier + b
-
-    # Calculate faster target for HFT using NumPy FFT
-    spectrum = fft.fft(close)
-    freq = fft.fftfreq(len(close))
-    hft_freq = freq * hft_cycle_multiplier
-    hft_forecasted_price = np.abs(fft.ifft(spectrum * np.exp(2j * np.pi * hft_freq * (len(close) + 1))))
-
-    # Determine market mood and incoming reversal
-    current_price = close[-1]
-    hft_forecast_price = hft_forecasted_price[-1].real
-
-    if hft_forecast_price > current_price:
-        market_mood = "Up"
-        incoming_reversal = "Top"
-    elif hft_forecast_price < current_price:
-        market_mood = "Down"
-        incoming_reversal = "Dip"
-    else:
-        market_mood = None
-        incoming_reversal = None
-
-    # Return results as a dictionary
-    results = {
-        "Last Reversal": last_reversal,
-        "Incoming Reversal": incoming_reversal,
-        "Market Mood": market_mood,
-        "HFT Forecasted Price": hft_forecast_price
-    }
-
-    return results
-
-# Example usage:
-regression_results = regression_channel(close, cycle_multiplier=2.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5)
-
-# Print the results
-print("Last Reversal:", regression_results["Last Reversal"])
-print("Incoming Reversal:", regression_results["Incoming Reversal"])
-print("Market Mood:", regression_results["Market Mood"])
-print("HFT Forecasted Price:", regression_results["HFT Forecasted Price"])
-
 
 print()
 
@@ -4544,15 +4480,6 @@ def main():
 
             ##################################################
             ##################################################
-
-            # Example usage:
-            regression_results = regression_channel(close, cycle_multiplier=2.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5)
-
-            # Print the results
-            print("Last Reversal:", regression_results["Last Reversal"])
-            print("Incoming Reversal:", regression_results["Incoming Reversal"])
-            print("Market Mood:", regression_results["Market Mood"])
-            print("HFT Forecasted Price:", regression_results["HFT Forecasted Price"])
 
             print()
 
