@@ -3470,9 +3470,9 @@ print()
 ##################################################
 
 import numpy as np
-from scipy.optimize import curve_fit
+import numpy.fft as fft
 
-def regression_channel(close, price, cycle_multiplier=1.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5):
+def regression_channel(close, cycle_multiplier=1.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5):
     # Function to fit a linear regression
     def linear_fit(x, a, b):
         return a * x + b
@@ -3481,7 +3481,7 @@ def regression_channel(close, price, cycle_multiplier=1.0, reversal_multiplier=0
     x_values = np.arange(len(close))
 
     # Fitting linear regression to the close prices
-    params, covariance = curve_fit(linear_fit, x_values, close)
+    params = np.polyfit(x_values, close, deg=1)
     a, b = params
 
     # Building the regression channel
@@ -3494,45 +3494,45 @@ def regression_channel(close, price, cycle_multiplier=1.0, reversal_multiplier=0
     # Projecting forecasted price
     forecasted_price = a * (len(close) + 1) * cycle_multiplier + b
 
-    # Determine market direction based on confirmations from time series reversals
-    if last_reversal:
-        close_vs_upper = close[-1] - regression_channel_upper[-1]
-        close_vs_lower = close[-1] - regression_channel_lower[-1]
+    # Calculate faster target for HFT using NumPy FFT
+    spectrum = fft.fft(close)
+    freq = fft.fftfreq(len(close))
+    hft_freq = freq * hft_cycle_multiplier
+    hft_forecasted_price = np.abs(fft.ifft(spectrum * np.exp(2j * np.pi * hft_freq * (len(close) + 1))))
 
-        # Determine incoming reversal
-        incoming_reversal = "Dip" if close_vs_upper < close_vs_lower else "Top"
+    # Determine market mood and incoming reversal
+    current_price = close[-1]
+    hft_forecast_price = hft_forecasted_price[-1].real
 
-    # Calculate faster target for HFT
-    hft_forecasted_price = a * (len(close) + 1) * hft_cycle_multiplier + b
+    if hft_forecast_price > current_price:
+        market_mood = "Up"
+        incoming_reversal = "Top"
+    elif hft_forecast_price < current_price:
+        market_mood = "Down"
+        incoming_reversal = "Dip"
+    else:
+        market_mood = None
+        incoming_reversal = None
 
     # Return results as a dictionary
     results = {
-        "Regression Channel Upper": regression_channel_upper.tolist(),
-        "Regression Channel Lower": regression_channel_lower.tolist(),
-        "Forecasted Price": forecasted_price,
         "Last Reversal": last_reversal,
-        "Incoming Reversal": incoming_reversal if 'incoming_reversal' in locals() else None,
-        "Market Direction": "Up" if last_reversal == "Dip" else "Down" if last_reversal == "Top" else None,
-        "HFT Forecasted Price": hft_forecasted_price
+        "Incoming Reversal": incoming_reversal,
+        "Market Mood": market_mood,
+        "HFT Forecasted Price": hft_forecast_price
     }
 
     return results
 
-# Calling the function
-regression_results = regression_channel(close, price, cycle_multiplier=2.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5)
+# Example usage:
+regression_results = regression_channel(close, cycle_multiplier=2.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5)
 
-# Printing the results outside the function
-print("Regression Channel Upper:", regression_results["Regression Channel Upper"][-1])
-print("Regression Channel Lower:", regression_results["Regression Channel Lower"][-1])
-print("Forecasted Price:", regression_results["Forecasted Price"])
+# Print the results
+print("Last Reversal:", regression_results["Last Reversal"])
+print("Incoming Reversal:", regression_results["Incoming Reversal"])
+print("Market Mood:", regression_results["Market Mood"])
+print("HFT Forecasted Price:", regression_results["HFT Forecasted Price"])
 
-# Determine market mood based on the price's relationship with the regression channel
-price_relation_upper = price - regression_results["Regression Channel Upper"][-1]
-price_relation_lower = price - regression_results["Regression Channel Lower"][-1]
-
-# Consider only "Up" and "Down" for market mood
-market_mood = "Up" if price_relation_upper > 0 and price_relation_lower < 0 else "Down"
-print("Market Mood:", market_mood)
 
 print()
 
@@ -4545,20 +4545,14 @@ def main():
             ##################################################
             ##################################################
 
-            regression_results = regression_channel(close, price, cycle_multiplier=2.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5)
+            # Example usage:
+            regression_results = regression_channel(close, cycle_multiplier=2.0, reversal_multiplier=0.1, hft_cycle_multiplier=0.5)
 
-            # Printing the results outside the function
-            print("Regression Channel Upper:", regression_results["Regression Channel Upper"][-1])
-            print("Regression Channel Lower:", regression_results["Regression Channel Lower"][-1])
-            print("Forecasted Price:", regression_results["Forecasted Price"])
-
-            # Determine market mood based on the price's relationship with the regression channel
-            price_relation_upper = price - regression_results["Regression Channel Upper"][-1]
-            price_relation_lower = price - regression_results["Regression Channel Lower"][-1]
-
-            # Consider only "Up" and "Down" for market mood
-            market_mood = "Up" if price_relation_upper > 0 and price_relation_lower < 0 else "Down"
-            print("Market Mood:", market_mood)
+            # Print the results
+            print("Last Reversal:", regression_results["Last Reversal"])
+            print("Incoming Reversal:", regression_results["Incoming Reversal"])
+            print("Market Mood:", regression_results["Market Mood"])
+            print("HFT Forecasted Price:", regression_results["HFT Forecasted Price"])
 
             print()
 
