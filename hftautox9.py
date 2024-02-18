@@ -3357,8 +3357,8 @@ def generate_technical_indicators(close, high_prices, low_prices, open_prices, v
 
     # Generate compound trigger for forecasting prices
     compound_trigger = (
-        (rsi > 70) & (macd > 0) |  # Example: Bullish condition based on RSI and MACD
-        (rsi < 30) & (macd < 0)    # Example: Bearish condition based on RSI and MACD
+        (rsi < 30) & (macd > 0) |  # Example: Bullish condition based on RSI and MACD
+        (rsi > 70) & (macd < 0)    # Example: Bearish condition based on RSI and MACD
     )
 
     # Generate forecasted prices based on the compound trigger
@@ -3366,11 +3366,11 @@ def generate_technical_indicators(close, high_prices, low_prices, open_prices, v
 
     # Determine market mood for each indicator
     market_mood = {
-        "BBANDS": "Bullish" if len(upper_band) > 0 and close[-1] > upper_band[-1] else "Bearish",
-        "EMA": "Bullish" if len(ema) > 0 and close[-1] > ema[-1] else "Bearish",
-        "SMA": "Bullish" if len(sma) > 0 and close[-1] > sma[-1] else "Bearish",
-        "RSI": "Bullish" if len(rsi) > 0 and rsi[-1] > 70 else "Bearish" if len(rsi) > 0 and rsi[-1] < 30 else "Neutral",
-        "MACD": "Bullish" if len(macd) > 0 and macd[-1] > 0 else "Bearish" if len(macd) > 0 and macd[-1] < 0 else "Neutral",
+        "BBANDS": "Bearish" if len(upper_band) > 0 and close[-1] > upper_band[-1] else "Bullish",
+        "EMA": "Bearish" if len(ema) > 0 and close[-1] > ema[-1] else "Bullish",
+        "SMA": "Bearish" if len(sma) > 0 and close[-1] > sma[-1] else "Bullish",
+        "RSI": "Bearish" if len(rsi) > 0 and rsi[-1] > 70 else "Bullish" if len(rsi) > 0 and rsi[-1] < 30 else "Neutral",
+        "MACD": "Bearish" if len(macd) > 0 and macd[-1] > 0 else "Bullish" if len(macd) > 0 and macd[-1] < 0 else "Neutral",
         # Add similar conditions for other indicators
     }
 
