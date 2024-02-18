@@ -301,14 +301,14 @@ def scale_to_sine(timeframe):
     return dist_from_close_to_min, dist_from_close_to_max, current_sine
       
 # Iterate over each timeframe and call the scale_to_sine function
-for timeframe in timeframes:
-    dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
+#for timeframe in timeframes:
+    #dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
     
     # Print the results for each timeframe
-    print(f"For {timeframe} timeframe:")
-    print(f"Distance to min: {dist_from_close_to_min:.2f}%")
-    print(f"Distance to max: {dist_from_close_to_max:.2f}%")
-    print(f"Current Sine value: {current_sine}\n")
+    #print(f"For {timeframe} timeframe:")
+    #print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+    #print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+    #print(f"Current Sine value: {current_sine}\n")
 
 print()
 
@@ -3375,7 +3375,7 @@ def generate_technical_indicators(close, high_prices, low_prices, open_prices, v
     }
 
     return {
-        "Timeframe": f"{timeframe}",
+        "Timeframe": f"{timeframe}m",
         "BBANDS": (remove_nan(upper_band[-1]), remove_nan(middle_band[-1]), remove_nan(lower_band[-1])),
         "EMA": remove_nan(ema[-1]),
         "SMA": remove_nan(sma[-1]),
@@ -3395,12 +3395,16 @@ def generate_technical_indicators(close, high_prices, low_prices, open_prices, v
         "DIV": remove_nan(div[-1]),
         "SUM": remove_nan(sum_result[-1]),
         "ForecastPrices": remove_nan(forecast_prices[-1]),
-        "MarketMood": market_mood
+        "MarketMood": market_mood,
+        "CompoundTrigger": remove_nan(compound_trigger[-1])
     }
 
 # Example data (replace this with your financial data)
 timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
 candles = get_candles(TRADE_SYMBOL, timeframes)
+
+# Store results for each timeframe
+results_by_timeframe = {}
 
 # Iterate over each timeframe and call the generate_technical_indicators function
 for timeframe in timeframes:
@@ -3414,11 +3418,47 @@ for timeframe in timeframes:
     # Generate technical indicators, forecast prices, and market mood for the current timeframe
     indicators_data = generate_technical_indicators(close_prices, high_prices, low_prices, open_prices, volume, timeframe)
 
+    # Store the results for the current timeframe
+    results_by_timeframe[timeframe] = indicators_data
+
     # Print the results (replace this with your preferred output)
     print(f"Results for {timeframe} timeframe:")
     for indicator, value in indicators_data.items():
         print(f"{indicator}:", value)
     print("-" * 40)
+
+# Assess overall bullish/bearish for each indicator across all timeframes
+overall_market_mood = {}
+for indicator in results_by_timeframe['1m']['MarketMood'].keys():
+    bullish_count = sum(1 for tf_result in results_by_timeframe.values() if tf_result['MarketMood'][indicator] == 'Bullish')
+    bearish_count = sum(1 for tf_result in results_by_timeframe.values() if tf_result['MarketMood'][indicator] == 'Bearish')
+    neutral_count = sum(1 for tf_result in results_by_timeframe.values() if tf_result['MarketMood'][indicator] == 'Neutral')
+    overall_market_mood[indicator] = {
+        'Bullish': bullish_count,
+        'Bearish': bearish_count,
+        'Neutral': neutral_count
+    }
+
+# Assess overall compound signals for each timeframe and across all timeframes
+overall_compound_signals = {}
+for timeframe in timeframes:
+    compound_signals = [results_by_timeframe[tf][
+        'CompoundTrigger'] for tf in results_by_timeframe if tf != timeframe]  # Exclude the current timeframe
+    overall_compound_signals[timeframe] = {
+        'Bullish': sum(1 for signal in compound_signals if signal),
+        'Bearish': sum(1 for signal in compound_signals if not signal),
+    }
+
+# Print overall assessment
+print("\nOverall Market Mood:")
+for indicator, mood_counts in overall_market_mood.items():
+    print(f"{indicator}: Bullish={mood_counts['Bullish']}, Bearish={mood_counts['Bearish']}, Neutral={mood_counts['Neutral']}")
+
+print("\nOverall Compound Signals:")
+for timeframe, signal_counts in overall_compound_signals.items():
+    print(f"{timeframe} timeframe: Bullish={signal_counts['Bullish']}, Bearish={signal_counts['Bearish']}")
+
+
 
 print()
 
@@ -4368,6 +4408,9 @@ def main():
 
             candles = get_candles(TRADE_SYMBOL, timeframes)
 
+            # Store results for each timeframe
+            results_by_timeframe = {}
+
             # Iterate over each timeframe and call the generate_technical_indicators function
             for timeframe in timeframes:
                 # Extract relevant data for the current timeframe
@@ -4380,11 +4423,45 @@ def main():
                 # Generate technical indicators, forecast prices, and market mood for the current timeframe
                 indicators_data = generate_technical_indicators(close_prices, high_prices, low_prices, open_prices, volume, timeframe)
 
+                # Store the results for the current timeframe
+                results_by_timeframe[timeframe] = indicators_data
+
                 # Print the results (replace this with your preferred output)
                 print(f"Results for {timeframe} timeframe:")
                 for indicator, value in indicators_data.items():
                     print(f"{indicator}:", value)
-                print("-" * 40)
+                    print("-" * 40)
+
+            # Assess overall bullish/bearish for each indicator across all timeframes
+            overall_market_mood = {}
+            for indicator in results_by_timeframe['1m']['MarketMood'].keys():
+                bullish_count = sum(1 for tf_result in results_by_timeframe.values() if tf_result['MarketMood'][indicator] == 'Bullish')
+                bearish_count = sum(1 for tf_result in results_by_timeframe.values() if tf_result['MarketMood'][indicator] == 'Bearish')
+                neutral_count = sum(1 for tf_result in results_by_timeframe.values() if tf_result['MarketMood'][indicator] == 'Neutral')
+                overall_market_mood[indicator] = {
+                    'Bullish': bullish_count,
+                    'Bearish': bearish_count,
+                    'Neutral': neutral_count
+                }
+
+            # Assess overall compound signals for each timeframe and across all timeframes
+            overall_compound_signals = {}
+            for timeframe in timeframes:
+                compound_signals = [results_by_timeframe[tf][
+                    'CompoundTrigger'] for tf in results_by_timeframe if tf != timeframe]  # Exclude the current timeframe
+                overall_compound_signals[timeframe] = {
+                    'Bullish': sum(1 for signal in compound_signals if signal),
+                    'Bearish': sum(1 for signal in compound_signals if not signal),
+                    }
+
+            # Print overall assessment
+            print("\nOverall Market Mood:")
+            for indicator, mood_counts in overall_market_mood.items():
+                print(f"{indicator}: Bullish={mood_counts['Bullish']}, Bearish={mood_counts['Bearish']}, Neutral={mood_counts['Neutral']}")
+
+            print("\nOverall Compound Signals:")
+            for timeframe, signal_counts in overall_compound_signals.items():
+                print(f"{timeframe} timeframe: Bullish={signal_counts['Bullish']}, Bearish={signal_counts['Bearish']}")
 
             print()
 
