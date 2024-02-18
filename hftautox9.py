@@ -3469,6 +3469,117 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def dan_stationary_circuit(close):
+    close = np.array(close)  # Convert close to a NumPy array
+    
+    # Apply Fast Fourier Transform (FFT) to get frequencies
+    fft_result = np.fft.fft(close)
+    
+    # Calculate amplitudes and frequencies
+    amplitudes = np.abs(fft_result)
+    frequencies = np.fft.fftfreq(len(close))
+
+    # Identify dominant frequency
+    dominant_frequency = frequencies[np.argmax(amplitudes)]
+
+    # Determine dominant frequency sign
+    dominant_frequency_sign = "Positive" if dominant_frequency > 0 else "Negative"
+
+    # Build stationary circuit with standing wave
+    stationary_wave = np.sin(2 * np.pi * dominant_frequency * np.arange(len(close)))
+
+    # Calculate quadrants based on the unit circle
+    quadrant_size = len(close) // 4
+    q1 = stationary_wave[:quadrant_size]
+    q2 = stationary_wave[quadrant_size:2*quadrant_size]
+    q3 = stationary_wave[2*quadrant_size:3*quadrant_size]
+    q4 = stationary_wave[3*quadrant_size:]
+
+    # Determine the cycle direction (Up or Down)
+    cycle_direction = "Up" if dominant_frequency_sign == "Negative" else "Down"
+
+    # Define key points for cycles and stages
+    key_points = {
+        "Up": {
+            "DIP": (["Q1", "Q2", "Q3", "Q4"], ["Q2", "Q1", "Q2"], ["Q1", "Q2", "Q3"], ["Q2", "Q3", "Q4"]),
+            "TOP": (["Q4", "Q3", "Q2", "Q1"], ["Q3", "Q4", "Q3"], ["Q4", "Q3", "Q2"], ["Q3", "Q2", "Q1"])
+        },
+        "Down": {
+            "TOP": (["Q4", "Q3", "Q2", "Q1"], ["Q3", "Q4", "Q3"], ["Q4", "Q3", "Q2"], ["Q3", "Q2", "Q1"]),
+            "DIP": (["Q1", "Q2", "Q3", "Q4"], ["Q2", "Q1", "Q2"], ["Q1", "Q2", "Q3"], ["Q2", "Q3", "Q4"])
+        }
+    }
+
+    # Get key points for the current cycle direction
+    dip_key_points, top_key_points = key_points[cycle_direction]["DIP"], key_points[cycle_direction]["TOP"]
+
+    # Get last quadrant, current quadrant, and next quadrant based on key points
+    last_quadrant = dip_key_points[0][np.argmax(q1)]
+    current_quadrant = dip_key_points[1][np.argmax(q2)]
+
+    # Ensure all arrays have the same length by trimming the longer ones
+    min_length = min(len(q2), len(q3), len(q4), len(q1))
+    q2 = q2[:min_length]
+    q3 = q3[:min_length]
+    q4 = q4[:min_length]
+    q1 = q1[:min_length]
+
+    # Check the cycle stage and set the next quadrant accordingly
+    if last_quadrant == "Q2" and current_quadrant == "Q1":
+        next_quadrant = dip_key_points[2][(np.argmax(q2) + len(q2) // 4) % len(q2)] if len(q2) > len(q3) else dip_key_points[2][(len(q2) // 4) % len(dip_key_points[2])]
+    elif last_quadrant == "Q1" and current_quadrant == "Q2":
+        next_quadrant = dip_key_points[2][(np.argmax(q3) + len(q3) // 4) % len(q3)] if len(q3) > len(q4) else dip_key_points[2][(len(q3) // 4) % len(dip_key_points[2])]
+    elif last_quadrant == "Q2" and current_quadrant == "Q3":
+        next_quadrant = dip_key_points[2][(np.argmax(q4) + len(q4) // 4) % len(q4)] if len(q4) > 0 else dip_key_points[2][0]
+    elif last_quadrant == "Q3" and current_quadrant == "Q4":
+        next_quadrant = top_key_points[0][np.argmax(q4)]
+    elif last_quadrant == "Q4" and current_quadrant == "Q3":
+        next_quadrant = top_key_points[1][np.argmax(q3)]
+    elif last_quadrant == "Q3" and current_quadrant == "Q2":
+        next_quadrant = top_key_points[2][np.argmax(q2)]
+    elif last_quadrant == "Q2" and current_quadrant == "Q1":
+        next_quadrant = top_key_points[3][np.argmax(q1)]
+
+    # Calculate forecast factor based on the stage of the cycle
+    try:
+        stage_index = dip_key_points[3].index(next_quadrant)
+    except ValueError:
+        stage_index = len(dip_key_points[3]) - 1
+
+    # Calculate forecast factor based on the stage of the cycle
+    total_range = np.max(close) - np.min(close)
+    forecast_factor = total_range * 0.25 * (stage_index + 1)
+
+    # Forecasted price based on the next quadrant with the introduced factor
+    forecasted_price = close[-1] + forecast_factor
+
+    # Return the dictionary with the updated variables
+    result_dict = {
+        "dominant_frequency_sign": dominant_frequency_sign,
+        "last_quadrant": last_quadrant,
+        "current_quadrant": current_quadrant,
+        "next_quadrant": next_quadrant,
+        "cycle_direction": cycle_direction,
+        "forecasted_price": forecasted_price,
+        "q1": q1.tolist(),
+        "q2": q2.tolist(),
+        "q3": q3.tolist(),
+        "q4": q4.tolist(),
+    }
+
+    return result_dict
+
+result = dan_stationary_circuit(close)
+
+# Print the specific variables
+print("Dominant Frequency Sign:", result["dominant_frequency_sign"])
+print("Last Quadrant:", result["last_quadrant"])
+print("Current Quadrant:", result["current_quadrant"])
+print("Next Quadrant:", result["next_quadrant"])
+print("Cycle Direction:", result["cycle_direction"])
+print("Forecasted Price:", result["forecasted_price"])
 
 print()
 
@@ -4480,6 +4591,16 @@ def main():
 
             ##################################################
             ##################################################
+
+            wave_result = dan_stationary_circuit(close)
+
+            # Print the specific variables
+            print("Dominant Frequency Sign:", wave_result["dominant_frequency_sign"])
+            print("Last Quadrant:", wave_result["last_quadrant"])
+            print("Current Quadrant:", wave_result["current_quadrant"])
+            print("Next Quadrant:", wave_result["next_quadrant"])
+            print("Cycle Direction:", wave_result["cycle_direction"])
+            print("Forecasted Price:", wave_result["forecasted_price"])
 
             print()
 
