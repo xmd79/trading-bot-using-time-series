@@ -3222,6 +3222,76 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def generate_stationary_wave(num_harmonics, amplitude, frequency, close):
+    time = np.linspace(0, 4 * np.pi, len(close))
+    compound_wave = np.zeros_like(time)
+
+    for harmonic in range(1, num_harmonics + 1):
+        sine_wave = amplitude * np.sin(harmonic * frequency * time)
+        cosine_wave = amplitude * np.cos(harmonic * frequency * time)
+
+        if harmonic % 2 == 1:  # Apply pi/phi symmetry to odd harmonics
+            compound_wave += sine_wave
+        else:  # Apply phi/pi symmetry to even harmonics
+            compound_wave += cosine_wave
+
+    return time, compound_wave
+
+def inverse_fourier_transform(compound_wave):
+    return np.fft.ifft(compound_wave)
+
+def analyze_market_mood(forecasted):
+    # Your logic to analyze market mood goes here
+    # For demonstration purposes, assuming a simple logic
+    mood = "Bullish" if forecasted[-1] > forecasted[0] else "Bearish"
+    return mood
+
+def print_forecasted_price(forecasted_price):
+    print(f"Forecasted Price: ${forecasted_price:.5f}")
+
+# Function to calculate fixed target prices for the next reversal
+def calculate_fixed_targets(current_close):
+    # Set fixed target prices as a percentage change from the current close
+    target_up_percentage = 1.0  # Replace with your desired fixed percentage for upward reversal
+    target_down_percentage = -1.0  # Replace with your desired fixed percentage for downward reversal
+
+    # Calculate fixed target prices
+    target_up = current_close * (1 + target_up_percentage / 100)
+    target_down = current_close * (1 + target_down_percentage / 100)
+
+    return target_up, target_down
+
+# Example: Generate stationary compound wave, perform inverse Fourier transform, and analyze market mood
+num_harmonics = 5
+amplitude = 1.0
+frequency = 1.0
+
+# Generate and print values of the stationary compound wave
+ifft_range, compound_wave = generate_stationary_wave(num_harmonics, amplitude, frequency, close)
+
+# Perform inverse Fourier transform to get forecasted prices
+forecasted = np.real(inverse_fourier_transform(compound_wave))
+
+# Analyze market mood based on forecasted prices
+market_mood = analyze_market_mood(forecasted)
+
+# Print other details
+print(f"Initial Close Price: {close[0]:.5f}")
+print(f"Final Close Price: {close[-1]:.5f}")
+print("\nMarket Mood:", market_mood)
+
+# Calculate fixed target prices for the next reversal
+current_close = price
+target_up, target_down = calculate_fixed_targets(current_close)
+
+# Print fixed target prices for the next reversal
+print("\nFixed Target Prices for the Next Reversal:")
+print(f"Target Price for Upward Reversal: {target_up:.5f}")
+print(f"Target Price for Downward Reversal: {target_down:.5f}")
+
+
 print()
 
 ##################################################
@@ -4129,6 +4199,39 @@ def main():
                 print(f"Overall Trend: {data['overall_trend']}")
     
                 print()
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Example: Generate stationary compound wave, perform inverse Fourier transform, and analyze market mood
+            num_harmonics = 5
+            amplitude = 1.0
+            frequency = 1.0
+
+            # Generate and print values of the stationary compound wave
+            ifft_range, compound_wave = generate_stationary_wave(num_harmonics, amplitude, frequency, close)
+
+            # Perform inverse Fourier transform to get forecasted prices
+            forecasted = np.real(inverse_fourier_transform(compound_wave))
+
+            # Analyze market mood based on forecasted prices
+            market_ifft_mood = analyze_market_mood(forecasted)
+
+            # Print other details
+            print(f"Initial Close Price: {close[0]:.5f}")
+            print(f"Final Close Price: {close[-1]:.5f}")
+            print("\nMarket Mood:", market_ifft_mood)
+
+            # Calculate fixed target prices for the next reversal
+            current_close = price
+            target_up, target_down = calculate_fixed_targets(current_close)
+
+            # Print fixed target prices for the next reversal
+            print("\nFixed Target Prices for the Next Reversal:")
+            print(f"Target Price for Upward Reversal: {target_up:.5f}")
+            print(f"Target Price for Downward Reversal: {target_down:.5f}")
 
             print()
 
