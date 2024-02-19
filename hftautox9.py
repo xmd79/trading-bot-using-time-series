@@ -3515,7 +3515,7 @@ def dan_stationary_circuit(close):
     # Get key points for the current cycle direction
     dip_key_points, top_key_points = key_points[cycle_direction]["DIP"], key_points[cycle_direction]["TOP"]
 
-    # Get last quadrant, current quadrant, and next quadrant based on key points
+    # Get last quadrant and current quadrant based on key points
     last_quadrant = dip_key_points[0][np.argmax(q1)]
     current_quadrant = dip_key_points[1][np.argmax(q2)]
 
@@ -3529,17 +3529,9 @@ def dan_stationary_circuit(close):
     # Use np.vstack after ensuring equal lengths
     max_indices = np.unravel_index(np.argmax(np.vstack([q2, q3, q4, q1]), axis=0), q2.shape)
 
-    # Calculate the index for the next quadrant based on the cycle direction
-    if cycle_direction == "Up":
-        next_quadrant_index = (max_indices[0][0] + len(q2) // 4) % len(dip_key_points[2])
-    else:
-        next_quadrant_index = (max_indices[0][0] + len(q2) // 4) % len(dip_key_points[2])
-
-    next_quadrant = dip_key_points[2][next_quadrant_index]
-
     # Calculate forecast factor based on the stage of the cycle
     try:
-        stage_index = dip_key_points[3].index(next_quadrant)
+        stage_index = dip_key_points[3].index(current_quadrant)
     except ValueError:
         stage_index = len(dip_key_points[3]) - 1
 
@@ -3547,7 +3539,7 @@ def dan_stationary_circuit(close):
     total_range = np.max(close) - np.min(close)
     forecast_factor = total_range * 0.25 * (stage_index + 1)
 
-    # Forecasted price based on the next quadrant with the introduced factor
+    # Forecasted price based on the current quadrant with the introduced factor
     forecasted_price = close[-1] + forecast_factor
 
     # Return the dictionary with the updated variables
@@ -3555,7 +3547,6 @@ def dan_stationary_circuit(close):
         "dominant_frequency_sign": dominant_frequency_sign,
         "last_quadrant": last_quadrant,
         "current_quadrant": current_quadrant,
-        "next_quadrant": next_quadrant,
         "cycle_direction": cycle_direction,
         "forecasted_price": forecasted_price,
         "q1": q1.tolist(),
@@ -3568,13 +3559,13 @@ def dan_stationary_circuit(close):
 
 result = dan_stationary_circuit(close)
 
-# Print the specific variables
+# Print the specific variables excluding "Next Quadrant"
 print("Dominant Frequency Sign:", result["dominant_frequency_sign"])
 print("Last Quadrant:", result["last_quadrant"])
 print("Current Quadrant:", result["current_quadrant"])
-print("Next Quadrant:", result["next_quadrant"])
 print("Cycle Direction:", result["cycle_direction"])
 print("Forecasted Price:", result["forecasted_price"])
+
 
 print()
 
@@ -4589,11 +4580,12 @@ def main():
 
             wave_result = dan_stationary_circuit(close)
 
+            fft_mood = wave_result["cycle_direction"]
+
             # Print the specific variables
             print("Dominant Frequency Sign:", wave_result["dominant_frequency_sign"])
             print("Last Quadrant:", wave_result["last_quadrant"])
             print("Current Quadrant:", wave_result["current_quadrant"])
-            print("Next Quadrant:", wave_result["next_quadrant"])
             print("Cycle Direction:", wave_result["cycle_direction"])
             print("Forecasted Price:", wave_result["forecasted_price"])
 
@@ -4970,11 +4962,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and roc_mood == "bullish" and price < mom_forecast and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top" and order_book_data['macd'] < 0 and order_book_data['rsi'] < 30  and order_book_data['buy_order_quantity'] > order_book_data['sell_order_quantity']:
+                    if momentum > 0 and roc_mood == "bullish" and price < mom_forecast and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top" and fft_mood == "Up":
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and roc_mood == "bearish" and price > mom_forecast and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip" and order_book_data['macd'] > 0 and order_book_data['rsi'] > 70 and order_book_data['buy_order_quantity'] < order_book_data['sell_order_quantity']:
+                    if momentum < 0 and roc_mood == "bearish" and price > mom_forecast and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip"  and fft_mood == "Down":
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
