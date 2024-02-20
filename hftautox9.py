@@ -3572,6 +3572,11 @@ print()
 ##################################################
 ##################################################
 
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -4595,7 +4600,7 @@ def main():
             ##################################################
 
             take_profit = 5
-            stop_loss = -25
+            stop_loss = -50
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -4895,8 +4900,8 @@ def main():
                                     print("LONG condition 4: closest_threshold < price")        
                                     if forecast_direction == "Up":
                                         print("LONG condition 5: forecast_direction == Up") 
-                                        if price < hft_target:  
-                                            print("LONG condition 6: price < hft_target")                           
+                                        if roc_mood == "bullish":  
+                                            print("LONG condition 6: roc_mood == bullish")                           
                                             if price < expected_price:
                                                 print("LONG condition 7: price < expected_price") 
                                                 if market_mood_fft == "Bullish":
@@ -4932,8 +4937,8 @@ def main():
                                     print("SHORT condition 4: closest_threshold > price")        
                                     if forecast_direction == "Down":
                                         print("SHORT condition 5: forecast_direction == Down")       
-                                        if price > hft_target:  
-                                            print("SHORT condition 6: price > hft_target")                          
+                                        if roc_mood == "bearish":  
+                                            print("SHORT condition 6: roc_mood == bearish")                          
                                             if price > expected_price:
                                                 print("SHORT condition 7: price > expected_price") 
                                                 if market_mood_fft == "Bearish":
