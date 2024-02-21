@@ -3574,7 +3574,7 @@ print()
 import talib
 import numpy as np
 
-def sine_market_analysis(close):
+def sine_market_analysis(close, closest_threshold, min_threshold, max_threshold):
     # Convert close to NumPy array
     close_array = np.array(close, dtype=float)
 
@@ -3583,7 +3583,7 @@ def sine_market_analysis(close):
 
     # Calculate the Sinewave using TA-Lib
     sinewave = talib.SIN(close_array)
-    #sinewave = -sinewave
+    sinewave = -sinewave
 
     # Find local minima and maxima
     minima = (sinewave[:-2] < sinewave[1:-1]) & (sinewave[1:-1] > sinewave[2:])
@@ -3594,20 +3594,27 @@ def sine_market_analysis(close):
     max_reversals = np.where(maxima)[0] + 1  # Add 1 to adjust for slicing
 
     # Determine market mood (uptrend/downtrend)
-    if len(min_reversals) > 0 and len(max_reversals) > 0:
-        last_min_reversal = min_reversals[-1]
-        last_max_reversal = max_reversals[-1]
-
-        if last_min_reversal > last_max_reversal:
-            market_mood = "Uptrend"  # Reversed condition
-            current_cycle = "Up"  # Reversed condition
-        else:
-            market_mood = "Downtrend"  # Reversed condition
-            current_cycle = "Down"  # Reversed condition
+    if min_threshold == closest_threshold:
+        market_mood = "Uptrend"
+        current_cycle = "Up"
+    elif max_threshold == closest_threshold:
+        market_mood = "Downtrend"
+        current_cycle = "Down"
     else:
-        # Default values if no reversals found
-        market_mood = "None"  # Reversed condition
-        current_cycle = "None"  # Reversed condition
+        if len(min_reversals) > 0 and len(max_reversals) > 0:
+            last_min_reversal = min_reversals[-1]
+            last_max_reversal = max_reversals[-1]
+
+            if last_min_reversal > last_max_reversal:
+                market_mood = "Downtrend"
+                current_cycle = "Down"
+            else:
+                market_mood = "Uptrend"
+                current_cycle = "Up"
+        else:
+            # Default values if no reversals found
+            market_mood = "Downtrend"
+            current_cycle = "Down"
 
     # Forecast price for the current cycle based on FFT
     fft_result = np.abs(np.fft.fft(close_array))
@@ -3615,19 +3622,18 @@ def sine_market_analysis(close):
     dominant_frequency = 1 / (len(close_array) * (1 / dominant_frequency_index))
 
     if current_cycle == "Up":
-        forecast_price = close_array[min_reversals[-1]] + np.mean(close_array) * np.sin(np.pi * 2 * dominant_frequency)
-    else:
         forecast_price = close_array[max_reversals[-1]] + np.mean(close_array) * np.sin(np.pi * 2 * dominant_frequency)
+    else:
+        forecast_price = close_array[min_reversals[-1]] + np.mean(close_array) * np.sin(np.pi * 2 * dominant_frequency)
 
     return market_mood, current_cycle, forecast_price
 
-sin_market_mood, sin_current_cycle, sin_price = sine_market_analysis(close)
+sin_market_mood, sin_current_cycle, sin_price = sine_market_analysis(close_prices, closest_threshold, min_threshold, max_threshold)
 
 # Print the results outside the function
 print("Market Mood:", sin_market_mood)
 print("Current Cycle:", sin_current_cycle)
 print("Forecast Price:", sin_price)
-
 
 print()
 
@@ -4656,7 +4662,7 @@ def main():
             ##################################################
             ##################################################
 
-            sin_market_mood, sin_current_cycle, sin_price = sine_market_analysis(close)
+            sin_market_mood, sin_current_cycle, sin_price = sine_market_analysis(close_prices, closest_threshold, min_threshold, max_threshold)
 
             # Print the results outside the function
             print("Market Mood:", sin_market_mood)
