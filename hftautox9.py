@@ -3566,7 +3566,6 @@ print("Current Quadrant:", result["current_quadrant"])
 print("Cycle Direction:", result["cycle_direction"])
 print("Forecasted Price:", result["forecasted_price"])
 
-
 print()
 
 ##################################################
