@@ -3640,6 +3640,12 @@ print()
 ##################################################
 ##################################################
 
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -4515,7 +4521,7 @@ def main():
             print("Last Resistance:", details["Last Resistance"])
             print("Last High:", details["Last High"])
             print("Last Low:", details["Last Low"])
-            print("WD Gann Fans from Last Reversal:", details["WD Gann Fans"])
+            print("Gann Fans from Last Reversal:", details["WD Gann Fans"])
             print("Market Mood:", details["Market Mood"])
             print("Next Fan Incoming:", details["Next Fan Incoming"])
 
@@ -4668,6 +4674,11 @@ def main():
             print("Market Mood:", sin_market_mood)
             print("Current Cycle:", sin_current_cycle)
             print("Forecast Price:", sin_price)
+
+            print()
+
+            ##################################################
+            ##################################################
 
             print()
 
