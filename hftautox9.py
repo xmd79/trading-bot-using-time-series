@@ -3723,15 +3723,15 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
     # Calculate the forecasted price as a real value
     forecasted_price = close[-1] + sin_price[-1]
 
-    # Calculate the total distance between min and max
+    # Calculate the distance of the current close on sine to min and max as percentages
+    distance_to_min_percent = ((close[-1] - min_sine_price) / (max_sine_price - min_sine_price)) * 100
+    distance_to_max_percent = ((max_sine_price - close[-1]) / (max_sine_price - min_sine_price)) * 100
+
+    # Calculate total distance between min and max
     total_distance = max_sine_price - min_sine_price
 
     # Calculate the distance for each quadrant (25% for each)
     quadrant_distance = total_distance * 0.25
-
-    # Calculate the distance of the current close on sine to min and max as percentages
-    distance_to_min_percent = ((close[-1] - min_sine_price) / total_distance) * 100
-    distance_to_max_percent = ((max_sine_price - close[-1]) / total_distance) * 100
 
     # Determine market mood based on sine wave and hexagonal symmetry
     sin_mood = np.where(sin_price > 0, 'Up Cycle', 'Down Cycle')
@@ -3740,8 +3740,15 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
     # Determine current quadrant based on the sine wave
     current_quadrant = int((t[-1] * frequency) % 4) + 1
 
-    # Determine the proper distance for the current quadrant
-    current_quadrant_distance = (current_quadrant - 1) * quadrant_distance
+    # Determine the current quadrant area
+    if 0 <= distance_to_min_percent <= 25:
+        current_quadrant_area = 'Q1'
+    elif 25 < distance_to_min_percent <= 50:
+        current_quadrant_area = 'Q2'
+    elif 50 < distance_to_min_percent <= 75:
+        current_quadrant_area = 'Q3'
+    else:
+        current_quadrant_area = 'Q4'
 
     # Determine hexagonal symmetry signal
     hexagonal_signal = 'Buy' if sin_price[-1] < hexagonal_symmetry_ratio * amplitude else 'Sell'
@@ -3787,7 +3794,7 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
         "Distance to Min (%)": distance_to_min_percent,
         "Distance to Max (%)": distance_to_max_percent,
         "Quadrant Distance": quadrant_distance,
-        "Current Quadrant Distance": current_quadrant_distance
+        "Current Quadrant Area": current_quadrant_area
     }
 
     return info_dict
@@ -3797,9 +3804,6 @@ info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_
 
 # Print information from the function
 print(f"Current Cycle: {info_dict['Current Cycle']}")
-print(f"Last Quadrant: {info_dict['Last Quadrant']}")
-print(f"Current Quadrant: {info_dict['Current Quadrant']}")
-print(f"Next Quadrant: {info_dict['Next Quadrant']}")
 print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
 print(f"Min Sine Price: {info_dict['Min Sine Price']}")
 print(f"Max Sine Price: {info_dict['Max Sine Price']}")
@@ -3807,8 +3811,7 @@ print(f"Forecasted Price: {info_dict['Forecasted Price']}")
 print(f"Distance to Min (%): {info_dict['Distance to Min (%)']}")
 print(f"Distance to Max (%): {info_dict['Distance to Max (%)']}")
 print(f"Quadrant Distance: {info_dict['Quadrant Distance']}")
-print(f"Current Quadrant Distance: {info_dict['Current Quadrant Distance']}")
-
+print(f"Current Quadrant Area: {info_dict['Current Quadrant Area']}")
 
 
 print()
@@ -4688,18 +4691,6 @@ def main():
             ##################################################
             ##################################################
 
-            details = calculate_gann_fans(price, close_prices)
-
-            # Print details
-            print("Gann Fans:", details["Gann Fans"])
-            print("Last Support:", details["Last Support"])
-            print("Last Resistance:", details["Last Resistance"])
-            print("Last High:", details["Last High"])
-            print("Last Low:", details["Last Low"])
-            print("Gann Fans from Last Reversal:", details["WD Gann Fans"])
-            print("Market Mood:", details["Market Mood"])
-            print("Next Fan Incoming:", details["Next Fan Incoming"])
-
             print()
 
             ##################################################
@@ -4879,9 +4870,6 @@ def main():
 
             # Print information from the function
             print(f"Current Cycle: {info_dict['Current Cycle']}")
-            print(f"Last Quadrant: {info_dict['Last Quadrant']}")
-            print(f"Current Quadrant: {info_dict['Current Quadrant']}")
-            print(f"Next Quadrant: {info_dict['Next Quadrant']}")
             print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
             print(f"Min Sine Price: {info_dict['Min Sine Price']}")
             print(f"Max Sine Price: {info_dict['Max Sine Price']}")
@@ -4889,7 +4877,7 @@ def main():
             print(f"Distance to Min (%): {info_dict['Distance to Min (%)']}")
             print(f"Distance to Max (%): {info_dict['Distance to Max (%)']}")
             print(f"Quadrant Distance: {info_dict['Quadrant Distance']}")
-            print(f"Current Quadrant Distance: {info_dict['Current Quadrant Distance']}")
+            print(f"Current Quadrant Area: {info_dict['Current Quadrant Area']}")
 
             print()
 
