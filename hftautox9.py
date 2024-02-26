@@ -5638,11 +5638,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and roc_mood == "bullish" and price < mom_forecast and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and incoming_reversal == "Top" and fft_wave_mood == "Up":
+                    if momentum > 0 and roc_mood == "bullish" and price < mom_forecast and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and price < pivot_forecast and long_conditions_met > short_conditions_met and signal == "BUY" and market_mood_type == "up" and forecast_direction == "Up" and current_point == "Apex" and incoming_reversal == "Top" and fft_wave_mood == "Up":
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and roc_mood == "bearish" and price > mom_forecast and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and incoming_reversal == "Dip"  and fft_wave_mood == "Down":
+                    if momentum < 0 and roc_mood == "bearish" and price > mom_forecast and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and price > pivot_forecast and long_conditions_met < short_conditions_met and signal == "SELL" and market_mood_type == "down" and forecast_direction == "Down" and current_point == "Right" and incoming_reversal == "Dip"  and fft_wave_mood == "Down":
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
