@@ -3798,9 +3798,7 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
 info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
 
 print(f"Current Cycle: {info_dict['Current Cycle']}")
-print(f"Last Quadrant: {info_dict['Last Quadrant']}")
 print(f"Current Quadrant: {info_dict['Current Quadrant']}")
-print(f"Next Quadrant: {info_dict['Next Quadrant']}")
 print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
 print(f"Min Sine Price: {info_dict['Min Sine Price']}")
 print(f"Max Sine Price: {info_dict['Max Sine Price']}")
@@ -4865,9 +4863,7 @@ def main():
             info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
 
             print(f"Current Cycle: {info_dict['Current Cycle']}")
-            print(f"Last Quadrant: {info_dict['Last Quadrant']}")
             print(f"Current Quadrant: {info_dict['Current Quadrant']}")
-            print(f"Next Quadrant: {info_dict['Next Quadrant']}")
             print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
             print(f"Min Sine Price: {info_dict['Min Sine Price']}")
             print(f"Max Sine Price: {info_dict['Max Sine Price']}")
