@@ -3085,95 +3085,6 @@ if order_book_data:
     for key, value in spread_orders.items():
         print(f"\n{key}: {value}")
 
-
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-
-def calculate_gann_fans(price, close):
-    # Find highs and lows
-    highs = np.maximum.accumulate(close)
-    lows = np.minimum.accumulate(close)
-
-    # Calculate Gann fans
-    fan_angles = [1, 1/2, 1/3, 1/4, 1/8, 1/16]
-    fans = []
-
-    for angle in fan_angles:
-        fan = price / angle
-        fans.append(fan)
-
-    # Identify last support and resistance
-    last_support = lows[-1]
-    last_resistance = highs[-1]
-
-    # Identify last high and last low
-    last_high = np.max(highs)
-    last_low = np.min(lows)
-
-    # Check if current close breaks support or resistance
-    current_close = price
-
-    # Set default values
-    market_mood = "None"
-
-    if current_close > last_resistance:
-        market_mood = "Bullish"
-    elif current_close < last_support:
-        market_mood = "Bearish"
-
-    # Determine whether overall highs are greater, smaller, or equal to lows
-    if np.max(highs) > np.min(lows):
-        highs_vs_lows = "Highs are greater than Lows"
-    elif np.max(highs) < np.min(lows):
-        highs_vs_lows = "Lows are greater than Highs"
-    else:
-        highs_vs_lows = "Lows are equal to Highs"
-
-    # WD Gann fans from last reversal
-    wd_gann_fans = [last_low + i * (last_high - last_low) for i in fan_angles]
-
-    # Determine market mood based on the current close and last reversal fan range
-    lower_fan = wd_gann_fans[-2]
-    upper_fan = wd_gann_fans[-1]
-
-    if lower_fan <= current_close <= upper_fan:
-        market_mood = "Bullish"
-    else:
-        market_mood = "Bearish"
-
-    # Calculate next fan incoming
-    next_fan = price / (fan_angles[-1] + 1)
-
-    # Return details
-    return {
-        "Gann Fans": fans,
-        "Last Support": last_support,
-        "Last Resistance": last_resistance,
-        "Last High": last_high,
-        "Last Low": last_low,
-        "WD Gann Fans": wd_gann_fans,
-        "Market Mood": market_mood,
-        "Next Fan Incoming": next_fan
-    }
-
-
-details = calculate_gann_fans(price, close_prices)
-
-# Print details
-print("Gann Fans:", details["Gann Fans"])
-print("Last Support:", details["Last Support"])
-print("Last Resistance:", details["Last Resistance"])
-print("Last High:", details["Last High"])
-print("Last Low:", details["Last Low"])
-print("WD Gann Fans from Last Reversal:", details["WD Gann Fans"])
-print("Market Mood:", details["Market Mood"])
-print("Next Fan Incoming:", details["Next Fan Incoming"])
-
 print()
 
 ##################################################
@@ -3705,108 +3616,566 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
+def generate_momentum_sinewave(timeframes):
+    # Initialize variables
+    momentum_sorter = []
+    market_mood = []
+    last_reversal = None
+    last_reversal_value_on_sine = None
+    last_reversal_value_on_price = None
+    next_reversal = None
+    next_reversal_value_on_sine = None
+    next_reversal_value_on_price = None
 
-def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1):
-    # Calculate hexagonal symmetry ratio using phi (Golden Ratio)
-    phi = (1 + np.sqrt(5)) / 2
-    hexagonal_symmetry_ratio = phi / 2
+    # Loop over timeframes
+    for timeframe in timeframes:
+        # Get close prices for current timeframe
+        close_prices = np.array(get_closes(timeframe))
 
-    # Calculate sine wave with motion
-    t = np.arange(len(close))
-    sin_price = amplitude * np.sin(2 * np.pi * frequency * t / len(close))
+        # Get last close price
+        current_close = close_prices[-1]
 
-    # Calculate minimum and maximum of the sine wave as real price values
-    min_sine_price = min_value + hexagonal_symmetry_ratio * amplitude
-    max_sine_price = max_value - hexagonal_symmetry_ratio * amplitude
+        # Calculate sine wave for current timeframe
+        sine_wave, leadsine = talib.HT_SINE(close_prices)
 
-    # Calculate the forecasted price as a real value
-    forecasted_price = close[-1] + sin_price[-1]
+        # Replace NaN values with 0
+        sine_wave = np.nan_to_num(sine_wave)
+        sine_wave = -sine_wave
 
-    # Calculate the distance of the current close on sine to min and max as percentages
-    distance_to_min_percent = ((close[-1] - min_sine_price) / (max_sine_price - min_sine_price)) * 100
-    distance_to_max_percent = ((max_sine_price - close[-1]) / (max_sine_price - min_sine_price)) * 100
+        # Get the sine value for last close
+        current_sine = sine_wave[-1]
 
-    # Calculate total distance between min and max
-    total_distance = max_sine_price - min_sine_price
+        # Calculate the min and max sine
+        sine_wave_min = np.nanmin(sine_wave) # Use nanmin to ignore NaN values
+        sine_wave_max = np.nanmax(sine_wave)
 
-    # Calculate the distance for each quadrant (25% for each)
-    quadrant_distance = total_distance * 0.25
+        # Calculate price values at min and max sine
+        sine_wave_min_price = close_prices[sine_wave == sine_wave_min][0]
+        sine_wave_max_price = close_prices[sine_wave == sine_wave_max][0]
+     
 
-    # Determine market mood based on sine wave and hexagonal symmetry
-    sin_mood = np.where(sin_price > 0, 'Up Cycle', 'Down Cycle')
-    current_cycle = sin_mood[-1]
+        # Calculate the difference between the max and min sine
+        sine_wave_diff = sine_wave_max - sine_wave_min
 
-    # Determine current quadrant based on the sine wave
-    current_quadrant = int((t[-1] * frequency) % 4) + 1
+        # If last close was the lowest, set as last reversal                                  
+        if current_sine == sine_wave_min:
+            last_reversal = 'dip'
+            last_reversal_value_on_sine = sine_wave_min 
+            last_reversal_value_on_price = sine_wave_min_price
+        
+        # If last close was the highest, set as last reversal                                 
+        if current_sine == sine_wave_max:
+            last_reversal = 'top'
+            last_reversal_value_on_sine = sine_wave_max
+            last_reversal_value_on_price = sine_wave_max_price
 
-    # Determine the current quadrant area
-    if 0 <= distance_to_min_percent <= 25:
-        current_quadrant_area = 'Q1'
-    elif 25 < distance_to_min_percent <= 50:
-        current_quadrant_area = 'Q2'
-    elif 50 < distance_to_min_percent <= 75:
-        current_quadrant_area = 'Q3'
+        # Calculate % distances
+        newsine_dist_min, newsine_dist_max = [], []
+        for close in close_prices:
+            # Calculate distances as percentages
+            dist_from_close_to_min = ((current_sine - sine_wave_min) /  
+                                      sine_wave_diff) * 100            
+            dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                                      sine_wave_diff) * 100
+                
+            newsine_dist_min.append(dist_from_close_to_min)       
+            newsine_dist_max.append(dist_from_close_to_max)
+
+        # Take average % distances
+        avg_dist_min = sum(newsine_dist_min) / len(newsine_dist_min)
+        avg_dist_max = sum(newsine_dist_max) / len(newsine_dist_max)
+
+        # Determine market mood based on % distances
+        if avg_dist_min <= 15:
+            mood = "At DIP Reversal and Up to Bullish"
+            if last_reversal != 'dip':
+                next_reversal = 'dip'
+                next_reversal_value_on_sine = sine_wave_min
+                next_reversal_value_on_price = close_prices[sine_wave == sine_wave_min][0]
+        elif avg_dist_max <= 15:
+            mood = "At TOP Reversal and Down to Bearish"
+            if last_reversal != 'top':
+                next_reversal = 'top'
+                next_reversal_value_on_sine = sine_wave_max
+                next_reversal_value_on_price = close_prices[sine_wave == sine_wave_max][0]
+        elif avg_dist_min < avg_dist_max:
+            mood = "Bullish"
+        else:
+            mood = "Bearish"
+
+        # Append momentum score and market mood to lists
+        momentum_score = avg_dist_max - avg_dist_min
+        momentum_sorter.append(momentum_score)
+        market_mood.append(mood)
+
+        # Print distances and market mood
+        print(f"{timeframe} Close is now at "       
+              f"dist. to min: {avg_dist_min:.2f}% "
+              f"and at "
+              f"dist. to max: {avg_dist_max:.2f}%. "
+              f"Market mood: {mood}")
+
+        # Update last and next reversal info
+        if next_reversal:
+            last_reversal = next_reversal
+            last_reversal_value_on_sine = next_reversal_value_on_sine
+            last_reversal_value_on_price = next_reversal_value_on_price
+            next_reversal = None
+            next_reversal_value_on_sine = None
+            next_reversal_value_on_price = None
+
+    # Get close prices for the 1-minute timeframe and last 3 closes
+    close_prices = np.array(get_closes('1m'))
+
+    # Calculate sine wave
+    sine_wave, leadsine = talib.HT_SINE(close_prices)
+
+    # Replace NaN values with 0
+    sine_wave = np.nan_to_num(sine_wave)
+    sine_wave = -sine_wave
+
+    # Get the sine value for last close
+    current_sine = sine_wave[-1]
+
+    # Get current date and time
+    now = datetime.datetime.now()
+
+    # Calculate the min and max sine
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate the difference between the maxand min sine
+    sine_wave_diff = sine_wave_max - sine_wave_min
+
+    # Calculate % distances
+    dist_from_close_to_min = ((current_sine - sine_wave_min) / 
+                              sine_wave_diff) * 100
+    dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                              sine_wave_diff) * 100
+
+    # Determine market mood based on % distances
+    if dist_from_close_to_min <= 15:
+        mood = "At DIP Reversal and Up to Bullish"
+        if last_reversal != 'dip':
+            next_reversal = 'dip'
+            next_reversal_value_on_sine = sine_wave_min
+
+    elif dist_from_close_to_max <= 15:
+        mood = "At TOP Reversal and Down to Bearish"
+        if last_reversal != 'top':
+            next_reversal = 'top'
+            next_reversal_value_on_sine = sine_wave_max
+
+    elif dist_from_close_to_min < dist_from_close_to_max:
+        mood = "Bullish"
     else:
-        current_quadrant_area = 'Q4'
+        mood = "Bearish"
 
-    # Mapping dictionary for current quadrant to current quadrant area
-    quadrant_mapping = {
-        'Q1': 1,
-        'Q2': 2,
-        'Q3': 3,
-        'Q4': 4
+    # Get the close prices that correspond to the min and max sine values
+    close_prices_between_min_and_max = close_prices[(sine_wave >= sine_wave_min) & (sine_wave <= sine_wave_max)]
+
+    print()
+
+    # Print distances and market mood for 1-minute timeframe
+    print(f"On 1min timeframe,Close is now at "       
+          f"dist. to min: {dist_from_close_to_min:.2f}% "
+          f"and at "
+          f"dist. to max:{dist_from_close_to_max:.2f}%. "
+          f"Market mood: {mood}")
+
+    min_val = min(close_prices_between_min_and_max)
+    max_val = max(close_prices_between_min_and_max)
+
+    print("The lowest value in the array is:", min_val)
+    print("The highest value in the array is:", max_val)
+
+    print()
+
+    # Update last and next reversal info
+    #if next_reversal:
+        #last_reversal = next_reversal
+        #last_reversal_value_on_sine = next_reversal_value_on_sine
+
+        #next_reversal = None
+        #next_reversal_value_on_sine = None
+
+
+    # Print last and next reversal info
+    #if last_reversal:
+        #print(f"Last reversal was at {last_reversal} on the sine wave at {last_reversal_value_on_sine:.2f} ")
+
+    # Return the momentum sorter, market mood, close prices between min and max sine, and reversal info
+    return momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max      
+
+momentum_sorter, market_mood, sine_wave_diff, dist_from_close_to_min, dist_from_close_to_max, now, close_prices, current_sine, close_prices_between_min_and_max = generate_momentum_sinewave(timeframes)
+
+print()
+
+#print("Close price values between last reversals on sine: ")
+#print(close_prices_between_min_and_max)
+
+print()
+
+print("Current close on sine value now at: ", current_sine)
+print("distances as percentages from close to min: ", dist_from_close_to_min, "%")
+print("distances as percentages from close to max: ", dist_from_close_to_max, "%")
+print("Momentum on 1min timeframe is now at: ", momentum_sorter[-12])
+print("Mood on 1min timeframe is now at: ", market_mood[-12])
+
+print()
+
+##################################################
+##################################################
+
+def generate_new_momentum_sinewave(close, candles, percent_to_max_val=5, percent_to_min_val=5):
+    # Convert 'close' to a NumPy array
+    close_np = np.array(close)
+
+    # Calculate the sine wave using HT_SINE
+    sine_wave, _ = talib.HT_SINE(close_np)
+    
+    # Replace NaN values with 0 using nan_to_num
+    sine_wave = np.nan_to_num(sine_wave)
+    sine_wave = -sine_wave
+
+    print("Current close on Sine wave:", sine_wave[-1])
+
+    # Calculate the minimum and maximum values of the sine wave
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate the distance from close to min and max as percentages on a scale from 0 to 100%
+    dist_from_close_to_min = ((sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
+    dist_from_close_to_max = ((sine_wave_max - sine_wave[-1]) / (sine_wave_max - sine_wave_min)) * 100
+
+    print("Distance from close to min:", dist_from_close_to_min)
+    print("Distance from close to max:", dist_from_close_to_max)
+
+    # Calculate the range of values for each quadrant
+    range_q1 = (sine_wave_max - sine_wave_min) / 4
+    range_q2 = (sine_wave_max - sine_wave_min) / 4
+    range_q3 = (sine_wave_max - sine_wave_min) / 4
+    range_q4 = (sine_wave_max - sine_wave_min) / 4
+
+    # Set the EM amplitude for each quadrant based on the range of values
+    em_amp_q1 = range_q1 / percent_to_max_val
+    em_amp_q2 = range_q2 / percent_to_max_val
+    em_amp_q3 = range_q3 / percent_to_max_val
+    em_amp_q4 = range_q4 / percent_to_max_val
+
+    # Calculate the EM phase for each quadrant
+    em_phase_q1 = 0
+    em_phase_q2 = math.pi/2
+    em_phase_q3 = math.pi
+    em_phase_q4 = 3*math.pi/2
+
+    # Calculate the current position of the price on the sine wave
+    current_position = (sine_wave[-1] - sine_wave_min) / (sine_wave_max - sine_wave_min)
+    current_quadrant = 0
+
+    # Determine which quadrant the current position is in
+    if current_position < 0.25:
+        # In quadrant 1
+        em_amp = em_amp_q1
+        em_phase = em_phase_q1
+        current_quadrant = 1
+        print("Current position is in quadrant 1. Distance from 0% to 25% of range:", (current_position - 0.0) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    elif current_position < 0.5:
+        # In quadrant 2
+        em_amp = em_amp_q2
+        em_phase = em_phase_q2
+        current_quadrant = 2
+        print("Current position is in quadrant 2. Distance from 25% to 50% of range:", (current_position - 0.25) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    elif current_position < 0.75:
+        # In quadrant 3
+        em_amp = em_amp_q3
+        em_phase = em_phase_q3
+        current_quadrant = 3
+        print("Current position is in quadrant 3. Distance from 50% to 75% of range:", (current_position - 0.5) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+    else:
+        # In quadrant 4
+        em_amp = em_amp_q4
+        em_phase = em_phase_q4
+        current_quadrant = 4
+        print("Current position is in quadrant 4. Distance from 75% to 100% of range:", (current_position - 0.75) / 0.25 * 100, "%")
+        print("Current quadrant is: ", current_quadrant)
+
+    print("EM amplitude:", em_amp)
+    print("EM phase:", em_phase)
+
+    # Calculate the EM value
+    em_value = em_amp * math.sin(em_phase)
+
+    print("EM value:", em_value)
+
+    # Determine the trend direction based on the EM phase differences
+    if em_phase_q4 - em_phase_q3 > 0 and em_phase_q3 - em_phase_q2 > 0 and em_phase_q2 - em_phase_q1 > 0:
+        trend_direction = "Down"
+    elif em_phase_q4 - em_phase_q3 < 0 and em_phase_q3 - em_phase_q2 < 0 and em_phase_q2 - em_phase_q1 < 0:
+        trend_direction = "Up"
+    else:
+        trend_direction = "Sideways"
+
+    print("Trend direction:", trend_direction)
+
+    # Calculate the percentage of the price range
+    price_range = candles[-1]["high"] - candles[-1]["low"]
+    price_range_percent = (close_prices[-1] - candles[-1]["low"]) / price_range * 100
+
+    print("Price range percent:", price_range_percent)
+
+    # Calculate the momentum value
+    momentum = em_value * price_range_percent / 100
+
+    print("Momentum value:", momentum)
+
+    print()
+
+    # Return a dictionary of all the features
+    return {
+        "current_close": sine_wave[-1],
+        "dist_from_close_to_min": dist_from_close_to_min,
+        "dist_from_close_to_max": dist_from_close_to_max,
+        "current_quadrant": current_quadrant,
+        "em_amplitude": em_amp,
+        "em_phase": em_phase,
+        "trend_direction": trend_direction,
+        "price_range_percent": price_range_percent,
+        "momentum": momentum,
+        "max": sine_wave_max,
+        "min": sine_wave_min
     }
 
-    # Map the current quadrant area to the corresponding current quadrant
-    mapped_current_quadrant = quadrant_mapping.get(current_quadrant_area, 'Unknown')
+print()
 
-    # Determine hexagonal symmetry signal
-    hexagonal_signal = 'Buy' if sin_price[-1] < hexagonal_symmetry_ratio * amplitude else 'Sell'
+##################################################
+##################################################
 
-    # Determine inverse current cycle
-    inverse_current_cycle = 'Down Cycle' if current_cycle == 'Up Cycle' else 'Up Cycle'
+def generate_market_mood_forecast(close, candles, percent_to_max_val=5, percent_to_min_val=5):
+    # Call generate_new_momentum_sinewave to get the sine wave and other features
+    sine_wave = generate_new_momentum_sinewave(close, candles, percent_to_max_val, percent_to_min_val)
 
-    # Determine last quadrant, current quadrant, and next quadrant
+    current_quadrant = sine_wave["current_quadrant"]
+    em_phase_q1 = sine_wave["em_phase"]
+    em_phase_q2 = em_phase_q1 + math.pi/2
+    em_phase_q3 = em_phase_q1 + math.pi
+    em_phase_q4 = em_phase_q1 + 3*math.pi/2
+
+    # Define PHI constant with 15 decimals
+    PHI = 1.6180339887498948482045868343656381177
+
+    # Calculate the Brun constant from the phi ratio and sqrt(5)
+    brun_constant = math.sqrt(PHI * math.sqrt(5))
+
+    # Define PI constant with 15 decimals
+    PI = 3.1415926535897932384626433832795028842
+
+    # Calculate sacred frequency
+    sacred_freq = (432 * PHI ** 2) / 360
+
+    # Calculate Alpha and Omega ratios
+    alpha_ratio = PHI / PI
+    omega_ratio = PI / PHI
+
+    # Calculate Alpha and Omega spiral angle rates
+    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
+    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
+
+    # Calculate quadrature phase shift based on current quadrant
     if current_quadrant == 1:
-        last_quadrant = 2
-        next_quadrant = 2
-    elif current_quadrant == 4:
-        last_quadrant = 3
-        next_quadrant = 3
+        # Up cycle from Q1 to Q4
+        quadrature_phase = em_phase_q1
+        em_phase = alpha_spiral
+    elif current_quadrant == 2:
+        quadrature_phase = em_phase_q2
+        em_phase = omega_spiral
+    elif current_quadrant == 3:
+        quadrature_phase = em_phase_q3
+        em_phase = omega_spiral
     else:
-        last_quadrant = current_quadrant - 1
-        next_quadrant = current_quadrant + 1
+        quadrature_phase = em_phase_q4
+        em_phase = alpha_spiral
 
-    # Return relevant information as a dictionary
-    info_dict = {
-        "Current Cycle": inverse_current_cycle,
-        "Current Quadrant": mapped_current_quadrant,
-        "Hexagonal Symmetry Signal": hexagonal_signal,
-        "Min Sine Price": min_sine_price,
-        "Max Sine Price": max_sine_price,
-        "Forecasted Price": forecasted_price,
-        "Distance to Min (%)": distance_to_min_percent,
-        "Distance to Max (%)": distance_to_max_percent,
-        "Quadrant Distance": quadrant_distance,
-        "Current Quadrant Area": current_quadrant_area,
-    }
+    cycle_direction = "UP"
+    next_quadrant = 1
 
-    return info_dict
+    if current_quadrant == 1:
+        next_quadrant = 2
+        cycle_direction = "UP"
 
-# Assuming you have defined close, last_low, last_high, min_value, and max_value elsewhere
-info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
+    elif current_quadrant == 2:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+        elif cycle_direction == "DOWN":
+            next_quadrant = 1
 
-print(f"Current Cycle: {info_dict['Current Cycle']}")
-print(f"Current Quadrant: {info_dict['Current Quadrant']}")
-print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
-print(f"Min Sine Price: {info_dict['Min Sine Price']}")
-print(f"Max Sine Price: {info_dict['Max Sine Price']}")
-print(f"Forecasted Price: {info_dict['Forecasted Price']}")
-print(f"Distance to Min (%): {info_dict['Distance to Min (%)']}")
-print(f"Distance to Max (%): {info_dict['Distance to Max (%)']}")
-print(f"Quadrant Distance: {info_dict['Quadrant Distance']}")
-print(f"Current Quadrant Area: {info_dict['Current Quadrant Area']}")
+    elif current_quadrant == 3:
+        if cycle_direction == "UP":
+            next_quadrant = 4
+        elif cycle_direction == "DOWN":
+            next_quadrant = 2
+
+    elif current_quadrant == 4:
+        if cycle_direction == "UP":
+            next_quadrant = 3
+            cycle_direction = "DOWN"
+
+    current_point = ""
+    if current_quadrant == 1:
+        current_point = "Apex"  
+    if current_quadrant == 2:  
+        current_point = "Left"       
+    if current_quadrant == 3:
+        current_point = "Base"        
+    if current_quadrant == 4:
+        current_point = "Right"  
+            
+    next_point = ""        
+    if next_quadrant == 1:
+        next_point = "Apex"   
+    if next_quadrant == 2:
+         next_point = "Left"          
+    if next_quadrant == 3:
+        next_point = "Base"       
+    if next_quadrant == 4:
+        next_point = "Right"
+
+    # Calculate quadrature phase
+    if next_quadrant == 1:
+        next_quadrature_phase = em_phase_q1
+    elif next_quadrant == 2:
+        next_quadrature_phase = em_phase_q2
+    elif next_quadrant == 3:
+        next_quadrature_phase = em_phase_q3
+    else:
+        next_quadrature_phase = em_phase_q4
+
+    # Calculate EM value
+    em_value = sine_wave["em_amplitude"] * math.sin(em_phase)
+
+    # Calculate quadrature phase shift from current to next quadrant
+    quadrature = next_quadrature_phase - quadrature_phase
+
+    if quadrature > 0:
+        cycle_direction = "UP"
+    else:
+        cycle_direction = "DOWN"
+
+    # Define the frequency bands and their corresponding emotional values
+    frequency_bands = {"Delta": -0.5, "Theta": -0.25, "Alpha": 0, "Beta": 0.25, "Gamma": 0.5}
+
+    # Calculate the emotional value of each frequency band using phi
+    emotional_values = {band: frequency_bands[band] * PHI for band in frequency_bands}
+
+    # Divide the frequency spectrum into 4 quadrants based on Metatron's Cube geometry
+    quadrant_amplitudes = {"Apex": 1, "Left": 0.5, "Base": 0, "Right": 0.5}
+    quadrant_phases = {"Apex": 0, "Left": math.pi/2, "Base": math.pi, "Right": 3*math.pi/2}
+
+    # Calculate emotional amplitude and phase values for each quadrant
+    quadrant_emotional_values = {}
+    for quadrant in quadrant_amplitudes:
+        amplitude = quadrant_amplitudes[quadrant]
+        phase = quadrant_phases[quadrant]
+        quadrant_emotional_values[quadrant] = {"amplitude": amplitude, "phase": phase}
+
+    # Calculate the forecast mood for the next 1 hour based on the phi value of each frequency band and mapping that to an emotional state
+    forecast_moods = {}
+    for band in emotional_values:
+        emotional_value = emotional_values[band]
+        phi_value = PHI ** (emotional_value / brun_constant)
+        forecast_moods[band] = math.cos(phi_value + em_value)
+
+    # Sort the frequencies from most negative to most positive based on their emotional value
+    sorted_frequencies = sorted(forecast_moods, key=lambda x: forecast_moods[x])
+
+    # Calculate average moods for the highest 3 and lowest 3 frequencies to determine the overall trend
+    high_moods = [forecast_moods[band] for band in sorted_frequencies[-3:]]
+    low_moods = [forecast_moods[band] for band in sorted_frequencies[:3]]
+    avg_high_mood = sum(high_moods) / len(high_moods)
+    avg_low_mood = sum(low_moods) / len(low_moods)
+
+    # Calculate weighted averages of the top n and bottom n frequencies to get a more nuanced forecast
+    n = 2
+    weighted_high_mood = sum([forecast_moods[band] * (n - i) for i, band in enumerate(sorted_frequencies[-n:])]) / sum(range(1, n+1))
+    weighted_low_mood = sum([forecast_moods[band] * (n - i) for i, band in enumerate(sorted_frequencies[:n])]) / sum(range(1, n+1))
+
+    # Map the 4 quadrants to the 4 points of Metatron's Cube (Apex, Left, Base, Right)
+    mapped_quadrants = {}
+    for quadrant in quadrant_emotional_values:
+        amplitude = quadrant_emotional_values[quadrant]["amplitude"]
+        phase = quadrant_emotional_values[quadrant]["phase"]
+        mapped_quadrants[quadrant] = amplitude * math.sin(em_value + phase)
+
+    # Identify the minimum and maximum frequency nodes to determine reversal points
+    min_node = sorted_frequencies[0]
+    max_node = sorted_frequencies[-1]
+
+    # Based on the minimum and maximum nodes, calculate forecasts for when mood reversals may occur
+    if forecast_moods[min_node] < avg_low_mood and forecast_moods[max_node] > avg_high_mood:
+        mood_reversal_forecast = "Mood reversal expected in the short term"
+    elif forecast_moods[min_node] < weighted_low_mood and forecast_moods[max_node] > weighted_high_mood:
+        mood_reversal_forecast = "Mood may reverse soon"
+    else:
+        mood_reversal_forecast = "No mood reversal expected in the near term"
+
+    # Determine an overall market mood based on the highest and lowest 3 frequencies - positive, negative or neutral
+    if avg_high_mood > 0 and avg_low_mood > 0:
+        market_mood = "Positive"
+    elif avg_high_mood < 0 and avg_low_mood < 0:
+        market_mood = "Negative"
+    else:
+        market_mood = "Neutral"
+
+    # Return the market mood forecast
+    return {"cycle_direction": cycle_direction, "quadrant_emotional_values": quadrant_emotional_values, "forecast_moods": forecast_moods, "sorted_frequencies": sorted_frequencies, "avg_high_mood": avg_high_mood, "avg_low_mood": avg_low_mood, "weighted_high_mood": weighted_high_mood, "weighted_low_mood": weighted_low_mood, "mapped_quadrants": mapped_quadrants, "min_node": min_node, "max_node": max_node, "mood_reversal_forecast": mood_reversal_forecast, "market_mood": market_mood, "current_point": current_point, "next_point": next_point}
+  
+#generate_market_mood_forecast(close, candles, percent_to_max_val=50, percent_to_min_val=50)
+
+market_mood_forecast = generate_market_mood_forecast(close, candles, percent_to_max_val=50, percent_to_min_val=50)
+
+cycle_direction = market_mood_forecast["cycle_direction"]
+quadrant_emotional_values = market_mood_forecast["quadrant_emotional_values"]
+forecast_moods = market_mood_forecast["forecast_moods"]
+sorted_frequencies = market_mood_forecast["sorted_frequencies"]
+avg_high_mood = market_mood_forecast["avg_high_mood"]
+avg_low_mood = market_mood_forecast["avg_low_mood"]
+weighted_high_mood = market_mood_forecast["weighted_high_mood"]
+weighted_low_mood = market_mood_forecast["weighted_low_mood"]
+mapped_quadrants = market_mood_forecast["mapped_quadrants"]
+min_node = market_mood_forecast["min_node"]
+max_node = market_mood_forecast["max_node"]
+mood_reversal_forecast = market_mood_forecast["mood_reversal_forecast"]
+market_mood = market_mood_forecast["market_mood"]
+
+current_point = market_mood_forecast["current_point"] 
+next_point = market_mood_forecast["next_point"]
+
+print(f"Current point: {current_point}")
+print(f"Next point: {next_point}")
+
+print("Cycle direction:", cycle_direction)
+print("Quadrant emotional values:", quadrant_emotional_values)
+print("Forecast moods:", forecast_moods)
+print("Sorted frequencies:", sorted_frequencies)
+print("Average high mood:", avg_high_mood)
+print("Average low mood:", avg_low_mood)
+print("Weighted high mood:", weighted_high_mood)
+print("Weighted low mood:", weighted_low_mood)
+print("Mapped quadrants:", mapped_quadrants)
+print("Minimum node:", min_node)
+print("Maximum node:", max_node)
+print("Mood reversal forecast:", mood_reversal_forecast)
+print("Market mood:", market_mood)
+
+print()
+
+##################################################
+##################################################
+
+
 
 print()
 
@@ -4860,18 +5229,41 @@ def main():
             ##################################################
             ##################################################
 
-            info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
+            market_mood_forecast = generate_market_mood_forecast(close, candles, percent_to_max_val=50, percent_to_min_val=50)
 
-            print(f"Current Cycle: {info_dict['Current Cycle']}")
-            print(f"Current Quadrant: {info_dict['Current Quadrant']}")
-            print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
-            print(f"Min Sine Price: {info_dict['Min Sine Price']}")
-            print(f"Max Sine Price: {info_dict['Max Sine Price']}")
-            print(f"Forecasted Price: {info_dict['Forecasted Price']}")
-            print(f"Distance to Min (%): {info_dict['Distance to Min (%)']}")
-            print(f"Distance to Max (%): {info_dict['Distance to Max (%)']}")
-            print(f"Quadrant Distance: {info_dict['Quadrant Distance']}")
-            print(f"Current Quadrant Area: {info_dict['Current Quadrant Area']}")
+            cycle_direction = market_mood_forecast["cycle_direction"]
+            quadrant_emotional_values = market_mood_forecast["quadrant_emotional_values"]
+            forecast_moods = market_mood_forecast["forecast_moods"]
+            sorted_frequencies = market_mood_forecast["sorted_frequencies"]
+            avg_high_mood = market_mood_forecast["avg_high_mood"]
+            avg_low_mood = market_mood_forecast["avg_low_mood"]
+            weighted_high_mood = market_mood_forecast["weighted_high_mood"]
+            weighted_low_mood = market_mood_forecast["weighted_low_mood"]
+            mapped_quadrants = market_mood_forecast["mapped_quadrants"]
+            min_node = market_mood_forecast["min_node"]
+            max_node = market_mood_forecast["max_node"]
+            mood_reversal_forecast = market_mood_forecast["mood_reversal_forecast"]
+            market_mood = market_mood_forecast["market_mood"]
+
+            current_point = market_mood_forecast["current_point"] 
+            next_point = market_mood_forecast["next_point"]
+
+            print(f"Current point: {current_point}")
+            print(f"Next point: {next_point}")
+
+            print("Cycle direction:", cycle_direction)
+            print("Quadrant emotional values:", quadrant_emotional_values)
+            print("Forecast moods:", forecast_moods)
+            print("Sorted frequencies:", sorted_frequencies)
+            print("Average high mood:", avg_high_mood)
+            print("Average low mood:", avg_low_mood)
+            print("Weighted high mood:", weighted_high_mood)
+            print("Weighted low mood:", weighted_low_mood)
+            print("Mapped quadrants:", mapped_quadrants)
+            print("Minimum node:", min_node)
+            print("Maximum node:", max_node)
+            print("Mood reversal forecast:", mood_reversal_forecast)
+            print("Market mood:", market_mood)
 
             print()
 
