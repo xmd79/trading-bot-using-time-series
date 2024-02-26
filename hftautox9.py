@@ -3716,6 +3716,17 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
     t = np.arange(len(close))
     sin_price = amplitude * np.sin(2 * np.pi * frequency * t / len(close))
 
+    # Calculate minimum and maximum of the sine wave as real price values
+    min_sine_price = min_value + hexagonal_symmetry_ratio * amplitude
+    max_sine_price = max_value - hexagonal_symmetry_ratio * amplitude
+
+    # Calculate the forecasted price as a real value
+    forecasted_price = close[-1] + sin_price[-1]
+
+    # Calculate the distance of the current close on sine to min and max as percentages
+    distance_to_min_percent = ((close[-1] - min_sine_price) / (max_sine_price - min_sine_price)) * 100
+    distance_to_max_percent = ((max_sine_price - close[-1]) / (max_sine_price - min_sine_price)) * 100
+
     # Determine market mood based on sine wave and hexagonal symmetry
     sin_mood = np.where(sin_price > 0, 'Up Cycle', 'Down Cycle')
     current_cycle = sin_mood[-1]
@@ -3761,10 +3772,16 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
         "Current Quadrant": current_quadrant,
         "Next Quadrant": next_quadrant,
         "Hexagonal Symmetry Signal": hexagonal_signal,
+        "Min Sine Price": min_sine_price,
+        "Max Sine Price": max_sine_price,
+        "Forecasted Price": forecasted_price,
+        "Distance to Min (%)": distance_to_min_percent,
+        "Distance to Max (%)": distance_to_max_percent
     }
 
     return info_dict
 
+# Assuming you have defined close, last_low, last_high, min_value, and max_value elsewhere
 info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
 
 # Print information from the function
@@ -3773,6 +3790,17 @@ print(f"Last Quadrant: {info_dict['Last Quadrant']}")
 print(f"Current Quadrant: {info_dict['Current Quadrant']}")
 print(f"Next Quadrant: {info_dict['Next Quadrant']}")
 print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
+print(f"Min Sine Price: {info_dict['Min Sine Price']}")
+print(f"Max Sine Price: {info_dict['Max Sine Price']}")
+print(f"Forecasted Price: {info_dict['Forecasted Price']}")
+print(f"Distance to Min (%): {info_dict['Distance to Min (%)']}")
+print(f"Distance to Max (%): {info_dict['Distance to Max (%)']}")
+
+
+print()
+
+##################################################
+##################################################
 
 print()
 
@@ -4841,6 +4869,11 @@ def main():
             print(f"Current Quadrant: {info_dict['Current Quadrant']}")
             print(f"Next Quadrant: {info_dict['Next Quadrant']}")
             print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
+            print(f"Min Sine Price: {info_dict['Min Sine Price']}")
+            print(f"Max Sine Price: {info_dict['Max Sine Price']}")
+            print(f"Forecasted Price: {info_dict['Forecasted Price']}")
+            print(f"Distance to Min (%): {info_dict['Distance to Min (%)']}")
+            print(f"Distance to Max (%): {info_dict['Distance to Max (%)']}")
 
             print()
 
