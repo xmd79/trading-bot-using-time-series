@@ -3601,20 +3601,7 @@ def sine_market_analysis(close, closest_threshold, min_threshold, max_threshold)
         market_mood = "Downtrend"
         current_cycle = "Down"
     else:
-        if len(min_reversals) > 0 and len(max_reversals) > 0:
-            last_min_reversal = min_reversals[-1]
-            last_max_reversal = max_reversals[-1]
-
-            if last_min_reversal > last_max_reversal:
-                market_mood = "Downtrend"
-                current_cycle = "Down"
-            else:
-                market_mood = "Uptrend"
-                current_cycle = "Up"
-        else:
-            # Default values if no reversals found
-            market_mood = "Downtrend"
-            current_cycle = "Down"
+        None
 
     # Forecast price for the current cycle based on FFT
     fft_result = np.abs(np.fft.fft(close_array))
@@ -3640,6 +3627,85 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def calculate_min_max_values(close):
+    # Find the index of the last lowest low and last highest high
+    last_low_index = np.argmin(close)
+    last_high_index = np.argmax(close)
+
+    # Calculate the last lowest low and last highest high
+    last_low = close[last_low_index]
+    last_high = close[last_high_index]
+
+    return last_low, last_high
+
+last_low, last_high = calculate_min_max_values(close)
+
+print(f"Last Lowest Low: {last_low}")
+print(f"Last Highest High: {last_high}")
+
+print()
+
+##################################################
+##################################################
+
+import numpy as np
+
+def calculate_min_max_values(close):
+    last_low_index = np.argmin(close)
+    last_high_index = np.argmax(close)
+    last_low = close[last_low_index]
+    last_high = close[last_high_index]
+    return last_low, last_high
+
+def generate_sine_wave_with_motion_and_factors(close, threshold_low, threshold_min, threshold_max):
+    last_low, last_high = calculate_min_max_values(close)
+
+    if threshold_low == threshold_min:
+        motion_factor = 1
+        market_mood = "Up"
+    elif threshold_low == threshold_max:
+        motion_factor = -1
+        market_mood = "Down"
+    else:
+        raise ValueError("Invalid threshold_low. Please choose threshold_min or threshold_max.")
+
+    t = np.linspace(0, 1, num=len(close), endpoint=False)
+    wave = 0.5 * (1 + amplitude * np.sin(2 * np.pi * frequency * t))
+    wave = last_low + (last_high - last_low) * wave
+
+    # Apply Fast Fourier Transform (FFT) to the sine wave
+    fft_wave = np.fft.fft(wave)
+    
+    # Modify the FFT for forecast (e.g., change the amplitude of certain frequency components)
+    # Here, we scale the amplitude of the second harmonic (frequency = 2) for illustration
+    fft_wave[2] *= 0.5
+
+    # Convert back to time domain using Inverse FFT
+    forecast_wave = np.fft.ifft(fft_wave).real
+
+    # Apply Fast Fourier Transform (FFT) to the forecasted price
+    fft_forecast_price = np.fft.fft(forecast_wave)
+    
+    # Modify the FFT for forecasted price (you can adjust this based on your requirements)
+    fft_forecast_price[3] *= 0.8  # Adjusting the amplitude of the fourth harmonic for illustration
+
+    # Convert back to time domain using Inverse FFT
+    forecast_price = np.fft.ifft(fft_forecast_price).real
+
+    return market_mood, forecast_price, np.min(forecast_wave), np.max(forecast_wave)
+
+# Example usage
+amplitude = 0.5
+frequency = 1
+
+sin_mood, sin_price, min_value, max_value = generate_sine_wave_with_motion_and_factors(close, closest_threshold, min_threshold, max_threshold)
+
+print(f"Market Mood: {sin_mood}")
+print(f"Forecast Price: {sin_price[-1]}")
+print(f"Min Value: {min_value}")
+print(f"Max Value: {max_value}")
 
 print()
 
@@ -4679,6 +4745,17 @@ def main():
 
             ##################################################
             ##################################################
+
+            # Example usage
+            amplitude = 0.5
+            frequency = 1
+
+            sin_mood, sin_price, min_value, max_value = generate_sine_wave_with_motion_and_factors(close, closest_threshold, min_threshold, max_threshold)
+
+            print(f"Market Mood: {sin_mood}")
+            print(f"Forecast Price: {sin_price[-1]}")
+            print(f"Min Value: {min_value}")
+            print(f"Max Value: {max_value}")
 
             print()
 
