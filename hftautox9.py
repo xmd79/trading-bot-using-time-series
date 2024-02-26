@@ -5651,6 +5651,34 @@ def main():
                     ##################################################
                     ##################################################
 
+
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and positive_count > negative_count:
+                        print("LONG ultra HFT momentum triggered")
+                        trigger_long = True
+
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and positive_count < negative_count:
+                        print("SHORT ultra HFT momentum triggered")
+                        trigger_short = True
+
+                    print()
+
+                    ##################################################
+                    ##################################################
+
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price:
+                        print("LONG ultra HFT momentum triggered")
+                        trigger_long = True
+
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price:
+                        print("SHORT ultra HFT momentum triggered")
+                        trigger_short = True
+
+                    print()
+
+                    ##################################################
+                    ##################################################
+
+
                     print()  
 
                     ##################################################
