@@ -3750,6 +3750,17 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
     else:
         current_quadrant_area = 'Q4'
 
+    # Mapping dictionary for current quadrant to current quadrant area
+    quadrant_mapping = {
+        'Q1': 1,
+        'Q2': 2,
+        'Q3': 3,
+        'Q4': 4
+    }
+
+    # Map the current quadrant area to the corresponding current quadrant
+    mapped_current_quadrant = quadrant_mapping.get(current_quadrant_area, 'Unknown')
+
     # Determine hexagonal symmetry signal
     hexagonal_signal = 'Buy' if sin_price[-1] < hexagonal_symmetry_ratio * amplitude else 'Sell'
 
@@ -3767,26 +3778,10 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
         last_quadrant = current_quadrant - 1
         next_quadrant = current_quadrant + 1
 
-    # Handle special cases for reversals and cycle continuation
-    if current_quadrant == 1 and next_quadrant == 2:
-        print("Dip Reversal: Down Cycle to Up Cycle")
-    elif current_quadrant == 4 and next_quadrant == 3:
-        print("Top Reversal: Up Cycle to Down Cycle")
-    elif current_quadrant == 1 and next_quadrant == 2:
-        print("Continuation: Up Cycle")
-    elif current_quadrant == 2 and next_quadrant == 3:
-        print("Continuation: Up Cycle")
-    elif current_quadrant == 3 and next_quadrant == 4:
-        print("Continuation: Down Cycle")
-    elif current_quadrant == 4 and next_quadrant == 3:
-        print("Continuation: Down Cycle")
-
     # Return relevant information as a dictionary
     info_dict = {
         "Current Cycle": inverse_current_cycle,
-        "Last Quadrant": last_quadrant,
-        "Current Quadrant": current_quadrant,
-        "Next Quadrant": next_quadrant,
+        "Current Quadrant": mapped_current_quadrant,
         "Hexagonal Symmetry Signal": hexagonal_signal,
         "Min Sine Price": min_sine_price,
         "Max Sine Price": max_sine_price,
@@ -3794,7 +3789,7 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
         "Distance to Min (%)": distance_to_min_percent,
         "Distance to Max (%)": distance_to_max_percent,
         "Quadrant Distance": quadrant_distance,
-        "Current Quadrant Area": current_quadrant_area
+        "Current Quadrant Area": current_quadrant_area,
     }
 
     return info_dict
@@ -3802,8 +3797,10 @@ def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, a
 # Assuming you have defined close, last_low, last_high, min_value, and max_value elsewhere
 info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
 
-# Print information from the function
 print(f"Current Cycle: {info_dict['Current Cycle']}")
+print(f"Last Quadrant: {info_dict['Last Quadrant']}")
+print(f"Current Quadrant: {info_dict['Current Quadrant']}")
+print(f"Next Quadrant: {info_dict['Next Quadrant']}")
 print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
 print(f"Min Sine Price: {info_dict['Min Sine Price']}")
 print(f"Max Sine Price: {info_dict['Max Sine Price']}")
@@ -3812,7 +3809,6 @@ print(f"Distance to Min (%): {info_dict['Distance to Min (%)']}")
 print(f"Distance to Max (%): {info_dict['Distance to Max (%)']}")
 print(f"Quadrant Distance: {info_dict['Quadrant Distance']}")
 print(f"Current Quadrant Area: {info_dict['Current Quadrant Area']}")
-
 
 print()
 
@@ -4868,8 +4864,10 @@ def main():
 
             info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
 
-            # Print information from the function
             print(f"Current Cycle: {info_dict['Current Cycle']}")
+            print(f"Last Quadrant: {info_dict['Last Quadrant']}")
+            print(f"Current Quadrant: {info_dict['Current Quadrant']}")
+            print(f"Next Quadrant: {info_dict['Next Quadrant']}")
             print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
             print(f"Min Sine Price: {info_dict['Min Sine Price']}")
             print(f"Max Sine Price: {info_dict['Max Sine Price']}")
