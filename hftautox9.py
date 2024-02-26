@@ -3705,6 +3705,80 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1):
+    # Calculate hexagonal symmetry ratio using phi (Golden Ratio)
+    phi = (1 + np.sqrt(5)) / 2
+    hexagonal_symmetry_ratio = phi / 2
+
+    # Calculate sine wave with motion
+    t = np.arange(len(close))
+    sin_price = amplitude * np.sin(2 * np.pi * frequency * t / len(close))
+
+    # Determine market mood based on sine wave and hexagonal symmetry
+    sin_mood = np.where(sin_price > 0, 'Up Cycle', 'Down Cycle')
+    current_cycle = sin_mood[-1]
+
+    # Determine current quadrant based on the sine wave
+    current_quadrant = int((t[-1] * frequency) % 4) + 1
+
+    # Determine hexagonal symmetry signal
+    hexagonal_signal = 'Buy' if sin_price[-1] < hexagonal_symmetry_ratio * amplitude else 'Sell'
+
+    # Determine inverse current cycle
+    inverse_current_cycle = 'Down Cycle' if current_cycle == 'Up Cycle' else 'Up Cycle'
+
+    # Determine last quadrant, current quadrant, and next quadrant
+    if current_quadrant == 1:
+        last_quadrant = 2
+        next_quadrant = 2
+    elif current_quadrant == 4:
+        last_quadrant = 3
+        next_quadrant = 3
+    else:
+        last_quadrant = current_quadrant - 1
+        next_quadrant = current_quadrant + 1
+
+    # Handle special cases for reversals and cycle continuation
+    if current_quadrant == 1 and next_quadrant == 2:
+        print("Dip Reversal: Down Cycle to Up Cycle")
+    elif current_quadrant == 4 and next_quadrant == 3:
+        print("Top Reversal: Up Cycle to Down Cycle")
+    elif current_quadrant == 1 and next_quadrant == 2:
+        print("Continuation: Up Cycle")
+    elif current_quadrant == 2 and next_quadrant == 3:
+        print("Continuation: Up Cycle")
+    elif current_quadrant == 3 and next_quadrant == 4:
+        print("Continuation: Down Cycle")
+    elif current_quadrant == 4 and next_quadrant == 3:
+        print("Continuation: Down Cycle")
+
+    # Return relevant information as a dictionary
+    info_dict = {
+        "Current Cycle": inverse_current_cycle,
+        "Last Quadrant": last_quadrant,
+        "Current Quadrant": current_quadrant,
+        "Next Quadrant": next_quadrant,
+        "Hexagonal Symmetry Signal": hexagonal_signal,
+    }
+
+    return info_dict
+
+info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
+
+# Print information from the function
+print(f"Current Cycle: {info_dict['Current Cycle']}")
+print(f"Last Quadrant: {info_dict['Last Quadrant']}")
+print(f"Current Quadrant: {info_dict['Current Quadrant']}")
+print(f"Next Quadrant: {info_dict['Next Quadrant']}")
+print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -4753,6 +4827,20 @@ def main():
             print(f"Last Highest High: {last_high}")
             print(f"Min Value: {min_value}")
             print(f"Max Value: {max_value}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            info_dict = hexagonal_symmetry_cycle(close, last_low, last_high, min_value, max_value, amplitude=0.5, frequency=1)
+
+            # Print information from the function
+            print(f"Current Cycle: {info_dict['Current Cycle']}")
+            print(f"Last Quadrant: {info_dict['Last Quadrant']}")
+            print(f"Current Quadrant: {info_dict['Current Quadrant']}")
+            print(f"Next Quadrant: {info_dict['Next Quadrant']}")
+            print(f"Hexagonal Symmetry Signal: {info_dict['Hexagonal Symmetry Signal']}")
 
             print()
 
