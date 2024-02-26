@@ -3652,13 +3652,6 @@ print()
 
 import numpy as np
 
-def calculate_min_max_values(close):
-    last_low_index = np.argmin(close)
-    last_high_index = np.argmax(close)
-    last_low = close[last_low_index]
-    last_high = close[last_high_index]
-    return last_low, last_high
-
 def generate_sine_wave_with_motion_and_factors(close, threshold_low, threshold_min, threshold_max):
     last_low, last_high = calculate_min_max_values(close)
 
