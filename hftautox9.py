@@ -4739,6 +4739,8 @@ def main():
             ##################################################
             ##################################################
 
+            last_low, last_high = calculate_min_max_values(close)
+
             # Example usage
             amplitude = 0.5
             frequency = 1
@@ -4747,6 +4749,8 @@ def main():
 
             print(f"Market Mood: {sin_mood}")
             print(f"Forecast Price: {sin_price[-1]}")
+            print(f"Last Lowest Low: {last_low}")
+            print(f"Last Highest High: {last_high}")
             print(f"Min Value: {min_value}")
             print(f"Max Value: {max_value}")
 
