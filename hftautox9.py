@@ -3836,7 +3836,7 @@ def generate_new_momentum_sinewave(close, candles, percent_to_max_val=5, percent
     
     # Replace NaN values with 0 using nan_to_num
     sine_wave = np.nan_to_num(sine_wave)
-    sine_wave = -sine_wave
+    #sine_wave = -sine_wave
 
     print("Current close on Sine wave:", sine_wave[-1])
 
@@ -5728,11 +5728,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and positive_count > negative_count and cycle_direction == "Up" and current_point == "Apex" and current_quadrant == "1" and trend_direction == "Up":
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and positive_count > negative_count and cycle_direction == "UP" and current_point == "Apex" and current_quadrant == "1" and trend_direction == "Up":
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and positive_count < negative_count and cycle_direction == "Down" and current_point == "Right" and current_quadrant == "4" and trend_direction == "Down":
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and positive_count < negative_count and cycle_direction == "DOWN" and current_point == "Right" and current_quadrant == "4" and trend_direction == "Down":
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
