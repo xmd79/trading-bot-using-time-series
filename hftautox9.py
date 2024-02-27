@@ -4059,7 +4059,7 @@ def generate_market_mood_forecast(close, candles, percent_to_max_val=5, percent_
     # Calculate quadrature phase shift from current to next quadrant
     quadrature = next_quadrature_phase - quadrature_phase
 
-    if quadrature > 0:
+    if quadrature < 0:
         cycle_direction = "UP"
     else:
         cycle_direction = "DOWN"
@@ -5271,7 +5271,7 @@ def main():
             ##################################################
 
             take_profit = 5
-            stop_loss = -75
+            stop_loss = -25
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
