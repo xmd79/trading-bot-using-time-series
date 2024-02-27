@@ -3913,9 +3913,9 @@ def generate_new_momentum_sinewave(close, candles, percent_to_max_val=5, percent
 
     # Determine the trend direction based on the EM phase differences
     if em_phase_q4 - em_phase_q3 > 0 and em_phase_q3 - em_phase_q2 > 0 and em_phase_q2 - em_phase_q1 > 0:
-        trend_direction = "Down"
-    elif em_phase_q4 - em_phase_q3 < 0 and em_phase_q3 - em_phase_q2 < 0 and em_phase_q2 - em_phase_q1 < 0:
         trend_direction = "Up"
+    elif em_phase_q4 - em_phase_q3 < 0 and em_phase_q3 - em_phase_q2 < 0 and em_phase_q2 - em_phase_q1 < 0:
+        trend_direction = "Down"
     else:
         trend_direction = "Sideways"
 
@@ -4059,7 +4059,7 @@ def generate_market_mood_forecast(close, candles, percent_to_max_val=5, percent_
     # Calculate quadrature phase shift from current to next quadrant
     quadrature = next_quadrature_phase - quadrature_phase
 
-    if quadrature < 0:
+    if quadrature > 0:
         cycle_direction = "UP"
     else:
         cycle_direction = "DOWN"
@@ -5270,8 +5270,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 5
-            stop_loss = -25
+            take_profit = 50
+            stop_loss = -50
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -5665,11 +5665,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price:
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and cycle_direction == "Up":
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price:
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and cycle_direction == "Down":
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
