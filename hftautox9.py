@@ -3836,7 +3836,7 @@ def generate_new_momentum_sinewave(close, candles, percent_to_max_val=5, percent
     
     # Replace NaN values with 0 using nan_to_num
     sine_wave = np.nan_to_num(sine_wave)
-    #sine_wave = -sine_wave
+    sine_wave = -sine_wave
 
     print("Current close on Sine wave:", sine_wave[-1])
 
@@ -3913,13 +3913,13 @@ def generate_new_momentum_sinewave(close, candles, percent_to_max_val=5, percent
 
     # Determine the trend direction based on the EM phase differences
     if em_phase_q4 - em_phase_q3 > 0 and em_phase_q3 - em_phase_q2 > 0 and em_phase_q2 - em_phase_q1 > 0:
-        trend_direction = "Down"
-    elif em_phase_q4 - em_phase_q3 < 0 and em_phase_q3 - em_phase_q2 < 0 and em_phase_q2 - em_phase_q1 < 0:
         trend_direction = "Up"
+    elif em_phase_q4 - em_phase_q3 < 0 and em_phase_q3 - em_phase_q2 < 0 and em_phase_q2 - em_phase_q1 < 0:
+        trend_direction = "Down"
     else:
         trend_direction = "Sideways"
 
-    #print("Trend direction:", trend_direction)
+    print("Trend direction:", trend_direction)
 
     # Calculate the percentage of the price range
     price_range = candles[-1]["high"] - candles[-1]["low"]
@@ -5388,23 +5388,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Example usage
-            n_components = 5
-            targets = []
-
-            for i in range(len(closes) - 1):
-                # Decompose the signal up to the current minute and predict the target for the next minute
-                entry_price, stop_loss, target1, target2, target3, target4, target5 = get_next_minute_targets(closes[:i+1], n_components)
-                targets.append((entry_price, stop_loss, target1, target2, target3, target4, target5))
-
-            # Print the predicted levels for the next minute
-            print("Entry price:", targets[-1][0])
-            print("Stop loss:", targets[-1][1])
-            print("Target 1:", targets[-1][2])
-            print("Target 2:", targets[-1][3])
-            print("Target 3:", targets[-1][4])
-            print("Target 4:", targets[-1][5])
-            print("Target 5:", targets[-1][6])
 
             print()
 
