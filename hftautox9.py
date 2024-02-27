@@ -5389,7 +5389,6 @@ def main():
             ##################################################
 
             # Example usage
-            closes = get_closes("1m")
             n_components = 5
             targets = []
 
