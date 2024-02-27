@@ -5325,7 +5325,7 @@ def main():
             em_phase = result["em_phase"]
             #trend_direction = result["trend_direction"]
             price_range_percent = result["price_range_percent"]
-            momentum = result["momentum"]
+            sine_momentum = result["momentum"]
             sine_wave_max = result["max"]
             sine_wave_min = result["min"]
 
@@ -5338,7 +5338,7 @@ def main():
             print("EM Phase:", em_phase)
             #print("Trend Direction:", trend_direction)
             print("Price Range Percent:", price_range_percent)
-            print("Momentum:", momentum)
+            print("Momentum:", sine_momentum)
             print("Sine Wave Max:", sine_wave_max)
             print("Sine Wave Min:", sine_wave_min)
 
@@ -5412,7 +5412,7 @@ def main():
             ##################################################
 
             take_profit = 5
-            stop_loss = -25
+            stop_loss = -50
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -5819,6 +5819,18 @@ def main():
                     ##################################################
                     ##################################################
 
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and current_point == "Apex" and current_quadrant == "1":
+                        print("LONG ultra HFT momentum triggered")
+                        trigger_long = True
+
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and current_point == "Right" and current_quadrant == "4":
+                        print("SHORT ultra HFT momentum triggered")
+                        trigger_short = True
+
+                    print()
+
+                    ##################################################
+                    ##################################################
 
                     print()  
 
