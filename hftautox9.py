@@ -4204,7 +4204,62 @@ print()
 ##################################################
 ##################################################
 
+print()
 
+##################################################
+##################################################
+
+def get_next_minute_targets(closes, n_components):
+    # Calculate FFT of closing prices
+    fft = fftpack.fft(closes)
+    frequencies = fftpack.fftfreq(len(closes))
+
+    # Sort frequencies by magnitude and keep only the top n_components
+    idx = np.argsort(np.abs(fft))[::-1][:n_components]
+    top_frequencies = frequencies[idx]
+
+    # Filter out the top frequencies and reconstruct the signal
+    filtered_fft = np.zeros_like(fft)
+    filtered_fft[idx] = fft[idx]
+    filtered_signal = np.real(fftpack.ifft(filtered_fft))
+
+    # Calculate the target price as the next value after the last closing price
+    target_price = filtered_signal[-1]
+    
+    # Calculate the stop loss and target levels
+    entry_price = closes[-1]
+    stop_loss = entry_price - np.std(closes)
+    target1 = target_price + 2*np.std(closes)
+    target2 = target_price + 3*np.std(closes)
+    target3 = target_price + 4*np.std(closes)
+    target4 = target_price + 5*np.std(closes)
+    target5 = target_price + 6*np.std(closes)
+
+    return entry_price, stop_loss, target1, target2, target3, target4, target5
+
+# Example usage
+closes = get_closes("1m")
+n_components = 5
+targets = []
+
+for i in range(len(closes) - 1):
+    # Decompose the signal up to the current minute and predict the target for the next minute
+    entry_price, stop_loss, target1, target2, target3, target4, target5 = get_next_minute_targets(closes[:i+1], n_components)
+    targets.append((entry_price, stop_loss, target1, target2, target3, target4, target5))
+
+# Print the predicted levels for the next minute
+print("Entry price:", targets[-1][0])
+print("Stop loss:", targets[-1][1])
+print("Target 1:", targets[-1][2])
+print("Target 2:", targets[-1][3])
+print("Target 3:", targets[-1][4])
+print("Target 4:", targets[-1][5])
+print("Target 5:", targets[-1][6])
+
+print()
+
+##################################################
+##################################################
 
 print()
 
@@ -5327,6 +5382,30 @@ def main():
             print("Maximum node:", max_node)
             print("Mood reversal forecast:", mood_reversal_forecast)
             print("Market mood:", market_mood)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Example usage
+            closes = get_closes("1m")
+            n_components = 5
+            targets = []
+
+            for i in range(len(closes) - 1):
+                # Decompose the signal up to the current minute and predict the target for the next minute
+                entry_price, stop_loss, target1, target2, target3, target4, target5 = get_next_minute_targets(closes[:i+1], n_components)
+                targets.append((entry_price, stop_loss, target1, target2, target3, target4, target5))
+
+            # Print the predicted levels for the next minute
+            print("Entry price:", targets[-1][0])
+            print("Stop loss:", targets[-1][1])
+            print("Target 1:", targets[-1][2])
+            print("Target 2:", targets[-1][3])
+            print("Target 3:", targets[-1][4])
+            print("Target 4:", targets[-1][5])
+            print("Target 5:", targets[-1][6])
 
             print()
 
