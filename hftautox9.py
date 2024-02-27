@@ -3949,6 +3949,35 @@ def generate_new_momentum_sinewave(close, candles, percent_to_max_val=5, percent
         "min": sine_wave_min
     }
 
+# Example usage:
+result = generate_new_momentum_sinewave(close, candles, percent_to_max_val=5, percent_to_min_val=5)
+
+# Assign each element to separate variables
+current_close = result["current_close"]
+dist_from_close_to_min = result["dist_from_close_to_min"]
+dist_from_close_to_max = result["dist_from_close_to_max"]
+current_quadrant = result["current_quadrant"]
+em_amplitude = result["em_amplitude"]
+em_phase = result["em_phase"]
+trend_direction = result["trend_direction"]
+price_range_percent = result["price_range_percent"]
+momentum = result["momentum"]
+sine_wave_max = result["max"]
+sine_wave_min = result["min"]
+
+# Print each variable separately
+print("Current Close:", current_close)
+print("Distance from Close to Min:", dist_from_close_to_min)
+print("Distance from Close to Max:", dist_from_close_to_max)
+print("Current Quadrant:", current_quadrant)
+print("EM Amplitude:", em_amplitude)
+print("EM Phase:", em_phase)
+print("Trend Direction:", trend_direction)
+print("Price Range Percent:", price_range_percent)
+print("Momentum:", momentum)
+print("Sine Wave Max:", sine_wave_max)
+print("Sine Wave Min:", sine_wave_min)
+
 print()
 
 ##################################################
@@ -5229,6 +5258,40 @@ def main():
             ##################################################
             ##################################################
 
+            # Example usage:
+            result = generate_new_momentum_sinewave(close, candles, percent_to_max_val=5, percent_to_min_val=5)
+
+            # Assign each element to separate variables
+            current_close = result["current_close"]
+            dist_from_close_to_min = result["dist_from_close_to_min"]
+            dist_from_close_to_max = result["dist_from_close_to_max"]
+            current_quadrant = result["current_quadrant"]
+            em_amplitude = result["em_amplitude"]
+            em_phase = result["em_phase"]
+            trend_direction = result["trend_direction"]
+            price_range_percent = result["price_range_percent"]
+            momentum = result["momentum"]
+            sine_wave_max = result["max"]
+            sine_wave_min = result["min"]
+
+            # Print each variable separately
+            print("Current Close:", current_close)
+            print("Distance from Close to Min:", dist_from_close_to_min)
+            print("Distance from Close to Max:", dist_from_close_to_max)
+            print("Current Quadrant:", current_quadrant)
+            print("EM Amplitude:", em_amplitude)
+            print("EM Phase:", em_phase)
+            print("Trend Direction:", trend_direction)
+            print("Price Range Percent:", price_range_percent)
+            print("Momentum:", momentum)
+            print("Sine Wave Max:", sine_wave_max)
+            print("Sine Wave Min:", sine_wave_min)
+
+            print()
+
+            ##################################################
+            ##################################################
+
             market_mood_forecast = generate_market_mood_forecast(close, candles, percent_to_max_val=50, percent_to_min_val=50)
 
             cycle_direction = market_mood_forecast["cycle_direction"]
@@ -5665,11 +5728,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and cycle_direction == "Up":
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < target_45_quad_4 and price < expected_price and cycle_direction == "Up" and current_point == "Apex" and current_quadrant == "1" and trend_diretion == "Up":
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and cycle_direction == "Down":
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > target_45_quad_4 and price > expected_price and cycle_direction == "Down" and current_point == "Right and current_quadrant == "4" and trend_diretion == "Down"":
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
