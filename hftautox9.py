@@ -6771,11 +6771,11 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and current_point == "Apex" and current_quadrant == "1":
+                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and current_point == "Apex" and current_quadrant == "1":
                         print("LONG ultra HFT momentum triggered")
                         trigger_long = True
 
-                    if buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and current_point == "Right" and current_quadrant == "4":
+                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and current_point == "Right" and current_quadrant == "4":
                         print("SHORT ultra HFT momentum triggered")
                         trigger_short = True
 
