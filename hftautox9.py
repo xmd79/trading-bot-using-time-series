@@ -4261,6 +4261,98 @@ print()
 ##################################################
 ##################################################
 
+import talib
+import numpy as np
+
+def ninja_trend(close):
+    fast_MA_period = 12
+    slow_MA_period = 26
+    signal_length = 9
+
+    # Add a sine wave reversal to the close prices
+    reversal_wave = np.sin(np.linspace(0, 10, len(close))) * 5
+    close_with_reversal = close + reversal_wave
+
+    # Convert 'close' to numpy array
+    close_np = np.array(close_with_reversal)
+
+    # Calculate MACD
+    macd, _, _ = talib.MACD(close_np, fast_MA_period, slow_MA_period, signal_length)
+
+    # Calculate Signal line
+    signal = talib.SMA(macd, timeperiod=signal_length)
+
+    # Identify Bull and Bear conditions
+    is_bull_bar = (macd < 0) & (signal < 0)
+    is_bear_bar = (macd > 0) & (signal > 0)
+
+    # Buy, Sell, or Neutral
+    trend_text = "Buy" if is_bull_bar[-1] else "Sell" if is_bear_bar[-1] else "Neutral"
+
+    # Alerts
+    buy_alert = "Buy Alert" if is_bull_bar[-1] and not is_bull_bar[-2] else None
+    sell_alert = "Sell Alert" if is_bear_bar[-1] and not is_bear_bar[-2] else None
+
+    # Market Mood
+    market_mood = "Bullish" if is_bull_bar[-1] else "Bearish" if is_bear_bar[-1] else "Neutral"
+
+    # Forecasted Price (adjusted for real price value)
+    multiplier = 0.1  # Adjust this multiplier based on your analysis
+    forecast_price_trend = close[-1] + (macd[-1] * multiplier) if trend_text == "Buy" else close[-1] - (macd[-1] * multiplier) if trend_text == "Sell" else close[-1]
+
+    # FFT-based Forecasting
+    n = len(close_with_reversal)
+    fft_result = fft.fft(close_np)
+    frequencies = fft.fftfreq(n)
+    max_frequency_index = np.argmax(np.abs(fft_result[1:n // 2])) + 1  # Ignore the DC component
+    dominant_frequency = frequencies[max_frequency_index]
+
+    # Estimate the next 5 targets
+    targets_count = 5
+    next_targets_fft = np.real(fft.ifft(fft_result[max_frequency_index] * np.exp(2j * np.pi * dominant_frequency * np.arange(1, targets_count + 1))))
+
+    # Scale the next targets based on the range of close prices
+    close_range = np.max(close_np) - np.min(close_np)
+    scaling_factor = 100 / close_range
+    next_targets = close_with_reversal[-1] + (next_targets_fft * scaling_factor)
+
+    # Get the current reversals on the sine wave as real price values
+    current_reversals = close_with_reversal[-len(reversal_wave):]
+
+    # Get the last highest high and lowest low
+    last_highest_high = np.max(close_with_reversal[-len(reversal_wave):])
+    last_lowest_low = np.min(close_with_reversal[-len(reversal_wave):])
+
+    return trend_text, buy_alert, sell_alert, market_mood, forecast_price_trend, next_targets, current_reversals, last_highest_high, last_lowest_low
+
+# Example usage with existing close prices
+trend, buy_alert, sell_alert, mood, forecast_price_trend, next_targets, current_reversals, last_highest_high, last_lowest_low = ninja_trend(close)
+
+# Print results
+print(f'Trend: {trend}')
+print(f'Buy Alert: {buy_alert}')
+print(f'Sell Alert: {sell_alert}')
+print(f'Market Mood: {mood}')
+print(f'Forecasted Price Trend: {forecast_price_trend}')
+
+print()
+
+for i, target in enumerate(next_targets, 1):
+    print(f'Next Target {i}: {target}')
+
+print()
+
+print(f'Current Reversals: {current_reversals[0]}')
+print(f'Next Most Significant Reversal: {current_reversals[1]}')
+
+print()
+
+print(f'Last Highest High: {last_highest_high}')
+print(f'Last Lowest Low: {last_lowest_low}')
+
+print()
+
+
 print()
 
 ##################################################
@@ -5143,24 +5235,6 @@ def main():
             ##################################################
             ##################################################
 
-            # Add this function call after obtaining the candles data
-            overall_trend_data = check_overall_trend(candles)
-
-            # Print the volume and price trends separately for each timeframe
-            print("\nVolume and Price Trend Data:")
-            for timeframe, data in overall_trend_data.items():
-                print(f"{timeframe} timeframe:")
-    
-                # Volume Trend
-                print(f"Volume Trend: {data.get('volume_trend', 'N/A')}")
-
-                # Price Trend
-                print(f"Price Trend: {data.get('price_trend', 'N/A')}")
-
-                # Overall Trend
-                print(f"Overall Trend: {data['overall_trend']}")
-    
-                print()
 
             print()
 
@@ -5293,6 +5367,7 @@ def main():
             ##################################################
             ##################################################
 
+
             last_low, last_high = calculate_min_max_values(close)
 
             # Example usage
@@ -5387,7 +5462,6 @@ def main():
 
             ##################################################
             ##################################################
-
 
             print()
 
