@@ -5239,6 +5239,67 @@ print(octa_metatron_cube(close_prices, candles))
 
 print()
 
+##################################################
+##################################################
+
+import math
+import numpy
+
+def merged_logic(close):
+    # Linear Regression
+    # Assume a linear relationship between time and close prices
+    # You may need to adapt this based on your specific data and requirements
+    time = list(range(len(close)))
+    slope, intercept = numpy.polyfit(time, close, 1)
+
+    # Special Triangles
+    # Using a 45-45-90 triangle as an example
+    side_length = 1  # Hypotenuse of the triangle
+    opposite_side = side_length / math.sqrt(2)
+
+    # Phi (Golden Ratio)
+    phi = (1 + math.sqrt(5)) / 2
+
+    # Pi
+    pi = math.pi
+
+    # Market Mood
+    market_mood = "Bullish" if close[-1] > close[-2] else "Bearish"
+
+    # Forecast Prices for Different Timeframes
+    timeframes = [5, 15, 30, 60, 120, 240, 360, 480, 720, 1440]  # in minutes
+    forecasts = [close[-1] + slope * timeframe for timeframe in timeframes]
+
+    return phi, pi, market_mood, forecasts
+
+phi, pi, market_mood, forecasts = merged_logic(close)
+
+# Print Market Mood
+print(f"Market Mood: {market_mood}")
+
+# Print Forecast Prices for Different Timeframes
+forecast_5_minutes = forecasts[0]
+forecast_15_minutes = forecasts[1]
+forecast_30_minutes = forecasts[2]
+forecast_60_minutes = forecasts[3]
+forecast_120_minutes = forecasts[4]
+forecast_240_minutes = forecasts[5]
+forecast_360_minutes = forecasts[6]
+forecast_480_minutes = forecasts[7]
+forecast_720_minutes = forecasts[8]
+forecast_1440_minutes = forecasts[9]
+
+# Print each forecast value with its corresponding variable
+print(f"Forecast for 5 minutes: {forecast_5_minutes}")
+print(f"Forecast for 15 minutes: {forecast_15_minutes}")
+print(f"Forecast for 30 minutes: {forecast_30_minutes}")
+print(f"Forecast for 60 minutes: {forecast_60_minutes}")
+print(f"Forecast for 120 minutes: {forecast_120_minutes}")
+print(f"Forecast for 240 minutes: {forecast_240_minutes}")
+print(f"Forecast for 360 minutes: {forecast_360_minutes}")
+print(f"Forecast for 480 minutes: {forecast_480_minutes}")
+print(f"Forecast for 720 minutes: {forecast_720_minutes}")
+print(f"Forecast for 1440 minutes: {forecast_1440_minutes}")
 
 print()
 
@@ -6345,13 +6406,42 @@ def main():
             ##################################################
             ##################################################
 
+            phi, pi, market_mood, forecasts = merged_logic(close)
+
+            # Print Market Mood
+            print(f"Market Mood: {market_mood}")
+
+            # Print Forecast Prices for Different Timeframes
+            forecast_5_minutes = forecasts[0]
+            forecast_15_minutes = forecasts[1]
+            forecast_30_minutes = forecasts[2]
+            forecast_60_minutes = forecasts[3]
+            forecast_120_minutes = forecasts[4]
+            forecast_240_minutes = forecasts[5]
+            forecast_360_minutes = forecasts[6]
+            forecast_480_minutes = forecasts[7]
+            forecast_720_minutes = forecasts[8]
+            forecast_1440_minutes = forecasts[9]
+
+            # Print each forecast value with its corresponding variable
+            print(f"Forecast for 5 minutes: {forecast_5_minutes}")
+            print(f"Forecast for 15 minutes: {forecast_15_minutes}")
+            print(f"Forecast for 30 minutes: {forecast_30_minutes}")
+            print(f"Forecast for 60 minutes: {forecast_60_minutes}")
+            print(f"Forecast for 120 minutes: {forecast_120_minutes}")
+            print(f"Forecast for 240 minutes: {forecast_240_minutes}")
+            print(f"Forecast for 360 minutes: {forecast_360_minutes}")
+            print(f"Forecast for 480 minutes: {forecast_480_minutes}")
+            print(f"Forecast for 720 minutes: {forecast_720_minutes}")
+            print(f"Forecast for 1440 minutes: {forecast_1440_minutes}")
+
             print()
 
             ##################################################
             ##################################################
 
             take_profit = 5
-            stop_loss = -50
+            stop_loss = -5
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -6651,8 +6741,8 @@ def main():
                                     print("LONG condition 4: closest_threshold < price")        
                                     if forecast_direction == "Up":
                                         print("LONG condition 5: forecast_direction == Up") 
-                                        if roc_mood == "bullish":  
-                                            print("LONG condition 6: roc_mood == bullish")                           
+                                        if cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex": 
+                                            print("LONG condition 6: cycle_direction == UP and sentiment == 1.0 and current_point == Apex")                           
                                             if price < expected_price:
                                                 print("LONG condition 7: price < expected_price") 
                                                 if market_mood_fft == "Bullish":
@@ -6688,8 +6778,8 @@ def main():
                                     print("SHORT condition 4: closest_threshold > price")        
                                     if forecast_direction == "Down":
                                         print("SHORT condition 5: forecast_direction == Down")       
-                                        if roc_mood == "bearish":  
-                                            print("SHORT condition 6: roc_mood == bearish")                          
+                                        if cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right":  
+                                            print("SHORT condition 6: cycle_direction == DOWN and sentiment == -1.0 and current_point == Right")                          
                                             if price > expected_price:
                                                 print("SHORT condition 7: price > expected_price") 
                                                 if market_mood_fft == "Bearish":
@@ -6718,104 +6808,19 @@ def main():
                     ##################################################
                     ##################################################
 
-                    if closest_threshold == min_threshold and price < avg_mtf and momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and forecast_direction == "Up" and sentiment == "1.0" and current_point == "Apex" and incoming_reversal == "Top":
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
+                    #if closest_threshold == min_threshold and price < avg_mtf momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex":
+                        #print("LONG ultra HFT momentum triggered")
+                        #trigger_long = True
 
-                    if closest_threshold == max_threshold and price > avg_mtf and momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and forecast_direction == "Down" and sentiment == "-1.0" and current_point == "Right" and incoming_reversal == "Dip":
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
-
-                    print()
-
-                    ##################################################
-                    ##################################################
-
-                    if closest_threshold == min_threshold and price < avg_mtf and momentum > 0 and buy_volume_1min > sell_volume_1min and price < expected_price and price < pivot_forecast and positive_count > negative_count and signal == "BUY" and market_mood_type == "up" and forecast_direction == "Up" and sentiment == "1.0" and current_point == "Apex" and incoming_reversal == "Top":
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
-
-                    if closest_threshold == max_threshold and price > avg_mtf and momentum < 0 and buy_volume_1min < sell_volume_1min and price > expected_price and price > pivot_forecast and positive_count < negative_count and signal == "SELL" and market_mood_type == "down" and forecast_direction == "Down" and sentiment == "-1.0" and current_point == "Right" and incoming_reversal == "Dip":
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
+                    #if closest_threshold == max_threshold and price > avg_mtf momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right":
+                        #print("SHORT ultra HFT momentum triggered")
+                        #trigger_short = True
 
                     print()
 
                     ##################################################
                     ##################################################
 
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and price < expected_price and positive_count > negative_count and sentiment == "1.0" and cycle_direction == "UP" and current_point == "Apex" and current_quadrant == "1":
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
-
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and price > expected_price and positive_count < negative_count and sentiment == "-1.0" and cycle_direction == "DOWN" and current_point == "Right" and current_quadrant == "4":
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
-
-                    print()
-
-                    ##################################################
-                    ##################################################
-
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex" and current_quadrant == "1":
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
-
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right" and current_quadrant == "4":
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
-
-                    print()
-
-                    ##################################################
-                    ##################################################
-
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex" and current_quadrant == "1":
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
-
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right" and current_quadrant == "4":
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
-
-                    print()
-
-                    ##################################################
-                    ##################################################
-
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex" and current_quadrant == "1":
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
-
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right" and current_quadrant == "4":
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
-
-                    print()
-
-                    ##################################################
-                    ##################################################
-
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex":
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
-
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right":
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
-
-                    print()
-
-                    ##################################################
-                    ##################################################
-
-                    if momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and sentiment == "1.0":
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
-
-                    if momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and sentiment == "-1.0":
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
 
                     print()
 
