@@ -6528,7 +6528,7 @@ def main():
                 print("LONG condition 4: price < expected_price")
                 long_conditions_met += 1
 
-            if price < forecast_5min:
+            if cycle_direction == "UP" and current_point == "Apex":
                 print("LONG condition 5: price < forecast_5min")
                 long_conditions_met += 1
 
@@ -6598,7 +6598,8 @@ def main():
                 print("LONG condition 18: positive_sine_count > negative_sine_count (assigned based on overall majority)")
                 long_conditions_met += 1
 
-            print()
+            print() 
+
 
             ##################################################
             ##################################################
@@ -6721,116 +6722,6 @@ def main():
                     print("Now not in a trade, seeking entry conditions")
 
                     print()
-
-                    ##################################################
-                    ##################################################
-
-                    print()  
-
-                    print("Trigger conditions:")  
-
-                    print()  
-
-                    ##################################################
-                    ##################################################
- 
-                    print("Uptrend conditions:")  
-
-                    # Uptrend cycle trigger conditions 
-                    if cycle_direction == "UP" and current_point == "Apex":
-                        print("LONG condition 1: cycle_direction == UP and current_point == Apex") 
-   
-                    if normalized_distance_to_min < normalized_distance_to_max:
-                        print("LONG condition 2: normalized_distance_to_min < normalized_distance_to_max")      
-          
-                    if closest_threshold == min_threshold and price < avg_mtf: 
-                        print("LONG condition 3: closest_threshold == min_threshold and price < avg_mtf") 
-                                                  
-                    if closest_threshold < price:  
-                        print("LONG condition 4: closest_threshold < price")  
-      
-                    if forecast_direction == "Up":
-                        print("LONG condition 5: forecast_direction == Up") 
-
-                    if sentiment == "1.0": 
-                        print("LONG condition 6: sentiment == 1.0")  
-                         
-                    if price < expected_price:
-                        print("LONG condition 7: price < expected_price") 
-
-                    if market_mood_fft == "Bullish":
-                        print("LONG condition 8: market_mood_fft == Bullish")  
-
-                    if price < forecast:
-                        print("LONG condition 9: price < forecast")
-
-                    if incoming_reversal == "Top": 
-                        print("LONG condition 10: incoming_reversal == Top") 
-
-                    if market_mood_type == "up":
-                        print("LONG condition 11: market_mood_type == up")   
-
-                    if signal == "BUY":
-                        print("LONG condition 12: signal == BUY") 
-
-                    if long_conditions_met > short_conditions_met:
-                        print("LONG condition 13: Overall LONG conditions met more than SHORT conditions") 
-                        
-                    if momentum > 0:
-                        print("LONG condition 14: momentum > 0")
- 
-                    print() 
-
-                    ##################################################
-                    ##################################################
-
- 
-                    print("Downtrend conditions:")  
-
-                    # Downtrend cycle trigger conditions
-                    if cycle_direction == "DOWN" and current_point == "Right":
-                        print("SHORT condition 1: cycle_direction == DOWN and current_point == Right")  
-  
-                    if normalized_distance_to_min > normalized_distance_to_max:
-                        print("SHORT condition 2: normalized_distance_to_min > normalized_distance_to_max")   
-             
-                    if closest_threshold == max_threshold and price > avg_mtf: 
-                        print("SHORT condition 3: closest_threshold == max_threshold and price > avg_mtf") 
-                                                  
-                    if closest_threshold > price:  
-                        print("SHORT condition 4: closest_threshold > price")     
-   
-                    if forecast_direction == "Down":
-                        print("SHORT condition 5: forecast_direction == Down")     
-  
-                    if sentiment == "-1.0":  
-                        print("SHORT condition 6: sentiment == -1.0")    
-                      
-                    if price > expected_price:
-                        print("SHORT condition 7: price > expected_price") 
-
-                    if market_mood_fft == "Bearish":
-                        print("SHORT condition 8: market_mood_fft == Bearish")  
-
-                    if price > forecast:
-                        print("SHORT condition 9: price > forecast")
-
-                    if incoming_reversal == "Dip": 
-                        print("SHORT condition 10: incoming_reversal == Dip") 
-
-                    if market_mood_type == "down":
-                        print("SHORT condition 11: market_mood_type == down")   
-
-                    if signal == "SELL":
-                        print("SHORT condition 12: signal == SELL") 
-
-                    if long_conditions_met < short_conditions_met:
-                        print("SHORT condition 13: Overall SHORT conditions met more than LONG conditions")    
-                     
-                    if momentum < 0:
-                        print("SHORT condition 14: momentum < 0")
-
-                    print()  
 
                     ##################################################
                     ##################################################
