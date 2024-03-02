@@ -6440,8 +6440,8 @@ def main():
             ##################################################
             ##################################################
 
-            take_profit = 5
-            stop_loss = -5
+            take_profit = 25
+            stop_loss = -25
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
@@ -6731,8 +6731,8 @@ def main():
                     ##################################################
 
                     # Uptrend cycle trigger conditions 
-                    if buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min:
-                        print("LONG condition 1: buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min")    
+                    if cycle_direction == "UP" and current_point == "Apex":
+                        print("LONG condition 1: cycle_direction == UP and current_point == Apex")    
                         if normalized_distance_to_min < normalized_distance_to_max:
                             print("LONG condition 2: normalized_distance_to_min < normalized_distance_to_max")                
                             if closest_threshold == min_threshold and price < avg_mtf: 
@@ -6741,8 +6741,8 @@ def main():
                                     print("LONG condition 4: closest_threshold < price")        
                                     if forecast_direction == "Up":
                                         print("LONG condition 5: forecast_direction == Up") 
-                                        if cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex": 
-                                            print("LONG condition 6: cycle_direction == UP and sentiment == 1.0 and current_point == Apex")                           
+                                        if sentiment == "1.0": 
+                                            print("LONG condition 6: sentiment == 1.0")                           
                                             if price < expected_price:
                                                 print("LONG condition 7: price < expected_price") 
                                                 if market_mood_fft == "Bullish":
@@ -6755,21 +6755,16 @@ def main():
                                                                 print("LONG condition 11: market_mood_type == up")   
                                                                 if signal == "BUY":
                                                                     print("LONG condition 12: signal == BUY") 
-                                                                    if  positive_count > negative_count or positive_count == negative_count:     
-                                                                        if positive_count > negative_count:
-                                                                            print("LONG condition 13: positive_count > negative_count")      
-                                                                        elif long_conditions_met == short_conditions_met:
-                                                                            print("LONG condition 13: positive_count == negative_count") 
-                                                                        if long_conditions_met > short_conditions_met:
-                                                                            print("LONG condition 14: Overall LONG conditions met more than SHORT conditions")                         
-                                                                            if momentum > 0:
-                                                                                print("LONG condition 15: momentum > 0")
-                                                                                trigger_long = True
+                                                                    if long_conditions_met > short_conditions_met:
+                                                                        print("LONG condition 13: Overall LONG conditions met more than SHORT conditions")                         
+                                                                        if momentum > 0:
+                                                                            print("LONG condition 14: momentum > 0")
+                                                                            trigger_long = True
 
 
                     # Downtrend cycle trigger conditions
-                    if buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min:
-                        print("SHORT condition 1: buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min")    
+                    if cycle_direction == "DOWN" and current_point == "Right":
+                        print("SHORT condition 1: cycle_direction == DOWN and current_point == Right")    
                         if normalized_distance_to_min > normalized_distance_to_max:
                             print("SHORT condition 2: normalized_distance_to_min > normalized_distance_to_max")                
                             if closest_threshold == max_threshold and price > avg_mtf: 
@@ -6778,8 +6773,8 @@ def main():
                                     print("SHORT condition 4: closest_threshold > price")        
                                     if forecast_direction == "Down":
                                         print("SHORT condition 5: forecast_direction == Down")       
-                                        if cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right":  
-                                            print("SHORT condition 6: cycle_direction == DOWN and sentiment == -1.0 and current_point == Right")                          
+                                        if sentiment == "-1.0":  
+                                            print("SHORT condition 6: sentiment == -1.0")                          
                                             if price > expected_price:
                                                 print("SHORT condition 7: price > expected_price") 
                                                 if market_mood_fft == "Bearish":
@@ -6792,27 +6787,22 @@ def main():
                                                                 print("SHORT condition 11: market_mood_type == down")   
                                                                 if signal == "SELL":
                                                                     print("SHORT condition 12: signal == SELL") 
-                                                                    if  positive_count < negative_count or positive_count == negative_count:     
-                                                                        if positive_count < negative_count:
-                                                                            print("SHORT condition 13: positive_count > negative_count")      
-                                                                        elif long_conditions_met == short_conditions_met:
-                                                                            print("SHORT condition 13: positive_count == negative_count") 
-                                                                        if long_conditions_met < short_conditions_met:
-                                                                            print("SHORT condition 14: Overall SHORT conditions met more than LONG conditions")                         
-                                                                            if momentum < 0:
-                                                                                print("SHORT condition 15: momentum < 0")
-                                                                                trigger_short = True
+                                                                    if long_conditions_met < short_conditions_met:
+                                                                        print("SHORT condition 13: Overall SHORT conditions met more than LONG conditions")                         
+                                                                        if momentum < 0:
+                                                                            print("SHORT condition 14: momentum < 0")
+                                                                            trigger_short = True
 
                     print()  
 
                     ##################################################
                     ##################################################
 
-                    #if closest_threshold == min_threshold and price < avg_mtf momentum > 0 and buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex":
+                    #if buy_volume_1min > sell_volume_1min and buy_volume_3min > sell_volume_3min and buy_volume_5min > sell_volume_5min and positive_count > negative_count and cycle_direction == "UP" and sentiment == "1.0" and current_point == "Apex":
                         #print("LONG ultra HFT momentum triggered")
                         #trigger_long = True
 
-                    #if closest_threshold == max_threshold and price > avg_mtf momentum < 0 and buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right":
+                    #if buy_volume_1min < sell_volume_1min and buy_volume_3min < sell_volume_3min and buy_volume_5min < sell_volume_5min and positive_count < negative_count and cycle_direction == "DOWN" and sentiment == "-1.0" and current_point == "Right":
                         #print("SHORT ultra HFT momentum triggered")
                         #trigger_short = True
 
