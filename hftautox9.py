@@ -6689,83 +6689,63 @@ def main():
             ##################################################
 
             # Cycles trigger conditions and bot autotrde sl and tp trigger conditions
-            with open("signals.txt", "a") as f:
-                # Get data and calculate indicators here...
-                timestamp = current_time.strftime("%d %H %M %S")
+            timestamp = current_time.strftime("%d %H %M %S")
 
-                if un_realized_profit == 0:  
-                    # Check if a position is not open
-                    print("Now not in a trade, seeking entry conditions")
+            if un_realized_profit == 0:  
+                # Check if a position is not open
+                print("Now not in a trade, seeking entry conditions")
 
-                    print()
+                print()
 
-                    ##################################################
-                    ##################################################
+                ##################################################
+                ##################################################
 
-                    if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and closest_threshold < price and forecast_direction == "Up" and price < expected_price and market_mood_fft == "Bullish" and price < forecast and incoming_reversal == "Top" and market_mood_type == "up" and signal == "BUY" and cycle_direction == "UP" and sentiment == "1.0" and long_conditions_met > short_conditions_met and momentum > 0:
-                        print("LONG ultra HFT momentum triggered")
-                        trigger_long = True
+                if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and closest_threshold < price and forecast_direction == "Up" and price < expected_price and market_mood_fft == "Bullish" and price < forecast and incoming_reversal == "Top" and market_mood_type == "up" and signal == "BUY" and cycle_direction == "UP" and sentiment == "1.0" and long_conditions_met > short_conditions_met and momentum > 0 and buy_volume_1min > sell_volume_1min:
+                    print("LONG ultra HFT momentum triggered")
+                    trigger_long = True
 
-                    if normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and closest_threshold > price and forecast_direction == "Down" and price > expected_price and market_mood_fft == "Bearish" and price > forecast and incoming_reversal == "Dip" and market_mood_type == "down" and signal == "SELL" and cycle_direction == "DOWN" and sentiment == "-1.0" and long_conditions_met < short_conditions_met and momentum < 0:
-                        print("SHORT ultra HFT momentum triggered")
-                        trigger_short = True
+                if normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and closest_threshold > price and forecast_direction == "Down" and price > expected_price and market_mood_fft == "Bearish" and price > forecast and incoming_reversal == "Dip" and market_mood_type == "down" and signal == "SELL" and cycle_direction == "DOWN" and sentiment == "-1.0" and long_conditions_met < short_conditions_met and momentum < 0 and buy_volume_1min < sell_volume_1min:
+                    print("SHORT ultra HFT momentum triggered")
+                    trigger_short = True
 
-                    print()
+                print()
 
-                    ##################################################
-                    ##################################################
+                ##################################################
+                ##################################################
 
 
-                    print()
+                print()
 
-                    ##################################################
-                    ##################################################
+                ##################################################
+                ##################################################
 
-                    print()  
+                print()  
 
-                    ##################################################
-                    ##################################################
+                ##################################################
+                ##################################################
 
+                if trigger_long:
+                    print("LONG signal!")
+                    entry_long(symbol)
+                    trigger_long = False
 
-                    #message = f'Price: ${price}' 
-                    #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message)
-                    #response = webhook.execute()
+                if trigger_short:
+                    print("SHORT signal!")
+                    entry_short(symbol)
+                    trigger_short = False
 
-                    #message_long = f'LONG signal! Price now at: {price}\n'
-                    #message_short = f'SHORT signal! Price now at: {price}\n'
+                print()
 
-                    if trigger_long:
-                        print("LONG signal!")
-                        f.write(f"{current_time} LONG {price}\n")
+                ##################################################
+                ##################################################
 
-                        #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1191539448782000189/Jvz-8g-pEa3FxWdnIL51Fi5XQJFZDmPrsOYaw8NOvp66S0BESptJ99sZAdtdQe4HGI0C', content=message_long)
-                        #response = webhook.execute()
+            # Check stop loss and take profit conditions
+            if un_realized_profit != 0:
+                print("Now in a trade, seeking exit conditions")
 
-                        entry_long(symbol)
-                        trigger_long = False
-
-                    if trigger_short:
-                        print("SHORT signal!")
-                        f.write(f"{current_time} SHORT {price}\n")
-
-                        #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1191539448782000189/Jvz-8g-pEa3FxWdnIL51Fi5XQJFZDmPrsOYaw8NOvp66S0BESptJ99sZAdtdQe4HGI0C', content=message_short)
-                        #response = webhook.execute()
-
-                        entry_short(symbol)
-                        trigger_short = False
-
-                    print()
-
-                    ##################################################
-                    ##################################################
-
-                # Check stop loss and take profit conditions
-                if un_realized_profit != 0:
-                    print("Now in a trade, seeking exit conditions")
-
-                    if roe_percentage >= take_profit or roe_percentage <= stop_loss:
-                        # Call exit_trade() function
-                        exit_trade() 
+                if roe_percentage >= take_profit or roe_percentage <= stop_loss:
+                    # Call exit_trade() function
+                    exit_trade() 
                     
             ##################################################
             ##################################################
