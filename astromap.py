@@ -572,7 +572,7 @@ latitude, longitude = get_location()
 planetary_element = get_planetary_element(current_time.hour, latitude, longitude)
 
 # Print the result
-print(f'Current Hour: {current_time.hour}')
+print(f'Current hour range: {current_time.hour}')
 print(f'Element for the current hour based on planetary cycles: {planetary_element}')
 
 print()
