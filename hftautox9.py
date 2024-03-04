@@ -5311,89 +5311,6 @@ print()
 ##################################################
 ##################################################
 
-import numpy as np
-
-def analyze_entropy_variation(close):
-    # Perform Fast Fourier Transform (FFT)
-    fft_result = np.fft.fft(close)
-    frequencies = np.fft.fftfreq(len(close))
-
-    # Assuming the logic for sine wave with motion between reversals
-    amplitude = np.abs(fft_result)  # Get amplitude spectrum
-
-    # Build a threshold (you can adjust this based on your requirements)
-    threshold = np.mean(amplitude) + 2 * np.std(amplitude)
-
-    # Identify significant frequencies
-    significant_frequencies = frequencies[np.logical_and(frequencies > -0.025, frequencies < 0.025)]
-    most_negative_freq = np.min(significant_frequencies)
-    most_positive_freq = np.max(significant_frequencies)
-
-    # Quadrature, 45-degree angle, and phase shift
-    quadrature = np.arctan2(np.imag(fft_result), np.real(fft_result))
-    angle_45_degrees = np.deg2rad(45)
-    phase_shifted = np.angle(fft_result) - angle_45_degrees
-
-    # Cycle analysis based on sine wave characteristics
-    min_sine = np.min(np.sin(np.angle(fft_result)))
-    max_sine = np.max(np.sin(np.angle(fft_result)))
-
-    # Calculate forecast target based on a combination of factors
-    if min_sine < 0:  # If min_sine is negative, consider it as an "Up" cycle
-        forecast_target = close[-1] + np.abs(np.cos(phase_shifted[-1])) * np.abs(np.sin(angle_45_degrees))
-        current_frequency_status = "Up"
-        last_reversal_price = np.min(close)
-        current_frequency_value = most_negative_freq
-    else:  # If min_sine is positive, consider it as a "Down" cycle
-        # Perform a new Fourier Transform
-        new_fft_result = np.fft.fft(close[::-1])  # Reverse the close array for a new FFT
-        new_frequencies = np.fft.fftfreq(len(close))
-
-        # Find the most negative and most positive frequencies in the new FFT result
-        new_significant_frequencies = new_frequencies[np.logical_and(new_frequencies > -0.025, new_frequencies < 0.025)]
-        new_most_negative_freq = np.min(new_significant_frequencies)
-        new_most_positive_freq = np.max(new_significant_frequencies)
-
-        forecast_target = close[-1] - np.abs(np.cos(phase_shifted[-1])) * np.abs(np.sin(angle_45_degrees)) * (new_most_negative_freq + new_most_positive_freq)
-        current_frequency_status = "Down"
-        last_reversal_price = np.max(close)
-        current_frequency_value = most_positive_freq
-
-    # Calculate reversal price at the end of the current cycle
-    if current_frequency_status == "Up":
-        reversal_price = close[-1] - np.abs(np.cos(phase_shifted[-1])) * np.abs(np.sin(angle_45_degrees))
-    else:
-        reversal_price = close[-1] + np.abs(np.cos(phase_shifted[-1])) * np.abs(np.sin(angle_45_degrees))
-
-    # ROC of Sine Cycle calculation
-    roc_sine_cycle = 100 * ((max_sine - min_sine) / min_sine)  # Simplified ROC formula
-
-    # Market Mood determination
-    market_mood = "Bullish" if min_sine > 0 else "Bearish"
-
-    return most_negative_freq, most_positive_freq, quadrature[-1], phase_shifted[-1], min_sine, max_sine, last_reversal_price, forecast_target, market_mood, current_frequency_status, current_frequency_value, reversal_price
-
-result = analyze_entropy_variation(close)
-
-# Print single values for the outputs
-print("Most Negative Frequency:", result[0])
-print("Most Positive Frequency:", result[1])
-print("Quadrature:", result[2])
-print("Phase Shifted:", result[3])
-print("Min Sine:", result[4])
-print("Max Sine:", result[5])
-print("Last Reversal Price:", result[6])
-print("Forecast Target:", result[7])
-print("Market Mood:", result[8])
-print("Current Frequency Status:", result[9])
-print("Current Frequency Value:", result[10])
-print("Reversal Price:", result[11])  # Print the reversal price value
-
-print()
-
-##################################################
-##################################################
-
 print()
 
 ##################################################
@@ -6538,21 +6455,6 @@ def main():
             ##################################################
             ##################################################
 
-            result = analyze_entropy_variation(close)
-
-            # Print single values for the outputs
-            print("Most Negative Frequency:", result[0])
-            print("Most Positive Frequency:", result[1])
-            print("Quadrature:", result[2])
-            print("Phase Shifted:", result[3])
-            print("Min Sine:", result[4])
-            print("Max Sine:", result[5])
-            print("Last Reversal Price:", result[6])
-            print("Forecast Target:", result[7])
-            print("Market Mood:", result[8])
-            print("Current Frequency Status:", result[9])
-            print("Current Frequency Value:", result[10])
-            print("Reversal Price:", result[11])  # Print the reversal price value
 
             print()
 
@@ -6870,12 +6772,6 @@ def main():
 
             print()
 
-            # Get the USDT balance of the futures account
-            bUSD_balance = float(get_account_balance())
-
-            # Print account balance
-            print("USDT Futures balance:", bUSD_balance)
-
             ##################################################
             ##################################################
 
@@ -6900,7 +6796,6 @@ def main():
         del result_cycles, sentiment, market_quadrant, support_level, resistance_level, market_mood_trend, forecasted_price_trend
         del pivot_mood, pivot_forecast, dist_from_close_to_min, dist_from_close_to_max, current_sine, analysis_result
         del dom_mood, dom_forecast, unitcircle_price, unitcircle_mood, overall_sentiments_sine, positive_sine_count, negative_sine_count
-        del bUSD_balance
 
         # Force garbage collection to free up memory
         gc.collect()
