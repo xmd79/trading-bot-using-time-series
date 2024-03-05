@@ -5451,11 +5451,17 @@ def price_forecast(close):
     spectrum = np.fft.fft(close)
     frequencies = np.fft.fftfreq(len(close))
 
+    # Define total frequency index range
+    total_freq_range = 25
+    center_freq_index = len(frequencies) // 2
+
     # Define frequency range for fear and greed clock
-    fear_range = 5
-    greed_range = 5
-    fear_start = np.argmin(frequencies)
-    greed_start = len(frequencies) // 2
+    fear_range = total_freq_range // 2
+    greed_range = total_freq_range // 2
+
+    # Calculate starting index for fear and greed ranges
+    fear_start = center_freq_index - greed_range
+    greed_start = center_freq_index
 
     # Gradually filter frequencies for fear and greed clock
     spectrum[fear_start:fear_start + fear_range] = 0
@@ -5464,8 +5470,16 @@ def price_forecast(close):
     # Inverse Fourier Transform
     reconstructed_prices = np.real(ifft(spectrum))
 
-    # Calculate current cycle direction
-    current_cycle = 'Up' if close[-1] > close[-2] else 'Down'
+    # Determine current cycle direction based on frequency range
+    if fear_start <= np.argmax(spectrum) <= fear_start + fear_range:
+        current_cycle = 'Up'  # Dip of sine generating up
+    elif greed_start <= np.argmax(spectrum) <= greed_start + greed_range:
+        current_cycle = 'Down'  # Top of sine generating down
+    else:
+        current_cycle = 'Up'  # Default to 'Up' between reversals
+
+    # Note on market direction based on the last reversal and forecasted incoming reversal
+    market_direction = 'Up' if current_cycle == 'Up' else 'Down'  # Inverse of current_cycle
 
     # Forecasting and converting frequencies to real price values
     small_range_forecast = close[-1] + (reconstructed_prices[-1] - reconstructed_prices[-2])
@@ -5475,14 +5489,15 @@ def price_forecast(close):
     # Determine predominant frequency direction
     predominant_direction = 'Positive' if np.sum(spectrum) > 0 else 'Negative' if np.sum(spectrum) < 0 else 'Balanced'
 
-    return current_cycle, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, spectrum, np.abs(spectrum), frequencies
+    return current_cycle, market_direction, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, spectrum, np.abs(spectrum), frequencies
 
 result = price_forecast(close)
 
 # Prints outside the function
-current_cycle, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, filtered_spectrum, abs_spectrum, frequencies = result
+current_cycle, market_direction, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, filtered_spectrum, abs_spectrum, frequencies = result
 
 print("Current Cycle Direction:", current_cycle)
+print("Market Direction:", market_direction)
 print("Forecast for Small Range:", small_range_forecast)
 print("Forecast for Medium Range:", medium_range_forecast)
 print("Forecast for Large Range:", large_range_forecast)
@@ -5493,7 +5508,6 @@ print("\nFear and Greed Clock:")
 print("Original Spectrum:", filtered_spectrum)
 print("Filtered Spectrum:", abs_spectrum)
 print("Frequencies:", frequencies)
-
 
 
 print()
@@ -6659,9 +6673,10 @@ def main():
             result = price_forecast(close)
 
             # Prints outside the function
-            current_cycle, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, filtered_spectrum, abs_spectrum, frequencies = result
+            current_cycle, market_direction, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, filtered_spectrum, abs_spectrum, frequencies = result
 
             print("Current Cycle Direction:", current_cycle)
+            print("Market Direction:", market_direction)
             print("Forecast for Small Range:", small_range_forecast)
             print("Forecast for Medium Range:", medium_range_forecast)
             print("Forecast for Large Range:", large_range_forecast)
@@ -6945,11 +6960,11 @@ def main():
                 ##################################################
                 ##################################################
 
-                if cycle_direction == "UP" and long_conditions_met > short_conditions_met and buy_volume_1min > sell_volume_1min:
+                if cycle_direction == "UP" and long_conditions_met > short_conditions_met and buy_volume_1min > sell_volume_1min and momentum > 0 :
                     print("LONG ultra HFT momentum triggered")
                     trigger_long = True
 
-                if cycle_direction == "DOWN" and long_conditions_met < short_conditions_met and buy_volume_1min < sell_volume_1min:
+                if cycle_direction == "DOWN" and long_conditions_met < short_conditions_met and buy_volume_1min < sell_volume_1min and momentum < 0 :
                     print("SHORT ultra HFT momentum triggered")
                     trigger_short = True
 
@@ -6984,7 +6999,7 @@ def main():
                 ##################################################
 
             # Check stop loss and take profit conditions
-            if un_realized_profit != 0:
+            elif un_realized_profit != 0:
                 print("Now in a trade, seeking exit conditions")
 
                 if roe_percentage >= take_profit or roe_percentage <= stop_loss:
