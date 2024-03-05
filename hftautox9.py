@@ -6973,6 +6973,14 @@ def main():
                 ##################################################
                 ##################################################
 
+                if cycle_direction == "UP" and dist_from_close_to_min < dist_from_close_to_max and buy_volume_1min > sell_volume_1min and momentum > 0 :
+                    print("LONG ultra HFT momentum triggered")
+                    trigger_long = True
+
+                if cycle_direction == "DOWN" and dist_from_close_to_min > dist_from_close_to_max and buy_volume_1min < sell_volume_1min and momentum < 0 :
+                    print("SHORT ultra HFT momentum triggered")
+                    trigger_short = True
+
                 print()
 
                 ##################################################
