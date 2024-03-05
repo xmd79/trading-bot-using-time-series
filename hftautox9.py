@@ -6868,11 +6868,11 @@ def main():
                 ##################################################
                 ##################################################
 
-                if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and closest_threshold < price and forecast_direction == "Up" and price < expected_price and market_mood_fft == "Bullish" and price < forecast and incoming_reversal == "Top" and market_mood_type == "up" and signal == "BUY" and cycle_direction == "UP" and sentiment == "1.0" and long_conditions_met > short_conditions_met and momentum > 0 and buy_volume_1min > sell_volume_1min:
+                if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and closest_threshold < price and forecast_direction == "Up" and price < expected_price and market_mood_fft == "Bullish" and price < forecast and incoming_reversal == "Top" and market_mood_type == "up" and signal == "BUY" and cycle_direction == "UP" and long_conditions_met > short_conditions_met and momentum > 0 and buy_volume_1min > sell_volume_1min:
                     print("LONG ultra HFT momentum triggered")
                     trigger_long = True
 
-                if normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and closest_threshold > price and forecast_direction == "Down" and price > expected_price and market_mood_fft == "Bearish" and price > forecast and incoming_reversal == "Dip" and market_mood_type == "down" and signal == "SELL" and cycle_direction == "DOWN" and sentiment == "-1.0" and long_conditions_met < short_conditions_met and momentum < 0 and buy_volume_1min < sell_volume_1min:
+                if normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and closest_threshold > price and forecast_direction == "Down" and price > expected_price and market_mood_fft == "Bearish" and price > forecast and incoming_reversal == "Dip" and market_mood_type == "down" and signal == "SELL" and cycle_direction == "DOWN" and long_conditions_met < short_conditions_met and momentum < 0 and buy_volume_1min < sell_volume_1min:
                     print("SHORT ultra HFT momentum triggered")
                     trigger_short = True
 
@@ -6881,11 +6881,11 @@ def main():
                 ##################################################
                 ##################################################
 
-                if cycle_direction == "UP" and sentiment == "1.0" and long_conditions_met > short_conditions_met and momentum > 0 and buy_volume_1min > sell_volume_1min:
+                if cycle_direction == "UP" and long_conditions_met > short_conditions_met and buy_volume_1min > sell_volume_1min:
                     print("LONG ultra HFT momentum triggered")
                     trigger_long = True
 
-                if cycle_direction == "DOWN" and sentiment == "-1.0" and long_conditions_met < short_conditions_met and momentum < 0 and buy_volume_1min < sell_volume_1min:
+                if cycle_direction == "DOWN" and long_conditions_met < short_conditions_met and buy_volume_1min < sell_volume_1min:
                     print("SHORT ultra HFT momentum triggered")
                     trigger_short = True
 
