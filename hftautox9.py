@@ -5311,6 +5311,133 @@ print()
 ##################################################
 ##################################################
 
+import talib
+import numpy as np
+
+def energy_triangle(close, closest_threshold, min_threshold, max_threshold):
+    # Convert the input list to a numpy array
+    close_array = np.array(close, dtype=np.double)
+
+    # Calculate the HT_SINE values using TA-Lib
+    ht_sine, _ = talib.HT_SINE(close_array)
+
+    # Filter out NaN values
+    valid_indices = ~np.isnan(ht_sine)
+    ht_sine = ht_sine[valid_indices]
+
+    # Extract corresponding prices for valid indices
+    valid_prices = np.array(close)[valid_indices]
+
+    # Check if there are any valid values after filtering
+    if len(ht_sine) == 0 or len(valid_prices) == 0:
+        raise ValueError("No valid values in HT_SINE. Cannot calculate energy triangle.")
+
+    # Find the closest threshold index
+    closest_index = np.argmin(np.abs(ht_sine - closest_threshold))
+
+    # Determine the dip and top conditions based on thresholds and frequencies
+    dip_condition = ht_sine[closest_index] < 0 and ht_sine[-1] > min_threshold
+    top_condition = ht_sine[closest_index] > 0 and ht_sine[-1] < max_threshold
+
+    # Determine dip and top confirmations based on symmetry of the golden triangle
+    dip_confirmation = dip_condition and ht_sine[closest_index] < ht_sine[-1]
+    top_confirmation = top_condition and ht_sine[closest_index] > ht_sine[-1]
+
+    # Determine the current trend momentum of the cycle (uptrend, downtrend, or undefined)
+    most_negative_freq = np.argmax(ht_sine)
+    most_positive_freq = np.argmin(ht_sine)
+    
+    uptrend_condition = ht_sine[most_negative_freq] < 0 and top_confirmation
+    downtrend_condition = ht_sine[most_positive_freq] > 0 and dip_confirmation
+    
+    if uptrend_condition:
+        current_momentum = "Uptrend"
+    elif downtrend_condition:
+        current_momentum = "Downtrend"
+    else:
+        current_momentum = "Undefined"
+
+    # Determine the current status of frequencies (mostly negative or positive)
+    current_frequency_status = "Mostly Negative" if np.sum(ht_sine < 0) > np.sum(ht_sine > 0) else "Mostly Positive"
+
+    # Find the maximum and minimum values of the HT_SINE wave
+    max_value = np.max(ht_sine)
+    min_value = np.min(ht_sine)
+
+    # Find corresponding prices for max and min values
+    max_price = valid_prices[np.argmax(ht_sine)]
+    min_price = valid_prices[np.argmin(ht_sine)]
+
+    # Calculate the golden ratio
+    golden_ratio = (1 + np.sqrt(5)) / 2
+
+    # Calculate the values for the energy triangle
+    vertex_a = max_value * golden_ratio
+    vertex_b = min_value * golden_ratio
+    vertex_c = (vertex_a + vertex_b) / 2
+
+    # Find corresponding prices for energy triangle vertices
+    price_a = valid_prices[np.argmax(ht_sine)]
+    price_b = valid_prices[np.argmin(ht_sine)]
+    price_c = (price_a + price_b) / 2
+
+    # Find last major reversal price value
+    last_major_reversal_price = close[-1]
+
+    # Find reversal price values for the current cycle
+    reversal_min = np.min(valid_prices[ht_sine < vertex_b]) if np.any(ht_sine < vertex_b) else last_major_reversal_price
+    reversal_max = np.max(valid_prices[ht_sine > vertex_a]) if np.any(ht_sine > vertex_a) else last_major_reversal_price
+    reversal_avg = np.mean(valid_prices) if len(valid_prices) > 0 else last_major_reversal_price
+
+    # Calculate Fast Fourier Transform (FFT)
+    fft_result = np.fft.fft(ht_sine)
+    frequencies = np.fft.fftfreq(len(ht_sine))
+    
+    # Extract 25 frequencies from the FFT spectrum
+    selected_frequencies = np.linspace(np.argmin(ht_sine), np.argmax(ht_sine), 25, dtype=int)
+    
+    # Extract corresponding price values for selected frequencies
+    fft_prices = valid_prices[selected_frequencies]
+    
+    # Find min and max values for current cycle
+    fft_min = np.min(fft_prices) if len(fft_prices) > 0 else last_major_reversal_price
+    fft_max = np.max(fft_prices) if len(fft_prices) > 0 else last_major_reversal_price
+
+    # Forecast price using average frequency
+    avg_frequency = int(np.mean(selected_frequencies))
+    forecast_price = valid_prices[avg_frequency] if len(valid_prices) > avg_frequency else last_major_reversal_price
+
+    # Return the values and corresponding prices of the energy triangle, reversals, and FFT results
+    return {'vertex_a': (vertex_a, price_a),
+            'vertex_b': (vertex_b, price_b),
+            'vertex_c': (vertex_c, price_c),
+            'reversal_min': reversal_min,
+            'reversal_max': reversal_max,
+            'reversal_avg': reversal_avg,
+            'fft_min': fft_min,
+            'fft_max': fft_max,
+            'forecast_price': forecast_price,
+            'momentum': current_momentum,
+            'dip_confirmation': dip_confirmation,
+            'top_confirmation': top_confirmation,
+            'frequency_status': current_frequency_status}
+
+# Separate print statements for debugging
+result = energy_triangle(close, closest_threshold, min_threshold, max_threshold)
+
+# Print information
+print(f"Current Momentum: {result['momentum']}")
+print(f"Vertex A: {result['vertex_a'][0]} (Price: {result['vertex_a'][1]})")
+print(f"Vertex B: {result['vertex_b'][0]} (Price: {result['vertex_b'][1]})")
+print(f"Vertex C: {result['vertex_c'][0]} (Price: {result['vertex_c'][1]})")
+print(f"Reversal Avg: {result['reversal_avg']}")
+print(f"FFT Min: {result['fft_min']}")
+print(f"FFT Max: {result['fft_max']}")
+print(f"Forecast Price: {result['forecast_price']}")
+print(f"Dip Confirmation: {result['dip_confirmation']}")
+print(f"Top Confirmation: {result['top_confirmation']}")
+print(f"Frequency Status: {result['frequency_status']}")
+
 print()
 
 ##################################################
@@ -6455,6 +6582,21 @@ def main():
             ##################################################
             ##################################################
 
+            # Separate print statements for debugging
+            result = energy_triangle(close, closest_threshold, min_threshold, max_threshold)
+
+            # Print information
+            print(f"Current Momentum: {result['momentum']}")
+            print(f"Vertex A: {result['vertex_a'][0]} (Price: {result['vertex_a'][1]})")
+            print(f"Vertex B: {result['vertex_b'][0]} (Price: {result['vertex_b'][1]})")
+            print(f"Vertex C: {result['vertex_c'][0]} (Price: {result['vertex_c'][1]})")
+            print(f"Reversal Avg: {result['reversal_avg']}")
+            print(f"FFT Min: {result['fft_min']}")
+            print(f"FFT Max: {result['fft_max']}")
+            print(f"Forecast Price: {result['forecast_price']}")
+            print(f"Dip Confirmation: {result['dip_confirmation']}")
+            print(f"Top Confirmation: {result['top_confirmation']}")
+            print(f"Frequency Status: {result['frequency_status']}")
 
             print()
 
