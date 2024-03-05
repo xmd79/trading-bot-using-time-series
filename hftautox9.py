@@ -5443,6 +5443,59 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+from scipy.fft import ifft
+
+def price_forecast(close):
+    # Compute Fourier Transform
+    spectrum = np.fft.fft(close)
+    frequencies = np.fft.fftfreq(len(close))
+
+    # Define frequency range for fear and greed clock
+    fear_range = 5
+    greed_range = 5
+    fear_start = np.argmin(frequencies)
+    greed_start = len(frequencies) // 2
+
+    # Gradually filter frequencies for fear and greed clock
+    spectrum[fear_start:fear_start + fear_range] = 0
+    spectrum[greed_start:greed_start + greed_range] = 0
+
+    # Inverse Fourier Transform
+    reconstructed_prices = np.real(ifft(spectrum))
+
+    # Calculate current cycle direction
+    current_cycle = 'Up' if close[-1] > close[-2] else 'Down'
+
+    # Forecasting and converting frequencies to real price values
+    small_range_forecast = close[-1] + (reconstructed_prices[-1] - reconstructed_prices[-2])
+    medium_range_forecast = close[-1] + (reconstructed_prices[-1] - reconstructed_prices[-3])
+    large_range_forecast = close[-1] + (reconstructed_prices[-1] - reconstructed_prices[-4])
+
+    # Determine predominant frequency direction
+    predominant_direction = 'Positive' if np.sum(spectrum) > 0 else 'Negative' if np.sum(spectrum) < 0 else 'Balanced'
+
+    return current_cycle, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, spectrum, np.abs(spectrum), frequencies
+
+result = price_forecast(close)
+
+# Prints outside the function
+current_cycle, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, filtered_spectrum, abs_spectrum, frequencies = result
+
+print("Current Cycle Direction:", current_cycle)
+print("Forecast for Small Range:", small_range_forecast)
+print("Forecast for Medium Range:", medium_range_forecast)
+print("Forecast for Large Range:", large_range_forecast)
+print("Predominant Frequency Direction:", predominant_direction)
+
+# Detailed prints for fear and greed clock
+print("\nFear and Greed Clock:")
+print("Original Spectrum:", filtered_spectrum)
+print("Filtered Spectrum:", abs_spectrum)
+print("Frequencies:", frequencies)
+
+
+
 print()
 
 ##################################################
@@ -6602,6 +6655,17 @@ def main():
 
             ##################################################
             ##################################################
+
+            result = price_forecast(close)
+
+            # Prints outside the function
+            current_cycle, small_range_forecast, medium_range_forecast, large_range_forecast, predominant_direction, filtered_spectrum, abs_spectrum, frequencies = result
+
+            print("Current Cycle Direction:", current_cycle)
+            print("Forecast for Small Range:", small_range_forecast)
+            print("Forecast for Medium Range:", medium_range_forecast)
+            print("Forecast for Large Range:", large_range_forecast)
+            print("Predominant Frequency Direction:", predominant_direction)
 
             print()
 
