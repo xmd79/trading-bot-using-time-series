@@ -5628,7 +5628,7 @@ print()
 import numpy as np
 from statsmodels.robust import mad
 
-def find_reversal_keypoints(close, threshold=0.1):
+def find_reversals_keypoints(close, threshold=0.1):
     # Fourier Transform
     fourier = np.fft.fft(close)
     
@@ -5673,7 +5673,7 @@ def dan_prophet_with_reversals_and_prices(close, minutes=5, threshold=0.1):
     future_projection = np.real(np.fft.ifft(high_pass_filter * fourier))
     
     # Identify reversal keypoints
-    dip_points, top_points = find_reversal_keypoints(close, threshold)
+    dip_points, top_points = find_reversals_keypoints(close, threshold)
     
     # Identify dominant frequency
     dominant_freq_index = np.argmax(np.abs(fourier))
@@ -5743,7 +5743,7 @@ def fftresult_advanced_sine_wave(close):
     current_quadrant = determine_quadrant(current_sine)
 
     # Identify reversal keypoints
-    dip_keypoint, top_keypoint = get_reversal_keypoints(close)
+    dip_keypoint, top_keypoint = find_reversal_keypoints(close)
 
     # Calculate distances to min and max of sine
     dist_to_min_sine = ((current_sine - sine_wave_min) /  
@@ -5753,11 +5753,14 @@ def fftresult_advanced_sine_wave(close):
 
     # Calculate distances to min and max of current quadrant
     min_quadrant_values = get_quadrant_values(current_quadrant)
-    dist_to_min_current_quadrant = ((current_sine - np.min(min_quadrant_values)) /  
-                                    (np.max(min_quadrant_values) - np.min(min_quadrant_values))) * 100
+    min_quadrant_values_scaled = ((min_quadrant_values - np.min(min_quadrant_values)) /  
+                                  (np.max(min_quadrant_values) - np.min(min_quadrant_values))) * 100
 
-    dist_to_max_current_quadrant = ((np.max(min_quadrant_values) - current_sine) / 
-                                    (np.max(min_quadrant_values) - np.min(min_quadrant_values))) * 100
+    dist_to_min_current_quadrant = ((current_sine - np.min(min_quadrant_values_scaled)) /  
+                                    (np.max(min_quadrant_values_scaled) - np.min(min_quadrant_values_scaled))) * 100
+
+    dist_to_max_current_quadrant = ((np.max(min_quadrant_values_scaled) - current_sine) / 
+                                    (np.max(min_quadrant_values_scaled) - np.min(min_quadrant_values_scaled))) * 100
 
     # Identify the current cycle (Up or Down)
     current_cycle = "Up" if current_sine > 0 else "Down"
@@ -5798,9 +5801,8 @@ def fftresult_advanced_sine_wave(close):
 
     # Calculate distances to each reversal in symmetrical percentages
     dist_to_dip = ((current_sine - sine_wave[dip_keypoint]) /  
-                   (sine_wave_max - sine_wave_min)) * 100
-    dist_to_top = ((sine_wave_max - sine_wave[top_keypoint]) / 
-                   (sine_wave_max - sine_wave_min)) * 100
+                   (sine_wave_max - sine_wave_min)) * 50  # Divide by 2 to ensure symmetrical percentages
+    dist_to_top = 100 - dist_to_dip  # Ensure the sum is 100%
 
     # Replace NaN values with 0 in the result
     result = {
@@ -5825,7 +5827,7 @@ def determine_quadrant(value):
     else:
         return "q3" if value >= -0.5 else "q4"
 
-def get_reversal_keypoints(close):
+def find_reversal_keypoints(close):
     # Identify dip and top reversal keypoints based on specified rules
     dip_keypoint = np.argmin(close)
     top_keypoint = np.argmax(close)
@@ -5870,10 +5872,13 @@ print("\nForecasted Price:")
 print(fftresult["forecasted_price"])
 
 print("\nDistance to Dip:")
-print(fftresult["dist_to_dip"])
+print(fftresult["dist_to_top"])
 
 print("\nDistance to Top:")
-print(fftresult["dist_to_top"])
+print(fftresult["dist_to_dip"])
+
+
+
 
 print()
 
@@ -7116,10 +7121,10 @@ def main():
             print(fftresult["forecasted_price"])
 
             print("\nDistance to Dip:")
-            print(fftresult["dist_to_dip"])
+            print(fftresult["dist_to_top"])
 
             print("\nDistance to Top:")
-            print(fftresult["dist_to_top"])
+            print(fftresult["dist_to_dip"])
 
             print()
 
