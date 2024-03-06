@@ -5647,6 +5647,10 @@ def dan_prophet(close, minutes=5):
     # Calculate HFT Fast Cycles Target based on dominant frequency
     hft_target = np.real(close[-1] + np.mean(noise) * minutes * dominant_freq)
     
+    # Ensure a minimum difference of at least 200 in price values
+    min_price_difference = 200
+    hft_target = max(hft_target, close[-1] + min_price_difference)
+    
     # Convert HFT Target to a more realistic value (adjust as needed)
     hft_target = np.clip(hft_target, close[-1] * 0.95, close[-1] * 1.05)
     
@@ -5660,7 +5664,7 @@ def dan_prophet(close, minutes=5):
 hft_target, big_cycles_target = dan_prophet(close)
 
 # Prints
-print(f"HFT Fast Cycles Target (next 5 minutes): {hft_target:.4f}")
+print(f"HFT Fast Cycles Target: {hft_target:.4f}")
 print("Big Cycles Target:", big_cycles_target)
 
 print()
@@ -6866,7 +6870,7 @@ def main():
             hft_target, big_cycles_target = dan_prophet(close)
 
             # Prints
-            print(f"HFT Fast Cycles Target (next 5 minutes): {hft_target:.4f}")
+            print(f"HFT Fast Cycles Target: {hft_target:.4f}")
             print("Big Cycles Target:", big_cycles_target)
 
             print()
