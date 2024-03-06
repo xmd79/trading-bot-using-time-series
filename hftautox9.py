@@ -5620,7 +5620,48 @@ print(f"Distance to Min: {distance_to_min}")
 print(f"Distance to Max: {distance_to_max}")
 print(f"Dominant Frequency Sign: {dominant_freq_sign}")
 
+print()
 
+##################################################
+##################################################
+
+import numpy as np
+from statsmodels.robust import mad
+
+def dan_prophet(close, minutes=5):
+    # Fourier Transform
+    fourier = np.fft.fft(close)
+    
+    # Noise Decomposition
+    mad_value = mad(close)
+    high_pass_filter = np.abs(fourier) > 5 * mad_value
+    noise = np.fft.ifft(fourier * high_pass_filter)
+
+    # Project into the future
+    future_projection = np.real(np.fft.ifft(high_pass_filter * fourier))
+    
+    # Identify dominant frequency
+    dominant_freq_index = np.argmax(np.abs(fourier))
+    dominant_freq = np.fft.fftfreq(len(fourier))[dominant_freq_index]
+    
+    # Calculate HFT Fast Cycles Target based on dominant frequency
+    hft_target = np.real(close[-1] + np.mean(noise) * minutes * dominant_freq)
+    
+    # Convert HFT Target to a more realistic value (adjust as needed)
+    hft_target = np.clip(hft_target, close[-1] * 0.95, close[-1] * 1.05)
+    
+    big_cycles_target = np.mean(future_projection)
+    
+    # Normalize big cycles target
+    big_cycles_target = big_cycles_target if big_cycles_target > 0 else -big_cycles_target
+    
+    return hft_target, big_cycles_target
+
+hft_target, big_cycles_target = dan_prophet(close)
+
+# Prints
+print(f"HFT Fast Cycles Target (next 5 minutes): {hft_target:.4f}")
+print("Big Cycles Target:", big_cycles_target)
 
 print()
 
@@ -6816,6 +6857,17 @@ def main():
             print(f"Distance to Min: {distance_to_min}")
             print(f"Distance to Max: {distance_to_max}")
             print(f"Dominant Frequency Sign: {dominant_freq_sign}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            hft_target, big_cycles_target = dan_prophet(close)
+
+            # Prints
+            print(f"HFT Fast Cycles Target (next 5 minutes): {hft_target:.4f}")
+            print("Big Cycles Target:", big_cycles_target)
 
             print()
 
