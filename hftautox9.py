@@ -5628,7 +5628,39 @@ print()
 import numpy as np
 from statsmodels.robust import mad
 
-def dan_prophet(close, minutes=5):
+def find_reversal_keypoints(close, threshold=0.1):
+    # Fourier Transform
+    fourier = np.fft.fft(close)
+    
+    # Identify dominant frequencies
+    abs_values = np.abs(fourier)
+    dominant_freq_indices = np.where(abs_values > threshold * np.max(abs_values))[0]
+    
+    # Find the corresponding frequencies
+    frequencies = np.fft.fftfreq(len(close))
+    dominant_freqs = frequencies[dominant_freq_indices]
+    
+    # Identify reversal keypoints for dips and tops
+    dip_points = []
+    top_points = []
+
+    for freq in dominant_freqs:
+        # Reconstruct the signal excluding the dominant frequency
+        filtered_fourier = fourier.copy()
+        filtered_fourier[dominant_freq_indices] = 0
+        filtered_signal = np.real(np.fft.ifft(filtered_fourier))
+        
+        # Find the local minima and maxima in the reconstructed signal
+        local_minima = np.where(filtered_signal[:-1] > filtered_signal[1:])[0] + 1
+        local_maxima = np.where(filtered_signal[:-1] < filtered_signal[1:])[0] + 1
+        
+        # Add the reversal keypoints for dips and tops
+        dip_points.extend(local_minima)
+        top_points.extend(local_maxima)
+
+    return np.unique(dip_points), np.unique(top_points)
+
+def dan_prophet_with_reversals_and_prices(close, minutes=5, threshold=0.1):
     # Fourier Transform
     fourier = np.fft.fft(close)
     
@@ -5639,6 +5671,9 @@ def dan_prophet(close, minutes=5):
 
     # Project into the future
     future_projection = np.real(np.fft.ifft(high_pass_filter * fourier))
+    
+    # Identify reversal keypoints
+    dip_points, top_points = find_reversal_keypoints(close, threshold)
     
     # Identify dominant frequency
     dominant_freq_index = np.argmax(np.abs(fourier))
@@ -5659,13 +5694,186 @@ def dan_prophet(close, minutes=5):
     # Normalize big cycles target
     big_cycles_target = big_cycles_target if big_cycles_target > 0 else -big_cycles_target
     
-    return hft_target, big_cycles_target
+    # Provide real price values for current dip and current top
+    current_dip_price = close[min(dip_points)]
+    current_top_price = close[max(top_points)]
+    
+    return hft_target, big_cycles_target, current_dip_price, current_top_price
 
-hft_target, big_cycles_target = dan_prophet(close)
+hft_target, big_cycles_target, current_dip_price, current_top_price = dan_prophet_with_reversals_and_prices(close)
 
 # Prints
 print(f"HFT Fast Cycles Target: {hft_target:.4f}")
 print("Big Cycles Target:", big_cycles_target)
+print("Current Dip Price:", current_dip_price)
+print("Current Top Price:", current_top_price)
+
+print()
+
+##################################################
+##################################################
+
+import numpy as np
+import talib
+
+def fftresult_advanced_sine_wave(close):
+    close = np.array(close)  # Convert to NumPy array
+
+    # Calculate the sine wave using talib
+    sine, _ = talib.HT_SINE(close)
+    
+    # Replace NaN values with 0
+    sine_wave = np.nan_to_num(sine)
+    sine_wave = -sine_wave
+    
+    # Get the sine value for the last close      
+    current_sine = sine_wave[-1]
+    
+    # Calculate the min and max sine           
+    sine_wave_min = np.min(sine_wave)
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate distances in percentages
+    dist_min_sine = ((current_sine - sine_wave_min) /  
+                     (sine_wave_max - sine_wave_min)) * 100
+    dist_max_sine = ((sine_wave_max - current_sine) / 
+                     (sine_wave_max - sine_wave_min)) * 100
+
+    # Determine current quadrant
+    current_quadrant = determine_quadrant(current_sine)
+
+    # Identify reversal keypoints
+    dip_keypoint, top_keypoint = get_reversal_keypoints(close)
+
+    # Calculate distances to min and max of sine
+    dist_to_min_sine = ((current_sine - sine_wave_min) /  
+                        (sine_wave_max - sine_wave_min)) * 100
+    dist_to_max_sine = ((sine_wave_max - current_sine) / 
+                        (sine_wave_max - sine_wave_min)) * 100
+
+    # Calculate distances to min and max of current quadrant
+    min_quadrant_values = get_quadrant_values(current_quadrant)
+    dist_to_min_current_quadrant = ((current_sine - np.min(min_quadrant_values)) /  
+                                    (np.max(min_quadrant_values) - np.min(min_quadrant_values))) * 100
+
+    dist_to_max_current_quadrant = ((np.max(min_quadrant_values) - current_sine) / 
+                                    (np.max(min_quadrant_values) - np.min(min_quadrant_values))) * 100
+
+    # Identify the current cycle (Up or Down)
+    current_cycle = "Up" if current_sine > 0 else "Down"
+
+    # Initialize forecasted price
+    forecasted_price = close[-1]
+
+    # Rules for up cycle stages
+    if current_cycle == "Up":
+        if current_quadrant == "q1":
+            forecasted_price += 0.25 * (dist_to_max_sine - dist_to_min_sine)
+        elif current_quadrant == "q2":
+            forecasted_price += 0.25 * (dist_to_max_sine - dist_to_min_sine)
+        elif current_quadrant == "q3":
+            forecasted_price += 0.25 * (dist_to_max_sine - dist_to_min_sine)
+        elif current_quadrant == "q4":
+            forecasted_price += 0.25 * (dist_to_max_sine - dist_to_min_sine)
+
+    # Rules for down cycle stages
+    elif current_cycle == "Down":
+        if current_quadrant == "q1":
+            forecasted_price -= 0.25 * (dist_to_max_sine - dist_to_min_sine)
+        elif current_quadrant == "q2":
+            forecasted_price -= 0.25 * (dist_to_max_sine - dist_to_min_sine)
+        elif current_quadrant == "q3":
+            forecasted_price -= 0.25 * (dist_to_max_sine - dist_to_min_sine)
+        elif current_quadrant == "q4":
+            forecasted_price -= 0.25 * (dist_to_max_sine - dist_to_min_sine)
+
+    # Perform Fourier Transform
+    fft_values = np.fft.fft(close)
+
+    # Extract the dominant frequency
+    dominant_freq = np.argmax(np.abs(fft_values))
+
+    # Calculate forecasted price using the dominant frequency
+    forecasted_price += np.real(np.fft.ifft(fft_values))[-1] * (dominant_freq / len(close))
+
+    # Calculate distances to each reversal in symmetrical percentages
+    dist_to_dip = ((current_sine - sine_wave[dip_keypoint]) /  
+                   (sine_wave_max - sine_wave_min)) * 100
+    dist_to_top = ((sine_wave_max - sine_wave[top_keypoint]) / 
+                   (sine_wave_max - sine_wave_min)) * 100
+
+    # Replace NaN values with 0 in the result
+    result = {
+        "sine_wave": sine_wave,
+        "current_cycle": current_cycle,
+        "current_quadrant": current_quadrant,
+        "dist_to_min_sine": dist_to_min_sine,
+        "dist_to_max_sine": dist_to_max_sine,
+        "dist_to_min_current_quadrant": dist_to_min_current_quadrant,
+        "dist_to_max_current_quadrant": dist_to_max_current_quadrant,
+        "forecasted_price": forecasted_price,
+        "dist_to_dip": dist_to_dip,
+        "dist_to_top": dist_to_top
+    }
+
+    return result
+
+def determine_quadrant(value):
+    # Determine current quadrant based on the value
+    if value > 0:
+        return "q1" if value <= 0.5 else "q2"
+    else:
+        return "q3" if value >= -0.5 else "q4"
+
+def get_reversal_keypoints(close):
+    # Identify dip and top reversal keypoints based on specified rules
+    dip_keypoint = np.argmin(close)
+    top_keypoint = np.argmax(close)
+    return dip_keypoint, top_keypoint
+
+def get_quadrant_values(quadrant):
+    # Return the values corresponding to the specified quadrant
+    if quadrant == "q1":
+        return np.arange(0, 90)
+    elif quadrant == "q2":
+        return np.arange(90, 180)
+    elif quadrant == "q3":
+        return np.arange(-180, -90)
+    elif quadrant == "q4":
+        return np.arange(-90, 0)
+
+fftresult = fftresult_advanced_sine_wave(close)
+
+# Print the results with specific variables
+print("Sine Wave Values:")
+print(fftresult["sine_wave"])
+
+print("\nCurrent Cycle:")
+print(fftresult["current_cycle"])
+
+print("\nCurrent Quadrant:")
+print(fftresult["current_quadrant"])
+
+print("\nDistance to Min of Sine:")
+print(fftresult["dist_to_min_sine"])
+
+print("\nDistance to Max of Sine:")
+print(fftresult["dist_to_max_sine"])
+
+print("\nDistance to Min of Current Quadrant:")
+print(fftresult["dist_to_min_current_quadrant"])
+
+print("\nDistance to Max of Current Quadrant:")
+print(fftresult["dist_to_max_current_quadrant"])
+
+print("\nForecasted Price:")
+print(fftresult["forecasted_price"])
+
+print("\nDistance to Dip:")
+print(fftresult["dist_to_dip"])
+
+print("\nDistance to Top:")
+print(fftresult["dist_to_top"])
 
 print()
 
@@ -6867,11 +7075,51 @@ def main():
             ##################################################
             ##################################################
 
-            hft_target, big_cycles_target = dan_prophet(close)
+            hft_target, big_cycles_target, current_dip_price, current_top_price = dan_prophet_with_reversals_and_prices(close)
 
             # Prints
             print(f"HFT Fast Cycles Target: {hft_target:.4f}")
             print("Big Cycles Target:", big_cycles_target)
+            print("Current Dip Price:", current_dip_price)
+            print("Current Top Price:", current_top_price)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            fftresult = fftresult_advanced_sine_wave(close)
+
+            # Print the results with specific variables
+            print("Sine Wave Values:")
+            print(fftresult["sine_wave"])
+
+            print("\nCurrent Cycle:")
+            print(fftresult["current_cycle"])
+
+            print("\nCurrent Quadrant:")
+            print(fftresult["current_quadrant"])
+
+            print("\nDistance to Min of Sine:")
+            print(fftresult["dist_to_min_sine"])
+
+            print("\nDistance to Max of Sine:")
+            print(fftresult["dist_to_max_sine"])
+
+            print("\nDistance to Min of Current Quadrant:")
+            print(fftresult["dist_to_min_current_quadrant"])
+
+            print("\nDistance to Max of Current Quadrant:")
+            print(fftresult["dist_to_max_current_quadrant"])
+
+            print("\nForecasted Price:")
+            print(fftresult["forecasted_price"])
+
+            print("\nDistance to Dip:")
+            print(fftresult["dist_to_dip"])
+
+            print("\nDistance to Top:")
+            print(fftresult["dist_to_top"])
 
             print()
 
