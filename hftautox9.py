@@ -5515,6 +5515,85 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+
+def ultimate_market_analysis(close):
+    # Perform Inverse FFT
+    fft_result = np.fft.fft(close)
+    
+    # Calculate symmetries between pi/phi and phi/pi
+    pi_phi_symmetry = np.sum(fft_result * np.cos(np.pi / 1.61803398875))  # Replace np.phi with the golden ratio
+    phi_pi_symmetry = np.sum(fft_result * np.cos(1.61803398875 / np.pi))  # Replace np.phi with the golden ratio
+    
+    # Determine reversal keypoints
+    reversal_points = np.diff(np.sign(np.diff(close)))
+    
+    # Identify the closest reversal at the last major reversal
+    last_major_reversal = reversal_points[-1]
+    closest_reversal_index = np.argmin(np.abs(reversal_points - last_major_reversal))
+    
+    # Check if the closest reversal at the last major reversal was a low or a high
+    last_reversal_type = "Low" if close[closest_reversal_index] < close[closest_reversal_index + 1] else "High"
+    
+    # Calculate stationarity symmetry ranges between reversals with a middle threshold
+    middle_threshold = int(np.mean(close))  # Convert to integer
+    stationarity_ranges = [range(int(start), int(end)) for start, end in zip(reversal_points[:-1], reversal_points[1:]) if
+                           middle_threshold in range(int(start), int(end))]
+    
+    # Determine market mood
+    market_mood = "Bullish" if last_reversal_type == "Low" else "Bearish"
+    
+    # Calculate current cycle duration from 0 to 100% at the current position of the current close on sine between reversals
+    current_position = len(close) - 1
+    cycle_duration_percentage = (current_position / len(close)) * 100
+    current_cycle_duration = np.sin(np.linspace(0, 2 * np.pi, len(close)))[current_position]
+    
+    # Calculate the range of close prices
+    close_range = np.max(close) - np.min(close)
+    
+    # Check the area for the top and bottom most frequencies
+    frequencies = np.fft.fftfreq(len(close))
+    top_freq_area = np.sum(fft_result[frequencies > 0])
+    bottom_freq_area = np.sum(fft_result[frequencies < 0])
+    
+    # Return the results as a dictionary
+    results = {
+        "Market Mood": market_mood,
+        "Current Cycle": 'Up' if last_reversal_type == 'Low' else 'Down',
+        "Current Cycle Duration": f"{cycle_duration_percentage:.6f}%",
+        # Removing the "Forecast Price" key and related code
+        "Top Frequency Area": top_freq_area,
+        "Bottom Frequency Area": bottom_freq_area,
+        "Most Dominant Frequency": 'Negative' if top_freq_area > abs(bottom_freq_area) else 'Positive'
+    }
+    
+    return results
+
+analysis_results = ultimate_market_analysis(close)
+
+# Separate variables for each element
+market_mood = analysis_results["Market Mood"]
+current_cycle = analysis_results["Current Cycle"]
+cycle_duration = analysis_results["Current Cycle Duration"]
+top_freq_area = analysis_results["Top Frequency Area"]
+bottom_freq_area = analysis_results["Bottom Frequency Area"]
+most_dominant_freq = analysis_results["Most Dominant Frequency"]
+
+# Print the results
+print(f"Market Mood: {market_mood}")
+print(f"Current Cycle: {current_cycle}")
+print(f"Current Cycle Duration: {cycle_duration}")
+# "Forecast Price" key and related code removed from the print statement
+print(f"Top Frequency Area: {top_freq_area}")
+print(f"Bottom Frequency Area: {bottom_freq_area}")
+print(f"Most Dominant Frequency: {most_dominant_freq}")
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -6681,6 +6760,29 @@ def main():
             print("Forecast for Medium Range:", medium_range_forecast)
             print("Forecast for Large Range:", large_range_forecast)
             print("Predominant Frequency Direction:", predominant_direction)
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            ffft_analysis_results = ultimate_market_analysis(close)
+
+            # Separate variables for each element
+            market_mood = ffft_analysis_results ["Market Mood"]
+            current_cycle = ffft_analysis_results ["Current Cycle"]
+            cycle_duration = ffft_analysis_results ["Current Cycle Duration"]
+            top_freq_area = ffft_analysis_results ["Top Frequency Area"]
+            bottom_freq_area = ffft_analysis_results ["Bottom Frequency Area"]
+            most_dominant_freq = ffft_analysis_results ["Most Dominant Frequency"]
+
+            # Print the results
+            print(f"Market Mood: {market_mood}")
+            print(f"Current Cycle: {current_cycle}")
+            print(f"Current Cycle Duration: {cycle_duration}")
+            print(f"Top Frequency Area: {top_freq_area}")
+            print(f"Bottom Frequency Area: {bottom_freq_area}")
+            print(f"Most Dominant Frequency: {most_dominant_freq}")
 
             print()
 
