@@ -5516,58 +5516,91 @@ print()
 ##################################################
 
 import numpy as np
+import talib
+
+def price_to_sine(close):
+    # Calculate sine wave        
+    sine_wave, _ = talib.HT_SINE(close_prices)
+            
+    # Replace NaN values with 0        
+    sine_wave = np.nan_to_num(sine_wave)
+    sine_wave = -sine_wave
+        
+    # Get the sine value for last close      
+    current_sine = sine_wave[-1]
+            
+    # Calculate the min and max sine           
+    sine_wave_min = np.min(sine_wave)        
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate % distances            
+    dist_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100            
+    dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
+
+    return dist_min, dist_max, current_sine
 
 def ultimate_market_analysis(close):
+    # Convert the input list to a numpy array
+    close_array = np.array(close, dtype=np.double)
+
+    # Calculate distances using scale_to_sine
+    dist_from_close_to_min, dist_from_close_to_max, current_sine = price_to_sine(close_array)
+
+    # Apply HT_SINE to determine sine wave
+    sine_wave, _ = talib.HT_SINE(close_array)
+
     # Perform Inverse FFT
-    fft_result = np.fft.fft(close)
-    
-    # Calculate symmetries between pi/phi and phi/pi
-    pi_phi_symmetry = np.sum(fft_result * np.cos(np.pi / 1.61803398875))  # Replace np.phi with the golden ratio
-    phi_pi_symmetry = np.sum(fft_result * np.cos(1.61803398875 / np.pi))  # Replace np.phi with the golden ratio
+    fft_result = np.fft.fft(close_array)
     
     # Determine reversal keypoints
-    reversal_points = np.diff(np.sign(np.diff(close)))
+    reversal_points = np.diff(np.sign(np.diff(close_array)))
     
     # Identify the closest reversal at the last major reversal
     last_major_reversal = reversal_points[-1]
     closest_reversal_index = np.argmin(np.abs(reversal_points - last_major_reversal))
     
     # Check if the closest reversal at the last major reversal was a low or a high
-    last_reversal_type = "Low" if close[closest_reversal_index] < close[closest_reversal_index + 1] else "High"
-    
-    # Calculate stationarity symmetry ranges between reversals with a middle threshold
-    middle_threshold = int(np.mean(close))  # Convert to integer
-    stationarity_ranges = [range(int(start), int(end)) for start, end in zip(reversal_points[:-1], reversal_points[1:]) if
-                           middle_threshold in range(int(start), int(end))]
+    last_reversal_type = "Low" if close_array[closest_reversal_index] < close_array[closest_reversal_index + 1] else "High"
     
     # Determine market mood
     market_mood = "Bullish" if last_reversal_type == "Low" else "Bearish"
     
-    # Calculate current cycle duration from 0 to 100% at the current position of the current close on sine between reversals
-    current_position = len(close) - 1
-    cycle_duration_percentage = (current_position / len(close)) * 100
-    current_cycle_duration = np.sin(np.linspace(0, 2 * np.pi, len(close)))[current_position]
+    # Calculate current cycle duration scaled from 0 to 100%
+    current_position = len(close_array) - 1
+    cycle_start = np.argmax(np.diff(reversal_points) > 0)
+    cycle_end = np.argmax(np.diff(reversal_points) < 0)
     
-    # Calculate the range of close prices
-    close_range = np.max(close) - np.min(close)
+    if cycle_end < cycle_start:
+        # Handle the case where the cycle wraps around
+        cycle_duration_percentage = ((current_position + len(close_array) - cycle_start) % len(close_array)) / len(close_array) * 100
+    else:
+        cycle_duration_percentage = ((current_position - cycle_start) % len(close_array)) / len(close_array) * 100
+
+    # Find indices of peaks and troughs in the sine wave
+    sine_peaks = np.where((sine_wave[:-2] < sine_wave[1:-1]) & (sine_wave[2:] < sine_wave[1:-1]))[0] + 1
+    sine_troughs = np.where((sine_wave[:-2] > sine_wave[1:-1]) & (sine_wave[2:] > sine_wave[1:-1]))[0] + 1
+
+    # Get the most significant frequencies
+    significant_freq_indices = np.argsort(np.abs(fft_result))[::-1][:5]
     
-    # Check the area for the top and bottom most frequencies
-    frequencies = np.fft.fftfreq(len(close))
-    top_freq_area = np.sum(fft_result[frequencies > 0])
-    bottom_freq_area = np.sum(fft_result[frequencies < 0])
-    
+    # Determine if the most significant frequencies are positive or negative
+    freq_signs = np.sign(fft_result[significant_freq_indices])
+
+    # Determine dominant sign
+    dominant_sign = "Positive" if np.sum(freq_signs > 0) > np.sum(freq_signs < 0) else "Negative"
+
     # Return the results as a dictionary
     results = {
         "Market Mood": market_mood,
         "Current Cycle": 'Up' if last_reversal_type == 'Low' else 'Down',
-        "Current Cycle Duration": f"{cycle_duration_percentage:.6f}%",
-        # Removing the "Forecast Price" key and related code
-        "Top Frequency Area": top_freq_area,
-        "Bottom Frequency Area": bottom_freq_area,
-        "Most Dominant Frequency": 'Negative' if top_freq_area > abs(bottom_freq_area) else 'Positive'
+        "Current Cycle Duration": f"{cycle_duration_percentage:.6f}%",  # Format the percentage
+        "Distance to Min": f"{dist_from_close_to_min:.6f}%",  # Format the percentage
+        "Distance to Max": f"{dist_from_close_to_max:.6f}%",  # Format the percentage
+        "Dominant Frequency Sign": dominant_sign,
     }
     
     return results
+
 
 analysis_results = ultimate_market_analysis(close)
 
@@ -5575,18 +5608,18 @@ analysis_results = ultimate_market_analysis(close)
 market_mood = analysis_results["Market Mood"]
 current_cycle = analysis_results["Current Cycle"]
 cycle_duration = analysis_results["Current Cycle Duration"]
-top_freq_area = analysis_results["Top Frequency Area"]
-bottom_freq_area = analysis_results["Bottom Frequency Area"]
-most_dominant_freq = analysis_results["Most Dominant Frequency"]
+distance_to_min = analysis_results["Distance to Min"]
+distance_to_max = analysis_results["Distance to Max"]
+dominant_freq_sign = analysis_results["Dominant Frequency Sign"]
 
 # Print the results
 print(f"Market Mood: {market_mood}")
 print(f"Current Cycle: {current_cycle}")
 print(f"Current Cycle Duration: {cycle_duration}")
-# "Forecast Price" key and related code removed from the print statement
-print(f"Top Frequency Area: {top_freq_area}")
-print(f"Bottom Frequency Area: {bottom_freq_area}")
-print(f"Most Dominant Frequency: {most_dominant_freq}")
+print(f"Distance to Min: {distance_to_min}")
+print(f"Distance to Max: {distance_to_max}")
+print(f"Dominant Frequency Sign: {dominant_freq_sign}")
+
 
 
 print()
@@ -6766,23 +6799,23 @@ def main():
             ##################################################
             ##################################################
 
-            ffft_analysis_results = ultimate_market_analysis(close)
+            analysis_results = ultimate_market_analysis(close)
 
             # Separate variables for each element
-            market_mood = ffft_analysis_results ["Market Mood"]
-            current_cycle = ffft_analysis_results ["Current Cycle"]
-            cycle_duration = ffft_analysis_results ["Current Cycle Duration"]
-            top_freq_area = ffft_analysis_results ["Top Frequency Area"]
-            bottom_freq_area = ffft_analysis_results ["Bottom Frequency Area"]
-            most_dominant_freq = ffft_analysis_results ["Most Dominant Frequency"]
+            market_mood = analysis_results["Market Mood"]
+            current_cycle = analysis_results["Current Cycle"]
+            cycle_duration = analysis_results["Current Cycle Duration"]
+            distance_to_min = analysis_results["Distance to Min"]
+            distance_to_max = analysis_results["Distance to Max"]
+            dominant_freq_sign = analysis_results["Dominant Frequency Sign"]
 
             # Print the results
             print(f"Market Mood: {market_mood}")
             print(f"Current Cycle: {current_cycle}")
             print(f"Current Cycle Duration: {cycle_duration}")
-            print(f"Top Frequency Area: {top_freq_area}")
-            print(f"Bottom Frequency Area: {bottom_freq_area}")
-            print(f"Most Dominant Frequency: {most_dominant_freq}")
+            print(f"Distance to Min: {distance_to_min}")
+            print(f"Distance to Max: {distance_to_max}")
+            print(f"Dominant Frequency Sign: {dominant_freq_sign}")
 
             print()
 
@@ -7049,6 +7082,8 @@ def main():
                 ##################################################
                 ##################################################
 
+                # Main trigger safest to be used 
+
                 if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and closest_threshold < price and forecast_direction == "Up" and price < expected_price and market_mood_fft == "Bullish" and price < forecast and incoming_reversal == "Top" and market_mood_type == "up" and signal == "BUY" and cycle_direction == "UP" and long_conditions_met > short_conditions_met and momentum > 0 and buy_volume_1min > sell_volume_1min:
                     print("LONG ultra HFT momentum triggered")
                     trigger_long = True
@@ -7062,26 +7097,28 @@ def main():
                 ##################################################
                 ##################################################
 
-                if cycle_direction == "UP" and long_conditions_met > short_conditions_met and buy_volume_1min > sell_volume_1min and momentum > 0 :
-                    print("LONG ultra HFT momentum triggered")
-                    trigger_long = True
+                # Second trigger for ultra hft (very fast profits)
 
-                if cycle_direction == "DOWN" and long_conditions_met < short_conditions_met and buy_volume_1min < sell_volume_1min and momentum < 0 :
-                    print("SHORT ultra HFT momentum triggered")
-                    trigger_short = True
+                #if cycle_direction == "UP" and long_conditions_met > short_conditions_met and buy_volume_1min > sell_volume_1min and momentum > 0 :
+                    #print("LONG ultra HFT momentum triggered")
+                    #trigger_long = True
+
+                #if cycle_direction == "DOWN" and long_conditions_met < short_conditions_met and buy_volume_1min < sell_volume_1min and momentum < 0 :
+                    #print("SHORT ultra HFT momentum triggered")
+                    #trigger_short = True
 
                 print()
 
                 ##################################################
                 ##################################################
 
-                if cycle_direction == "UP" and dist_from_close_to_min < dist_from_close_to_max and buy_volume_1min > sell_volume_1min and momentum > 0 :
-                    print("LONG ultra HFT momentum triggered")
-                    trigger_long = True
+                #if cycle_direction == "UP" and dist_from_close_to_min < dist_from_close_to_max and buy_volume_1min > sell_volume_1min and momentum > 0 :
+                    #print("LONG ultra HFT momentum triggered")
+                    #trigger_long = True
 
-                if cycle_direction == "DOWN" and dist_from_close_to_min > dist_from_close_to_max and buy_volume_1min < sell_volume_1min and momentum < 0 :
-                    print("SHORT ultra HFT momentum triggered")
-                    trigger_short = True
+                #if cycle_direction == "DOWN" and dist_from_close_to_min > dist_from_close_to_max and buy_volume_1min < sell_volume_1min and momentum < 0 :
+                    #print("SHORT ultra HFT momentum triggered")
+                    #trigger_short = True
 
                 print()
 
