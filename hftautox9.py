@@ -5877,6 +5877,79 @@ print(fftresult["dist_to_top"])
 print("\nDistance to Top:")
 print(fftresult["dist_to_dip"])
 
+print()
+
+##################################################
+##################################################
+
+import numpy as np
+
+def analyze_45degree(initial_point, current_close, distance, num_points, last_close=None, reversal_threshold=0.5):
+    x, y = initial_point
+
+    # Determine if current close is above or below the 45-degree angle
+    above_45_degree = current_close > (initial_point[0] + distance / np.sqrt(2))
+
+    # Determine market mood cumulatively based on the movement from below or above the 45-degree angle
+    if last_close is not None:
+        if above_45_degree and current_close > last_close:
+            market_mood = 'up'
+        elif not above_45_degree and current_close < last_close:
+            market_mood = 'down'
+        else:
+            market_mood = 'neutral'
+    else:
+        market_mood = 'neutral'  # Initial mood if no previous close
+
+    # Calculate the forecasted prices and targets
+    forecasts = {'fast_wave': current_close + distance,
+                 'medium_wave': current_close + 2 * distance,
+                 'large_wave': current_close + 3 * distance}
+
+    targets = {'fast_wave': current_close + 0.5 * distance,
+               'medium_wave': current_close + 1.5 * distance,
+               'large_wave': current_close + 2.5 * distance}
+
+    # Generate 45-degree pattern
+    points = [(x, y)]
+    for _ in range(num_points):
+        if market_mood == 'up':
+            x += distance / np.sqrt(2)
+            y += distance / np.sqrt(2)
+        elif market_mood == 'down':
+            x -= distance / np.sqrt(2)
+            y += distance / np.sqrt(2)
+
+        points.append((x, y))
+
+    # Include conditions for reversals
+    if abs(current_close - last_close) > reversal_threshold * distance:
+        reversal_condition = 'Reversal Detected'
+    else:
+        reversal_condition = 'No Reversal'
+
+    return {'market_mood': market_mood, 'forecast_prices': forecasts, 'targets': targets,
+            'reversal_condition': reversal_condition}
+
+# Example usage:
+initial_point = (0, 0)
+current_close = price
+distance = 1
+num_points = 10
+last_close = close[-1]
+
+result = analyze_45degree(initial_point, current_close, distance, num_points, last_close)
+
+# Print the results
+print("Market Mood:", result['market_mood'])
+print("Reversal Condition:", result['reversal_condition'])
+print("Forecast Prices:")
+for wave, price in result['forecast_prices'].items():
+    print(f"{wave.capitalize()} Wave: {price}")
+
+print("\nTargets:")
+for wave, target in result['targets'].items():
+    print(f"{wave.capitalize()} Wave Target: {target}")
 
 
 
@@ -7125,6 +7198,31 @@ def main():
 
             print("\nDistance to Top:")
             print(fftresult["dist_to_dip"])
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Example usage:
+            initial_point = (0, 0)
+            current_close = price
+            distance = 1
+            num_points = 10
+            last_close = close[-1]
+
+            result = analyze_45degree(initial_point, current_close, distance, num_points, last_close)
+
+            # Print the results
+            print("Market Mood:", result['market_mood'])
+            print("Reversal Condition:", result['reversal_condition'])
+            print("Forecast Prices:")
+            for wave, price in result['forecast_prices'].items():
+                print(f"{wave.capitalize()} Wave: {price}")
+
+            print("\nTargets:")
+            for wave, target in result['targets'].items():
+                print(f"{wave.capitalize()} Wave Target: {target}")
 
             print()
 
