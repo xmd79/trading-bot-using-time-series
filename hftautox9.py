@@ -7424,6 +7424,27 @@ def main():
             ##################################################
             ##################################################
 
+            sin_results = financial_analysis(close)
+
+            # Detailed prints outside the function
+            print("\nDetailed Analysis:")
+            print("Market Mood:", sin_results["Market_Mood"])
+            print("Current Reversals:", sin_results["Current_Reversals"])
+            print("Fast Period Forecasted sin_results:", results["Fast_Period_Forecast"])
+            print("Medium Period Forecasted Price:", sin_results["Medium_Period_Forecast"])
+            print("Big Period Forecasted Price:", sin_results["Big_Period_Forecast"])
+            print("Gann Progression:", sin_results["Gann_Progression"])
+            print("Harmonic Values:", sin_results["Harmonic_Values"])
+            print("Octave Values:", sin_results["Octave_Values"])
+            print("Pressure Energy:", sin_results["Pressure_Energy"])
+            print("Min Pressure:", sin_results["Min_Pressure"])
+            print("Max Pressure:", sin_results["Max_Pressure"])
+
+            print()
+
+            ##################################################
+            ##################################################
+
             take_profit = 5
             stop_loss = -15
 
