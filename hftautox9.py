@@ -6003,6 +6003,132 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import talib
+
+def financial_analysis(close):
+    # Remove NaN values
+    close = np.asarray(close)
+    close = close[~np.isnan(close)].tolist()
+
+    # Perform Fourier transform on Talib sinewave
+    sinewave = talib.SIN(np.array(close))
+    fourier_transform = np.fft.fft(sinewave)
+
+    # Gann progression, harmonics, octaves, and pressure energy per time geometry
+    gann_progression = calculate_gann_progression(close)
+    harmonic_values = calculate_harmonics(close)
+    octave_values = calculate_octaves(close)
+    pressure_energy, min_pressure, max_pressure = calculate_pressure_energy(sinewave)
+
+    # Calculate market mood, current reversals, and forecasted prices
+    market_mood = analyze_market_mood(close)
+    current_reversals = detect_reversals(close)
+
+    # Forecast prices for different periods - adjust as needed
+    big_period_forecast = forecast_price(close, period='big', reversals=current_reversals)
+    fast_period_forecast = close[-1] + 0.33 * (big_period_forecast - close[-1])
+    medium_period_forecast = close[-1] + 0.6666 * (big_period_forecast - close[-1])
+
+    # Return results as a dictionary
+    results = {
+        "Market_Mood": market_mood,
+        "Current_Reversals": current_reversals,
+        "Fast_Period_Forecast": convert_back_to_original(fast_period_forecast, close),
+        "Medium_Period_Forecast": convert_back_to_original(medium_period_forecast, close),
+        "Big_Period_Forecast": convert_back_to_original(big_period_forecast, close),
+        "Gann_Progression": convert_back_to_original(gann_progression, close),
+        "Harmonic_Values": convert_back_to_original(harmonic_values, close),
+        "Octave_Values": convert_back_to_original(octave_values, close),
+        "Pressure_Energy": convert_back_to_original(pressure_energy, close),
+        "Min_Pressure": min_pressure,
+        "Max_Pressure": max_pressure
+    }
+
+    return results
+
+def calculate_gann_progression(close):
+    # Add your Gann progression calculation logic here
+    # This is a simple example; you may need to customize it based on your requirements
+    gann_steps = np.arange(1, len(close) + 1)
+    gann_progression = close[0] + gann_steps * (close[-1] - close[0]) / len(close)
+    return gann_progression[-1]  # Return the last value as a single point
+
+def calculate_harmonics(close):
+    # Add your harmonic calculation logic here
+    # This is a simple example; you may need to customize it based on your requirements
+    harmonic_values = np.sin(np.arange(1, len(close) + 1) * np.pi / len(close))
+    return harmonic_values[-1]  # Return the last value as a single point
+
+def calculate_octaves(close):
+    # Add your octave calculation logic here
+    # This is a simple example; you may need to customize it based on your requirements
+    octave_values = close * 2
+    return octave_values[-1]  # Return the last value as a single point
+
+def calculate_pressure_energy(sinewave):
+    # Calculate pressure energy based on the Talib sinewave
+    min_value = np.min(sinewave)
+    max_value = np.max(sinewave)
+    normalized_sinewave = (sinewave - min_value) / (max_value - min_value)
+    pressure_energy = np.cumsum(np.square(np.diff(normalized_sinewave)))
+    return pressure_energy[-1], min_value, max_value  # Return the last value and min/max
+
+def analyze_market_mood(close):
+    # Determine market mood based on the last reversal type
+    last_reversal = detect_reversals(close)
+
+    if last_reversal["Reversal_Type"] == "Upward":
+        return "Bearish"
+    elif last_reversal["Reversal_Type"] == "Downward":
+        return "Bullish"
+    else:
+        return "Neutral"  # Add more conditions if needed
+
+def detect_reversals(close):
+    # Add your reversal detection logic here
+    # Return relevant information about current reversals
+    # For simplicity, assuming the last reversal is at index -2
+    return {"Reversal_Type": "Upward", "KeyPoints": [120, 150, 180]}  # Placeholder values
+
+def forecast_price(close, period='fast', reversals=None):
+    # Add your price forecasting logic based on the specified period and reversals
+    # Return a single value representing the forecasted price
+    if period == 'fast':
+        return close[-1] + 5  # Placeholder value, replace with your analysis
+    elif period == 'medium':
+        return close[-1] + 10  # Placeholder value, replace with your analysis
+    elif period == 'big':
+        return close[-1] + 20  # Placeholder value, replace with your analysis
+    else:
+        raise ValueError("Invalid period specified")
+
+def convert_back_to_original(forecasted_price, close):
+    # Use a scaling factor for demonstration purposes; adjust based on your data characteristics
+    scaling_factor = np.mean(close) / np.mean(forecasted_price)
+    return forecasted_price * scaling_factor
+
+results = financial_analysis(close)
+
+# Detailed prints outside the function
+print("\nDetailed Analysis:")
+print("Market Mood:", results["Market_Mood"])
+print("Current Reversals:", results["Current_Reversals"])
+print("Fast Period Forecasted Price:", results["Fast_Period_Forecast"])
+print("Medium Period Forecasted Price:", results["Medium_Period_Forecast"])
+print("Big Period Forecasted Price:", results["Big_Period_Forecast"])
+print("Gann Progression:", results["Gann_Progression"])
+print("Harmonic Values:", results["Harmonic_Values"])
+print("Octave Values:", results["Octave_Values"])
+print("Pressure Energy:", results["Pressure_Energy"])
+print("Min Pressure:", results["Min_Pressure"])
+print("Max Pressure:", results["Max_Pressure"])
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
