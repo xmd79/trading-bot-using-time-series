@@ -5951,7 +5951,52 @@ print("\nTargets:")
 for wave, target in result['targets'].items():
     print(f"{wave.capitalize()} Wave Target: {target}")
 
+print()
 
+##################################################
+##################################################
+
+import numpy as np
+
+# Function to apply Fourier transform and return the most prominent frequency and amplitude
+def get_max_frequency_amplitude(close):
+    close_array = np.array(close)  # Convert the list to a NumPy array
+    fft_result = np.fft.fft(close_array)
+    frequencies = np.fft.fftfreq(len(fft_result))
+    amplitudes = np.abs(fft_result)
+    
+    # Find the index of the maximum amplitude
+    max_amplitude_index = np.argmax(amplitudes)
+    
+    # Sort frequencies and amplitudes based on frequency
+    sorted_indices = np.argsort(frequencies)
+    sorted_frequencies = frequencies[sorted_indices]
+    sorted_amplitudes = amplitudes[sorted_indices]
+    
+    # Get the most prominent frequency and amplitude
+    most_prominent_frequency = sorted_frequencies[max_amplitude_index]
+    most_prominent_amplitude = sorted_amplitudes[max_amplitude_index]
+    
+    return most_prominent_frequency, most_prominent_amplitude
+
+# Get the most prominent frequency and amplitude
+most_prominent_frequency, most_prominent_amplitude = get_max_frequency_amplitude(close)
+
+# Print the most prominent frequency and amplitude as single values
+print("Most Prominent Frequency:", most_prominent_frequency)
+print("Most Prominent Amplitude:", most_prominent_amplitude)
+
+# Determine market mood based on the sign of the most prominent frequency
+market_mood = "Bullish" if most_prominent_frequency > 0 else "Bearish"
+print("Market Mood:", market_mood)
+
+# Determine reversals of the current cycle based on the sign of the most prominent amplitude
+reversals = "Positive" if most_prominent_amplitude > 0 else "Negative"
+print("Reversals of Current Cycle:", reversals)
+
+# Forecasted price based on the most prominent frequency and amplitude (simple linear model)
+forecasted_price = np.mean(close) + most_prominent_amplitude * np.sin(2 * np.pi * most_prominent_frequency * np.arange(len(close)))
+print("Forecasted Price:", forecasted_price[-1])  # Print the last forecasted price
 
 print()
 
@@ -7223,6 +7268,30 @@ def main():
             print("\nTargets:")
             for wave, target in result['targets'].items():
                 print(f"{wave.capitalize()} Wave Target: {target}")
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Get the most prominent frequency and amplitude
+            most_prominent_frequency, most_prominent_amplitude = get_max_frequency_amplitude(close)
+
+            # Print the most prominent frequency and amplitude as single values
+            print("Most Prominent Frequency:", most_prominent_frequency)
+            print("Most Prominent Amplitude:", most_prominent_amplitude)
+
+            # Determine market mood based on the sign of the most prominent frequency
+            market_mood = "Bullish" if most_prominent_frequency > 0 else "Bearish"
+            print("Market Mood:", market_mood)
+
+            # Determine reversals of the current cycle based on the sign of the most prominent amplitude
+            reversals = "Positive" if most_prominent_amplitude > 0 else "Negative"
+            print("Reversals of Current Cycle:", reversals)
+
+            # Forecasted price based on the most prominent frequency and amplitude (simple linear model)
+            forecasted_price = np.mean(close) + most_prominent_amplitude * np.sin(2 * np.pi * most_prominent_frequency * np.arange(len(close)))
+            print("Forecasted Price:", forecasted_price[-1])  # Print the last forecasted price
 
             print()
 
