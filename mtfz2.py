@@ -1,6 +1,5 @@
 from binance.client import Client
 import numpy as np
-import matplotlib.pyplot as plt
 import talib
 
 class Trader:
@@ -20,8 +19,7 @@ class TechnicalAnalyzer:
     def get_historical_data(self, symbol, interval):
         klines = self.client.futures_historical_klines(symbol, interval, '1 day ago')
         close_prices = np.array([float(entry[4]) for entry in klines])
-        volumes = np.array([float(entry[5]) for entry in klines])
-        return close_prices, volumes
+        return close_prices
 
     def fit_line(self, data):
         if len(data) == 0:
