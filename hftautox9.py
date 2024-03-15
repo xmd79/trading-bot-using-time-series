@@ -7430,7 +7430,7 @@ def main():
             print("\nDetailed Analysis:")
             print("Market Mood:", sin_results["Market_Mood"])
             print("Current Reversals:", sin_results["Current_Reversals"])
-            print("Fast Period Forecasted sin_results:", results["Fast_Period_Forecast"])
+            print("Fast Period Forecasted results:", sin_results["Fast_Period_Forecast"])
             print("Medium Period Forecasted Price:", sin_results["Medium_Period_Forecast"])
             print("Big Period Forecasted Price:", sin_results["Big_Period_Forecast"])
             print("Gann Progression:", sin_results["Gann_Progression"])
