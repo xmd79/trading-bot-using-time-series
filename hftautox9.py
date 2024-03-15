@@ -1496,7 +1496,7 @@ print()
 ##################################################
 ##################################################
 
-def adjust_stationary_object(min_threshold, max_threshold, reversal):
+def adjust_stationary_object(min_threshold, max_threshold, xreversal):
     """
     Adjust the stationary object based on the reversal.
     
@@ -1509,9 +1509,9 @@ def adjust_stationary_object(min_threshold, max_threshold, reversal):
         tuple: Adjusted thresholds (min_threshold, max_threshold).
     """
     # Convert reversal values to numerical values for comparison
-    if reversal == "peak":
+    if xreversal == "peak":
         reversal_value = max_threshold  # Assuming 'peak' corresponds to the current max_threshold
-    elif reversal == "dip":
+    elif xreversal == "dip":
         reversal_value = min_threshold  # Assuming 'dip' corresponds to the current min_threshold
     else:
         raise ValueError("Invalid reversal value")
@@ -1525,7 +1525,7 @@ def adjust_stationary_object(min_threshold, max_threshold, reversal):
     current_value = (min_threshold + max_threshold) / 2
     return min_threshold, max_threshold
 
-def detect_reversals(close):
+def xdetect_reversals(close):
     """
     Detect peaks and troughs in the close prices to identify reversals.
     
@@ -1543,7 +1543,7 @@ def detect_reversals(close):
             reversals.append("dip")  # Dip
     return reversals
 
-def analyze_market_mood(reversals):
+def xanalyze_market_mood(reversals):
     """
     Analyze the last reversal to determine the market mood.
     
@@ -1562,14 +1562,14 @@ def analyze_market_mood(reversals):
     # Default to up if no reversals detected (for demonstration purposes)
     return "up"
 
-reversals = detect_reversals(close)
+xreversals = xdetect_reversals(close)
 
-for reversal in reversals:
-    min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, reversal)
+for xreversal in xreversals:
+    min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, xreversal)
 
-market_mood_type = analyze_market_mood(reversals)
+xmarket_mood_type = xanalyze_market_mood(xreversals)
 
-print(f"Market Mood: {market_mood_type}")
+print(f"Market Mood: {xmarket_mood_type}")
 
 print()
 
@@ -2351,7 +2351,7 @@ def market_dom_analysis(close):
     market_mood = determine_dom_market_mood(dc_period, dc_phase, trend_mode)
     
     # Forecasting logic based on conditions
-    price_forecast = forecast_price(dc_period, dc_phase, inphase, quadrature, sine, leadsine, trend_mode)
+    price_forecast = forecast_pricex(dc_period, dc_phase, inphase, quadrature, sine, leadsine, trend_mode)
     
     return market_mood, price_forecast
 
@@ -2365,7 +2365,7 @@ def determine_dom_market_mood(dc_period, dc_phase, trend_mode):
     else:
         return "Neutral"
 
-def forecast_price(dc_period, dc_phase, inphase, quadrature, sine, leadsine, trend_mode):
+def forecast_pricex(dc_period, dc_phase, inphase, quadrature, sine, leadsine, trend_mode):
     # Add your logic to forecast price based on the given conditions
     # You can customize these conditions based on your strategy
     if np.any(trend_mode == -1):
@@ -6026,7 +6026,7 @@ def financial_analysis(close):
     current_reversals = detect_reversals(close)
 
     # Forecast prices for different periods - adjust as needed
-    big_period_forecast = forecast_price(close, period='big', reversals=current_reversals)
+    big_period_forecast = forecast_pricex2(close, period='big', reversals=current_reversals)
     fast_period_forecast = close[-1] + 0.33 * (big_period_forecast - close[-1])
     medium_period_forecast = close[-1] + 0.6666 * (big_period_forecast - close[-1])
 
@@ -6091,7 +6091,7 @@ def detect_reversals(close):
     # For simplicity, assuming the last reversal is at index -2
     return {"Reversal_Type": "Upward", "KeyPoints": [120, 150, 180]}  # Placeholder values
 
-def forecast_price(close, period='fast', reversals=None):
+def forecast_pricex2(close, period='fast', reversals=None):
     # Add your price forecasting logic based on the specified period and reversals
     # Return a single value representing the forecasted price
     if period == 'fast':
@@ -6510,14 +6510,14 @@ def main():
             ##################################################
             ##################################################
 
-            reversals = detect_reversals(close)
+            xreversals = xdetect_reversals(close)
 
-            for reversal in reversals:
-                min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, reversal)
+            for xreversal in xreversals:
+                min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, xreversal)
 
-            market_mood_type = analyze_market_mood(reversals)
+            xmarket_mood_type = xanalyze_market_mood(xreversals)
 
-            print(f"Market Mood: {market_mood_type}")
+            print(f"Market Mood: {xmarket_mood_type}")
 
             print()
 
@@ -7541,7 +7541,7 @@ def main():
                 print("LONG condition 6: signal == BUY")
                 long_conditions_met += 1
 
-            if market_mood_type == "up":
+            if xmarket_mood_type == "up":
                 print("LONG condition 7: market_mood_type == up")
                 long_conditions_met += 1
 
@@ -7622,7 +7622,7 @@ def main():
                 print("SHORT condition 6: signal == SELL")
                 short_conditions_met += 1
 
-            if market_mood_type == "down":
+            if xmarket_mood_type == "down":
                 print("SHORT condition 7: market_mood_type == down")
                 short_conditions_met += 1
 
@@ -7707,11 +7707,11 @@ def main():
 
                 # Main trigger safest to be used 
 
-                if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and closest_threshold < price and forecast_direction == "Up" and price < expected_price and market_mood_fft == "Bullish" and price < forecast and incoming_reversal == "Top" and market_mood_type == "up" and signal == "BUY" and cycle_direction == "UP" and long_conditions_met > short_conditions_met and momentum > 0 and buy_volume_1min > sell_volume_1min:
+                if normalized_distance_to_min < normalized_distance_to_max and closest_threshold == min_threshold and price < avg_mtf and closest_threshold < price and forecast_direction == "Up" and price < expected_price and market_mood_fft == "Bullish" and price < forecast and incoming_reversal == "Top" and xmarket_mood_type == "up" and signal == "BUY" and cycle_direction == "UP" and long_conditions_met > short_conditions_met and momentum > 0 and buy_volume_1min > sell_volume_1min:
                     print("LONG ultra HFT momentum triggered")
                     trigger_long = True
 
-                if normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and closest_threshold > price and forecast_direction == "Down" and price > expected_price and market_mood_fft == "Bearish" and price > forecast and incoming_reversal == "Dip" and market_mood_type == "down" and signal == "SELL" and cycle_direction == "DOWN" and long_conditions_met < short_conditions_met and momentum < 0 and buy_volume_1min < sell_volume_1min:
+                if normalized_distance_to_min > normalized_distance_to_max and closest_threshold == max_threshold and price > avg_mtf and closest_threshold > price and forecast_direction == "Down" and price > expected_price and market_mood_fft == "Bearish" and price > forecast and incoming_reversal == "Dip" and xmarket_mood_type == "down" and signal == "SELL" and cycle_direction == "DOWN" and long_conditions_met < short_conditions_met and momentum < 0 and buy_volume_1min < sell_volume_1min:
                     print("SHORT ultra HFT momentum triggered")
                     trigger_short = True
 
@@ -7798,7 +7798,7 @@ def main():
         del x, slope, intercept, expected_price
         del fast_price, medium_price, slow_price, forecasted_price, results
         del momentum_values, normalized_momentum, positive_count, negative_count  
-        del closes, signal, close, candles, reversals, market_mood_type, market_mood_fastfft, analysis_results
+        del closes, signal, close, candles, xreversals, xmarket_mood_type, market_mood_fastfft, analysis_results
         del current_price, forecasted_phi_price, market_mood_phi, intraday_target, market_mood_intraday, momentum_target, market_mood_momentum
         del div1, div2, keypoints, poly_features, X_poly, model, future, coefficients, regression_mood
         del forecast_price, market_mood, forecast_5min, forecast_15min, predicted_market_mood, price 
