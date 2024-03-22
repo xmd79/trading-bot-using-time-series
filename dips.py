@@ -62,7 +62,7 @@ def filter1(pair):
     close = [float(entry[4]) for entry in klines]
     close_array = np.asarray(close)
 
-    print("on 1h timeframe " + symbol)
+    print("on 2h timeframe " + symbol)
 
     x = close
     y = range(len(x))
