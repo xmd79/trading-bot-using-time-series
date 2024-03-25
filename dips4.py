@@ -126,3 +126,12 @@ if __name__ == "__main__":
                 if filtered_pairs_1m:
                     selected_pair_1m, selected_pairCMO_1m = trader.momentum(filtered_pairs_1m)
                     print('Dips for selected pairs on 1min timeframe:', selected_pair_1m)
+
+                    # If more than one dip found on 1min timeframe, select the dip with lowest CMO value
+                    if len(selected_pair_1m) > 1:
+                        min_cmo_index = np.argmin(selected_pairCMO_1m)
+                        selected_pair_1m = [selected_pair_1m[min_cmo_index]]
+                        print('Selected dip with the lowest CMO value on 1min timeframe:', selected_pair_1m)
+                    else:
+                        print('Dips for selected pairs on 1min timeframe:', selected_pair_1m)
+
