@@ -6303,7 +6303,78 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
 
+def cartesian_to_geographic(x, y, z):
+    # Calculate latitude
+    lat = np.arcsin(z / np.sqrt(x**2 + y**2 + z**2))
+    
+    # Calculate longitude
+    lon = np.arctan2(y, x)
+    
+    # Convert longitude to degrees
+    lon = np.degrees(lon)
+    
+    # Calculate the third coordinate
+    third_coord = np.sqrt(x**2 + y**2 + z**2)
+    
+    # Determine the quadrant
+    if x >= 0 and y >= 0:
+        quadrant = "Quadrant 1"
+    elif x < 0 and y >= 0:
+        quadrant = "Quadrant 2"
+    elif x < 0 and y < 0:
+        quadrant = "Quadrant 3"
+    else:
+        quadrant = "Quadrant 4"
+    
+    return lat, lon, third_coord, quadrant
+
+def market_mood(current_min, current_max, forecast_price):
+    if forecast_price > current_max:
+        return "Market mood: Up"
+    elif forecast_price < current_min:
+        return "Market mood: Down"
+    else:
+        return "Market mood: Neutral"
+
+def analyze_close(close):
+    # Perform Fourier transform
+    fourier_transform = np.fft.fft(close)
+
+    # Extract frequencies
+    frequencies = np.fft.fftfreq(len(close))
+
+    # Find index of minimum and maximum frequencies
+    min_freq_index = np.argmin(np.abs(frequencies))
+    max_freq_index = np.argmax(np.abs(frequencies))
+
+    # Forecast price
+    last_close_price = close[-1]  # Last observed close price
+    forecast_price_offset = np.real(fourier_transform[max_freq_index])  # Forecast price as an offset
+    forecast_price = last_close_price + forecast_price_offset
+
+    # Market mood analysis
+    current_min = np.min(close)
+    current_max = np.max(close)
+    return forecast_price, market_mood(current_min, current_max, forecast_price)
+
+# Example usage
+x = 1.0
+y = 2.0
+z = 3.0
+
+lat, lon, third_coord, quadrant = cartesian_to_geographic(x, y, z)
+
+print("Latitude:", lat)
+print("Longitude:", lon)
+print("Third Coordinate:", third_coord)
+print("Quadrant:", quadrant)
+
+# Analyze close prices
+forecast_price, mood = analyze_close(close)
+print("Forecast Price:", forecast_price)
+print(mood)
 
 
 print()
@@ -7681,6 +7752,28 @@ def main():
             print("Last Major Reversal:", analysis_result["last_major_reversal"])
             print("Current Cycle Direction:", analysis_result["current_cycle_direction"])
             print("Forecasted Price:", analysis_result["forecasted_price"])
+
+            print()
+
+            ##################################################
+            ##################################################
+
+            # Example usage
+            x = 1.0
+            y = 2.0
+            z = 3.0
+
+            lat, lon, third_coord, quadrant = cartesian_to_geographic(x, y, z)
+
+            print("Latitude:", lat)
+            print("Longitude:", lon)
+            print("Third Coordinate:", third_coord)
+            print("Quadrant:", quadrant)
+
+            # Analyze close prices
+            forecast_price, mood = analyze_close(close)
+            print("Forecast Price:", forecast_price)
+            print(mood)
 
             print()
 
