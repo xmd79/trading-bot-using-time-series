@@ -6218,6 +6218,99 @@ print()
 ##################################################
 ##################################################
 
+import numpy as np
+import talib
+
+def find_reversals(fft_cycles):
+    # Find peaks in the FFT spectrum
+    peaks = []
+    for i in range(1, len(fft_cycles) - 1):
+        if fft_cycles[i] > fft_cycles[i-1] and fft_cycles[i] > fft_cycles[i+1]:
+            peaks.append(i)
+    return peaks
+
+def analyze_price(close):
+    # Convert single close value to numpy array
+    close = np.array(close)
+    
+    # Calculate the Hilbert Transform sine
+    sine, _ = talib.HT_SINE(close)
+    
+    # Remove NaN values from the result
+    sine = sine[~np.isnan(sine)]
+    
+    # Calculate FFT of sine to determine cycles between reversals
+    fft_result = np.fft.fft(sine)
+    fft_cycles = np.abs(fft_result)
+    
+    # Find potential reversals using FFT
+    reversal_indices = find_reversals(fft_cycles)
+    
+    # Determine minimum and maximum values for FFT cycle and HT sine
+    min_fft_cycle = np.min(fft_cycles)
+    max_fft_cycle = np.max(fft_cycles)
+    min_ht_sine = np.min(sine)
+    max_ht_sine = np.max(sine)
+    
+    # Convert minimum and maximum values to real price values
+    close_range = np.max(close) - np.min(close)
+    min_price = np.min(close)
+    max_price = np.max(close)
+    min_fft_cycle_price = min_price + (min_fft_cycle / np.max(fft_cycles)) * close_range
+    max_fft_cycle_price = min_price + (max_fft_cycle / np.max(fft_cycles)) * close_range
+    min_ht_sine_price = min_price + (min_ht_sine / np.max(sine)) * close_range
+    max_ht_sine_price = min_price + (max_ht_sine / np.max(sine)) * close_range
+    
+    # Determine last reversal type (Min or Max)
+    last_reversal_type = "Min" if sine[-1] == np.min(sine) else "Max"
+    
+    # Determine if the last reversal was a min or max
+    last_major_reversal = None
+    if last_reversal_type == "Min":
+        last_major_reversal = "Max" if sine[-1] > sine[-2] else "Min"
+    else:
+        last_major_reversal = "Min" if sine[-1] < sine[-2] else "Max"
+    
+    # Identify the current cycle direction
+    current_cycle_direction = "Up" if sine[-1] > sine[-2] else "Down"
+    
+    # Provide forecasted price as the real value
+    forecasted_price = close[-1] + (sine[-1] - sine[-2])
+    
+    return {
+        "min_fft_cycle_price": min_fft_cycle_price,
+        "max_fft_cycle_price": max_fft_cycle_price,
+        "min_ht_sine_price": min_ht_sine_price,
+        "max_ht_sine_price": max_ht_sine_price,
+        "reversal_indices": reversal_indices,
+        "last_major_reversal": last_major_reversal,
+        "current_cycle_direction": current_cycle_direction,
+        "forecasted_price": forecasted_price
+    }
+
+analysis_result = analyze_price(close)
+print("Minimum FFT Cycle Price:", analysis_result["min_fft_cycle_price"])
+print("Maximum FFT Cycle Price:", analysis_result["max_fft_cycle_price"])
+print("Minimum HT Sine Price:", analysis_result["min_ht_sine_price"])
+print("Maximum HT Sine Price:", analysis_result["max_ht_sine_price"])
+print("Reversal Indices:", analysis_result["reversal_indices"])
+print("Last Major Reversal:", analysis_result["last_major_reversal"])
+print("Current Cycle Direction:", analysis_result["current_cycle_direction"])
+print("Forecasted Price:", analysis_result["forecasted_price"])
+
+print()
+
+##################################################
+##################################################
+
+
+
+
+print()
+
+##################################################
+##################################################
+
 print("Init main() loop: ")
 
 print()
@@ -7576,12 +7669,26 @@ def main():
 
             print()
 
+            ##################################################
+            ##################################################
+
+            analysis_result = analyze_price(close)
+
+            print("Minimum FFT Cycle Price:", analysis_result["min_fft_cycle_price"])
+            print("Maximum FFT Cycle Price:", analysis_result["max_fft_cycle_price"])
+            print("Minimum HT Sine Price:", analysis_result["min_ht_sine_price"])
+            print("Maximum HT Sine Price:", analysis_result["max_ht_sine_price"])
+            print("Last Major Reversal:", analysis_result["last_major_reversal"])
+            print("Current Cycle Direction:", analysis_result["current_cycle_direction"])
+            print("Forecasted Price:", analysis_result["forecasted_price"])
+
+            print()
 
             ##################################################
             ##################################################
 
             take_profit = 5
-            stop_loss = -15
+            stop_loss = -5
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
