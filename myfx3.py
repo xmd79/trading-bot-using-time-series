@@ -132,29 +132,6 @@ def generate_stationary_wave_with_harmonics(frequency, phase_shift, angle, durat
 
     return t, sine_wave
 
-def perform_fft_analysis(wave, sampling_rate):
-    # Perform FFT
-    fft_result = np.fft.fft(wave)
-    frequencies = np.fft.fftfreq(len(wave), d=1/sampling_rate)
-
-    # Get the amplitude spectrum
-    amplitude_spectrum = np.abs(fft_result)
-
-    # Get the top 24 frequencies
-    sorted_indices = np.argsort(amplitude_spectrum)[::-1]
-    top_indices = sorted_indices[:24]
-
-    top_frequencies = frequencies[top_indices]
-    top_amplitudes = amplitude_spectrum[top_indices]
-
-    # Find the most predominant frequencies
-    predominant_frequencies = top_frequencies[:3]
-    predominant_amplitudes = top_amplitudes[:3]
-
-    negativity_vs_positivity = np.sum(predominant_amplitudes[predominant_frequencies < 0]) - np.sum(predominant_amplitudes[predominant_frequencies > 0])
-
-    return top_frequencies, top_amplitudes, predominant_frequencies, predominant_amplitudes, negativity_vs_positivity
-
 def analyze_wave(t, wave, frequency, sampling_rate, close_real_price):
     # Determine the current cycle between reversals
     period = 1 / frequency
@@ -226,46 +203,6 @@ def analyze_wave(t, wave, frequency, sampling_rate, close_real_price):
     last_reversal_type = "Dip" if last_reversal_value == np.min(wave) else "Top"
     print(f"Last Reversal Type: {last_reversal_type}")
 
-    # Perform FFT analysis
-    top_frequencies, top_amplitudes, predominant_frequencies, predominant_amplitudes, negativity_vs_positivity = perform_fft_analysis(wave, sampling_rate)
-    
-    print("FFT Analysis:")
-    print(f"Top 24 Frequencies: {top_frequencies}")
-    print(f"Top 24 Amplitudes: {top_amplitudes}")
-    print(f"Predominant Frequencies: {predominant_frequencies}")
-    print(f"Predominant Amplitudes: {predominant_amplitudes}")
-    print(f"Negativity vs Positivity: {negativity_vs_positivity}")
-
-    # Check if the most predominant frequency is negative or positive
-    if np.sum(predominant_amplitudes[predominant_frequencies < 0]) > np.sum(predominant_amplitudes[predominant_frequencies > 0]):
-        predominant_sign = "Negative"
-    else:
-        predominant_sign = "Positive"
-
-    print(f"Most Predominant Frequency is {predominant_sign}")
-
-    # Calculate forecast price based on the most predominant frequency
-    forecast_price = close_real_price * (1 + np.sum(predominant_amplitudes) / len(predominant_amplitudes))
-
-    # Get the format of the close real price
-    close_real_price_format = "{:." + str(len(str(close_real_price).split(".")[1])) + "f}"
-
-    # Apply the same format to the forecasted price
-    forecast_price = close_real_price_format.format(forecast_price)
-
-    print(f"Forecast Price: {forecast_price}")
-
-    # Convert the forecast price back to the same type as the close real price
-    forecast_price_type = type(close_real_price)
-    forecast_price = forecast_price_type(forecast_price)
-
-    print(f"Forecast Price: {forecast_price}")
-
-
-
-
-print()
-
 # First pass: Filter trading pairs for dips and tops on main timeframe
 print('Scanning all available assets on main timeframe...')
 for pair in trading_pairs:
@@ -275,8 +212,6 @@ print('Filtered dips (30m):', filtered_pairs_dips)
 print('Filtered tops (30m):', filtered_pairs_tops)
 print('Intermediate pairs (30m):', intermediate_pairs)
 
-print()
-
 # Rescan dips on lower timeframes
 if len(filtered_pairs_dips) > 0:
     print('Rescanning dips on lower timeframes...')
@@ -284,8 +219,6 @@ if len(filtered_pairs_dips) > 0:
 
     for pair in filtered_pairs_dips:
         filter2(pair)
-
-    print()
 
     print('Dips after 5m filter:', selected_pair_dips)
 
