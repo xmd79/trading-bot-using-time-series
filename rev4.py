@@ -243,7 +243,7 @@ def analyze_wave(t, wave, frequency, sampling_rate, df):
     print(f"Middle Threshold for Stationary Sine: {middle_threshold}")
 
     last_reversal_value = wave[prev_reversal_index]
-    last_reversal_type = "Dip" if last_reversal_value == np.min(wave) else "Top"
+    last_reversal_type = "Top" if last_reversal_value == np.min(wave) else "Dip"
     print(f"Last Reversal Type: {last_reversal_type}")
 
 def scan_assets(pair):
