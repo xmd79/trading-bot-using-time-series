@@ -243,7 +243,7 @@ def analyze_wave(t, wave, frequency, sampling_rate, df):
     print(f"Middle Threshold for Stationary Sine: {middle_threshold}")
 
     last_reversal_value = wave[prev_reversal_index]
-    last_reversal_type = "Dip" if last_reversal_value == np.min(wave) else "Top"
+    last_reversal_type = "Top" if last_reversal_value == np.min(wave) else "Dip"
     print(f"Last Reversal Type: {last_reversal_type}")
 
 def scan_assets(pair):
@@ -264,6 +264,8 @@ if len(filtered_pairs_dips) > 0:
     with concurrent.futures.ThreadPoolExecutor() as executor:
         executor.map(filter2, filtered_pairs_dips)
 
+    print()
+
     print('Dips after 5m filter:', selected_pair_dips)
 
     if len(selected_pair_dips) > 1:
@@ -272,7 +274,7 @@ if len(filtered_pairs_dips) > 0:
         lowest_value = float('inf')
 
         for pair in selected_pair_dips:
-            interval = '5m'
+            interval = '1h'
             df = get_klines(pair, interval)
             close = df['Close'].values
 
@@ -290,9 +292,9 @@ if len(filtered_pairs_dips) > 0:
                 lowest_value = min_wave_value
                 lowest_dip = pair
 
-        print(f'Lowest dip on 5m timeframe is {lowest_dip} with wave value {lowest_value}')
+        print(f'Lowest dip on 1h timeframe is {lowest_dip} with wave value {lowest_value}')
         print(f'Current asset vs USDT: {lowest_dip}')
-        interval = '5m'
+        interval = '1h'
         df = get_klines(lowest_dip, interval)
         close_real_price = df['Close'].values[-1]
         analyze_wave(t, wave, frequency, sampling_rate, df)
