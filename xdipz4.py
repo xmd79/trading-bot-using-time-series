@@ -273,6 +273,6 @@ if len(filtered_pairs_dips) > 0:
         t, wave = generate_stationary_wave_with_harmonics(frequency, phase_shift, angle, duration, sampling_rate)
         analyze_wave(t, wave, frequency, sampling_rate, df)
     else:
-        print('No dips found on 5m timeframe.')
+        print('No dips found on second timeframe.')
 else:
-    print('No dips found on 30m timeframe.')
+    print('No dips found on main timeframe.')
