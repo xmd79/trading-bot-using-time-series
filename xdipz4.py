@@ -153,9 +153,9 @@ def filter2(pair):
 
     if current_price < best_fit_line1[-1]:
         selected_pair_dips.append(symbol)
-        status = 'Dip confirmed on 5m'
+        status = 'Dip confirmed on second timeframe'
     else:
-        status = 'Not a dip on 5m'
+        status = 'Not a dip on second timeframe'
 
     print(f"{datetime.now()} - Symbol: {symbol}, Status: {status}, Current Price: {current_price}, Poly Value: {poly_value}")
 
