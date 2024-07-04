@@ -25,28 +25,68 @@ class Trader:
 
     def find_arbitrage_triangles(self):
         active_pairs = self.get_active_trading_pairs()
-        for pair in active_pairs:
-            base, quote = pair.split('USDT')
-            for middle in set(active_pairs) - {pair}:
-                if middle.endswith(base):
-                    third_pair = f"{quote}USDT"
+        usdt_pairs = [pair for pair in active_pairs if pair.endswith('USDT')]
+        for usdt_pair in usdt_pairs:
+            a = usdt_pair[:-4]  # Remove 'USDT' to get the base currency
+            for pair in active_pairs:
+                if pair.startswith(a) and pair != usdt_pair:
+                    b = pair[len(a):]
+                    third_pair = f"{b}USDT"
                     if third_pair in active_pairs:
-                        self.triangles.append((pair, middle, third_pair))
-                elif middle.endswith(quote):
-                    third_pair = f"{base}USDT"
-                    if third_pair in active_pairs:
-                        self.triangles.append((pair, middle, third_pair))
+                        self.triangles.append((usdt_pair, pair, third_pair))
 
     def get_active_trading_pairs(self):
         tickers = self.client.get_all_tickers()
         exchange_info = self.client.get_exchange_info()
         symbols_info = exchange_info['symbols']
-        active_trading_pairs = [symbol['symbol'] for symbol in symbols_info if symbol['status'] == 'TRADING' and symbol['symbol'].endswith("USDT")]
+        active_trading_pairs = [symbol['symbol'] for symbol in symbols_info if symbol['status'] == 'TRADING']
         return active_trading_pairs
 
-    def print_triangles(self):
+    def get_current_prices(self):
+        prices = self.client.get_all_tickers()
+        price_dict = {item['symbol']: float(item['price']) for item in prices}
+        return price_dict
+
+    def calculate_profit(self, triangle, prices):
+        pair1, pair2, pair3 = triangle
+        if pair1 in prices and pair2 in prices and pair3 in prices:
+            rate1 = prices[pair1]  # USDT to A
+            rate2 = prices[pair2]  # A to B
+            rate3 = prices[pair3]  # B to USDT
+
+            # Calculate cross rates
+            if pair2.startswith(pair1[:-4]):
+                cross_rate2 = rate2
+            else:
+                cross_rate2 = 1 / rate2
+
+            if pair3.startswith(pair2[len(pair1[:-4]):]):
+                cross_rate3 = rate3
+            else:
+                cross_rate3 = 1 / rate3
+
+            # Profit calculation
+            initial_amount = 1
+            amount_a = initial_amount / rate1
+            amount_b = amount_a * cross_rate2
+            final_amount = amount_b * cross_rate3
+            profit_percentage = ((final_amount - initial_amount) / initial_amount) * 100
+            return profit_percentage
+        return None
+
+    def find_profitable_triangles(self):
+        prices = self.get_current_prices()
+        profitable_triangles = []
         for triangle in self.triangles:
-            print(triangle)
+            profit_percentage = self.calculate_profit(triangle, prices)
+            if profit_percentage and profit_percentage > 0:
+                profitable_triangles.append((triangle, profit_percentage))
+        return profitable_triangles
+
+    def print_profitable_triangles(self):
+        profitable_triangles = self.find_profitable_triangles()
+        for triangle, profit_percentage in profitable_triangles:
+            print(f"Triangle: {triangle} | Potential Profit: {profit_percentage:.2f}%")
 
     def get_klines(self, symbol, interval):
         klines = self.client.get_klines(symbol=symbol, interval=interval)
@@ -67,4 +107,4 @@ if __name__ == "__main__":
     file = 'credentials.txt'  # Replace with your API keys file path
     trader = Trader(file)
     trader.find_arbitrage_triangles()
-    trader.print_triangles()
+    trader.print_profitable_triangles()
