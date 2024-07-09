@@ -25,7 +25,7 @@ def get_active_trading_pairs(client):
     tickers = client.get_all_tickers()
     exchange_info = client.get_exchange_info()
     symbols_info = exchange_info['symbols']
-    active_trading_pairs = [symbol['symbol'] for symbol in symbols_info if symbol['status'] == 'TRADING' and symbol['symbol'].endswith("USDT")]
+    active_trading_pairs = [symbol['symbol'] for symbol in symbols_info if symbol['status'] == 'TRADING' and symbol['symbol'].endswith("USDC")]
     return active_trading_pairs
 
 def get_klines(client, symbol, interval):
