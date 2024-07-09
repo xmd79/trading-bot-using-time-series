@@ -84,7 +84,7 @@ def rescan_dips_with_ht_sine(client, pair, selected_pair_dips):
     print(f"{datetime.now()} - Symbol: {pair}, Status: {status}, Current Price: {current_price}, Sine: {current_sine}, Lead Sine: {current_leadsine}")
 
 def filter_dips_with_ht_sine_momentum(client, pair, selected_pair_dips_momentum):
-    interval = '1m'
+    interval = '3m'
     df = get_klines(client, pair, interval)
     close_prices = df['Close'].values
 
@@ -139,7 +139,7 @@ try:
             lowest_value = float('inf')
 
             for pair in selected_pair_dips:
-                interval = '5m'
+                interval = '15m'
                 df = get_klines(trader.client, pair, interval)
                 close_prices = df['Close'].values
 
