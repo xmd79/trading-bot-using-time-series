@@ -190,7 +190,7 @@ try:
 
             print('Performing volume analysis...')
             for pair, _ in selected_pair_dips_momentum:
-                volume_status = volume_analysis(trader.client, pair, ['1m', '3m', '5m'])
+                volume_status = volume_analysis(trader.client, pair, ['1m'])
                 for interval, status in volume_status.items():
                     print(f'Symbol: {pair}, Interval: {interval}, Volume Status: {status}')
         else:
