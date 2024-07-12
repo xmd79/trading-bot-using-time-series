@@ -92,6 +92,7 @@ def main(file):
 
     top_volume_stats = volume_stats[:10]  # Get top 10 by volume
 
+    bullish_assets = []
     for symbol, df, buy_volume, sell_volume, total_volume in top_volume_stats:
         close_prices = df['Close'].values
         small_wave_forecast, medium_wave_forecast, large_wave_forecast = perform_fft(close_prices, 20)
@@ -110,6 +111,21 @@ def main(file):
         
         print("\nLarge Wave Forecast:")
         print(df[['Close', 'Large_Wave_Forecast']].tail(10))  # Print the last 10 values for comparison
+        
+        if trend == 'Bullish':
+            latest_close = df['Close'].iloc[-1]
+            forecast_close = df['Medium_Wave_Forecast'].iloc[-1]
+            potential_profit = (forecast_close - latest_close) / latest_close
+            bullish_assets.append((symbol, potential_profit, latest_close, forecast_close))
+
+    if bullish_assets:
+        most_profitable_asset = max(bullish_assets, key=lambda x: x[1])
+        symbol, potential_profit, latest_close, forecast_close = most_profitable_asset
+        print(f"\nMost Profitable Bullish Asset:")
+        print(f"Symbol: {symbol}")
+        print(f"Latest Close Price: {latest_close}")
+        print(f"Forecasted Close Price: {forecast_close}")
+        print(f"Potential Profit: {potential_profit:.2%}")
 
 if __name__ == "__main__":
     api_keys_file = "credentials.txt"  # Replace with the path to your API keys file
