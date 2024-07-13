@@ -152,6 +152,21 @@ def get_planet_positions(current_time):
             'astro_cycle_status': astrological_cycle_status
         }
 
+    # Adding Sun data
+    sun = ephem.Sun(current_time)
+    sun.compute(current_time)
+    planet_data['Sun'] = {
+        'phase_percent': 0.0,  # Sun does not have a phase angle like other planets
+        'age_days': None,       # Sun does not have an age in days like the Moon
+        'sign': ephem.constellation(sun)[1],
+        'degree': math.degrees(sun.ra),
+        'distance_km': sun.earth_distance * ephem.meters_per_au / 1000,
+        'angular_diameter': math.degrees(sun.size / (sun.earth_distance * ephem.meters_per_au / 1000)),
+        'speed_km_hr': sun.earth_distance * ephem.meters_per_au / 1000 / (1 / 24),
+        'energy': 1.0,          # Assume full energy since there's no phase for the Sun
+        'astro_cycle_status': "To be defined"  # Adjust based on astrological interpretations
+    }
+
     return planet_data
 
 def get_location():
