@@ -1,4 +1,4 @@
-hi, just install python and all coresp needed modules that u see at imports via pip install and talib module via anaconda or manually downloading proper pack and pip install it like that...as u prefer, then u need in same folder with python code a file named "signals.txt" but u can comment those parts in the code and skip that part but what as it is its needed...then u need another file, most imp thing in same folder with py trading bot code that is named "credentials.txt" with oyur binance api key and secret strings one below each other and then have permission for your ip in api settings from binance acc then enable all there as well, have some money if you want to auto trade, set your custom values for sl and tp vars if u prefer to change them and then run code and it should work, cheers )
+
 
 for any donations, this is my binance deposit wallet for:
 
