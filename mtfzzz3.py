@@ -3,7 +3,6 @@ import sys
 from datetime import datetime
 from binance.client import Client
 import pandas as pd
-import concurrent.futures
 import talib
 
 class Trader:
@@ -52,27 +51,10 @@ def calculate_rsi(prices, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def calculate_volume_stats(df):
-    buy_volume = df[df['Close'] > df['Open']]['Volume'].sum()
-    sell_volume = df[df['Close'] < df['Open']]['Volume'].sum()
-    total_volume = df['Volume'].sum()
-    return buy_volume, sell_volume, total_volume
+def calculate_percentage_deviation(close_price, sma):
+    return ((close_price - sma) / sma) * 100
 
-def normalize(value, min_val, max_val):
-    return (value - min_val) / (max_val - min_val)
-
-def forecast_reversal(close, s_sma, m_sma, l_sma):
-    if close < s_sma < m_sma < l_sma:
-        return 'Dip forecasted'
-    elif close > s_sma > m_sma > l_sma:
-        return 'Top forecasted'
-    else:
-        return 'No clear forecast'
-
-def determine_cycle(close, m_sma):
-    return 'up' if close > m_sma else 'down'
-
-def filter_pair_with_sma_and_rsi(client, pair, interval):
+def filter_pair_details(client, pair, interval):
     df = get_klines(client, pair, interval)
     close_prices = df['Close']
     
@@ -85,18 +67,14 @@ def filter_pair_with_sma_and_rsi(client, pair, interval):
     rsi = calculate_rsi(close_prices).iloc[-1]
 
     current_price = close_prices.iloc[-1]
-    forecast = forecast_reversal(current_price, s_sma, m_sma, l_sma)
-    current_cycle = determine_cycle(current_price, m_sma)
 
-    # Determine status
-    status = forecast
-    if forecast == 'Dip forecasted' and current_cycle == 'down':
-        status = 'Confirmed Dip'
-    elif forecast == 'Top forecasted' and current_cycle == 'up':
-        status = 'Confirmed Top'
+    # Calculate percentage deviations
+    s_sma_dev = calculate_percentage_deviation(current_price, s_sma)
+    m_sma_dev = calculate_percentage_deviation(current_price, m_sma)
+    l_sma_dev = calculate_percentage_deviation(current_price, l_sma)
     
-    buy_volume, sell_volume, total_volume = calculate_volume_stats(df)
-    volume_status = 'Bullish' if buy_volume > sell_volume else 'Bearish'
+    # Determine if conditions are met for dip
+    dip_condition = s_sma < m_sma < l_sma
 
     return {
         'pair': pair,
@@ -105,27 +83,23 @@ def filter_pair_with_sma_and_rsi(client, pair, interval):
         'm_sma': m_sma,
         'l_sma': l_sma,
         'rsi': rsi,
-        'status': status,
-        'volume_status': volume_status
+        's_sma_dev': s_sma_dev,
+        'm_sma_dev': m_sma_dev,
+        'l_sma_dev': l_sma_dev,
+        'dip_condition': dip_condition
     }
 
-def find_top_asset_with_lowest_position(client, pairs, interval):
+def find_top_asset(client, pairs, interval):
     best_asset = None
-    lowest_position = float('inf')
+    lowest_rsi = float('inf')
     best_details = {}
-
+    
     for pair in pairs:
-        details = filter_pair_with_sma_and_rsi(client, pair, interval)
-        current_price = details['current_price']
-        s_sma = details['s_sma']
-        m_sma = details['m_sma']
-        l_sma = details['l_sma']
+        details = filter_pair_details(client, pair, interval)
         
-        # Compute position based on SMAs
-        position = abs(current_price - s_sma) + abs(current_price - m_sma) + abs(current_price - l_sma)
-
-        if position < lowest_position:
-            lowest_position = position
+        # Select asset with the lowest RSI and meet the dip condition
+        if details['rsi'] < lowest_rsi and details['dip_condition']:
+            lowest_rsi = details['rsi']
             best_asset = pair
             best_details = details
 
@@ -142,11 +116,11 @@ try:
     for pair in active_trading_pairs:
         print(f"Symbol: {pair}")
 
-    print('Finding top asset with the lowest position...')
-    top_asset, top_asset_details = find_top_asset_with_lowest_position(trader.client, active_trading_pairs, '2h')
+    print('\nFinding top asset with the lowest RSI and dip condition...')
+    top_asset, top_asset_details = find_top_asset(trader.client, active_trading_pairs, '2h')
 
     if top_asset:
-        print(f"Top asset with the lowest position: {top_asset}")
+        print(f"\nTop asset with the lowest RSI and dip condition: {top_asset}")
         print(f"Details: {top_asset_details}")
     else:
         print("No suitable asset found.")
