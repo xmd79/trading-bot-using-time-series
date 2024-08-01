@@ -1,4 +1,3 @@
-# Import modules
 import numpy as np
 import talib
 import requests
@@ -108,185 +107,46 @@ def get_price(symbol):
         print(f"Error fetching price for {symbol}: {e}")
         return 0.0
 
-# Scale current close price to sine wave
-def scale_to_sine(timeframe):
-    close_prices = np.array(get_close_prices(timeframe))
-    if len(close_prices) < 2:
-        return None, None, None
-
-    # Calculate HT_SINE values
-    sine_wave, _ = talib.HT_SINE(close_prices)
-    sine_wave = np.nan_to_num(sine_wave)  # Replace NaNs with 0
-    sine_wave = -sine_wave
-
-    # Get current sine and min/max values
-    current_sine = sine_wave[-1]
-    sine_wave_min = np.min(sine_wave)
-    sine_wave_max = np.max(sine_wave)
-
-    # Calculate distances
-    dist_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100 if sine_wave_max != sine_wave_min else 0
-    dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100 if sine_wave_max != sine_wave_min else 0
-
-    return dist_min, dist_max, current_sine
-
-# Print results for each timeframe
-def print_results(timeframes):
-    for timeframe in timeframes:
-        dist_min, dist_max, current_sine = scale_to_sine(timeframe)
-        if dist_min is not None:
-            print(f"For {timeframe} timeframe:")
-            print(f"Distance to min: {dist_min:.2f}%")
-            print(f"Distance to max: {dist_max:.2f}%")
-            print(f"Current Sine value: {current_sine}\n")
-
-print_results(timeframes)
-
-# Calculate overall percentages for different bands of timeframes
-def calculate_band_averages(timeframe_groups):
-    band_averages = {}
-    for band_name, timeframes in timeframe_groups.items():
-        distances_min = []
-        distances_max = []
-        for timeframe in timeframes:
-            dist_min, dist_max, _ = scale_to_sine(timeframe)
-            if dist_min is not None:
-                distances_min.append(dist_min)
-                distances_max.append(dist_max)
-        
-        if distances_min:
-            band_averages[band_name] = {
-                'average_min': np.mean(distances_min),
-                'average_max': np.mean(distances_max)
-            }
-        else:
-            band_averages[band_name] = {
-                'average_min': None,
-                'average_max': None
-            }
-    
-    return band_averages
-
-# Define timeframe bands
-timeframe_bands = {
-    'Small Band': ['1m', '3m', '5m'],
-    'Medium Band': ['15m', '30m', '1h'],
-    'Major Band': ['2h', '4h', '6h'],
-    'Big Band': ['8h', '12h', '1d']
-}
-
-# Calculate and print band averages
-band_averages = calculate_band_averages(timeframe_bands)
-
-for band_name, averages in band_averages.items():
-    print(f"{band_name} Averages:")
-    print(f"Average Distance to Min: {averages['average_min']:.2f}%" if averages['average_min'] is not None else "No Data")
-    print(f"Average Distance to Max: {averages['average_max']:.2f}%" if averages['average_max'] is not None else "No Data")
-    print("\n" + "="*30 + "\n")
-
-# Define the function to calculate thresholds and averages
-def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
-    """
-    Calculate thresholds and averages based on min and max percentages.
-    """
-    close_prices = np.array(close_prices)
-    
-    # Get min/max close    
-    min_close = np.nanmin(close_prices)
-    max_close = np.nanmax(close_prices)
-    
-    # Calculate momentum
-    momentum = talib.MOM(close_prices, timeperiod=period)
-    
-    # Get min/max momentum    
-    min_momentum = np.nanmin(momentum)   
-    max_momentum = np.nanmax(momentum)
-    
-    # Calculate custom percentages 
-    min_percentage_custom = minimum_percentage / 100  
-    max_percentage_custom = maximum_percentage / 100
-
-    # Calculate thresholds       
-    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
-    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
-
-    # Calculate range of prices within a certain distance from the current close price
-    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
-
-    # Filter close prices
-    with np.errstate(invalid='ignore'):
-        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
-        filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
-        
-    # Calculate avg    
-    avg_mtf = np.nanmean(filtered_close)
-
-    # Get current momentum       
-    current_momentum = momentum[-1]
-
-    # Calculate % to min/max momentum    
-    with np.errstate(invalid='ignore', divide='ignore'):
-        percent_to_min_momentum = ((max_momentum - current_momentum) /   
-                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
-
-        percent_to_max_momentum = ((current_momentum - min_momentum) / 
-                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
- 
-    # Calculate combined percentages              
-    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
-    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
-      
-    # Combined momentum signal     
-    momentum_signal = percent_to_max_combined - percent_to_min_combined
-
-    return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
-
-# Calculate thresholds and print results for each timeframe
-for timeframe in timeframes:
-    closes = get_close_prices(timeframe)
-    min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-    
-    print(f"For {timeframe} timeframe:")
-    print(f"Momentum Signal: {momentum_signal:.2f}")
-    print(f"Minimum Threshold: {min_threshold:.2f}")
-    print(f"Maximum Threshold: {max_threshold:.2f}")
-    print(f"Average MTF: {avg_mtf:.2f}")
-    
-    # Determine which threshold is closest to the current close
-    current_close = closes[-1]
-    closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - current_close))
-
-    if closest_threshold == min_threshold:
-        print("The last minimum value is closest to the current close.")
-    elif closest_threshold == max_threshold:
-        print("The last maximum value is closest to the current close.")
-    else:
-        print("No threshold value found.")
-    
-    print("\n" + "="*30 + "\n")
-
 # Calculate momentum for each timeframe
 def get_momentum(timeframe):
     """Calculate momentum for a single timeframe"""
     # Get candle data               
     candles = candle_map[timeframe][-100:]  
     # Calculate momentum using talib MOM
-    momentum = talib.MOM(np.array([c["close"] for c in candles]), timeperiod=14)
+    close_prices = np.array([c["close"] for c in candles])
+    momentum = talib.MOM(close_prices, timeperiod=14)
     return momentum[-1]
 
-# Calculate momentum for each timeframe
+# Print momentum values for each timeframe
 momentum_values = {}
 for timeframe in timeframes:
     momentum = get_momentum(timeframe)
     momentum_values[timeframe] = momentum
     print(f"Momentum for {timeframe}: {momentum}")
 
-# Convert momentum to a normalized scale and determine if it's positive or negative
-normalized_momentum = {}
-for timeframe, momentum in momentum_values.items():
-    normalized_value = (momentum + 100) / 2  # Normalize to a scale between 0 and 100
-    normalized_momentum[timeframe] = normalized_value
-    print(f"Normalized Momentum for {timeframe}: {normalized_value:.2f}%")
+# Normalize momentum values
+def normalize_momentum(momentum_values):
+    """Normalize momentum values to a 0-100 scale based on observed min and max."""
+    if not momentum_values:
+        return {}
+    
+    min_momentum = min(momentum_values.values())
+    max_momentum = max(momentum_values.values())
+    
+    normalized = {}
+    for timeframe, momentum in momentum_values.items():
+        # Avoid division by zero
+        if max_momentum == min_momentum:
+            normalized[timeframe] = 50.0  # Arbitrary value if no range exists
+        else:
+            normalized[timeframe] = (momentum - min_momentum) / (max_momentum - min_momentum) * 100
+    return normalized
+
+normalized_momentum = normalize_momentum(momentum_values)
+
+# Print normalized momentum values
+for timeframe, norm_momentum in normalized_momentum.items():
+    print(f"Normalized Momentum for {timeframe}: {norm_momentum:.2f}%")
 
 # Calculate dominant ratio
 positive_count = sum(1 for value in normalized_momentum.values() if value > 50)
