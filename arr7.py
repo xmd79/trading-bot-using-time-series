@@ -18,24 +18,15 @@ client = BinanceClient(api_key, api_secret)
 
 # Define a function to get the account balance in USDT
 def get_account_balance():
-    account = client.get_asset_balance(asset='USDT')
+    account = client.get_asset_balance(asset='USDC')
     return float(account['free']) if account else 0.0
 
 # Get the USDT balance
 bUSD_balance = get_account_balance()
-print("USDT Spot balance:", bUSD_balance)
-
-# Define Binance client reading api key and secret from local file
-def get_binance_client():
-    with open("credentials.txt", "r") as f:
-        lines = f.readlines()
-        api_key = lines[0].strip()
-        api_secret = lines[1].strip()
-    client = BinanceClient(api_key, api_secret)
-    return client
+print("USDC Spot balance:", bUSD_balance)
 
 # Initialize variables for tracking trade state
-TRADE_SYMBOL = "BTCUSDT"
+TRADE_SYMBOL = "BTCUSDC"
 timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
 # Define a function to get candles
@@ -273,3 +264,40 @@ for timeframe in timeframes:
         print("No threshold value found.")
     
     print("\n" + "="*30 + "\n")
+
+# Calculate momentum for each timeframe
+def get_momentum(timeframe):
+    """Calculate momentum for a single timeframe"""
+    # Get candle data               
+    candles = candle_map[timeframe][-100:]  
+    # Calculate momentum using talib MOM
+    momentum = talib.MOM(np.array([c["close"] for c in candles]), timeperiod=14)
+    return momentum[-1]
+
+# Calculate momentum for each timeframe
+momentum_values = {}
+for timeframe in timeframes:
+    momentum = get_momentum(timeframe)
+    momentum_values[timeframe] = momentum
+    print(f"Momentum for {timeframe}: {momentum}")
+
+# Convert momentum to a normalized scale and determine if it's positive or negative
+normalized_momentum = {}
+for timeframe, momentum in momentum_values.items():
+    normalized_value = (momentum + 100) / 2  # Normalize to a scale between 0 and 100
+    normalized_momentum[timeframe] = normalized_value
+    print(f"Normalized Momentum for {timeframe}: {normalized_value:.2f}%")
+
+# Calculate dominant ratio
+positive_count = sum(1 for value in normalized_momentum.values() if value > 50)
+negative_count = len(normalized_momentum) - positive_count
+
+print(f"Positive momentum timeframes: {positive_count}/{len(normalized_momentum)}")
+print(f"Negative momentum timeframes: {negative_count}/{len(normalized_momentum)}")
+
+if positive_count > negative_count:
+    print("Overall dominant momentum: Positive")
+elif positive_count < negative_count:
+    print("Overall dominant momentum: Negative")
+else:
+    print("Overall dominant momentum: Balanced")
