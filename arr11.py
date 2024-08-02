@@ -1,6 +1,5 @@
 import numpy as np
 import talib
-import requests
 from datetime import datetime
 from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException
@@ -154,8 +153,7 @@ def calculate_all_talib_indicators(candles):
     results['HT_TRENDMODE'] = talib.HT_TRENDMODE(close_prices)
 
     # Math Transform
-    results['ACOS'] = talib.ACOS(close_prices)
-    results['ASIN'] = talib.ASIN(close_prices)
+
     results['ATAN'] = talib.ATAN(close_prices)
     results['CEIL'] = talib.CEIL(close_prices)
     results['COS'] = talib.COS(close_prices)
@@ -194,10 +192,22 @@ def calculate_all_talib_indicators(candles):
     results['TSF'] = talib.TSF(close_prices)
     results['VAR'] = talib.VAR(close_prices)
 
-    return results
+    # Filter out invalid values (NaN and empty)
+    filtered_results = {
+        k: (v[~np.isnan(v) & ~np.isinf(v)] if isinstance(v, np.ndarray) and v.size > 0 else "No valid data")
+        for k, v in results.items()
+    }
+
+    # Remove entries with "No valid data"
+    filtered_results = {
+        k: v for k, v in filtered_results.items() 
+        if not (isinstance(v, str) and v == "No valid data")
+    }
+
+    return filtered_results
 
 # Main logic
-symbol = "BTCUSDC"
+symbol = "BTCUSDT"  # Fixed symbol to use the correct Binance format
 timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
 for timeframe in timeframes:
@@ -237,5 +247,11 @@ for timeframe in timeframes:
     print(f"IFFT Result (first 5 components): {ifft_result[:5]}")
     print("\nTA-Lib Indicators:")
     for key, value in talib_indicators.items():
-        print(f"{key}: {value[-1] if isinstance(value, np.ndarray) else value}")
+        if isinstance(value, np.ndarray):
+            if value.size > 0:
+                print(f"{key}: {value[-1]}")
+            else:
+                print(f"{key}: No valid data")
+        else:
+            print(f"{key}: {value}")
     print("\n" + "="*30 + "\n")
