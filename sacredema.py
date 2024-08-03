@@ -98,11 +98,11 @@ def generate_report(timeframe, candles):
     # Determine the position on the fear-greed spectrum
     neutral_threshold = 50.00
     if intensity <= neutral_threshold:
-        fear_percentage = 100 - intensity
-        greed_percentage = intensity
-    else:
         greed_percentage = 100 - intensity
         fear_percentage = intensity
+    else:
+        fear_percentage = 100 - intensity
+        greed_percentage = intensity
     
     # Print key points for most fear and most greed
     most_fear_ema = min(emas, key=lambda x: emas[x])
@@ -113,33 +113,35 @@ def generate_report(timeframe, candles):
     print(f"\nMost Fear EMA Length: {most_fear_ema}, Value: {most_fear_value:.2f}")
     print(f"Most Greed EMA Length: {most_greed_ema}, Value: {most_greed_value:.2f}")
     
+    # Print symmetrical fear and greed analysis
+    print(f"\nFear Percentage: {fear_percentage:.2f}%")
+    print(f"Greed Percentage: {greed_percentage:.2f}%")
+    
     # Plot the fear and greed
-    fig, ax = plt.subplots()
-    ax.set_aspect('equal')
-    theta = np.linspace(0, 2 * np.pi, 100)
-    x = np.cos(theta)
-    y = np.sin(theta)
-    ax.plot(x, y, 'k--')
+    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
     
     # Plot the quadrants
-    for angle in [0, np.pi/2, np.pi, 3*np.pi/2]:
-        ax.plot([0, np.cos(angle)], [0, np.sin(angle)], 'r--', alpha=0.5)
+    quadrant_angles = [0, np.pi/2, np.pi, 3*np.pi/2]
+    for angle in quadrant_angles:
+        ax.plot([angle, angle], [0, 1], 'r--', alpha=0.5)
     
     # Plot special triangles
-    for angle in [np.pi/6, np.pi/3, np.pi/2, 2*np.pi/3]:
-        triangle_angles = [angle, angle + 2*np.pi/3, angle + 4*np.pi/3]
-        triangle_x = np.cos(triangle_angles)
-        triangle_y = np.sin(triangle_angles)
-        ax.fill(triangle_x, triangle_y, alpha=0.1, edgecolor='b', linewidth=2)
+    special_triangles = [30, 60, 90]
+    for angle in special_triangles:
+        triangle_angles = [np.deg2rad(angle), np.deg2rad(angle + 120), np.deg2rad(angle + 240)]
+        triangle_r = [1] * 3
+        triangle_theta = np.array(triangle_angles)
+        ax.fill(triangle_theta, triangle_r, alpha=0.1, edgecolor='b', linewidth=2)
     
     # Plot fear and greed as points
     if fear_percentage > 0:
-        ax.plot(-fear_percentage / 50, 0, 'ro', label=f'Fear: {fear_percentage:.2f}%')
+        ax.plot(np.deg2rad(180), fear_percentage / 50, 'ro', label=f'Fear: {fear_percentage:.2f}%')
     if greed_percentage > 0:
-        ax.plot(greed_percentage / 50, 0, 'go', label=f'Greed: {greed_percentage:.2f}%')
+        ax.plot(np.deg2rad(0), greed_percentage / 50, 'go', label=f'Greed: {greed_percentage:.2f}%')
     
     # Highlight the neutral position
     ax.plot(0, 0, 'bo', label='Neutral')
+    ax.set_rmax(2)  # Set the maximum radius for clarity
     ax.legend()
     plt.title(f'Fear and Greed Analysis for {timeframe}')
     plt.show()
