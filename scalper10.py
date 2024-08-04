@@ -549,6 +549,7 @@ def analyze_timeframes():
         candles = candle_map[timeframe]
         close_prices = np.array([c["close"] for c in candles])
         
+        # Generate and print the detailed report
         generate_report(timeframe, candles)
 
         # Print VWAP
@@ -627,8 +628,13 @@ def analyze_timeframes():
             else:
                 print(f"{Fore.YELLOW}Current price ({current_close:.2f}) is EQUAL to the 45-degree angle price ({angle_price:.2f}){Style.RESET_ALL}")
 
+        # Analyze and print volume trend
+        volume_trend = analyze_volume_trend(candles, window_size=20)
+        print(f"Volume Trend for {timeframe}: {volume_trend}")
+
         print()
         print()
+
 
 ##################################################
 ##################################################
