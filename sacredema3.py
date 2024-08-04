@@ -390,6 +390,35 @@ def generate_report(timeframe, candles):
     print(f"Fear: {fear_percentage:.2f}%")
     print(f"Greed: {greed_percentage:.2f}%")
 
+def analyze_volume_trend(candles, window_size=20):
+    """
+    Analyzes the volume trend to determine if it is bullish or bearish.
+
+    :param candles: List of candle data.
+    :param window_size: Number of periods to calculate the average volume.
+    :return: A string indicating whether the trend is bullish or bearish.
+    """
+    if len(candles) < window_size:
+        return "Not enough data"
+
+    volumes = np.array([c["volume"] for c in candles[-window_size:]])
+    average_volume = np.mean(volumes)
+    recent_volume = np.array([c["volume"] for c in candles])
+
+    # Calculate average volumes for recent windows
+    avg_recent_volume = np.mean(recent_volume[-window_size:])
+    avg_previous_volume = np.mean(recent_volume[-2*window_size:-window_size])
+
+    if avg_recent_volume > avg_previous_volume:
+        return "Bullish"
+    elif avg_recent_volume < avg_previous_volume:
+        return "Bearish"
+    else:
+        return "Neutral"
+
+# Example usage:
+# trend = analyze_volume_trend(candle_map["1h"], window_size=20)
+# print(f"Volume trend: {trend}")
 
 
 # Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
@@ -453,7 +482,9 @@ def analyze_timeframes():
         print(f"Sine Scaling Current Sine for {timeframe}: {current_sine:.2f}")
         
         # Calculate thresholds
-        min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
+        min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(
+            close_prices, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
+        )
         print(f"Thresholds for {timeframe}:")
         print(f"Minimum Threshold: {min_threshold:.2f}")
         print(f"Maximum Threshold: {max_threshold:.2f}")
@@ -468,6 +499,12 @@ def analyze_timeframes():
             print("The last maximum value is closest to the current close.")
         else:
             print("No threshold value found.")
+        
+        # Analyze volume trend
+        volume_trend = analyze_volume_trend(candles, window_size=20)
+        print(f"Volume Trend for {timeframe}: {volume_trend}")
+        
+        print()
 
         print()
 
