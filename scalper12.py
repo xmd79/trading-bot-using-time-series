@@ -21,7 +21,7 @@ client = BinanceClient(api_key, api_secret)
 init(autoreset=True)
 
 symbol = "BTCUSDC"
-timeframes = ["1m", "5m"]
+timeframes = ["5m", "1m"]
 candle_map = {}
 
 # Define a function to get candles
