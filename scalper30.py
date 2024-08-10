@@ -24,7 +24,7 @@ client = BinanceClient(api_key, api_secret)
 # Initialize colorama
 init(autoreset=True)
 
-symbol = "BTCUSDT"  # Adjusted symbol to USDT
+symbol = "BTCUSDT"  # The trading pair
 timeframes = ["5m", "3m", "1m"]
 candle_map = {}
 
@@ -74,9 +74,6 @@ def calculate_profit_loss(current_price, target_price):
 
 # Fetch liquidation levels (Pseudo function)
 def get_liquidation_levels(symbol):
-    # This function is a placeholder. You need to implement actual data fetching logic.
-    # For example, composite levels of liquidations based on available public sources.
-    # You could utilize volume data or explore other APIs that might provide the necessary information.
     liquidation_levels = []  # Placeholder for liquidation volume levels.
     return liquidation_levels
 
@@ -167,7 +164,6 @@ def calculate_macd(candles, fastperiod=12, slowperiod=26, signalperiod=9):
     close_prices = np.array([c["close"] for c in candles])
     close_prices, = remove_nans_and_zeros(close_prices)
     macd, macdsignal, macdhist = talib.MACD(close_prices, fastperiod=fastperiod, slowperiod=slowperiod, signalperiod=signalperiod)
-    macd, macdsignal, macdhist = remove_nans_and_zeros(macd, macdsignal, macdhist)
     return (
         macd[-1] if len(macd) > 0 and not np.isnan(macd[-1]) else np.nan,
         macdsignal[-1] if len(macdsignal) > 0 and not np.isnan(macdsignal[-1]) else np.nan,
@@ -226,12 +222,9 @@ def calculate_regression_channels(candles):
         regression_upper = regression_line + std_dev
         regression_lower = regression_line - std_dev
 
-        regression_upper_value = regression_upper[-1] if not np.isnan(regression_upper[-1]) else None
-        regression_lower_value = regression_lower[-1] if not np.isnan(regression_lower[-1]) else None
-
-        current_close_value = close_prices[-1] if len(close_prices) > 0 and not np.isnan(close_prices[-1]) else None
-
-        return regression_lower_value, regression_upper_value, (regression_upper_value + regression_lower_value) / 2, current_close_value
+        return regression_lower[-1] if not np.isnan(regression_lower[-1]) else None, \
+               regression_upper[-1] if not np.isnan(regression_upper[-1]) else None, \
+               (regression_upper[-1] + regression_lower[-1]) / 2, close_prices[-1]
 
     except Exception as e:
         print(f"Error calculating regression channels: {e}")
@@ -452,16 +445,15 @@ def generate_signal(candles, price):
     short_ema = calculate_ema(candles, timeperiod=9)
     long_ema = calculate_ema(candles, timeperiod=21)
 
-    if price < short_ema < long_ema:  # Use price instead of current_close
+    if price < short_ema < long_ema:
         return "Buy"
-    elif price > short_ema > long_ema:  # Use price instead of current_close
+    elif price > short_ema > long_ema:
         return "Sell"
     else:
         return "Hold"
 
 # Analyze volume trend
 def analyze_volume_trend(candles, window_size=20):
-    """ Analyze volume trend with percentage change """
     if len(candles) < window_size:
         return "Not enough data"
 
@@ -485,8 +477,8 @@ def analyze_volume_trend(candles, window_size=20):
 def merged_fft_forecast(candles, n_components=5):
     closes = np.array([c['close'] for c in candles])
     fft = fftpack.rfft(closes)
-    frequencies = fftpack.rfftfreq(len(closes))
-
+    
+    # Select top n components
     idx = np.argsort(np.abs(fft))[::-1][:n_components]
     filtered_fft = np.zeros_like(fft)
     filtered_fft[idx] = fft[idx]
@@ -508,7 +500,7 @@ def calculate_volatility_with_fft(candles):
     amplitudes = np.abs(fft)
     frequencies = fftpack.rfftfreq(len(closes))
 
-    # Get the current amplitude and frequency (last values)
+    # Get current amplitude and frequency (last values)
     current_amplitude = amplitudes[-1]  # Last amplitude value
     current_frequency = frequencies[-1]   # Last frequency value
 
@@ -542,37 +534,39 @@ def calculate_garch_volatility(candles):
     print(f"GARCH Predicted Volatility: {predicted_volatility:.4f}")
     return predicted_volatility
 
-# Harmonic Wave Analysis
-def harmonic_wave_forecasting(candles, dist_min, dist_max):
+# Harmonic Wave Analysis for HFT
+def harmonic_wave_forecasting_hft(candles, forecast_minutes=5):
     closes = np.array([c['close'] for c in candles])
     if len(closes) == 0:
-        return None, None, None, None
+        return None, None
 
-    # Compute FFT
+    # Use FFT for frequency analysis
     fft_result = fftpack.rfft(closes)
     n = len(closes)
 
-    # Compute Frequencies
     frequencies = fftpack.rfftfreq(n)
     amplitudes = np.abs(fft_result)
 
-    # Get the maximum and minimum thresholds
-    min_threshold = np.min(closes)
-    max_threshold = np.max(closes)
-    mid_threshold = (min_threshold + max_threshold) / 2
+    # Get the most recent closing price
+    current_price = closes[-1]
 
-    # Analyze the harmonic relationship for ups and downs
-    if closes[-1] < mid_threshold:
-        dominant_frequency = frequencies[np.argmin(amplitudes)]
-        market_mood = "Bearish"
-    else:
-        dominant_frequency = frequencies[np.argmax(amplitudes)]
-        market_mood = "Bullish"
+    # Identify the dominant frequency
+    dominant_frequency_index = np.argmax(amplitudes)
+    dominant_frequency = frequencies[dominant_frequency_index]
 
-    # Calculate predicted price based on sine distance scaling
-    predicted_price = closes[-1] + np.mean(amplitudes) + (dist_max - dist_min) / 100 * (closes[-1] - min_threshold)
+    # Calculate harmonic predicted price
+    predicted_harmonic_price = current_price + np.mean(amplitudes) * np.sin(2 * np.pi * dominant_frequency * forecast_minutes)
+    
+    # Adjust predicted price based on current market conditions (e.g., considering the last few prices)
+    incoming_prices = closes[-forecast_minutes:]  # Get the last 'forecast_minutes' closing prices
+    average_incoming_price = np.mean(incoming_prices)
+    
+    # Adjust the predicted price towards the average of incoming prices, simulating responsiveness
+    adjusted_predicted_price = predicted_harmonic_price + 0.5 * (average_incoming_price - predicted_harmonic_price)
 
-    return dominant_frequency, market_mood, predicted_price, mid_threshold
+    market_mood = "Bullish" if adjusted_predicted_price > current_price else "Bearish"
+
+    return adjusted_predicted_price, market_mood
 
 # Generate a market analysis report based on the time frame
 def generate_report(timeframe, candles, investment, forecast_minutes=12):
@@ -580,12 +574,9 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12):
 
     # Fetch liquidation levels
     liquidation_levels = get_liquidation_levels(symbol)
-
-    # Update support and resistance based on liquidation levels
     support, resistance = calculate_dynamic_support_resistance(candles, liquidation_levels)
-
+    
     current_close, emas, is_dip, is_top, intensity = evaluate_ema_pattern(candles)
-
     print(f"Current Close Price: {current_close:.2f}")
     print(f"Dynamic Support Level: {support:.2f}")
     print(f"Dynamic Resistance Level: {resistance:.2f}")
@@ -596,19 +587,14 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12):
         close_below = current_close < ema_value
         print(f"{length:<10} {ema_value:<20.2f} {close_below:<15}")
 
-    # Get the current price using the function
-    current_price = get_price("BTCUSDT")  # Use the updated ticker symbol accurately
+    current_price = get_price(symbol)
 
-    # Generate Trading Signal using the current price
     trading_signal = generate_signal(candles, current_price)
     print(f"Trading Signal: {trading_signal}")
 
-    # Calculate sine distances
     dist_min_close, dist_max_close, current_sine_close = scale_to_sine(timeframe)
 
-    # Market mood and reversal predictions
     predictions, minor_reversal_target, major_reversal_target = predict_reversals(candles, forecast_minutes)
-
     if predictions is not None:
         print(f"Predicted Close Prices for next {len(predictions)} minutes: {[round(p, 2) for p in predictions]}")
         print(f"Minor Reversal Target: {minor_reversal_target:.2f}")
@@ -617,30 +603,25 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12):
         trend_direction = "Up" if predictions[-1] > current_price else "Down"
         print(f"Market Mood: {trend_direction}")
 
-        # Corrected Profit & Loss calculation based on the current price
         pl_amount, pl_percentage = calculate_profit_loss(current_price, minor_reversal_target)
         print(f"Potential Profit/Loss for Minor Target: Amount = {pl_amount:.2f}, Percentage = {pl_percentage:.2f}%")
 
         pl_amount, pl_percentage = calculate_profit_loss(current_price, major_reversal_target)
         print(f"Potential Profit/Loss for Major Target: Amount = {pl_amount:.2f}, Percentage = {pl_percentage:.2f}%")
 
-    # Price Forecast using FFT
     target_price, market_mood = forecast_price(candles, n_components=5, target_distance=0.01)
     print(f"Forecasted Price: {target_price:.2f}")
     print(f"Forecast Market Mood: {market_mood}")
 
-    # Merged FFT Forecasting
     merged_forecast = merged_fft_forecast(candles, n_components=5)
     if merged_forecast is not None:
         print(f"Merged FFT Forecast Price: {merged_forecast:.2f}")
 
-    # Harmonic Wave Analysis with Sine Scaling
-    dominant_frequency, harmonic_market_mood, harmonic_predicted_price, mid_threshold = harmonic_wave_forecasting(candles, dist_min_close, dist_max_close)
-    if dominant_frequency is not None:
-        print(f"Harmonic Dominant Frequency: {dominant_frequency:.4f} Hz")
+    # Harmonic Wave Analysis for HFT
+    hft_forecasted_price, harmonic_market_mood = harmonic_wave_forecasting_hft(candles, forecast_minutes)
+    if hft_forecasted_price is not None:
+        print(f"Harmonic Predicted Price (Adjusted for HFT): {hft_forecasted_price:.2f}")
         print(f"Harmonic Market Mood: {harmonic_market_mood}")
-        print(f"Harmonic Predicted Price (Adjusted): {harmonic_predicted_price:.2f}")
-        print(f"Mid Threshold Price: {mid_threshold:.2f}")
 
     # Analyze and print the volume trend
     volume_trend, volume_change = analyze_volume_trend(candles, window_size=20)
@@ -652,21 +633,18 @@ investment_amount = 1000  # Define an example investment amount for profit/loss 
 while True:
     candle_map.clear()
 
-    # Fetch candles for all timeframes
     for timeframe in timeframes:
         candle_map[timeframe] = get_candles(symbol, timeframe)
 
-    # Analyze timeframes
     for timeframe in timeframes:
         candles = candle_map[timeframe]
 
         if len(candles) > 0:
             generate_report(timeframe, candles, investment_amount, forecast_minutes=12)
 
-            # Analyze GARCH volatility
+            # GARCH volatility analysis
             garch_volatility = calculate_garch_volatility(candles)
-
-            # Additional calculations can be included here...
+            print(f"GARCH Volatility for {timeframe}: {garch_volatility:.4f}")
 
             vwap = calculate_vwap(candles)
             print(f"VWAP for {timeframe}: {vwap:.2f}")
@@ -678,9 +656,7 @@ while True:
             print(f"RSI 14 for {timeframe}: {rsi:.2f}")
 
             macd, macdsignal, macdhist = calculate_macd(candles)
-            print(f"MACD for {timeframe}: {macd:.2f}")
-            print(f"MACD Signal for {timeframe}: {macdsignal:.2f}")
-            print(f"MACD Histogram for {timeframe}: {macdhist:.2f}")
+            print(f"MACD for {timeframe}: {macd:.2f}, Signal: {macdsignal:.2f}, Histogram: {macdhist:.2f}")
 
             momentum = calculate_momentum(candles, timeperiod=10)
             if momentum is not None:
@@ -741,10 +717,7 @@ while True:
 
             # Analyze and print the volume trend.
             volume_trend, volume_change = analyze_volume_trend(candles, window_size=20)
-            print(f"Volume Trend for {timeframe}: {volume_trend}, Volume Change: {volume_change:.2f}%")
-
-            # Calculate volatility using FFT and print relevant details
-            current_amplitude, current_frequency, volatility = calculate_volatility_with_fft(candles)
+            print(f"Volume Trend for {timeframe}: {volume_trend}, Volume Change: {volume_change:.2f}")
 
             print()  # Add a newline for better separation of timeframes.
 
