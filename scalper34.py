@@ -2,7 +2,7 @@
 
 import numpy as np
 import talib
-import requests  # Import requests for fetching current price
+import requests
 from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException
 from scipy.stats import linregress
@@ -11,7 +11,6 @@ from colorama import init, Fore, Style
 from datetime import datetime
 from sklearn.linear_model import LinearRegression
 import scipy.fftpack as fftpack
-from arch import arch_model  # GARCH Model
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
@@ -25,7 +24,7 @@ client = BinanceClient(api_key, api_secret)
 init(autoreset=True)
 
 symbol = "BTCUSDT"  # The trading pair
-timeframes = ["5m", "3m", "1m"]
+timeframes = ["1d", "12h", "8h", "6h", "4h", "2h", "1h", "30m", "15m", "5m", "3m", "1m"]
 candle_map = {}
 
 # Define the file for saving signals
@@ -40,7 +39,6 @@ def fourierExtrapolation(x, n_predict):
     x_freqdom = fftpack.fft(x_notrend)  # detrended x in frequency domain
     f = fftpack.fftfreq(n) 
     indexes = list(range(n))  # frequencies
-    # sort indexes by frequency, lower -> higher
     indexes.sort(key=lambda i: np.absolute(f[i]))
 
     t = np.arange(0, n + n_predict)
@@ -357,11 +355,11 @@ def forecast_price(candles, n_components, target_distance=0.01):
     # Filter out the top frequencies and reconstruct the signal
     filtered_fft = np.zeros_like(fft)
     filtered_fft[idx] = fft[idx]
-    filtered_signal = fftpack.irfft(filtered_fft)
+    reconstructed_signal = fftpack.irfft(filtered_fft)
 
     # Calculate the target price as the next value after the last closing price 
     current_close = closes[-1]
-    target_price = filtered_signal[-1] + target_distance
+    target_price = reconstructed_signal[-1] + target_distance
 
     # Calculate the market mood based on the predicted target price and the current close price
     diff = target_price - current_close
@@ -463,80 +461,7 @@ def analyze_volume_trend(candles, window_size=20):
     else:
         return "Neutral", percentage_change
 
-def merged_fft_forecast(candles, n_components=5):
-    closes = np.array([c['close'] for c in candles])
-    fft = fftpack.rfft(closes)
-    
-    idx = np.argsort(np.abs(fft))[::-1][:n_components]
-    filtered_fft = np.zeros_like(fft)
-    filtered_fft[idx] = fft[idx]
-    
-    merged_forecast = fftpack.irfft(filtered_fft)
-
-    return merged_forecast[-1] if len(merged_forecast) > 0 else None
-
-def calculate_volatility_with_fft(candles):
-    closes = np.array([c["close"] for c in candles])
-    closes, = remove_nans_and_zeros(closes)
-
-    fft = fftpack.rfft(closes)
-    amplitudes = np.abs(fft)
-    frequencies = fftpack.rfftfreq(len(closes))
-
-    current_amplitude = amplitudes[-1]
-    current_frequency = frequencies[-1]
-
-    reconstructed_signal = fftpack.irfft(fft)
-
-    volatility = np.std(reconstructed_signal)
-
-    print(f"Current Frequency (Hz): {current_frequency:.4f}")
-    print(f"Current Amplitude: {current_amplitude:.4f}")
-    print(f"Calculated Volatility: {volatility:.4f}")
-
-    return current_amplitude, current_frequency, volatility
-
-def calculate_garch_volatility(candles):
-    closes = np.array([c["close"] for c in candles])
-    closes, = remove_nans_and_zeros(closes)
-
-    scaled_closes = closes * 0.01
-    
-    model = arch_model(scaled_closes, vol='Garch', p=1, q=1)
-    garch_fit = model.fit(disp="off")
-
-    predicted_volatility = np.sqrt(garch_fit.conditional_volatility[-1]) / 0.01
-
-    print(f"GARCH Predicted Volatility: {predicted_volatility:.4f}")
-    return predicted_volatility
-
-def harmonic_wave_forecasting_hft(candles, forecast_minutes=5):
-    closes = np.array([c['close'] for c in candles])
-    if len(closes) == 0:
-        return None, None
-
-    fft_result = fftpack.rfft(closes)
-    n = len(closes)
-
-    frequencies = fftpack.rfftfreq(n)
-    amplitudes = np.abs(fft_result)
-
-    current_price = closes[-1]
-
-    dominant_frequency_index = np.argmax(amplitudes)
-    dominant_frequency = frequencies[dominant_frequency_index]
-
-    predicted_harmonic_price = current_price + np.mean(amplitudes) * np.sin(2 * np.pi * dominant_frequency * forecast_minutes)
-
-    incoming_prices = closes[-forecast_minutes:]
-    average_incoming_price = np.mean(incoming_prices)
-    
-    adjusted_predicted_price = predicted_harmonic_price + 0.5 * (average_incoming_price - predicted_harmonic_price)
-
-    market_mood = "Bullish" if adjusted_predicted_price > current_price else "Bearish"
-
-    return adjusted_predicted_price, market_mood
-
+# Main function to generate analysis report
 def generate_report(timeframe, candles, investment, forecast_minutes=12):
     print(f"\nTimeframe: {timeframe}")
 
@@ -584,15 +509,6 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12):
     fourier_forecasted_price = fourierExtrapolation(closes_array, n_predict=forecast_minutes)
     print(f"Fourier Extrapolated Forecast Price: {fourier_forecasted_price[-1]:.2f}")
 
-    merged_forecast = merged_fft_forecast(candles, n_components=5)
-    if merged_forecast is not None:
-        print(f"Merged FFT Forecast Price: {merged_forecast:.2f}")
-
-    hft_forecasted_price, harmonic_market_mood = harmonic_wave_forecasting_hft(candles, forecast_minutes)
-    if hft_forecasted_price is not None:
-        print(f"Harmonic Predicted Price (Adjusted for HFT): {hft_forecasted_price:.2f}")
-        print(f"Harmonic Market Mood: {harmonic_market_mood}")
-
     volume_trend, volume_change = analyze_volume_trend(candles, window_size=20)
     print(f"Volume Trend: {volume_trend}, Volume Change: {volume_change:.2f}%")
 
@@ -610,10 +526,7 @@ while True:
 
         if len(candles) > 0:
             generate_report(timeframe, candles, investment_amount, forecast_minutes=12)
-
-            garch_volatility = calculate_garch_volatility(candles)
-            print(f"GARCH Volatility for {timeframe}: {garch_volatility:.4f}")
-
+            
             vwap = calculate_vwap(candles)
             print(f"VWAP for {timeframe}: {vwap:.2f}")
 
