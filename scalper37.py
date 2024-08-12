@@ -9,6 +9,7 @@ from scipy.stats import linregress
 import time
 from colorama import init, Fore, Style
 from datetime import datetime, timezone
+import pytz
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split
@@ -139,6 +140,11 @@ def calculate_reversals(candles):
             last_minor_reversal = (datetime.fromtimestamp(candles[i]['time'], tz=timezone.utc), lows[i], 'DIP')
 
     return last_major_reversal, last_minor_reversal
+
+def convert_time_to_local(utc_dt):
+    local_tz = pytz.timezone('Europe/Bucharest')  # Timișoara is in Bucharest timezone
+    utc_dt = utc_dt.replace(tzinfo=timezone.utc)  # Ensure it is timezone aware
+    return utc_dt.astimezone(local_tz)
 
 def calculate_45_degree_price(candles):
     if len(candles) < 50:
@@ -585,13 +591,15 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_mode
     last_major_reversal, last_minor_reversal = calculate_reversals(candles)
     if last_major_reversal:
         reversal_time, price, reversal_type = last_major_reversal
-        print(f"Last Major Reversal: {reversal_type} at price {price:.2f} on {reversal_time.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        local_reversal_time = convert_time_to_local(reversal_time)
+        print(f"Last Major Reversal: {reversal_type} at price {price:.2f} on {local_reversal_time.strftime('%Y-%m-%d %H:%M:%S')} local time")
     else:
         print("Last Major Reversal: None")
 
     if last_minor_reversal:
         reversal_time, price, reversal_type = last_minor_reversal
-        print(f"Last Minor Reversal: {reversal_type} at price {price:.2f} on {reversal_time.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        local_reversal_time = convert_time_to_local(reversal_time)
+        print(f"Last Minor Reversal: {reversal_type} at price {price:.2f} on {local_reversal_time.strftime('%Y-%m-%d %H:%M:%S')} local time")
     else:
         print("Last Minor Reversal: None")
 
