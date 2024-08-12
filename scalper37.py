@@ -146,6 +146,15 @@ def convert_time_to_local(utc_dt):
     utc_dt = utc_dt.replace(tzinfo=timezone.utc)  # Ensure it is timezone aware
     return utc_dt.astimezone(local_tz)
 
+def get_current_local_time():
+    local_tz = pytz.timezone('Europe/Bucharest')
+    local_time = datetime.now(local_tz)
+    return local_time
+
+def calculate_time_difference(current_time, reversal_time):
+    time_difference = current_time - reversal_time
+    return time_difference.total_seconds() / 60  # Return minutes
+
 def calculate_45_degree_price(candles):
     if len(candles) < 50:
         print("Not enough data for 45-degree angle calculation")
@@ -531,6 +540,9 @@ def integrate_ml_predictions(candles, model):
 def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_model=None):
     print(f"\nTimeframe: {timeframe}")
 
+    current_local_time = get_current_local_time()
+    print(f"Current local time: {current_local_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
     liquidation_levels = get_liquidation_levels(symbol)
     support, resistance = calculate_dynamic_support_resistance(candles, liquidation_levels)
 
@@ -592,14 +604,18 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_mode
     if last_major_reversal:
         reversal_time, price, reversal_type = last_major_reversal
         local_reversal_time = convert_time_to_local(reversal_time)
+        time_diff_major = calculate_time_difference(current_local_time, local_reversal_time)
         print(f"Last Major Reversal: {reversal_type} at price {price:.2f} on {local_reversal_time.strftime('%Y-%m-%d %H:%M:%S')} local time")
+        print(f"Distance from current time: {time_diff_major:.2f} minutes")
     else:
         print("Last Major Reversal: None")
 
     if last_minor_reversal:
         reversal_time, price, reversal_type = last_minor_reversal
         local_reversal_time = convert_time_to_local(reversal_time)
+        time_diff_minor = calculate_time_difference(current_local_time, local_reversal_time)
         print(f"Last Minor Reversal: {reversal_type} at price {price:.2f} on {local_reversal_time.strftime('%Y-%m-%d %H:%M:%S')} local time")
+        print(f"Distance from current time: {time_diff_minor:.2f} minutes")
     else:
         print("Last Minor Reversal: None")
 
