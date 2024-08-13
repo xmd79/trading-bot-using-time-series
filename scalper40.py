@@ -27,15 +27,9 @@ init(autoreset=True)
 
 symbol = "BTCUSDT"  # The trading pair
 
-#timeframes = [
-#    "1d", "12h", "8h", "6h", "4h", "2h", "1h", "30m", "15m", "5m", "3m", "1m"
-#]
-
 timeframes = ["5m", "1m"]
 
-
 candle_map = {}
-
 
 # Define the file for saving signals
 signal_file = "trading_signals.txt"
@@ -594,54 +588,23 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_mode
         pl_amount, pl_percentage = calculate_profit_loss(current_price, major_reversal_target)
         print(f"Potential Profit/Loss for Major Target: Amount = {pl_amount:.2f}, Percentage = {pl_percentage:.2f}%")
 
-    if ml_model is not None:
-        ml_predicted_action = integrate_ml_predictions(candles, ml_model)
-        if ml_predicted_action is not None:
-            action = "Buy" if ml_predicted_action == 1 else "Sell"
-            print(f"ML Model Prediction: {action}")
+    # Check for Major Reversal and apply Gann Fans & Mirrored Progression
+    major_reverse_high = np.max([c['high'] for c in candles])
+    major_reverse_low = np.min([c['low'] for c in candles])
+    last_major_reversal_type = None
+    last_major_reversal_price = None
 
-            # Forecasting price based on ML
-            ml_forecast_price = candles[-1]["close"] * (1.01 if ml_predicted_action == 1 else 0.99)  # 1% change as a simple forecast
-            print(f"ML Forecast Price for next period: {ml_forecast_price:.2f}")
+    if current_close >= major_reverse_high:
+        last_major_reversal_type = "TOP"
+        last_major_reversal_price = major_reverse_high
+        print(f"Major reversal found: TOP at price {last_major_reversal_price:.2f}")
+    elif current_close <= major_reverse_low:
+        last_major_reversal_type = "DIP"
+        last_major_reversal_price = major_reverse_low
+        print(f"Major reversal found: DIP at price {last_major_reversal_price:.2f}")
 
-    target_price, market_mood = forecast_price(candles, n_components=5, target_distance=0.01)
-    print(f"Forecasted Price: {target_price:.2f}")
-    print(f"Forecast Market Mood: {market_mood}")
-
-    closes_array = np.array([c['close'] for c in candles])
-    fourier_forecasted_price = fourierExtrapolation(closes_array, n_predict=forecast_minutes)
-    print(f"Fourier Extrapolated Forecast Price: {fourier_forecasted_price[-1]:.2f}")
-
-    volume_trend, volume_change = analyze_volume_trend(candles, window_size=20)
-    print(f"Volume Trend: {volume_trend}, Volume Change: {volume_change:.2f}")
-
-    # Detect major and minor reversals by checking the peaks and troughs
-    highs = np.array([c['high'] for c in candles])
-    lows = np.array([c['low'] for c in candles])
-    
-    candle_time = datetime.fromtimestamp(candles[-1]["time"])
-
-    # Minor reversal points
-    minor_reverse_up = highs[highs == max(highs[-5:])]
-    minor_reverse_down = lows[lows == min(lows[-5:])]
-
-    # Check for minor reversals
-    if minor_reverse_up.size > 0:
-        found_price_up = minor_reverse_up[-1]
-        print(f"Minor reversal TOP found at {found_price_up:.2f}")
-
-    if minor_reverse_down.size > 0:
-        found_price_down = minor_reverse_down[-1]
-        print(f"Minor reversal DIP found at {found_price_down:.2f}")
-
-    # Major reversal detection
-    major_reverse_high = np.max(highs)
-    major_reverse_low = np.min(lows)
-
-    if current_close < major_reverse_high:
-        print(f"Major reversal found: TOP at price {major_reverse_high:.2f}")
-    elif current_close > major_reverse_low:
-        print(f"Major reversal found: DIP at price {major_reverse_low:.2f}")
+    if last_major_reversal_type and last_major_reversal_price:
+        calculate_gann_fans_and_mirrored_progression(last_major_reversal_price, current_close, last_major_reversal_type)
 
 # Main loop for continuous analysis
 investment_amount = 1000  # Define an example investment amount for profit/loss calculations
@@ -746,52 +709,59 @@ while True:
 
             print()  # Add a newline for better separation of timeframes.
 
-            # Trigger setup for main timeframe.
-            if timeframe == "5m":
+            # Trigger setup for 1m timeframe.
+            if timeframe == "1m":
                 true_count = 0
                 false_count = 0
 
                 # Check condition results
-                if closest_threshold == min_threshold:
-                    print("Condition 1: closest_threshold == min_threshold is TRUE")
+                if dist_min_close < dist_max_close:
+                    print("Condition 1: dist_min_close < dist_max_close is TRUE")
                     true_count += 1
                 else:
-                    print("Condition 1: closest_threshold == min_threshold is FALSE")
+                    print("Condition 1: dist_min_close < dist_max_close is FALSE")
+                    false_count += 1
+
+                if closest_threshold == min_threshold:
+                    print("Condition 2: closest_threshold == min_threshold is TRUE")
+                    true_count += 1
+                else:
+                    print("Condition 2: closest_threshold == min_threshold is FALSE")
                     false_count += 1
 
                 if dist_min_momentum < dist_max_momentum:
-                    print("Condition 2: dist_min_momentum < dist_max_momentum is TRUE")
+                    print("Condition 3: dist_min_momentum < dist_max_momentum is TRUE")
                     true_count += 1
                 else:
-                    print("Condition 2: dist_min_momentum < dist_max_momentum is FALSE")
+                    print("Condition 3: dist_min_momentum < dist_max_momentum is FALSE")
                     false_count += 1
 
                 if current_close < angle_price:
-                    print("Condition 3: current_close < angle_price is TRUE")
+                    print("Condition 4: current_close < angle_price is TRUE")
                     true_count += 1
                 else:
-                    print("Condition 3: current_close < angle_price is FALSE")
+                    print("Condition 4: current_close < angle_price is FALSE")
                     false_count += 1
 
                 if current_close < avg_mtf:
-                    print("Condition 4: current_close < avg_mtf is TRUE")
+                    print("Condition 5: current_close < avg_mtf is TRUE")
                     true_count += 1
                 else:
-                    print("Condition 4: current_close < avg_mtf is FALSE")
+                    print("Condition 5: current_close < avg_mtf is FALSE")
                     false_count += 1
 
                 if volume_trend == "Bullish":
-                    print("Condition 5: volume_trend == Bullish is TRUE")
+                    print("Condition 6: volume_trend == Bullish is TRUE")
                     true_count += 1
                 else:
-                    print("Condition 5: volume_trend == Bullish is FALSE")
+                    print("Condition 6: volume_trend == Bullish is FALSE")
                     false_count += 1
 
                 if trading_signal == "Buy":
-                    print("Condition 6: trading_signal == Buy is TRUE")
+                    print("Condition 7: trading_signal == Buy is TRUE")
                     true_count += 1
                 else:
-                    print("Condition 6: trading_signal == Buy is FALSE")
+                    print("Condition 7: trading_signal == Buy is FALSE")
                     false_count += 1
 
                 # Summary of conditions
@@ -804,77 +774,7 @@ while True:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
                     with open(signal_file, "a") as f:
                         f.write(f"{timestamp} - SIGNAL: DIP found. BUY {current_close:.2f}\n")
-                    print(f"DIP on main timeframe was found. BUY at {current_close:.2f} - Recorded to {signal_file}")
-
-                    print()
- 
-                    # Trigger setup for main timeframe.
-                    if timeframe == "5m":
-                        true_count = 0
-                        false_count = 0
-
-                        # Check condition results
-                        if dist_min_close < dist_max_close:
-                            print("Condition 1: dist_min_close < dist_max_close is TRUE")
-                            true_count += 1
-                        else:
-                            print("Condition 1: dist_min_close < dist_max_close is FALSE")
-                            false_count += 1
-
-                        if closest_threshold == min_threshold:
-                            print("Condition 2: closest_threshold == min_threshold is TRUE")
-                            true_count += 1
-                        else:
-                            print("Condition 2: closest_threshold == min_threshold is FALSE")
-                            false_count += 1
-
-                        if dist_min_momentum < dist_max_momentum:
-                            print("Condition 3: dist_min_momentum < dist_max_momentum is TRUE")
-                            true_count += 1
-                        else:
-                            print("Condition 3: dist_min_momentum < dist_max_momentum is FALSE")
-                            false_count += 1
-
-                        if current_close < angle_price:
-                            print("Condition 4: current_close < angle_price is TRUE")
-                            true_count += 1
-                        else:
-                            print("Condition 4: current_close < angle_price is FALSE")
-                            false_count += 1
-
-                        if current_close < avg_mtf:
-                            print("Condition 5: current_close < avg_mtf is TRUE")
-                            true_count += 1
-                        else:
-                            print("Condition 5: current_close < avg_mtf is FALSE")
-                            false_count += 1
-
-                        if volume_trend == "Bullish":
-                            print("Condition 6: volume_trend == Bullish is TRUE")
-                            true_count += 1
-                        else:
-                            print("Condition 6: volume_trend == Bullish is FALSE")
-                            false_count += 1
-
-                        if trading_signal == "Buy":
-                            print("Condition 7: trading_signal == Buy is TRUE")
-                            true_count += 1
-                        else:
-                            print("Condition 7: trading_signal == Buy is FALSE")
-                            false_count += 1
-
-                        # Summary of conditions
-                        print("\nSummary of Conditions:")
-                        print(f"Total TRUE conditions: {true_count}")
-                        print(f"Total FALSE conditions: {false_count}")
-
-                        # If all conditions are TRUE, write the signal to file
-                        if true_count == 7:  # All conditions met
-                            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-                            with open(signal_file, "a") as f:
-                                f.write(f"{timestamp} - SIGNAL: DIP found. BUY {current_close:.2f}\n")
-                            print(f"DIP found. BUY at {current_close:.2f} - Recorded to {signal_file}")
-
+                    print(f"DIP found. BUY at {current_close:.2f} - Recorded to {signal_file}")
 
             print()
 
