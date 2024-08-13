@@ -506,7 +506,49 @@ def integrate_ml_predictions(candles, model):
     
     return model.predict(feature_set[-1].reshape(1, -1))[0]  # Predicting the last available data
 
-# Main function to generate analysis report
+def calculate_gann_fans_and_mirrored_progression(last_major_reversal_price, current_close, reversal_type):
+    if reversal_type == 'DIP':
+        print(f"Calculating Gann Fans and mirrored progression from last dip at price {last_major_reversal_price:.2f}")
+        gann_levels = {
+            "1x1": last_major_reversal_price + (current_close - last_major_reversal_price) * 1,
+            "1x2": last_major_reversal_price + (current_close - last_major_reversal_price) * 0.5,
+            "2x1": last_major_reversal_price + (current_close - last_major_reversal_price) * 2,
+        }
+        fibonacci_levels = {
+            "0.382": last_major_reversal_price + (current_close - last_major_reversal_price) * 0.382,
+            "0.618": last_major_reversal_price + (current_close - last_major_reversal_price) * 0.618,
+            "1.0": current_close,
+        }
+
+        print("Gann Fan Levels:")
+        for angle, level in gann_levels.items():
+            print(f"  {angle}: {level:.2f}")
+
+        print("Fibonacci Levels:")
+        for fib, level in fibonacci_levels.items():
+            print(f"  {fib}: {level:.2f}")
+
+    elif reversal_type == 'TOP':
+        print(f"Calculating Gann Fans and mirrored progression from last top at price {last_major_reversal_price:.2f}")
+        gann_levels = {
+            "1x1": last_major_reversal_price - (last_major_reversal_price - current_close) * 1,
+            "1x2": last_major_reversal_price - (last_major_reversal_price - current_close) * 0.5,
+            "2x1": last_major_reversal_price - (last_major_reversal_price - current_close) * 2,
+        }
+        fibonacci_levels = {
+            "0.382": last_major_reversal_price - (last_major_reversal_price - current_close) * 0.382,
+            "0.618": last_major_reversal_price - (last_major_reversal_price - current_close) * 0.618,
+            "1.0": current_close,
+        }
+
+        print("Gann Fan Levels:")
+        for angle, level in gann_levels.items():
+            print(f"  {angle}: {level:.2f}")
+
+        print("Fibonacci Levels:")
+        for fib, level in fibonacci_levels.items():
+            print(f"  {fib}: {level:.2f}")
+
 def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_model=None):
     print(f"\nTimeframe: {timeframe}")
 
@@ -546,54 +588,23 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_mode
         pl_amount, pl_percentage = calculate_profit_loss(current_price, major_reversal_target)
         print(f"Potential Profit/Loss for Major Target: Amount = {pl_amount:.2f}, Percentage = {pl_percentage:.2f}%")
 
-    if ml_model is not None:
-        ml_predicted_action = integrate_ml_predictions(candles, ml_model)
-        if ml_predicted_action is not None:
-            action = "Buy" if ml_predicted_action == 1 else "Sell"
-            print(f"ML Model Prediction: {action}")
-
-            # Forecasting price based on ML
-            ml_forecast_price = candles[-1]["close"] * (1.01 if ml_predicted_action == 1 else 0.99)  # 1% change as a simple forecast
-            print(f"ML Forecast Price for next period: {ml_forecast_price:.2f}")
-
-    target_price, market_mood = forecast_price(candles, n_components=5, target_distance=0.01)
-    print(f"Forecasted Price: {target_price:.2f}")
-    print(f"Forecast Market Mood: {market_mood}")
-
-    closes_array = np.array([c['close'] for c in candles])
-    fourier_forecasted_price = fourierExtrapolation(closes_array, n_predict=forecast_minutes)
-    print(f"Fourier Extrapolated Forecast Price: {fourier_forecasted_price[-1]:.2f}")
-
-    volume_trend, volume_change = analyze_volume_trend(candles, window_size=20)
-    print(f"Volume Trend: {volume_trend}, Volume Change: {volume_change:.2f}")
-
-    # Detect major and minor reversals by checking the peaks and troughs
-    highs = np.array([c['high'] for c in candles])
-    lows = np.array([c['low'] for c in candles])
-    
-    candle_time = datetime.fromtimestamp(candles[-1]["time"])
-
-    # Minor reversal points
-    minor_reverse_up = highs[highs == max(highs[-5:])]
-    minor_reverse_down = lows[lows == min(lows[-5:])]
-
-    # Check for minor reversals
-    if minor_reverse_up.size > 0:
-        found_price_up = minor_reverse_up[-1]
-        print(f"Minor reversal TOP found at {found_price_up:.2f}")
-
-    if minor_reverse_down.size > 0:
-        found_price_down = minor_reverse_down[-1]
-        print(f"Minor reversal DIP found at {found_price_down:.2f}")
-
-    # Major reversal detection
-    major_reverse_high = np.max(highs)
-    major_reverse_low = np.min(lows)
+    # Check for Major Reversal and apply Gann Fans & Mirrored Progression
+    major_reverse_high = np.max([c['high'] for c in candles])
+    major_reverse_low = np.min([c['low'] for c in candles])
+    last_major_reversal_type = None
+    last_major_reversal_price = None
 
     if current_close >= major_reverse_high:
-        print(f"Major reversal found: TOP at price {major_reverse_high:.2f}")
+        last_major_reversal_type = "TOP"
+        last_major_reversal_price = major_reverse_high
+        print(f"Major reversal found: TOP at price {last_major_reversal_price:.2f}")
     elif current_close <= major_reverse_low:
-        print(f"Major reversal found: DIP at price {major_reverse_low:.2f}")
+        last_major_reversal_type = "DIP"
+        last_major_reversal_price = major_reverse_low
+        print(f"Major reversal found: DIP at price {last_major_reversal_price:.2f}")
+
+    if last_major_reversal_type and last_major_reversal_price:
+        calculate_gann_fans_and_mirrored_progression(last_major_reversal_price, current_close, last_major_reversal_type)
 
 # Main loop for continuous analysis
 investment_amount = 1000  # Define an example investment amount for profit/loss calculations
