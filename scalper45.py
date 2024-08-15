@@ -590,7 +590,7 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_mode
         reversal_time, price, reversal_type = last_major_reversal
         local_reversal_time = convert_time_to_local(reversal_time)
         time_diff_major = calculate_time_difference(current_local_time, local_reversal_time)
-        print(f"Last Major Reversal: {reversal_type} at price {price:.2f} on {local_reversal_time.strftime('%Y-%m-%d %H:%M:%S')} local time")
+        print(f"Last TOP Reversal: {reversal_type} at price {price:.2f} on {local_reversal_time.strftime('%Y-%m-%d %H:%M:%S')} local time")
         print(f"Distance from current time: {time_diff_major:.2f} minutes")
     else:
         print("Last Major Reversal: None")
@@ -599,7 +599,7 @@ def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_mode
         reversal_time, price, reversal_type = last_minor_reversal
         local_reversal_time = convert_time_to_local(reversal_time)
         time_diff_minor = calculate_time_difference(current_local_time, local_reversal_time)
-        print(f"Last Minor Reversal: {reversal_type} at price {price:.2f} on {local_reversal_time.strftime('%Y-%m-%d %H:%M:%S')} local time")
+        print(f"Last DIP Reversal: {reversal_type} at price {price:.2f} on {local_reversal_time.strftime('%Y-%m-%d %H:%M:%S')} local time")
         print(f"Distance from current time: {time_diff_minor:.2f} minutes")
     else:
         print("Last Minor Reversal: None")
