@@ -136,33 +136,30 @@ class Calculation:
         self.binance_wrapper = binance_wrapper
 
     def calculate_total_balance_in_usdc(self):
-        """Calculate the total balance in USDC."""
+        """Calculate the total balance in USDC and BTC, and convert BTC to USDC value."""
         balances = self.binance_wrapper.get_binance_balance()
+        usdc_balance = 0.0
+        btc_balance = 0.0
         total_balance_in_usdc = 0.0
-        total_balance_in_btc = 0.0
-        
+
         if balances:
             for balance in balances:
                 asset = balance['asset']
                 free = float(balance['free'])
                 locked = float(balance['locked'])
                 total = free + locked
-                if total > 0:
-                    print(f"{asset}: {total:.8f}")              
-                    if asset == "BTC":
-                        # Convert BTC to USDC
-                        btc_to_usdc_rate = self.binance_wrapper.get_exchange_rate("BTCUSDC")
-                        total_balance_in_btc += total
-                        total_balance_in_usdc += total * btc_to_usdc_rate
-                    elif asset == "USDC":
-                        total_balance_in_usdc += total
-                    else:
-                        # For other assets, get conversion quote
-                        conversion_result = self.binance_wrapper.convert_assets(asset, "USDC", total)
-                        if conversion_result and 'toAmount' in conversion_result:
-                            total_balance_in_usdc += float(conversion_result['toAmount'])
 
-        return total_balance_in_usdc, total_balance_in_btc  # Return both balances for printing
+                if asset == "USDC":
+                    usdc_balance += total
+                elif asset == "BTC":
+                    btc_balance += total
+
+        # Get the current exchange rate to convert BTC to USDC
+        btc_to_usdc_rate = self.binance_wrapper.get_exchange_rate("BTCUSDC")
+        if btc_to_usdc_rate is not None:
+            total_balance_in_usdc = usdc_balance + (btc_balance * btc_to_usdc_rate)
+
+        return usdc_balance, total_balance_in_usdc, btc_balance  # Return balances
 
 def fourierExtrapolation(x, n_predict):
     n = x.size
@@ -740,9 +737,16 @@ while True:
         candle_map[timeframe] = get_candles(symbol, timeframe)
 
     # Check the total balances in USDC and BTC
-    total_balance_usdc, total_balance_btc = calculation_class.calculate_total_balance_in_usdc()
-    print(f"Total Balance in USDC: {total_balance_usdc:.8f}")
-    print(f"Total Balance in BTC: {total_balance_btc:.8f}")
+    usdc_balance, total_balance_usdc, btc_balance = calculation_class.calculate_total_balance_in_usdc()
+    
+    # Print USDC balance and BTC balance with their values
+    print(f"USDC Balance: {usdc_balance:.8f} USDC")
+    btc_to_usdc_rate = binance_wrapper.get_exchange_rate("BTCUSDC")
+    if btc_to_usdc_rate is not None:
+        btc_value_in_usdc = btc_balance * btc_to_usdc_rate
+        print(f"BTC Balance: {btc_balance:.8f} BTC, Value in USDC: {btc_value_in_usdc:.8f} USDC")
+    else:
+        print(f"BTC Balance: {btc_balance:.8f} BTC, Value in USDC: Unable to fetch rate")
 
     # Check if the performance has hit the profit threshold of 3%
     profit_threshold = initial_usdc_balance * 0.03
@@ -846,13 +850,19 @@ while True:
             volume_trend, volume_change = analyze_volume_trend(candles, window_size=20)
             print(f"Volume Trend for {timeframe}: {volume_trend}, Volume Change: {volume_change:.2f}%")
 
-            # Check and print the total balance in USDC and BTC
-            total_balance_usdc, total_balance_btc = calculation_class.calculate_total_balance_in_usdc()
-            print(f"Total Balance in USDC: {total_balance_usdc:.8f}")
-            print(f"Total Balance in BTC: {total_balance_btc:.8f}")
+            # Print USDC balance and BTC balance with their values
+            usdc_balance, total_balance_usdc, btc_balance = calculation_class.calculate_total_balance_in_usdc()
+            print(f"USDC Balance: {usdc_balance:.8f} USDC")
+            btc_to_usdc_rate = binance_wrapper.get_exchange_rate("BTCUSDC")
+            if btc_to_usdc_rate is not None:
+                btc_value_in_usdc = btc_balance * btc_to_usdc_rate
+                print(f"BTC Balance: {btc_balance:.8f} BTC, Value in USDC: {btc_value_in_usdc:.8f} USDC")
+            else:
+                print(f"BTC Balance: {btc_balance:.8f} BTC, Value in USDC: Unable to fetch rate")
 
             # Initialize true_count variable for MTF signals
             true_count = 0  
+
             # Track conditions for MTF signal
             if timeframe == "5m":
                 if dist_min_close < dist_max_close:
