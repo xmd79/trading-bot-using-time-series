@@ -48,7 +48,7 @@ maint_lookup_table = [
 ]
 
 def calculate_liquidation_price(wallet_balance, contract_qty, entry_price):
-    """ Calculate liquidation prices based on wallet balance, contract quantity, and entry price. """
+    """Calculate liquidation prices based on wallet balance, contract quantity, and entry price."""
     for max_position, maint_margin_rate_pct, maint_amount in maint_lookup_table:
         maint_margin_rate = maint_margin_rate_pct / 100
         liq_price = (wallet_balance + maint_amount - contract_qty * entry_price) / (abs(contract_qty) * (maint_margin_rate - (1 if contract_qty >= 0 else -1)))
@@ -59,7 +59,7 @@ def calculate_liquidation_price(wallet_balance, contract_qty, entry_price):
 
 # Fetch wallet balance and calculate liquidation levels
 def get_liquidation_levels(symbol):
-    """ Fetch wallet balance and calculate liquidation levels. """
+    """Fetch wallet balance and calculate liquidation levels."""
     balances = client.futures_account_balance()
     wallet_balance = 0.0
     
@@ -83,7 +83,7 @@ class BinanceWrapper:
         self.binance_client = BinanceClient(api_key=api_key, api_secret=api_secret)
 
     def get_exchange_rate(self, symbol):
-        """Get the exchange rate of Coins"""
+        """Get the exchange rate of Coins."""
         try:
             ticker = self.binance_client.get_symbol_ticker(symbol=symbol)
             rate = float(ticker['price'])
@@ -93,7 +93,7 @@ class BinanceWrapper:
             return None
 
     def get_binance_balance(self):
-        """Get the balances of Binance Wallet"""
+        """Get the balances of Binance Wallet."""
         try:
             balances = self.binance_client.get_account()['balances']
             return balances
@@ -102,7 +102,7 @@ class BinanceWrapper:
             return None
 
     def get_convert_quote(self, from_asset, to_asset, amount):
-        """Get a conversion quote using the Binance Convert API"""
+        """Get a conversion quote using the Binance Convert API."""
         url = "https://api.binance.com/sapi/v1/convert/getQuote"
         params = {
             "fromAsset": from_asset,
@@ -119,7 +119,7 @@ class BinanceWrapper:
             return None
 
     def convert_assets(self, from_asset, to_asset, amount):
-        """Execute asset conversion using the Binance Convert API"""
+        """Execute asset conversion using the Binance Convert API."""
         quote = self.get_convert_quote(from_asset, to_asset, amount)
         if quote and 'quoteId' in quote:
             quote_id = quote['quoteId']
@@ -136,7 +136,7 @@ class Calculation:
         self.binance_wrapper = binance_wrapper
 
     def calculate_total_balance_in_usdc(self):
-        """Calculate the total balance in USDC"""
+        """Calculate the total balance in USDC."""
         balances = self.binance_wrapper.get_binance_balance()
         total_balance_in_usdc = 0.0
         total_balance_in_btc = 0.0
@@ -731,6 +731,8 @@ calculation_class = Calculation(binance_wrapper)
 investment_amount = 1000  
 ml_model = None  
 
+initial_usdc_balance = investment_amount  # Store the initial USDC balance
+
 while True:
     candle_map.clear()
 
@@ -741,6 +743,15 @@ while True:
     total_balance_usdc, total_balance_btc = calculation_class.calculate_total_balance_in_usdc()
     print(f"Total Balance in USDC: {total_balance_usdc:.8f}")
     print(f"Total Balance in BTC: {total_balance_btc:.8f}")
+
+    # Check if the performance has hit the profit threshold of 3%
+    profit_threshold = initial_usdc_balance * 0.03
+    profit_amount = total_balance_usdc - initial_usdc_balance
+
+    if profit_amount >= profit_threshold:
+        print(f"Profit threshold exceeded. Exiting position with profit of {profit_amount:.8f} USDC.")
+        # Logic to exit position by converting BTC to USDC should be implemented here.
+        break  # Exit the loop if conditions met
 
     if ml_model is None:
         combined_candles = np.concatenate([candle_map[t] for t in timeframes if len(candle_map[t]) > 0])
@@ -870,8 +881,6 @@ while True:
                             true_count_1m += 1
                         if closest_threshold == min_threshold:
                             true_count_1m += 1
-                        if dist_min_momentum < dist_max_momentum:
-                            true_count_1m += 1
                         if current_close < angle_price:
                             true_count_1m += 1
                         if current_close < avg_mtf:
@@ -883,7 +892,7 @@ while True:
                         print(f"Total TRUE conditions: {true_count_1m}")
 
                         # Check if the conditions meet the trigger requirements for 1m
-                        if true_count_1m >= 6:
+                        if true_count_1m >= 5:
                             timestamp = datetime.now().strftime("%Y-%m-%d")
                             with open(signal_file, "a") as f:
                                 f.write(f"{timestamp} - SIGNAL: MTF DIP found on both 5m & 1m at {current_close:.2f}\n")
