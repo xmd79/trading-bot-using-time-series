@@ -198,9 +198,9 @@ def harmonic_wave_analysis(candles, period=14):
     if lower_bound <= current_price <= upper_bound:
         market_mood = "Stable"
     elif current_price < lower_bound:
-        market_mood = "Bearish"
-    else:
         market_mood = "Bullish"
+    else:
+        market_mood = "Bearish"
 
     return market_mood, lower_bound, upper_bound, avg_mtf
 
