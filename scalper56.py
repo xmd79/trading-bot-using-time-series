@@ -863,8 +863,10 @@ while True:
             closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - candles[-1]["close"]))
             if closest_threshold == min_threshold:
                 print("The last minimum value is closest to the current close.")
+                print("The last biggest reversal value found is DIP at: ", closest_threshold)
             elif closest_threshold == max_threshold:
                 print("The last maximum value is closest to the current close.")
+                print("The last biggest reversal value found is TOP at: ", closest_threshold)
             else:
                 print("No threshold value found.")
 
