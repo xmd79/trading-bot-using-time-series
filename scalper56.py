@@ -927,7 +927,6 @@ while True:
                         true_count_1m = 0  # Initialize for 5m checks
                         if dist_min_close < dist_max_close:
                             true_count_1m += 1
-                            true_count_1m += 1
                         if current_close < ml_forecast_price:
                             true_count_1m += 1
                         if volume_trend == "Bullish":
