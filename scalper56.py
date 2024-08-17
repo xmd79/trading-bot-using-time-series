@@ -27,7 +27,7 @@ client = BinanceClient(api_key, api_secret)
 init(autoreset=True)
 
 symbol = "BTCUSDC"  # The trading pair
-timeframes = ["30m", "5m"]
+timeframes = ["30m", "1m"]
 candle_map = {}
 
 # Define the file for saving signals
@@ -918,32 +918,29 @@ while True:
                 # Check if the conditions meet the trigger requirements for 5m
                 if true_count >= 4:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    with open(signal_file, "a") as f:
-                        f.write(f"{timestamp} - SIGNAL: DIP found on 30m at {current_close:.2f}\n")
+                    #with open(signal_file, "a") as f:
+                        #f.write(f"{timestamp} - SIGNAL: DIP found on 30m at {current_close:.2f}\n")
                     print(f"DIP found on 30m at {current_close:.2f} - Recorded to {signal_file}")
 
-                    # Additional MTF condition check based on 5m signals
-                    if timeframe == "5m":
-                        true_count_5m = 0  # Initialize for 5m checks
+                    # Additional MTF condition check based on 1m signals
+                    if timeframe == "1m":
+                        true_count_1m = 0  # Initialize for 5m checks
                         if dist_min_close < dist_max_close:
-                            true_count_5m += 1
-                        if closest_threshold == min_threshold:
-                            true_count_5m += 1
-                        if current_close < angle_price:
-                            true_count_5m += 1
-                        if current_close < avg_mtf:
-                            true_count_5m += 1
+                            true_count_1m += 1
+                            true_count_1m += 1
+                        if current_close < ml_forecast_price:
+                            true_count_1m += 1
                         if volume_trend == "Bullish":
-                            true_count_5m += 1
+                            true_count_1m += 1
 
-                        print("\nSummary of Conditions for 5m DIP:")
-                        print(f"Total TRUE conditions: {true_count_5m}")
+                        print("\nSummary of Conditions for 1m DIP:")
+                        print(f"Total TRUE conditions: {true_count_1m}")
 
-                        # Check if the conditions meet the trigger requirements for 5m
-                        if true_count_5m >= 5:
+                        # Check if the conditions meet the trigger requirements for 1m
+                        if true_count_1m >= 3:
                             timestamp = datetime.now().strftime("%Y-%m-%d")
                             with open(signal_file, "a") as f:
-                                f.write(f"{timestamp} - SIGNAL: MTF DIP found on both 30m & 5m at {current_close:.2f}\n")
-                            print(f"MTF DIP found on both 30m & 5m at {current_close:.2f} - Recorded to {signal_file}")
+                                f.write(f"{timestamp} - SIGNAL: MTF DIP found on both 30m & 1m at {current_close:.2f}\n")
+                            print(f"MTF DIP found on both 30m & 1m at {current_close:.2f} - Recorded to {signal_file}")
 
     time.sleep(5)  # Delay before the next data fetch
