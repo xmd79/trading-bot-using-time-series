@@ -967,6 +967,8 @@ while True:
                     # Additional MTF condition check based on 1m signals
                     if timeframe == "1m":
                         true_count_1m = 0  # Initialize for 1m checks
+                        if closest_threshold == min_threshold:
+                            true_count_1m += 1
                         if dist_min_close < dist_max_close:
                             true_count_1m += 1
                         if current_close < ml_forecast_price:
@@ -978,7 +980,7 @@ while True:
                         print(f"Total TRUE conditions: {true_count_1m}")
 
                         # Check if the conditions meet the trigger requirements for 1m
-                        if true_count_1m >= 3:
+                        if true_count_1m >= 4:
                             timestamp = datetime.now().strftime("%Y-%m-%d")
                             with open(signal_file, "a") as f:
                                 f.write(f"{timestamp} - SIGNAL: MTF DIP found on both 5m & 1m at {current_close:.2f}\n")
