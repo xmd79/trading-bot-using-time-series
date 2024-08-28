@@ -954,7 +954,7 @@ while True:
                 if volume_trend == "Bullish":
                     true_count += 1
 
-                print("\nSummary of Conditions for 5m DIP:")
+                print("\nSummary of Conditions for daily DIP:")
                 print(f"Total TRUE conditions: {true_count}")
 
                 # Check if the conditions meet the trigger requirements for 5m
@@ -966,21 +966,21 @@ while True:
 
                     # Additional MTF condition check based on 1m signals
                     if timeframe == "4h":
-                        true_count_1m = 0  # Initialize for 1m checks
+                        true_count_4h = 0  # Initialize for 1m checks
                         if closest_threshold == min_threshold:
-                            true_count_1m += 1
+                            true_count_4h += 1
                         if dist_min_close < dist_max_close:
-                            true_count_1m += 1
+                            true_count_4h += 1
                         if current_close < ml_forecast_price:
-                            true_count_1m += 1
+                            true_count_4h += 1
                         if volume_trend == "Bullish":
-                            true_count_1m += 1
+                            true_count_4h += 1
 
-                        print("\nSummary of Conditions for 1m DIP:")
-                        print(f"Total TRUE conditions: {true_count_1m}")
+                        print("\nSummary of Conditions for 4h DIP:")
+                        print(f"Total TRUE conditions: {true_count_4h}")
 
                         # Check if the conditions meet the trigger requirements for 1m
-                        if true_count_1m >= 4:
+                        if true_count_4h >= 4:
                             timestamp = datetime.now().strftime("%Y-%m-%d")
                             with open(signal_file, "a") as f:
                                 f.write(f"{timestamp} - SIGNAL: MTF DIP found on both 5m & 1m at {current_close:.2f}\n")
