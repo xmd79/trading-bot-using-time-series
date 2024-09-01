@@ -28,11 +28,11 @@ client = BinanceClient(api_key, api_secret)
 init(autoreset=True)
 
 symbol = "BTCUSDC"  # The trading pair
-timeframes = ["4h", "15m", "5m", "1m"]
+timeframes = ["1h", "15m", "5m", "1m"]
 candle_map = {}
 
 # Define the file for saving signals
-signal_file1 = "trading_signals_4h.txt"
+signal_file1 = "trading_signals_1h.txt"
 signal_file2 = "trading_signals_15m.txt"
 signal_file3 = "trading_signals_5m.txt"
 signal_file4 = "trading_signals_1m.txt"
@@ -947,7 +947,7 @@ while True:
             true_count = 0  
 
             # Track conditions for MTF signal
-            if timeframe == "4h":
+            if timeframe == "1h":
                 if dist_min_close < dist_max_close:
                     true_count += 1
                 if closest_threshold == min_threshold:
@@ -965,7 +965,7 @@ while True:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
                     with open(signal_file1, "w") as f:  # Overwrites existing file content
                         f.write(f"{timestamp} - SIGNAL: DIP found on 4h timeframe at {current_close:.2f}\n")
-                    print(f"DIP found on 4h timeframe tf at {current_close:.2f} - Recorded to {signal_file1}")
+                    print(f"DIP found on 1h timeframe tf at {current_close:.2f} - Recorded to {signal_file1}")
 
             true_count = 0 
 
