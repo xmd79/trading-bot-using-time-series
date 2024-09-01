@@ -28,7 +28,7 @@ client = BinanceClient(api_key, api_secret)
 init(autoreset=True)
 
 symbol = "BTCUSDC"  # The trading pair
-timeframes = ["1h", "15m", "5m", "1m"]
+timeframes = ["1h", "15m", "3m", "1m"]
 candle_map = {}
 
 # Define the file for saving signals
@@ -960,7 +960,7 @@ while True:
                 print("\nSummary of Conditions for 4h DIP:")
                 print(f"Total TRUE conditions: {true_count}")
 
-                # Check if the conditions meet the trigger requirements for 4h
+                # Check if the conditions meet the trigger requirements for 1h
                 if true_count >= 4:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
                     with open(signal_file1, "w") as f:  # Overwrites existing file content
