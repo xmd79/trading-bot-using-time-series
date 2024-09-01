@@ -34,7 +34,7 @@ candle_map = {}
 # Define the file for saving signals
 signal_file1 = "trading_signals_1h.txt"
 signal_file2 = "trading_signals_15m.txt"
-signal_file3 = "trading_signals_5m.txt"
+signal_file3 = "trading_signals_3m.txt"
 signal_file4 = "trading_signals_1m.txt"
 
 # (max) position, maintenance margin, maintenance amount
@@ -993,7 +993,7 @@ while True:
             true_count = 0 
 
             # Track conditions for MTF signal
-            if timeframe == "5min":
+            if timeframe == "3min":
                 if dist_min_close < dist_max_close:
                     true_count += 1
                 if closest_threshold == min_threshold:
@@ -1003,15 +1003,15 @@ while True:
                 if volume_trend == "Bullish":
                     true_count += 1
 
-                print("\nSummary of Conditions for 5min DIP:")
+                print("\nSummary of Conditions for 3min DIP:")
                 print(f"Total TRUE conditions: {true_count}")
 
-                # Check if the conditions meet the trigger requirements for 5m
+                # Check if the conditions meet the trigger requirements for 3m
                 if true_count >= 4:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
                     with open(signal_file3, "w") as f:  # Overwrites existing file content
-                        f.write(f"{timestamp} - SIGNAL: DIP found on 5min timeframe at {current_close:.2f}\n")
-                    print(f"DIP found on 5min timeframe tf at {current_close:.2f} - Recorded to {signal_file3}")
+                        f.write(f"{timestamp} - SIGNAL: DIP found on 3min timeframe at {current_close:.2f}\n")
+                    print(f"DIP found on 3min timeframe tf at {current_close:.2f} - Recorded to {signal_file3}")
 
             true_count = 0 
 
