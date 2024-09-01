@@ -703,6 +703,22 @@ def analyze_energy_fields(prices, current_sine_close):
     energy_fields = np.mean(prices) + current_sine_close  # Replace with your actual analysis
     print(f"Energy fields: {energy_fields:.2f}")
 
+# Function to check signals
+def check_signals():
+    for file_name in [signal_file1, signal_file2, signal_file3, signal_file4]:
+        try:
+            with open(file_name, "r") as f:
+                lines = f.readlines()
+                if lines and any(line.strip() for line in lines):  # Check for any non-empty lines
+                    print(f"{len(lines)} DIPs found in {file_name}:")
+                    for line in lines:
+                        if line.strip():  # Print only non-empty lines
+                            print(line.strip())
+                else:
+                    print(f"No DIPs found in {file_name}.")
+        except FileNotFoundError:
+            print(f"{file_name} does not exist yet.")
+
 # Main function to generate analysis report
 def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_model=None):
     print(f"\nTimeframe: {timeframe}")
@@ -957,7 +973,7 @@ while True:
                 if volume_trend == "Bullish":
                     true_count += 1
 
-                print("\nSummary of Conditions for 4h DIP:")
+                print("\nSummary of Conditions for 1h DIP:")
                 print(f"Total TRUE conditions: {true_count}")
 
                 # Check if the conditions meet the trigger requirements for 1h
@@ -1036,25 +1052,15 @@ while True:
                         f.write(f"{timestamp} - SIGNAL: DIP found on 1min timeframe at {current_close:.2f}\n")
                     print(f"DIP found on 1min timeframe tf at {current_close:.2f} - Recorded to {signal_file4}")
 
-    # New Feature: Check for signals found in the files and print the results
-    def check_signals():
-        for file_name in [signal_file1, signal_file2, signal_file3, signal_file4]:
-            try:
-                with open(file_name, "r") as f:
-                    lines = f.readlines()
-                    if lines:
-                        print(f"{len(lines)} DIPs found in {file_name}:")
-                        for line in lines:
-                            print(line.strip())
-                    else:
-                        print(f"No DIPs found in {file_name}.")
-            except FileNotFoundError:
-                print(f"{file_name} does not exist yet.")
-
     print()
 
+    # New Feature: Check for signals found in the files and print the results
     check_signals()  # Call the function to check and print signals after each iteration
 
     print()
+
+    # Clearing candle_map and ml_model for garbage collection
+    candle_map.clear()
+    ml_model = None
 
     time.sleep(5)  # Delay before the next data fetch
