@@ -993,7 +993,7 @@ while True:
             true_count = 0 
 
             # Track conditions for MTF signal
-            if timeframe == "3min":
+            if timeframe == "3m":
                 if dist_min_close < dist_max_close:
                     true_count += 1
                 if closest_threshold == min_threshold:
