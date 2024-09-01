@@ -1051,6 +1051,10 @@ while True:
             except FileNotFoundError:
                 print(f"{file_name} does not exist yet.")
 
+    print()
+
     check_signals()  # Call the function to check and print signals after each iteration
+
+    print()
 
     time.sleep(5)  # Delay before the next data fetch
