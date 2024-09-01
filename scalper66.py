@@ -964,7 +964,7 @@ while True:
                 if true_count >= 4:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
                     with open(signal_file1, "w") as f:  # Overwrites existing file content
-                        f.write(f"{timestamp} - SIGNAL: DIP found on 4h timeframe at {current_close:.2f}\n")
+                        f.write(f"{timestamp} - SIGNAL: DIP found on 1h timeframe at {current_close:.2f}\n")
                     print(f"DIP found on 1h timeframe tf at {current_close:.2f} - Recorded to {signal_file1}")
 
             true_count = 0 
