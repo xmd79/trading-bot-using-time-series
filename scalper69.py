@@ -704,28 +704,28 @@ def analyze_energy_fields(prices, current_sine_close):
     energy_fields = np.mean(prices) + current_sine_close  # Replace with your actual analysis
     print(f"Energy fields: {energy_fields:.2f}")
 
-# Function to delete signal files
-def delete_signal_files(signal_files):
-    for file in signal_files:
-        if os.path.exists(file):
-            os.remove(file)
-            print(f"{file} has been deleted.")
-
 # Function to check signals
 def check_signals(signal_files):
+    signals_found = {}
     for file_name in signal_files:
         try:
             with open(file_name, "r") as f:
                 lines = f.readlines()
                 if lines and any(line.strip() for line in lines):  # Check for any non-empty lines
+                    signals_found[file_name] = [line.strip() for line in lines if line.strip()]
                     print(f"{len(lines)} DIPs found in {file_name}:")
-                    for line in lines:
-                        if line.strip():  # Print only non-empty lines
-                            print(line.strip())
+                    for line in signals_found[file_name]:
+                        print(line)
                 else:
                     print(f"No DIPs found in {file_name}.")
         except FileNotFoundError:
             print(f"{file_name} does not exist yet.")
+    
+    # Check if all signal files have found signals, and if so, clear their contents
+    if all(file_name in signals_found for file_name in signal_files):
+        for file_name in signal_files:
+            open(file_name, 'w').close()  # Clear the content of the file
+            print(f"Cleared contents of {file_name}.")
 
 # Main function to generate analysis report
 def generate_report(timeframe, candles, investment, forecast_minutes=12, ml_model=None):
@@ -858,10 +858,9 @@ while True:
     profit_threshold = initial_usdc_balance * 0.03
     profit_amount = total_balance_usdc - initial_usdc_balance
 
-    if profit_amount >= profit_threshold:
-        print(f"Profit threshold exceeded. Exiting position with profit of {profit_amount:.8f} USDC.")
-        break  # Exit the loop if conditions met
-
+    # Flag to check if all time frames have DIPs found
+    all_timeframes_signaled = True
+    
     if ml_model is None:
         combined_candles = np.concatenate([candle_map[t] for t in timeframes if len(candle_map[t]) > 0])
         if len(combined_candles) > 0:
@@ -872,7 +871,6 @@ while True:
 
     # Initialize counts to track conditions
     true_count = 0
-    false_count = 0
 
     for timeframe in timeframes:
         candles = candle_map[timeframe]
@@ -1064,9 +1062,6 @@ while True:
 
     # New Feature: Check for signals found in the files and print the results
     check_signals([signal_file1, signal_file2, signal_file3, signal_file4])  # Call the function to check and print signals after each iteration
-
-    # Delete previous trading signals
-    delete_signal_files([signal_file1, signal_file2, signal_file3, signal_file4])
 
     print()
 
