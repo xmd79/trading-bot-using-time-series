@@ -258,6 +258,58 @@ def detect_reversal(candles):
 
     return local_dip_signal, local_top_signal
 
+##################################################
+
+# Scale current close price to sine wave       
+def scale_to_sine(timeframe):  
+  
+    close_prices = np.array(get_close(timeframe))
+  
+    # Get last close price 
+    current_close = close_prices[-1]      
+        
+    # Calculate sine wave        
+    sine_wave, leadsine = talib.HT_SINE(close_prices)
+            
+    # Replace NaN values with 0        
+    sine_wave = np.nan_to_num(sine_wave)
+    sine_wave = -sine_wave
+        
+    # Get the sine value for last close      
+    current_sine = sine_wave[-1]
+            
+    # Calculate the min and max sine           
+    sine_wave_min = np.min(sine_wave)        
+    sine_wave_max = np.max(sine_wave)
+
+    # Calculate % distances            
+    dist_min, dist_max = [], []
+ 
+    for close in close_prices:    
+        # Calculate distances as percentages        
+        dist_from_close_to_min = ((current_sine - sine_wave_min) /  
+                                   (sine_wave_max - sine_wave_min)) * 100            
+        dist_from_close_to_max = ((sine_wave_max - current_sine) / 
+                                   (sine_wave_max - sine_wave_min)) * 100
+                
+        dist_min.append(dist_from_close_to_min)       
+        dist_max.append(dist_from_close_to_max)
+
+    return dist_from_close_to_min, dist_from_close_to_max, current_sine
+     
+ 
+# Iterate over each timeframe and call the scale_to_sine function
+for timeframe in timeframes:
+    dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
+    
+    # Print the results for each timeframe
+    print(f"For {timeframe} timeframe:")
+    print(f"Distance to min: {dist_from_close_to_min:.2f}%")
+    print(f"Distance to max: {dist_from_close_to_max:.2f}%")
+    print(f"Current Sine value: {current_sine}\n")
+
+##################################################
+
 # Iterate over each timeframe and check for reversals using the new SMA method
 for timeframe in timeframes:
     candles = candle_map[timeframe]
@@ -266,5 +318,6 @@ for timeframe in timeframes:
     print(dip_signal)
     print(top_signal)
     print("\n" + "=" * 30 + "\n")
+
 
 ##################################################
