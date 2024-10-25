@@ -168,9 +168,9 @@ def check_open_close_reversals(candle):
     resistance_level = np.max(highs)  # Approximate resistance level
 
     if current_close < daily_open and current_close > support_level:
-        return "Bullish reversal signal detected."
+        return "Below daily open"
     elif current_close > daily_open and current_close < resistance_level:
-        return "Bearish reversal signal detected."
+        return "Above daily open"
     
     return "No reversal signal detected."
 
