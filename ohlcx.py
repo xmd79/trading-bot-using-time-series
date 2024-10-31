@@ -16,7 +16,7 @@ def get_binance_client():
 
 client = get_binance_client()
 
-TRADE_SYMBOL = "JTOUSDC"
+TRADE_SYMBOL = "BTCUSDC"
 timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
 def get_candles(symbol, timeframes):
