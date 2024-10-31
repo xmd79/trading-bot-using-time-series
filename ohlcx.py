@@ -3,7 +3,6 @@ import numpy as np
 import talib  # Make sure to have TA-Lib installed
 from binance.client import Client as BinanceClient
 import datetime
-from sklearn.linear_model import LinearRegression  # Importing LinearRegression for forecasting
 
 # Define Binance client by reading API key and secret from local file
 def get_binance_client():
@@ -190,25 +189,6 @@ def analyze_market_mood(sine_wave, min_threshold, max_threshold, current_close):
     print(f"Last Maximum Value: {last_max}")
     print(f"Last Minimum Value: {last_min}")
 
-# New function to forecast price using linear regression
-def forecast_price(candle_map, timeframe, periods_ahead=1):
-    candles = candle_map[timeframe]
-    closes = np.array([candle['close'] for candle in candles])
-
-    # Prepare the data for linear regression
-    X = np.arange(len(closes)).reshape(-1, 1)  # Time points (0, 1, 2, ...)
-    y = closes.reshape(-1, 1)  # Closing prices
-
-    # Create a linear regression model and fit it
-    model = LinearRegression()
-    model.fit(X, y)
-
-    # Make prediction for the next 'periods_ahead' time steps
-    future_X = np.array([len(closes) + i for i in range(1, periods_ahead + 1)]).reshape(-1, 1)
-    forecasted_prices = model.predict(future_X)
-
-    return forecasted_prices.flatten()
-
 for timeframe in timeframes:
     candles = candle_map[timeframe]
     dip_signal, top_signal = detect_reversal(candles)
@@ -240,10 +220,6 @@ for timeframe in timeframes:
     last_candle = candles[-1]
     reversal_signal = check_open_close_reversals(last_candle)
     print(reversal_signal)
-
-    # New Forecasting Step
-    forecasted_prices = forecast_price(candle_map, timeframe, periods_ahead=3)  # Forecast for the next 3 periods
-    print(f"Forecasted Prices for {timeframe}: {forecasted_prices}")
 
     # Print results for each timeframe
     print(f"Timeframe: {timeframe}")
