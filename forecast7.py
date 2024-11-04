@@ -100,6 +100,14 @@ def detect_reversal(candles):
 
     return local_dip_signal, local_top_signal, sma56[-1], sma100[-1], sma200[-1], sma369[-1]
 
+def calculate_45_degree_angle(prices):
+    """ Calculate the price expected at a 45-degree angle specific to the timeframe. """
+    if len(prices) < 2:
+        return np.nan
+    current_price = prices[-1]
+    price_range = np.max(prices) - np.min(prices)  # Calculate the range of prices in this timeframe
+    return current_price + (price_range / len(prices))  # Calculate the 45-degree increment
+
 def scale_to_sine(thresholds, last_reversal, cycles=5):  
     min_threshold, max_threshold, avg_threshold = thresholds
     num_points = 100
@@ -181,14 +189,28 @@ for timeframe in timeframes:
     # Calculate thresholds with custom percentage settings
     min_threshold, max_threshold, avg_mtf = calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2)
     
-    # Log thresholds for current timeframe
+    # Calculate the price at a 45-degree angle specific to each timeframe
+    angle_price = calculate_45_degree_angle(close_prices)
+
     print(f"=== Timeframe: {timeframe} ===")
     print("Minimum threshold:", min_threshold)
     print("Maximum threshold:", max_threshold)
     print("Average MTF:", avg_mtf)
+    print("Price at 45-degree angle:", angle_price)
 
-    # Check which threshold is closer to the last close price
+    # Check the distance of current close to angle price
     current_close = close_prices[-1]
+    if angle_price is not None:
+        if current_close < angle_price:
+            difference_percentage = ((angle_price - current_close) / angle_price) * 100
+            print(f"Current close is below the 45-degree angle price by {difference_percentage:.2f}%")
+        elif current_close > angle_price:
+            difference_percentage = ((current_close - angle_price) / angle_price) * 100
+            print(f"Current close is above the 45-degree angle price by {difference_percentage:.2f}%")
+        else:
+            print("Current close is exactly at the 45-degree angle price.")
+    
+    # Check which threshold is closer to the last close price
     closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - current_close))
     
     if closest_threshold == min_threshold:
