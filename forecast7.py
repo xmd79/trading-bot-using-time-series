@@ -177,8 +177,31 @@ print("Current local Time is now at: ", current_time)
 for timeframe in timeframes:
     candles = candle_map[timeframe]
     close_prices = get_close(timeframe)
-    thresholds = calculate_thresholds(close_prices)
 
+    # Calculate thresholds with custom percentage settings
+    min_threshold, max_threshold, avg_mtf = calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2)
+    
+    # Log thresholds for current timeframe
+    print(f"=== Timeframe: {timeframe} ===")
+    print("Minimum threshold:", min_threshold)
+    print("Maximum threshold:", max_threshold)
+    print("Average MTF:", avg_mtf)
+
+    # Check which threshold is closer to the last close price
+    current_close = close_prices[-1]
+    closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - current_close))
+    
+    if closest_threshold == min_threshold:
+        print("The last minimum value is closest to the current close.")
+        print("The last minimum value is", closest_threshold)
+    elif closest_threshold == max_threshold:
+        print("The last maximum value is closest to the current close.")
+        print("The last maximum value is", closest_threshold)
+    else:
+        print("No threshold value found.")
+
+    # Calculate remaining indicators
+    thresholds = (min_threshold, max_threshold, avg_mtf)
     dip_signal, top_signal, sma56, sma100, sma200, sma369 = detect_reversal(candles)
 
     last_reversal = "dip" if "Dip" in dip_signal else "top"
@@ -186,10 +209,7 @@ for timeframe in timeframes:
 
     dist_to_min_normalized, dist_to_max_normalized = calculate_distance_percentages(close_prices)
 
-    analyze_market_mood(sine_wave, thresholds[0], thresholds[1], close_prices[-1])
-
-    current_close = close_prices[-1]
-    closest_threshold = min(thresholds[0], thresholds[1], key=lambda x: abs(x - current_close))
+    analyze_market_mood(sine_wave, thresholds[0], thresholds[1], current_close)
 
     if closest_threshold == thresholds[1]: 
         next_reversal_target = find_next_reversal_target(sine_wave, "dip")
@@ -201,7 +221,6 @@ for timeframe in timeframes:
     last_candle = candles[-1]
     reversal_signal = check_open_close_reversals(last_candle)
 
-    print(f"=== Timeframe: {timeframe} ===")
     print(dip_signal)
     print(top_signal)
     print(f"SMA56: {sma56:.2f}")
