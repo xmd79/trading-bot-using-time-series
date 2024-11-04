@@ -182,6 +182,8 @@ def calculate_distance_percentages(closes):
 current_time = datetime.datetime.now()
 print("Current local Time is now at: ", current_time)
 
+print()
+
 for timeframe in timeframes:
     candles = candle_map[timeframe]
     close_prices = get_close(timeframe)
