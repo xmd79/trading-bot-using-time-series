@@ -16,7 +16,7 @@ def get_binance_client():
 
 client = get_binance_client()
 
-TRADE_SYMBOL = "BTCUSDC"
+TRADE_SYMBOL = "TONUSDC"
 timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
 def get_candles(symbol, timeframes):
@@ -117,10 +117,10 @@ def scale_to_sine(thresholds, last_reversal, cycles=5):
 
     if last_reversal == "dip":
         baseline = min_threshold + amplitude
-        sine_wave = baseline + amplitude * np.sin(t)
+        sine_wave = baseline - amplitude * np.sin(t)  # Inverted sine wave for dip
     else:
         baseline = max_threshold - amplitude
-        sine_wave = baseline - amplitude * np.sin(t)
+        sine_wave = baseline + amplitude * np.sin(t)  # Normal sine wave for peak
 
     return sine_wave
 
