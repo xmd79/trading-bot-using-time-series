@@ -1,6 +1,6 @@
 import requests
 import numpy as np
-import talib  # Make sure to have TA-Lib installed
+import talib  
 from binance.client import Client as BinanceClient
 import datetime
 from sklearn.linear_model import LinearRegression
@@ -16,7 +16,7 @@ def get_binance_client():
 
 client = get_binance_client()
 
-TRADE_SYMBOL = "BTCUSDC"
+TRADE_SYMBOL = "TRBUSDC"
 timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
 def get_candles(symbol, timeframes):
@@ -37,7 +37,6 @@ def get_candles(symbol, timeframes):
             candles.append(candle)
     return candles
 
-# Get candle data for each timeframe and create a map
 candles = get_candles(TRADE_SYMBOL, timeframes)
 candle_map = {}
 for candle in candles:
@@ -59,16 +58,16 @@ def get_close(timeframe):
     candles = candle_map[timeframe]
     for c in candles:
         close = c['close']
-        if not np.isnan(close) and close > 0:  # Check not NaN and not zero
+        if not np.isnan(close) and close > 0:
             closes.append(close)
     current_price = get_price(TRADE_SYMBOL)
-    if current_price > 0:  # Ensure current price is valid
+    if current_price > 0:
         closes.append(current_price)
     return np.array(closes)
 
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3):
     close_prices = np.array(close_prices)
-    close_prices = close_prices[~np.isnan(close_prices) & (close_prices > 0)]  # Remove NaNs and zeros
+    close_prices = close_prices[~np.isnan(close_prices) & (close_prices > 0)]
     if len(close_prices) == 0:
         raise ValueError("No valid close prices available for threshold calculation.")
 
@@ -85,23 +84,21 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
 
 def detect_reversal(candles):
     closes = np.array([candle['close'] for candle in candles])
-    closes = closes[~np.isnan(closes) & (closes > 0)]  # Ensure valid close prices
+    closes = closes[~np.isnan(closes) & (closes > 0)]
 
-    if len(closes) < 1:  # Ensure there's at least one close price
+    if len(closes) < 1:
         raise ValueError("Insufficient close prices for reversal detection.")
 
-    # We will only calculate SMA56 regardless of the available data for other SMAs
     sma_length = 56
-    sma56 = np.nan  # Initialize
+    sma56 = np.nan
 
     if len(closes) >= sma_length:
-        valid_closes = closes[-sma_length:]  # Only use the last 'sma_length' closes
-        sma56 = talib.SMA(valid_closes, timeperiod=sma_length)[-1]  # Get the last calculated SMA
+        valid_closes = closes[-sma_length:]
+        sma56 = talib.SMA(valid_closes, timeperiod=sma_length)[-1]
 
     local_dip_signal = "No Local close vs SMA Dip"
     local_top_signal = "No Local close vs SMA Top"
 
-    # Check for dip and top signals based on SMA56 if available
     if sma56 and closes[-1] < sma56 and all(closes[-1] < closes[-i] for i in range(2, 5) if len(closes) >= i):
         local_dip_signal = f"Local Dip detected at price {closes[-1]}"
 
@@ -111,12 +108,11 @@ def detect_reversal(candles):
     return local_dip_signal, local_top_signal, sma56
 
 def calculate_45_degree_angle(prices):
-    """ Calculate the price expected at a 45-degree angle specific to the timeframe. """
     if len(prices) < 2:
         return np.nan
     current_price = prices[-1]
-    price_range = np.max(prices) - np.min(prices)  # Calculate the range of prices in this timeframe
-    return current_price + (price_range / len(prices))  # Calculate the 45-degree increment
+    price_range = np.max(prices) - np.min(prices)
+    return current_price + (price_range / len(prices))
 
 def scale_to_sine(thresholds, last_reversal, cycles=5):
     min_threshold, max_threshold, avg_threshold = thresholds
@@ -128,23 +124,22 @@ def scale_to_sine(thresholds, last_reversal, cycles=5):
     if last_reversal == "dip":
         baseline = min_threshold + amplitude
         sine_wave = baseline - amplitude * np.sin(t)  # Inverted sine wave for dip
-    else:
+    else:  # "top"
         baseline = max_threshold - amplitude
-        sine_wave = baseline + amplitude * np.sin(t)  # Normal sine wave for peak
+        sine_wave = baseline + amplitude * np.sin(t)
 
     return sine_wave
 
 def find_next_reversal_target(sine_wave, last_reversal):
     if last_reversal == "dip":
-        return np.min(sine_wave)
+        return np.max(sine_wave)  # Expecting an upward movement
     else:
-        return np.max(sine_wave)
+        return np.min(sine_wave)  # Expecting a downward movement
 
 def check_open_close_reversals(candle):
     daily_open = candle['open']
     current_close = candle['close']
 
-    # Get support and resistance levels safely
     timeframe = candle['timeframe']
     lows = [c['low'] for c in candle_map[timeframe]]
     highs = [c['high'] for c in candle_map[timeframe]]
@@ -174,9 +169,9 @@ def analyze_market_mood(sine_wave, min_threshold, max_threshold, current_close):
     return market_mood, last_max, last_min
 
 def calculate_distance_percentages(closes):
-    closes = closes[~np.isnan(closes) & (closes > 0)]  # Ensure valid closes
+    closes = closes[~np.isnan(closes) & (closes > 0)]
     if len(closes) == 0:
-        return 0, 0  # Prevent div by zero
+        return 0, 0
 
     min_close = np.min(closes)
     max_close = np.max(closes)
@@ -191,15 +186,12 @@ def calculate_distance_percentages(closes):
     return distance_to_min_normalized, distance_to_max_normalized
 
 def linear_regression_forecast(close_prices, forecast_steps=1):
-    """
-    Forecast future prices using Linear Regression.
-    """
-    close_prices = close_prices[~np.isnan(close_prices) & (close_prices > 0)]  # Ensure valid close prices
+    close_prices = close_prices[~np.isnan(close_prices) & (close_prices > 0)]
     if len(close_prices) == 0:
         raise ValueError("No valid close prices for linear regression.")
 
-    X = np.arange(len(close_prices)).reshape(-1, 1)  # Create an array of time
-    y = close_prices  # Close prices as target variable
+    X = np.arange(len(close_prices)).reshape(-1, 1)
+    y = close_prices
 
     model = LinearRegression()
     model.fit(X, y)
@@ -226,10 +218,10 @@ def generate_sinusoidal_envelope(thresholds, frequency_bands=25):
 def calculate_fear_greed_intensity(positive_indices, negative_indices):
     total_indices = len(positive_indices) + len(negative_indices)
     if total_indices == 0:
-        return 0  # Avoid division by zero
+        return 0
 
     intensity = (len(positive_indices) - len(negative_indices)) / total_indices
-    return intensity * 100  # Scale to percentage
+    return intensity * 100
 
 def map_intensity_to_degrees(intensity):
     if intensity > 70:
@@ -242,8 +234,6 @@ def map_intensity_to_degrees(intensity):
         return "Extreme Fear"
 
 def find_most_significant_frequency(sinusoidal_envelope):
-    # Find the frequency with the maximum amplitude in the sinusoidal envelope
-    # The envelope is shaped (frequency_bands, envelope_points)
     max_amplitudes = np.max(sinusoidal_envelope, axis=1)
     significant_frequency_index = np.argmax(max_amplitudes)
 
@@ -288,7 +278,6 @@ for timeframe in timeframes:
         else:
             print("Current close is exactly at the 45-degree angle price.")
 
-    # Check which threshold is closer to the last close price
     closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - current_close))
 
     if closest_threshold == min_threshold:
@@ -300,68 +289,82 @@ for timeframe in timeframes:
     else:
         print("No threshold value found.")
 
-    # Calculate remaining indicators
     thresholds = (min_threshold, max_threshold, avg_mtf)
     dip_signal, top_signal, sma56 = detect_reversal(candles)
 
     last_reversal = "dip" if "Dip" in dip_signal else "top"
     sine_wave = scale_to_sine(thresholds, last_reversal)
 
-    # Generate sinusoidal envelope (for internal calculations only)
     sinusoidal_envelope = generate_sinusoidal_envelope(thresholds)
 
     dist_to_min_normalized, dist_to_max_normalized = calculate_distance_percentages(close_prices)
 
     market_mood, last_max, last_min = analyze_market_mood(sine_wave, thresholds[0], thresholds[1], current_close)
 
-    # Analyze predominant frequency and current status
+    # Analyze the predominant frequency and current status
     negative_range_indices = []
     positive_range_indices = []
 
-    # Assuming sinusoidal_envelope is (frequency_bands, envelope_points)
     for band in sinusoidal_envelope:
-        negative_indices = np.where(band < 0)[0]  # Indices in this band that are negative
-        positive_indices = np.where(band > 0)[0]  # Indices in this band that are positive
+        negative_indices = np.where(band < 0)[0]
+        positive_indices = np.where(band > 0)[0]
 
-        negative_range_indices.extend(negative_indices)  # Collect all negative indices
-        positive_range_indices.extend(positive_indices)  # Collect all positive indices
+        negative_range_indices.extend(negative_indices)
+        positive_range_indices.extend(positive_indices)
 
     intensity = calculate_fear_greed_intensity(positive_range_indices, negative_range_indices)
     intensity_label = map_intensity_to_degrees(intensity)
 
     most_significant_frequency = find_most_significant_frequency(sinusoidal_envelope)
 
-    # Determine predominant frequency and cycle direction
-    if most_significant_frequency > 0:
-        predominant_message = "Positive"
+    # Determine predominant frequency and adjust for cycle direction
+    if last_reversal == "top":
+        predominant_frequency_direction = "Positive"  # Recently decreased peak
+    else:  # last_reversal == "dip"
+        predominant_frequency_direction = "Negative"  # Recently increased trough
+
+    print("The most significant predominant frequency is:", predominant_frequency_direction)
+
+    print(f"Current cycle is: {'up cycle' if last_reversal == 'dip' else 'down cycle'}")
+
+    # Adjust intensity calculation based on frequency signals
+    adjusted_intensity = intensity if last_reversal == 'dip' else -intensity  
+
+    # New: Incorporate distance of current close to min and max of sine wave
+    min_sine = np.min(sine_wave)
+    max_sine = np.max(sine_wave)
+    
+    distance_to_min_sine = abs(current_close - min_sine) / (max_sine - min_sine) * 100 if (max_sine - min_sine) > 0 else 0
+    distance_to_max_sine = abs(current_close - max_sine) / (max_sine - min_sine) * 100 if (max_sine - min_sine) > 0 else 0
+    
+    adjusted_distance_intensity = (distance_to_min_sine - distance_to_max_sine + 100) / 2
+    adjusted_intensity = adjusted_intensity * adjusted_distance_intensity / 100  # Normalize to influence
+
+    adjusted_intensity = np.clip(adjusted_intensity, -100, 100)  # Ensures intensity is within reasonable limits
+
+    print(f"Adjusted Intensity: {adjusted_intensity:.2f}%")
+
+    # Determine market mood based on adjusted intensity
+    if adjusted_intensity > 70:
+        market_mood = "Extreme Greed"
+    elif adjusted_intensity > 50:
+        market_mood = "Greed"
+    elif adjusted_intensity > 30:
+        market_mood = "Fear"
     else:
-        predominant_message = "Negative"
+        market_mood = "Extreme Fear"
 
-    print(f"The most significant predominant frequency is: {predominant_message}")
-    print(f"Current cycle is: {'down cycle' if predominant_message == 'Positive' else 'up cycle'}")
-
-    if len(negative_range_indices) > 0 and current_close < angle_price:
-        major_reversal = "Negative Predominance"
-        print(f"Major reversal found: {major_reversal} below current close.")
-    elif len(positive_range_indices) > 0 and current_close > angle_price:
-        major_reversal = "Positive Predominance"
-        print(f"Major reversal found: {major_reversal} above current close.")
-    else:
-        major_reversal = "Neutral"
-        print("No major reversal detected.")
-
-    # Print intensity and advice
-    print(f"Current Intensity: {intensity:.2f}% - Market Mood: {intensity_label}")
+    # Print overall market mood
+    print(f"Current Market Mood: {market_mood}")
 
     forecast_price = forecasted_prices[-1]
-    if intensity_label in ["Extreme Greed", "Greed"]:
+    if market_mood in ["Extreme Greed", "Greed"]:
         print(f"Forecast price suggests potential downside towards {forecast_price:.2f}.")
-    elif intensity_label in ["Fear", "Extreme Fear"]:
+    elif market_mood in ["Fear", "Extreme Fear"]:
         print(f"Forecast price suggests potential upside towards {forecast_price:.2f}.")
     else:
         print(f"Forecast price holds steady around {forecast_price:.2f}.")
 
-    # Print additional signals
     print(dip_signal)
     print(top_signal)
     print(f"SMA56: {sma56:.2f}" if not np.isnan(sma56) else "SMA56: Not enough data")
@@ -380,7 +383,6 @@ for timeframe in timeframes:
 
     print(f"Next target reversal price expected: {next_reversal_target:.2f}")
     print(reversal_signal)
-    print(f"Current Market Mood: {market_mood}")
     print("\n" + "=" * 30 + "\n")
 
 print("All timeframe calculations completed.")
