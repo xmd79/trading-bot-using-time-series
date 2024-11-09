@@ -1,6 +1,6 @@
 import requests
 import numpy as np
-import talib  
+import talib
 from binance.client import Client as BinanceClient
 import datetime
 from sklearn.linear_model import LinearRegression
@@ -132,11 +132,12 @@ def scale_to_sine(thresholds, last_reversal, cycles=5):
 
     return sine_wave
 
-def find_next_reversal_target(sine_wave, last_reversal):
+def find_next_reversal_target(sine_wave, last_reversal, frequency_amplitude, current_close):
+    # Adjust the next target reversal based on identified frequencies
     if last_reversal == "dip":
-        return np.max(sine_wave)  # Expecting an upward movement
+        return np.min(sine_wave) - frequency_amplitude  # Subtracting amplitude for dips
     else:
-        return np.min(sine_wave)  # Expecting a downward movement
+        return np.max(sine_wave) + frequency_amplitude  # Adding amplitude for tops
 
 def check_open_close_reversals(candle):
     daily_open = candle['open']
@@ -235,35 +236,36 @@ def map_intensity_to_degrees(intensity):
     else:
         return "Extreme Fear"
 
-def find_most_significant_frequency(sinusoidal_envelope):
-    max_amplitudes = np.max(sinusoidal_envelope, axis=1)
-    significant_frequency_index = np.argmax(max_amplitudes)
+def find_most_significant_frequency(close_prices):
+    # Apply FFT on the close prices
+    n = len(close_prices)
+    if n < 2:
+        return 0, 0
 
-    return significant_frequency_index + 1  # Returning 1-based index for readability
+    # Apply FFT
+    fft_values = np.fft.fft(close_prices)
+    frequencies = np.fft.fftfreq(n)
+
+    # Only take the positive part of FFT
+    positive_frequencies = frequencies[:n//2]
+    positive_magnitudes = np.abs(fft_values)[:n//2]
+
+    # Get indices of largest FFT magnitudes
+    sorted_indices = np.argsort(positive_magnitudes)[::-1]
+    
+    # Identify predominant frequency
+    predominant_frequency_index = sorted_indices[0]
+    predominant_frequency_value = positive_frequencies[predominant_frequency_index]
+
+    return predominant_frequency_value, positive_magnitudes
 
 def calculate_channel(swing_low, swing_high, num_periods):
-    """
-    Calculate support/resistance reversal channel using the Pythagorean theorem with a 45-degree middle threshold.
-
-    Parameters:
-    swing_low (float): The price of the swing low.
-    swing_high (float): The price of the swing high.
-    num_periods (int): The time periods (horizontal distance) to project the channel.
-
-    Returns:
-    dict: A dictionary containing lower_channel, middle_channel, and upper_channel.
-    """
-    # Calculate distance a (price change)
+    # Calculate support/resistance reversal channel using the Pythagorean theorem with a 45-degree middle threshold.
     a = swing_high - swing_low  # vertical distance
     b = num_periods  # horizontal distance
-    
-    # Calculate hypotenuse c
     c = np.sqrt(a**2 + b**2)
 
-    # Define the middle channel based on the swing low
     middle_channel = swing_low + (a + b) / 2  # This ensures it forms a threshold at a 45-degree angle.
-
-    # Calculate channel lines based on the 45-degree mid threshold
     lower_channel = middle_channel - c / 2  # Half of the hypotenuse below the middle
     upper_channel = middle_channel + c / 2  # Half of the hypotenuse above the middle
 
@@ -326,7 +328,7 @@ for timeframe in timeframes:
     thresholds = (min_threshold, max_threshold, avg_mtf)
     dip_signal, top_signal, sma56 = detect_reversal(candles)
 
-    # Now calculate channel using min and max threshold
+    # Calculate channel using min and max threshold
     channel = calculate_channel(min_threshold, max_threshold, num_periods=10)  # Example num_periods
     print(f"Lower Channel: {channel['lower_channel']:.2f}")
     print(f"Middle Channel: {channel['middle_channel']:.2f}")
@@ -341,82 +343,33 @@ for timeframe in timeframes:
 
     market_mood, last_max, last_min = analyze_market_mood(sine_wave, thresholds[0], thresholds[1], current_close)
 
-    # Analyze the predominant frequency and current status
-    negative_range_indices = []
-    positive_range_indices = []
+    # Analyze frequencies using FFT
+    predominant_frequency, magnitudes = find_most_significant_frequency(close_prices)
 
-    for band in sinusoidal_envelope:
-        negative_indices = np.where(band < 0)[0]
-        positive_indices = np.where(band > 0)[0]
-
-        negative_range_indices.extend(negative_indices)
-        positive_range_indices.extend(positive_indices)
-
-    intensity = calculate_fear_greed_intensity(positive_range_indices, negative_range_indices)
-    intensity_label = map_intensity_to_degrees(intensity)
-
-    most_significant_frequency = find_most_significant_frequency(sinusoidal_envelope)
-
-    # Determine predominant frequency and adjust for cycle direction
-    if last_reversal == "top":
-        predominant_frequency_direction = "Positive"  # Recently decreased peak
-    else:  # last_reversal == "dip"
-        predominant_frequency_direction = "Negative"  # Recently increased trough
-
-    print("The most significant predominant frequency is:", predominant_frequency_direction)
-
-    print(f"Current cycle is: {'up cycle' if last_reversal == 'dip' else 'down cycle'}")
-
-    # Adjust intensity calculation based on frequency signals
-    adjusted_intensity = intensity if last_reversal == 'dip' else -intensity  
-
-    # New: Incorporate distance of current close to min and max of sine wave
-    min_sine = np.min(sine_wave)
-    max_sine = np.max(sine_wave)
-    
-    distance_to_min_sine = abs(current_close - min_sine) / (max_sine - min_sine) * 100 if (max_sine - min_sine) > 0 else 0
-    distance_to_max_sine = abs(current_close - max_sine) / (max_sine - min_sine) * 100 if (max_sine - min_sine) > 0 else 0
-    
-    adjusted_distance_intensity = (distance_to_min_sine - distance_to_max_sine + 100) / 2
-    adjusted_intensity = adjusted_intensity * adjusted_distance_intensity / 100  # Normalize to influence
-
-    adjusted_intensity = np.clip(adjusted_intensity, -100, 100)  # Ensures intensity is within reasonable limits
-
-    print(f"Adjusted Intensity: {adjusted_intensity:.2f}%")
-
-    # Determine market mood based on adjusted intensity
-    if adjusted_intensity > 70:
-        market_mood = "Extreme Greed"
-    elif adjusted_intensity > 50:
-        market_mood = "Greed"
-    elif adjusted_intensity > 30:
-        market_mood = "Fear"
+    # Determine predominant trend based on predominant frequency
+    neutral_threshold = 0  # Set neutral threshold here; adjust based on your range
+    if predominant_frequency < neutral_threshold:
+        predominant_frequency_label = "Negative"
+        frequency_amplitude = (last_max - last_min) * 0.05  # Example spread adjustment for negative
+        cycle_direction = "Expecting Top"
     else:
-        market_mood = "Extreme Fear"
+        predominant_frequency_label = "Positive"
+        frequency_amplitude = (last_max - last_min) * 0.05  # Example spread adjustment for positive
+        cycle_direction = "Expecting Dip"
 
-    # Print overall market mood
-    print(f"Current Market Mood: {market_mood}")
+    print(f"The predominant frequency is {predominant_frequency:.4f} Hz, classified as {predominant_frequency_label}.")
+    print(f"Predominant Cycle Direction: {cycle_direction}")
 
-    forecast_price = forecasted_prices[-1]
-    if market_mood in ["Extreme Greed", "Greed"]:
-        print(f"Forecast price suggests potential downside towards {forecast_price:.2f}.")
-    elif market_mood in ["Fear", "Extreme Fear"]:
-        print(f"Forecast price suggests potential upside towards {forecast_price:.2f}.")
+    # Calculate target reversal based on identified frequencies
+    next_reversal_target = find_next_reversal_target(sine_wave, last_reversal, frequency_amplitude, current_close)
+
+    if cycle_direction == "Expecting Top":
+        # Ensure the expected dip is calculated correctly
+        expected_next_dip = max(current_close, next_reversal_target)
+        print(f"Starting a down cycle from last maximum price: {last_max:.2f}, expected next dip: {expected_next_dip:.2f}")
     else:
-        print(f"Forecast price holds steady around {forecast_price:.2f}.")
-
-    print(dip_signal)
-    print(top_signal)
-    print(f"SMA56: {sma56:.2f}" if not np.isnan(sma56) else "SMA56: Not enough data")
-    print(f"Distance to Min (Normalized): {dist_to_min_normalized:.2f}%")
-    print(f"Distance to Max (Normalized): {dist_to_max_normalized:.2f}%")
-
-    next_reversal_target = find_next_reversal_target(sine_wave, last_reversal)
-
-    if closest_threshold == thresholds[1]:
-        print(f"Starting a down cycle from last maximum price: {thresholds[1]:.2f}, expected next dip: {next_reversal_target:.2f}")
-    else:
-        print(f"Starting an up cycle from last minimum price: {thresholds[0]:.2f}, expected next top: {next_reversal_target:.2f}")
+        expected_next_top = min(current_close, next_reversal_target)
+        print(f"Starting an up cycle from last minimum price: {last_min:.2f}, expected next top: {expected_next_top:.2f}")
 
     last_candle = candles[-1]
     reversal_signal = check_open_close_reversals(last_candle)
