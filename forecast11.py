@@ -14,6 +14,7 @@ def get_binance_client():
     client = BinanceClient(api_key, api_secret)
     return client
 
+# Initialize Binance client
 client = get_binance_client()
 
 TRADE_SYMBOL = "TRBUSDC"
@@ -37,6 +38,7 @@ def get_candles(symbol, timeframes):
             candles.append(candle)
     return candles
 
+# Get candles data
 candles = get_candles(TRADE_SYMBOL, timeframes)
 candle_map = {}
 for candle in candles:
@@ -258,7 +260,7 @@ for timeframe in timeframes:
     print("Minimum threshold:", min_threshold)
     print("Maximum threshold:", max_threshold)
     print("Average MTF:", avg_mtf)
-    print("Price at 45-degree angle:", angle_price)
+    print("Price at 45-degree angle specific to timeframe:", angle_price)
 
     # Linear Regression Forecast
     forecasted_prices = linear_regression_forecast(close_prices, forecast_steps=1)
