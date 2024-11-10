@@ -58,7 +58,7 @@ class TradingBot:
 
             # Calculate bullish and bearish volumes
             bullish_volume = np.sum(volumes[1:][close_prices[1:] > close_prices[:-1]])
-            bearish_volume = np.sum(volumes[1:][close_prices[1:] < close_prices[:-1]])  # Fixed parenthesis error
+            bearish_volume = np.sum(volumes[1:][close_prices[1:] < close_prices[:-1]])
             avg_volume = np.mean(volumes)
 
             # Linear regression for price forecasting
@@ -66,7 +66,6 @@ class TradingBot:
             model = LinearRegression()
             model.fit(X, close_prices)
 
-            # Forecast the current price using linear regression
             future_index = np.array([[len(close_prices),]]) 
             forecast_price = model.predict(future_index)[0]
 
@@ -76,11 +75,11 @@ class TradingBot:
                 "Bullish Volume": bullish_volume,
                 "Bearish Volume": bearish_volume,
                 "Forecast Price": forecast_price,
-                "Trend Status": self.determine_trend_status(close_prices[-1], forecast_price)
+                "Trend Status": self.determine_trend_status(close_prices[-1], forecast_price),
             }
 
             # Hurst Exponent Calculation
-            hurst_value = self.hurst_exponent(close_prices)  
+            hurst_value = self.hurst_exponent(close_prices)
             dips_found[interval]["Hurst Exponent"] = hurst_value if hurst_value is not None else np.nan
 
             # FFT Analysis
@@ -109,9 +108,9 @@ class TradingBot:
         try:
             ts = np.asarray(ts)  # Ensure the input is a numpy array
             tau = [np.std(np.subtract(ts[l:], ts[:-l])) for l in lags if len(ts) > l]
-            if not tau or any(np.array(tau) <= 0):  # Correctly check against 'tau'
+            if not tau or any(np.array(tau) <= 0):
                 return None
-            
+
             log_lags = np.log(lags)
             log_tau = np.log(tau)
 
@@ -125,7 +124,7 @@ class TradingBot:
         """Perform FFT Analysis."""
         freq_data = fft(close_prices)
         magnitudes = np.abs(freq_data[:25])
-        
+
         negative_freqs = magnitudes[:12]
         neutral_freq = magnitudes[12]
         positive_freqs = magnitudes[13:25]
@@ -152,7 +151,7 @@ class TradingBot:
             }
             if data:
                 all_results[interval] = pd.DataFrame.from_dict(data, orient='index')
-        
+
         for interval, df in all_results.items():
             print(f"\nMarket Analysis for Timeframe: {interval.upper()}")
             print(df.to_string(index=True))
@@ -174,9 +173,14 @@ class TradingBot:
                 overall_data.append({
                     'Symbol': symbol,
                     'Last Close Price': last_close,
-                    '1D Trend Status': dip_info['1d'].get('Trend Status')
+                    '1D Trend Status': dip_info['1d'].get('Trend Status'),
+                    '4H Trend Status': dip_info['4h'].get('Trend Status'),
+                    '1H Trend Status': dip_info['1h'].get('Trend Status'),
+                    '15M Trend Status': dip_info['15m'].get('Trend Status'),
+                    '5M Trend Status': dip_info['5m'].get('Trend Status'),
+                    '1M Trend Status': dip_info['1m'].get('Trend Status'),
                 })
-        
+
         overall_df = pd.DataFrame(overall_data)
         overall_df.fillna('N/A', inplace=True)
         print("\nOverall Table: Top Dips")
@@ -201,6 +205,46 @@ class TradingBot:
         self.display_results(overall_analysis)
         dip_assets = self.get_top_dip_assets(overall_analysis)
         self.build_overall_table(dip_assets, overall_analysis)
+
+        # MTF analysis for lowest assets across timeframes
+        self.perform_mtf_analysis(overall_analysis)
+
+    def perform_mtf_analysis(self, overall_analysis):
+        """Perform MTF analysis for the lowest assets found on multiple timeframes."""
+        low_assets = []
+
+        # Collect lowest assets by multiple timeframes
+        for symbol, analysis in overall_analysis.items():
+            min_close = min([analyze['Current Close'] for interval, analyze in analysis.items() if analyze.get('Current Close') is not None])
+            low_assets.append((symbol, min_close))
+
+        # Sort by the lowest close prices
+        low_assets.sort(key=lambda x: x[1])
+
+        # Prepare a table for the MTF results
+        mtf_summary_data = []
+        for symbol, _ in low_assets:
+            asset_analysis = overall_analysis[symbol]
+            asset_row = {
+                'Symbol': symbol,
+                '1D Close': asset_analysis['1d']['Current Close'],
+                '4H Close': asset_analysis['4h']['Current Close'],
+                '1H Close': asset_analysis['1h']['Current Close'],
+                '15M Close': asset_analysis['15m']['Current Close'],
+                '5M Close': asset_analysis['5m']['Current Close'],
+                '1M Close': asset_analysis['1m']['Current Close'],
+                '1D Trend Status': asset_analysis['1d']['Trend Status'],
+                '4H Trend Status': asset_analysis['4h']['Trend Status'],
+                '1H Trend Status': asset_analysis['1h']['Trend Status'],
+                '15M Trend Status': asset_analysis['15m']['Trend Status'],
+                '5M Trend Status': asset_analysis['5m']['Trend Status'],
+                '1M Trend Status': asset_analysis['1m']['Trend Status'],
+            }
+            mtf_summary_data.append(asset_row)
+
+        mtf_summary_df = pd.DataFrame(mtf_summary_data)
+        print("\n=== MTF Overall Summary ===")
+        print(mtf_summary_df.to_string(index=False))
 
 # Main program loop
 if __name__ == "__main__":
