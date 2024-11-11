@@ -4,6 +4,7 @@ import talib
 from binance.client import Client as BinanceClient
 import datetime
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Define Binance client by reading API key and secret from a local file
@@ -100,6 +101,29 @@ def linear_regression_forecast(close_prices, forecast_steps=1):
 
     return forecast_prices
 
+def calculate_regression_channel(close_prices):
+    close_prices = close_prices[~np.isnan(close_prices) & (close_prices > 0)]
+    if len(close_prices) == 0:
+        raise ValueError("No valid close prices for regression channel.")
+
+    X = np.arange(len(close_prices)).reshape(-1, 1)
+    y = close_prices
+
+    model = LinearRegression()
+    model.fit(X, y)
+
+    # Predictions for regression line
+    regression_line = model.predict(X)
+
+    # Calculate upper and lower channel bounds
+    residuals = close_prices - regression_line
+    std_dev = np.std(residuals)
+
+    upper_channel = regression_line + (std_dev * 2)  # You can adjust the multiplier for channel width
+    lower_channel = regression_line - (std_dev * 2)
+
+    return regression_line, upper_channel, lower_channel
+
 def analyze_asset(symbol):
     """Analyze a single asset and return analysis results."""
     candles = get_candles(symbol, timeframes)
@@ -130,20 +154,20 @@ def analyze_asset(symbol):
 
         # Only analyze if bullish volume is greater than bearish volume
         if bullish_volume > bearish_volume:
+            # Calculate regression channel
+            regression_line, upper_channel, lower_channel = calculate_regression_channel(close_prices)
+
             # Forecast the price using linear regression
             projected_price = linear_regression_forecast(close_prices, forecast_steps=1)[-1]
-            
-            # Define price forecasts based on max threshold
-            max_price_forecast = max_threshold
-            min_price_forecast = max_threshold * 0.98  # Example: 2% below max threshold
 
             # Store the analysis results
             analysis_results[timeframe] = {
                 "Min Threshold": f"{min_threshold:.25f}",
                 "Max Threshold": f"{max_threshold:.25f}",
                 "Projected Price": f"{projected_price:.25f}",
-                "Max Price Forecast": f"{max_price_forecast:.25f}",
-                "Min Price Forecast": f"{min_price_forecast:.25f}",
+                "Upper Channel": f"{upper_channel[-1]:.25f}",
+                "Lower Channel": f"{lower_channel[-1]:.25f}",
+                "Trend": "Bullish" if regression_line[-1] < projected_price else "Bearish",
                 "Market Mood": "Bullish" if (bullish_volume > bearish_volume) else "Bearish",
                 "Dip Signal": dip_signal,
                 "Top Signal": top_signal
@@ -169,12 +193,12 @@ def main():
             
     # Display detailed analysis results
     print("\n" + "=" * 60)
-    print(f"{'Symbol':<15}{'Timeframe':<10}{'Min Threshold':<45}{'Max Threshold':<45}{'Projected Price':<45}{'Max Price Forecast':<45}{'Min Price Forecast':<45}{'Market Mood':<15}")
+    print(f"{'Symbol':<15}{'Timeframe':<10}{'Min Threshold':<45}{'Max Threshold':<45}{'Projected Price':<45}{'Upper Channel':<45}{'Lower Channel':<45}{'Market Mood':<15}")
     print("-" * 60)
     
     for symbol, results in overall_analysis.items():
         for timeframe, data in results.items():
-            print(f"{symbol:<15}{timeframe:<10}{data['Min Threshold']:<45}{data['Max Threshold']:<45}{data['Projected Price']:<45}{data['Max Price Forecast']:<45}{data['Min Price Forecast']:<45}{data['Market Mood']:<15}")
+            print(f"{symbol:<15}{timeframe:<10}{data['Min Threshold']:<45}{data['Max Threshold']:<45}{data['Projected Price']:<45}{data['Upper Channel']:<45}{data['Lower Channel']:<45}{data['Market Mood']:<15}")
 
     print("=" * 60)
 
