@@ -109,6 +109,19 @@ def linear_regression_forecast(close_prices, forecast_steps=1):
 
     return forecast_prices
 
+def fft_forecast(close_prices):
+    """Calculate the FFT forecast for cycle prediction."""
+    n = len(close_prices)
+    if n <= 1:
+        return []
+
+    fft_result = np.fft.fft(close_prices)
+    threshold = np.abs(fft_result).max() / 10
+    dominant_frequencies = np.where(np.abs(fft_result) > threshold, fft_result, 0)
+
+    forecasted_prices = np.fft.ifft(dominant_frequencies)
+    return forecasted_prices.real  # Return the real part
+
 def analyze_asset(symbol):
     """Analyze a single asset."""
     candles = get_candles(symbol, timeframes)
@@ -119,6 +132,8 @@ def analyze_asset(symbol):
         candle_map[candle['timeframe']].append(candle)
 
     analysis_results = {}
+    bullish_dips = []
+
     for timeframe in timeframes:
         close_prices = np.array([candle['close'] for candle in candle_map[timeframe]])
         if len(close_prices) < 1:
@@ -138,22 +153,26 @@ def analyze_asset(symbol):
         # Add closes for mood confirmation
         closes = np.array([candle['close'] for candle in candle_map[timeframe]])
 
+        # Check if the volume is bullish and the dip signal was detected
+        if "Local Dip detected" in dip_signal and bullish_volume > bearish_volume:
+            bullish_dips.append((timeframe, closes[-1], bullish_volume, dip_signal))
+
         # Forecast the price using linear regression
         projected_price = linear_regression_forecast(close_prices)[-1]
 
         # Add sinusoidal forecast
         sine_forecast = sinusoidal_forecast(close_prices)
 
-        # Confirm market mood with extra condition
+        # Confirm market mood
         overall_market_mood = "Bullish" if (bullish_volume > bearish_volume and closes[-1] >= avg_mtf) else "Bearish"
 
         # Dynamic adjustment of the projected price based on market conditions
         if overall_market_mood == "Bullish":
-            projected_price = max(projected_price, max_threshold)  # Ensure it's above current close and max threshold
+            projected_price = max(projected_price, max_threshold)
         else:
-            projected_price = min(projected_price, min_threshold)  # Ensure it's below current close and min threshold
+            projected_price = min(projected_price, min_threshold)
 
-        # Calculate the middle price as the 45-degree angle equilibrium point
+        # Calculate the price validation against a middle price
         middle_price = (min_threshold + max_threshold) / 2
         price_validation = "Above Middle Price" if closes[-1] >= middle_price else "Below Middle Price"
 
@@ -169,7 +188,7 @@ def analyze_asset(symbol):
             "Middle Price Validation": price_validation
         }
 
-    return symbol, analysis_results
+    return symbol, analysis_results, bullish_dips
 
 def main():
     current_time = datetime.datetime.now()
@@ -179,13 +198,17 @@ def main():
     usdc_pairs = fetch_usdc_pairs()
     
     overall_analysis = {}
+    bullish_dips_found = []
 
     # Use thread pool to fetch data concurrently
     with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_symbol = {executor.submit(analyze_asset, symbol): symbol for symbol in usdc_pairs}
         for future in as_completed(future_to_symbol):
-            symbol, results = future.result()
+            symbol, results, dips = future.result()
             overall_analysis[symbol] = results
+
+            # Collect bullish dips
+            bullish_dips_found.extend([(symbol, timeframe, price, volume, dip_signal) for timeframe, price, volume, dip_signal in dips])
 
     # Display results in a dynamic table format
     print("\n" + "=" * 60)
@@ -194,8 +217,17 @@ def main():
     
     for symbol, results in overall_analysis.items():
         for timeframe, data in results.items():
-            print(f"{symbol:<15}{timeframe:<10}{data['Min Threshold']:<45.45f}{data['Max Threshold']:<45.45f}{data['Projected Price']:<45.45f}{data['Market Mood']:<15}")
-    
+            print(f"{symbol:<15}{timeframe:<10}{data['Min Threshold']:<45.25f}{data['Max Threshold']:<45.25f}{data['Projected Price']:<45.25f}{data['Market Mood']:<15}")
+
+    print("=" * 60)
+
+    # Print bullish dips found
+    print("\nBullish Dips Found:")
+    print(f"{'Symbol':<15}{'Timeframe':<10}{'Dip Price':<30}{'Volume (Bullish)':<25}{'Dip Signal':<30}")
+    print("-" * 60)
+    for symbol, timeframe, price, volume, dip_signal in bullish_dips_found:
+        print(f"{symbol:<15}{timeframe:<10}{price:<30.25f}{volume:<25.25f}{dip_signal:<30}")
+
     print("=" * 60)
 
 if __name__ == "__main__":
