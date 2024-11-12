@@ -153,8 +153,8 @@ def main():
             print(f"{symbol:<20}{'5m':<10}{min_threshold:<25.4f}{max_threshold:<25.4f}{forecast_price:<25.4f}{volume_resistance:<25.4f}{volume_support:<25.4f}{'Bullish' if total_bullish > total_bearish else 'Bearish':<20}")
             print(f"{'Distance to Min (%):':<45}{distance_to_min:<20.2f}")
             print(f"{'Distance to Max (%):':<45}{distance_to_max:<20.2f}")
-            print(f"{'Distance to Forecast Price (%):':<45}{distance_to_forecast:<20.2f}")
-            # Removed prints for Time to Target and Normalized Distance to Target
+            # Removed print for Distance to Forecast Price
+            # print(f"{'Distance to Forecast Price (%):':<45}{distance_to_forecast:<20.2f}")
             print(f"{'Bullish Volume Percentage (%):':<45}{bullish_percentage:<20.2f}%")
             print(f"{'Bearish Volume Percentage (%):':<45}{bearish_percentage:<20.2f}%")
             print("=" * 80)
