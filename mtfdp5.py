@@ -1,164 +1,168 @@
 import numpy as np
-import talib
-import datetime
 import concurrent.futures
-from sklearn.linear_model import LinearRegression
-from binance.client import Client as BinanceClient
+from binance.client import Client
+from datetime import datetime, timedelta
 
-# Function to create a Binance client
-def get_binance_client():
-    with open("credentials.txt", "r") as f:
-        lines = [line.strip() for line in f]
-        api_key, api_secret = lines[0], lines[1]
-    return BinanceClient(api_key, api_secret)
+class Trader:
+    def __init__(self, file):
+        self.connect(file)
 
-# Initialize Binance client
-client = get_binance_client()
-timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
+    def connect(self, file):
+        lines = [line.rstrip('\n') for line in open(file)]
+        key = lines[0]
+        secret = lines[1]
+        self.client = Client(key, secret)
 
-def fetch_usdc_pairs():
-    """Fetch all available trading pairs against USDC."""
-    exchange_info = client.get_exchange_info()
-    symbols = exchange_info['symbols']
-    return [s['symbol'] for s in symbols if s['quoteAsset'] == 'USDC' and s['status'] == 'TRADING']
+    def get_usdc_pairs(self):
+        exchange_info = self.client.get_exchange_info()
+        trading_pairs = [
+            symbol['symbol'] for symbol in exchange_info['symbols']
+            if symbol['quoteAsset'] == 'USDC' and symbol['status'] == 'TRADING'
+        ]
+        return trading_pairs
 
-def get_candles(symbol, timeframes):
-    """Get kline data for a symbol across specified timeframes."""
-    candles = []
-    for timeframe in timeframes:
-        klines = client.get_klines(symbol=symbol, interval=timeframe)
-        for k in klines:
-            candle = {
-                "time": k[0] / 1000,
-                "open": float(k[1]),
-                "high": float(k[2]),
-                "low": float(k[3]),
-                "close": float(k[4]),
-                "volume": float(k[5]),
-                "timeframe": timeframe
-            }
-            candles.append(candle)
-    return candles
+    def calculate_volume(self, symbol, interval):
+        klines = self.client.get_klines(symbol=symbol, interval=interval)
+        volumes = [float(entry[5]) for entry in klines]
+        close_prices = [float(entry[4]) for entry in klines]
 
-def calculate_thresholds(close_prices, min_percentage=5, max_percentage=5):
-    """Calculate min and max price thresholds for candlestick closes."""
-    close_prices = np.array(close_prices)
-    min_close = np.nanmin(close_prices) if len(close_prices) > 0 else np.nan
-    max_close = np.nanmax(close_prices) if len(close_prices) > 0 else np.nan
-    
-    min_threshold = min_close - ((max_close - min_close) * (min_percentage / 100))
-    max_threshold = max_close + ((max_close - min_close) * (max_percentage / 100))
-    return min_threshold, max_threshold
+        if not close_prices or not volumes:
+            return symbol, {'bullish': 0, 'bearish': 0}
 
-def detect_reversals(candles):
-    """Detect local dips and tops based on SMA."""
-    closes = np.array([candle['close'] for candle in candles])
-    if len(closes) < 1:
-        return "No local reversal signals", None
+        bullish_volume = sum(volumes[i] for i in range(len(close_prices) - 1) if close_prices[i] < close_prices[i + 1])
+        bearish_volume = sum(volumes[i] for i in range(len(close_prices) - 1) if close_prices[i] > close_prices[i + 1])
 
-    sma_length = 56
-    sma56 = talib.SMA(closes, timeperiod=sma_length)[-1] if len(closes) >= sma_length else None
+        return symbol, {'bullish': bullish_volume, 'bearish': bearish_volume, 'prices': close_prices}
 
-    dip_signal = top_signal = "No Local close vs SMA Dip/Top"
-    if sma56:
-        if closes[-1] < sma56 and all(closes[-1] < closes[-i] for i in range(2, 5)):
-            dip_signal = f"Local Dip detected at price {closes[-1]}"
-        elif closes[-1] > sma56 and all(closes[-1] > closes[-i] for i in range(2, 5)):
-            top_signal = f"Local Top detected at price {closes[-1]}"
-    
-    return dip_signal, top_signal, sma56
+    def envelope_and_forecast(self, prices):
+        N = len(prices)
+        if N < 10:
+            return None, None, None, None
 
-def linear_regression_forecast(close_prices, forecast_steps=1):
-    """Forecast future close prices using linear regression."""
-    close_prices = close_prices[~np.isnan(close_prices) & (close_prices > 0)]
-    if len(close_prices) < 1:
-        return None
+        support = np.min(prices)
+        resistance = np.max(prices)
 
-    X = np.arange(len(close_prices)).reshape(-1, 1)
-    model = LinearRegression().fit(X, close_prices)
-    future_X = np.arange(len(close_prices), len(close_prices) + forecast_steps).reshape(-1, 1)
-    return model.predict(future_X)
+        return support, resistance
 
-def calculate_regression_channel(close_prices):
-    """Calculate regression channel for the given prices."""
-    valid_prices = close_prices[~np.isnan(close_prices) & (close_prices > 0)]
-    if len(valid_prices) < 2:
-        return None, None, None
-
-    X = np.arange(len(valid_prices)).reshape(-1, 1)
-    model = LinearRegression().fit(X, valid_prices)
-    regression_line = model.predict(X)
-
-    residuals = valid_prices - regression_line
-    std_dev = np.std(residuals)
-
-    upper_channel = regression_line + (std_dev * 2)
-    lower_channel = regression_line - (std_dev * 2)
-
-    return regression_line, upper_channel, lower_channel
-
-def calculate_distances(current_price, min_threshold, max_threshold):
-    """Calculate the percentage distances to the min and max thresholds."""
-    distance_to_min = ((current_price - min_threshold) / (max_threshold - min_threshold)) * 100
-    distance_to_max = ((max_threshold - current_price) / (max_threshold - min_threshold)) * 100
-    return distance_to_min, distance_to_max
-
-def analyze_asset(symbol):
-    """Analyze a symbol, returning detailed market information."""
-    candles = get_candles(symbol, timeframes)
-
-    analysis_results = {}
-    for timeframe in timeframes:
-        close_prices = np.array([candle['close'] for candle in candles if candle['timeframe'] == timeframe])
-
-        min_threshold, max_threshold = calculate_thresholds(close_prices)
-        dip_signal, top_signal, _ = detect_reversals(candles)
-        
-        total_volume = np.sum([candle['volume'] for candle in candles if candle['timeframe'] == timeframe])
-        bullish_volume = np.sum([candle['volume'] for candle in candles if candle['close'] > candle['open'] and candle['timeframe'] == timeframe])
-        bearish_volume = total_volume - bullish_volume
-
-        market_mood = "Bearish" if bearish_volume > bullish_volume else "Bullish"
-
-        if len(close_prices) > 0:
-            projected_price = linear_regression_forecast(close_prices, forecast_steps=1)[-1]
-            distance_to_min, distance_to_max = calculate_distances(close_prices[-1], min_threshold, max_threshold)
-
-            analysis_results[timeframe] = {
-                "Min Threshold": f"{min_threshold:.25f}",
-                "Max Threshold": f"{max_threshold:.25f}",
-                "Projected Price": f"{projected_price:.25f}",
-                "Market Mood": market_mood,
-                "Dip Signal": dip_signal,
-                "Top Signal": top_signal,
-                "Distance to Min (%)": f"{distance_to_min:.2f}%",
-                "Distance to Max (%)": f"{distance_to_max:.2f}%"
-            }
-
-    return symbol, analysis_results
+    def next_reversal_price(self, amplitude, sym_center):
+        return sym_center + (amplitude * 1.1)  # extend the target slightly to ensure bullish outlook
 
 def main():
-    print("Current local Time is now at: ", datetime.datetime.now())
-    
-    usdc_pairs = fetch_usdc_pairs()
-    overall_analysis = {}
+    filename = 'credentials.txt'
+    trader = Trader(filename)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        future_to_symbol = {executor.submit(analyze_asset, symbol): symbol for symbol in usdc_pairs}
+    trading_pairs = trader.get_usdc_pairs()
+    volume_data = {}
+    timeframes_volume = ['1m']
+    timeframes_sine = ['5m']
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_symbol = {
+            executor.submit(trader.calculate_volume, symbol, tf): (symbol, tf)
+            for symbol in trading_pairs for tf in timeframes_volume
+        }
+
         for future in concurrent.futures.as_completed(future_to_symbol):
-            symbol, results = future.result()
-            overall_analysis[symbol] = results
+            symbol, tf = future_to_symbol[future]
+            try:
+                result = future.result()
+                if result:
+                    symbol, vol = result
+                    if symbol not in volume_data:
+                        volume_data[symbol] = {}
+                    volume_data[symbol][tf] = vol
+            except Exception as e:
+                print(f'Error fetching data for {symbol} in {tf}: {e}')
 
-    # Display detailed analysis results
-    print("\n" + "=" * 60)
-    print(f"{'Symbol':<15}{'Timeframe':<10}{'Min Threshold':<45}{'Max Threshold':<45}{'Projected Price':<45}{'Market Mood':<15}{'Distance to Min (%)':<20}{'Distance to Max (%)':<20}")
-    print("-" * 60)
+    highest_ratio = 0
+    best_symbol = None
 
-    for symbol, results in overall_analysis.items():
-        for timeframe, data in results.items():
-            print(f"{symbol:<15}{timeframe:<10}{data['Min Threshold']:<45}{data['Max Threshold']:<45}{data['Projected Price']:<45}{data['Market Mood']:<15}{data['Distance to Min (%)']:<20}{data['Distance to Max (%)']:<20}")
+    for symbol, volumes in volume_data.items():
+        total_bullish = sum(volumes[tf]['bullish'] for tf in volumes if 'bullish' in volumes[tf])
+        total_bearish = sum(volumes[tf]['bearish'] for tf in volumes if 'bearish' in volumes[tf])
 
-    print("=" * 60)
+        if total_bearish > 0:
+            ratio = total_bullish / total_bearish
+            if ratio > highest_ratio:
+                highest_ratio = ratio
+                best_symbol = (symbol, total_bullish, total_bearish)
+
+    if best_symbol:
+        symbol, total_bullish, total_bearish = best_symbol
+        print(f'The asset with the highest bullish/bearish volume ratio is: {symbol}')
+
+        total_volume = total_bullish + total_bearish
+        bullish_percentage = (total_bullish / total_volume) * 100 if total_volume > 0 else 0
+        bearish_percentage = (total_bearish / total_volume) * 100 if total_volume > 0 else 0
+
+        print(f'Bullish Volume: {total_bullish:.2f} ({bullish_percentage:.2f}%)')
+        print(f'Bearish Volume: {total_bearish:.2f} ({bearish_percentage:.2f}%)')
+
+        # Get the latest price data for the selected symbol using the 5-minute timeframe
+        klines = trader.client.get_klines(symbol=symbol, interval='5m')
+        latest_prices = [float(entry[4]) for entry in klines]
+        support, resistance = trader.envelope_and_forecast(latest_prices)
+
+        if latest_prices:
+            current_price = latest_prices[-1]
+            max_threshold = np.max(latest_prices)
+            min_threshold = np.min(latest_prices)
+
+            # Revised next reversal price logic
+            forecast_price = trader.next_reversal_price(max_threshold - current_price, current_price)
+
+            # Calculate upper and lower channel based on volume resistance and projections
+            volume_resistance = max_threshold * 1.05  # 5% extension potential resistance based on volume
+            volume_support = max_threshold * 0.95      # 5% extension potential support based on volume
+            
+            # Calculate distances to min/max
+            distance_to_min = (current_price - min_threshold) / (max_threshold - min_threshold) * 100
+            distance_to_max = (max_threshold - current_price) / (max_threshold - min_threshold) * 100
+
+            # Calculate distance from current price to forecast price
+            distance_to_forecast = ((forecast_price - current_price) / current_price) * 100 if current_price > 0 else float('inf')
+
+            # Estimate time to target more realistically
+            recent_price_changes = [latest_prices[i] - latest_prices[i-1] for i in range(1, len(latest_prices))]
+            average_price_change_per_5m = np.mean(recent_price_changes)  # Average price change per 5 minutes
+
+            # Calculate how many 5-minute intervals it will take to reach the forecast price
+            if average_price_change_per_5m != 0:
+                time_to_target_intervals = (forecast_price - current_price) / average_price_change_per_5m 
+                if time_to_target_intervals < 0:
+                    time_to_target_intervals = 0
+            else:
+                time_to_target_intervals = float('inf')
+
+            time_to_target_mins = time_to_target_intervals * 5  # Convert to minutes
+            
+            # Convert time to target into days, hours, minutes, and seconds
+            days = int(time_to_target_mins // 1440)
+            hours = int((time_to_target_mins % 1440) // 60)
+            minutes = int(time_to_target_mins % 60)
+            seconds = int((time_to_target_mins - int(time_to_target_mins)) * 60)
+
+            # Current local time and projected target time
+            current_local_time = datetime.now()
+            target_time = current_local_time + timedelta(minutes=time_to_target_mins)
+
+            # Final output display
+            print("\n" + "=" * 80)
+            print(f"{'Symbol':<20}{'Timeframe':<10}{'Min Threshold':<25}{'Max Threshold':<25}{'Projected Price':<25}{'Upper Channel':<25}{'Lower Channel':<25}{'Market Mood':<20}")
+            print("-" * 80)
+            print(f"{symbol:<20}{'5m':<10}{min_threshold:<25.4f}{max_threshold:<25.4f}{forecast_price:<25.4f}{volume_resistance:<25.4f}{volume_support:<25.4f}{'Bullish' if total_bullish > total_bearish else 'Bearish':<20}")
+            print(f"{'Distance to Min (%):':<45}{distance_to_min:<20.2f}")
+            print(f"{'Distance to Max (%):':<45}{distance_to_max:<20.2f}")
+            print(f"{'Distance to Forecast Price (%):':<45}{distance_to_forecast:<20.2f}")
+            # Removed prints for Time to Target and Normalized Distance to Target
+            print(f"{'Bullish Volume Percentage (%):':<45}{bullish_percentage:<20.2f}%")
+            print(f"{'Bearish Volume Percentage (%):':<45}{bearish_percentage:<20.2f}%")
+            print("=" * 80)
+
+        else:
+            print('No suitable asset found.')
+    else:
+        print('No assets found.')
 
 if __name__ == "__main__":
     main()
