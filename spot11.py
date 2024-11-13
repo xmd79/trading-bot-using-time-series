@@ -95,7 +95,7 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
     range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
 
     with np.errstate(invalid='ignore'):
-        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
+        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)
         filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
 
     avg_mtf = np.nanmean(filtered_close)
@@ -119,6 +119,26 @@ def calculate_buy_sell_volume(candle_map):
             buy_volume[timeframe] = sum(candle["volume"] for candle in candle_map[timeframe] if candle["close"] > candle["open"])
             sell_volume[timeframe] = sum(candle["volume"] for candle in candle_map[timeframe] if candle["close"] < candle["open"])
     return buy_volume, sell_volume 
+
+def calculate_volume_ratio(buy_volume, sell_volume):
+    """ Calculate the bullish and bearish volume ratios. """
+    volume_ratio = {}
+    for timeframe in buy_volume.keys():
+        total_volume = buy_volume[timeframe] + sell_volume[timeframe]
+        if total_volume > 0:
+            ratio = (buy_volume[timeframe] / total_volume) * 100
+            volume_ratio[timeframe] = {
+                "buy_ratio": ratio,
+                "sell_ratio": 100 - ratio,
+                "status": "Bullish" if ratio > 50 else "Bearish" if ratio < 50 else "Neutral"
+            }
+        else:
+            volume_ratio[timeframe] = {
+                "buy_ratio": 0,
+                "sell_ratio": 0,
+                "status": "No Activity"
+            }
+    return volume_ratio
 
 def check_volume_trend(candle_map):
     volume_trend_data = {}
@@ -210,6 +230,9 @@ while True:
     # Calculate volume details
     buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
 
+    # Calculate volume ratios
+    volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
+
     # Analyze each timeframe for its relevant data
     conditions = {
         "current_close_above_min_threshold": False,
@@ -250,6 +273,7 @@ while True:
             print(f"Maximum Threshold: {max_threshold:.2f}")
             print(f"Average MTF: {avg_mtf:.2f}")
             print(f"Momentum Signal: {momentum_signal:.2f}")
+            print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.2f}% | Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.2f}% | Status: {volume_ratios[timeframe]['status']}")
 
             # Get distances to min and max on SINE
             dist_to_min_sine, dist_to_max_sine, current_sine = scale_to_sine(closes)
