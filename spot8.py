@@ -79,7 +79,7 @@ def buy_btc(amount):
 
 def check_exit_condition(initial_investment, btc_balance):
     current_value = btc_balance * get_current_btc_price()
-    return current_value >= (initial_investment * 1.012)
+    return current_value >= (initial_investment * 1.0255)
 
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
     min_close = np.nanmin(close_prices)
