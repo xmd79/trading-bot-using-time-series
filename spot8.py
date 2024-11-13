@@ -164,6 +164,16 @@ def scale_to_sine(close_prices):
 
     return dist_from_close_to_min, dist_from_close_to_max, current_sine
 
+def log_entry_signal(timestamp, btc_price, projected_price):
+    """ Log the entry signal details into a text file, keeping only the last entry. """
+    try:
+        with open("entry_signals.txt", "w") as f:  # Opens in write mode to overwrite existing content
+            f.write(f"Timestamp: {timestamp}, BTC Price: {btc_price:.2f}, Projected Price: {projected_price:.2f}\n")
+        print(f"Logged entry signal: Timestamp: {timestamp}, BTC Price: {btc_price:.2f}, Projected Price: {projected_price:.2f}")
+    except IOError as e:
+        logging.error(f"Error writing to entry_signals.txt: {e}")
+        print(f"Error writing to entry_signals.txt: {e}")  # Print the error in the console for debugging
+
 def calculate_bullish_bearish_ratio(candle_map):
     volume_ratios = {}
     for timeframe in ['1m', '3m', '5m']:
@@ -188,15 +198,6 @@ def calculate_golden_ratio_projection(last_close, angle_projection):
     phi = 1.618
     projected_price_golden = last_close + (angle_projection - last_close) * phi
     return projected_price_golden
-
-def log_entry_signal(timestamp, btc_price, projected_price):
-    """ Log the entry signal details into a text file, keeping only the last entry. """
-    try:
-        with open("entry_signals.txt", "w") as f:  # Opens in write mode to overwrite existing content
-            f.write(f"Timestamp: {timestamp}, BTC Price: {btc_price:.2f}, Projected Price: {projected_price:.2f}\n")
-        print(f"Logged entry signal: Timestamp: {timestamp}, BTC Price: {btc_price:.2f}, Projected Price: {projected_price:.2f}")
-    except IOError as e:
-        logging.error(f"Error writing to entry_signals.txt: {e}")
 
 # Initialize variables for tracking trade state
 TRADE_SYMBOL = "BTCUSDC"
@@ -257,9 +258,10 @@ while True:
             print(f"Momentum Signal: {momentum_signal:.2f}")
             print(f"Volume Trend: {volume_trend_data[timeframe]['trend']}")
 
-            # Print distances to min and max percentages
-            print(f"Distance to Min Momentum: {percent_to_min_momentum:.2f}%")
-            print(f"Distance to Max Momentum: {percent_to_max_momentum:.2f}%")
+            # Print distances to min and max percentages for HT_SINE
+            dist_to_min, dist_to_max, current_sine = scale_to_sine(closes)
+            print(f"Distance to Min SINE: {dist_to_min:.2f}%")
+            print(f"Distance to Max SINE: {dist_to_max:.2f}%")
 
             # Find major reversals
             last_bottom, last_top = find_major_reversals(candle_map[timeframe])
