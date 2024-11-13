@@ -79,7 +79,7 @@ def buy_btc(amount):
 
 def check_exit_condition(initial_investment, btc_balance):
     current_value = btc_balance * get_current_btc_price()
-    return current_value >= (initial_investment * 1.0255)
+    return current_value >= (initial_investment * 1.012)
 
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
     min_close = np.nanmin(close_prices)
@@ -114,7 +114,7 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
 
     momentum_signal = percent_to_max_combined - percent_to_min_combined
 
-    return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
+    return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price, percent_to_min_momentum, percent_to_max_momentum
 
 def calculate_buy_sell_volume(candle_map):
     buy_volume, sell_volume = {}, {}
@@ -190,9 +190,13 @@ def calculate_golden_ratio_projection(last_close, angle_projection):
     return projected_price_golden
 
 def log_entry_signal(timestamp, btc_price, projected_price):
-    """ Log the entry signal details into a text file. """
-    with open("entry_signals.txt", "a") as f:
-        f.write(f"Timestamp: {timestamp}, BTC Price: {btc_price}, Projected Price: {projected_price}\n")
+    """ Log the entry signal details into a text file, keeping only the last entry. """
+    try:
+        with open("entry_signals.txt", "w") as f:  # Opens in write mode to overwrite existing content
+            f.write(f"Timestamp: {timestamp}, BTC Price: {btc_price:.2f}, Projected Price: {projected_price:.2f}\n")
+        print(f"Logged entry signal: Timestamp: {timestamp}, BTC Price: {btc_price:.2f}, Projected Price: {projected_price:.2f}")
+    except IOError as e:
+        logging.error(f"Error writing to entry_signals.txt: {e}")
 
 # Initialize variables for tracking trade state
 TRADE_SYMBOL = "BTCUSDC"
@@ -240,7 +244,7 @@ while True:
 
             # Calculate thresholds
             closes = [candle['close'] for candle in candle_map[timeframe]]
-            min_threshold, max_threshold, avg_mtf, momentum_signal, _ = calculate_thresholds(
+            min_threshold, max_threshold, avg_mtf, momentum_signal, _, percent_to_min_momentum, percent_to_max_momentum = calculate_thresholds(
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
             
@@ -252,6 +256,10 @@ while True:
             print(f"Average MTF: {avg_mtf:.2f}")
             print(f"Momentum Signal: {momentum_signal:.2f}")
             print(f"Volume Trend: {volume_trend_data[timeframe]['trend']}")
+
+            # Print distances to min and max percentages
+            print(f"Distance to Min Momentum: {percent_to_min_momentum:.2f}%")
+            print(f"Distance to Max Momentum: {percent_to_max_momentum:.2f}%")
 
             # Find major reversals
             last_bottom, last_top = find_major_reversals(candle_map[timeframe])
@@ -269,7 +277,7 @@ while True:
             if projected_price_45 > current_btc_price and projected_price_golden > current_btc_price:
                 entry_trigger_conditions["forecast_condition"] = True
             
-            if projected_price_45 > current_btc_price:  # Adding this condition for 45-degree forecast
+            if projected_price_45 > current_btc_price:
                 entry_trigger_conditions["below_angle"] = True
 
     print()
@@ -291,7 +299,7 @@ while True:
                 btc_balance += amount_to_invest / current_btc_price
                 print(f"New position opened with {amount_to_invest} USDC at price {current_btc_price:.2f}.")
                 
-                # Log the entry signal
+                # Log the entry signal with projected price
                 log_entry_signal(current_local_time, current_btc_price, projected_price_45)
                 
                 position_open = True  # Mark position as open
