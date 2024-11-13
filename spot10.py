@@ -240,53 +240,58 @@ while True:
 
     min_threshold_1m = None
     last_bottom_1m = None 
+    last_top_1m = None
+    min_threshold_3m = None
+    last_bottom_3m = None 
+    last_top_3m = None
+    min_threshold_5m = None
+    last_bottom_5m = None 
+    last_top_5m = None
 
     for timeframe in timeframes:
         if timeframe in candle_map:
-            # Print volume conditions for 1m, 3m, and 5m
-            buy_vol = volume_ratios[timeframe][0]
-            sell_vol = volume_ratios[timeframe][1]
-            if buy_vol > sell_vol:
-                print(f"{timeframe} Volume Condition: Bullish (Buy Volume: {buy_vol:.2f}, Sell Volume: {sell_vol:.2f})")
-            else:
-                print(f"{timeframe} Volume Condition: Bearish (Buy Volume: {buy_vol:.2f}, Sell Volume: {sell_vol:.2f})")
-
+            print(f"--- {timeframe} ---")
+            
             # Calculate thresholds
             closes = [candle['close'] for candle in candle_map[timeframe]]
             min_threshold, max_threshold, avg_mtf, momentum_signal, _, percent_to_min_momentum, percent_to_max_momentum = calculate_thresholds(
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            # Store Minimum Threshold and major reversal from the 1m timeframe
-            if timeframe == '1m':
-                min_threshold_1m = min_threshold
-                last_bottom_1m = find_major_reversals(candle_map[timeframe])[0]
+            # Find major reversals
+            last_bottom, last_top = find_major_reversals(candle_map[timeframe])
+            print(f"Last Bottom (Major Reversal): {last_bottom:.2f}")
+            print(f"Last Top (Major Reversal): {last_top:.2f}")
 
             # Print relevant details
-            print(f"--- {timeframe} ---")
             print(f"Current Close: {closes[-1]:.2f}")
             print(f"Minimum Threshold: {min_threshold:.2f}")
             print(f"Maximum Threshold: {max_threshold:.2f}")
             print(f"Average MTF: {avg_mtf:.2f}")
             print(f"Momentum Signal: {momentum_signal:.2f}")
-            print(f"Volume Trend: {volume_trend_data[timeframe]['trend']}")
-
+            
             # Get distances to min and max on SINE
             dist_to_min_sine, dist_to_max_sine, current_sine = scale_to_sine(closes)
             print(f"Distance to Min SINE: {dist_to_min_sine:.2f}%")
             print(f"Distance to Max SINE: {dist_to_max_sine:.2f}%")
 
-            # Store the distances based on timeframe
+            # Store values based on timeframe
             if timeframe == '1m':
+                min_threshold_1m = min_threshold
+                last_bottom_1m = last_bottom
+                last_top_1m = last_top
                 entry_trigger_conditions["dist_to_min_sine_1m"] = dist_to_min_sine
                 entry_trigger_conditions["dist_to_max_sine_1m"] = dist_to_max_sine
-            elif timeframe == '5m':
+            elif timeframe == '3m':
+                min_threshold_3m = min_threshold
+                last_bottom_3m = last_bottom
+                last_top_3m = last_top
                 entry_trigger_conditions["dist_to_min_sine_5m"] = dist_to_min_sine
                 entry_trigger_conditions["dist_to_max_sine_5m"] = dist_to_max_sine
-
-            # Find major reversals
-            last_bottom, last_top = find_major_reversals(candle_map[timeframe])
-            print(f"Last Bottom: {last_bottom:.2f}, Last Top: {last_top:.2f}")
+            elif timeframe == '5m':
+                min_threshold_5m = min_threshold
+                last_bottom_5m = last_bottom
+                last_top_5m = last_top
 
             # 45 Degree Angle Price Calculation
             projected_price_45 = calculate_45_degree_projection(last_bottom, last_top)
@@ -296,14 +301,17 @@ while True:
             projected_price_golden = calculate_golden_ratio_projection(closes[-1], projected_price_45)
             print(f"Projected Price Using Golden Ratio: {projected_price_golden:.2f}")
 
-            # Check entry conditions
-            if projected_price_45 > current_btc_price and projected_price_golden > current_btc_price:
-                entry_trigger_conditions["forecast_condition"] = True
-            
-            if projected_price_45 > current_btc_price:
-                entry_trigger_conditions["below_angle"] = True
+            # Determine which major reversal is closer to the current close
+            if abs(current_btc_price - last_bottom) < abs(current_btc_price - last_top):
+                last_major_reversal = f"Last Major Reversal Found is at: DIP ({last_bottom:.2f})"
+                market_mood = "Market Mood: Up Cycle" if current_btc_price < last_top else "Market Mood: Sideways"
+            else:
+                last_major_reversal = f"Last Major Reversal Found is at: TOP ({last_top:.2f})"
+                market_mood = "Market Mood: Down Cycle" if current_btc_price > last_bottom else "Market Mood: Sideways"
 
-    print()
+            print(last_major_reversal)
+            print(market_mood)
+            print()  # Add an extra line for spacing between timeframes
 
     # Use bullish volume condition from the 5-minute timeframe
     if buy_volume['5m'] > sell_volume['5m']:
@@ -327,22 +335,25 @@ while True:
             entry_trigger_conditions["dist_to_min_sine_5m"] < entry_trigger_conditions["dist_to_max_sine_5m"] and
             entry_trigger_conditions["current_close_above_min_threshold"] and
             entry_trigger_conditions["dip_condition_met"]):
-            
-            # Check if balance is sufficient for entry
-            if usdc_balance > 0:  # Ensure we have some balance to invest
-                amount_to_invest = usdc_balance
-                btc_order = buy_btc(amount_to_invest)
-                if btc_order:
-                    initial_investment = amount_to_invest
-                    btc_balance += amount_to_invest / current_btc_price
-                    print(f"New position opened with {amount_to_invest} USDC at price {current_btc_price:.2f}.")
-                    
-                    # Log the entry signal with projected price
-                    log_entry_signal(current_local_time, current_btc_price, projected_price_45)
 
-                    position_open = True 
-            else:
-                print("Insufficient USDC balance to open a new position.")
+            # Check if last reversal indicates a dip
+            # The below condition ensures that the last major reversal was a dip.
+            if last_bottom_1m < current_close:
+                # Check if balance is sufficient for entry
+                if usdc_balance > 0:  # Ensure we have some balance to invest
+                    amount_to_invest = usdc_balance
+                    btc_order = buy_btc(amount_to_invest)
+                    if btc_order:
+                        initial_investment = amount_to_invest
+                        btc_balance += amount_to_invest / current_btc_price
+                        print(f"New position opened with {amount_to_invest} USDC at price {current_btc_price:.2f}.")
+                        
+                        # Log the entry signal with projected price
+                        log_entry_signal(current_local_time, current_btc_price, projected_price_45)
+
+                        position_open = True 
+                else:
+                    print("Insufficient USDC balance to open a new position.")
 
     # Exit Logic
     if position_open and check_exit_condition(initial_investment, btc_balance):
