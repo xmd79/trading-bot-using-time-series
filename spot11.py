@@ -234,12 +234,6 @@ while True:
     volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
 
     # Analyze each timeframe for its relevant data
-    conditions = {
-        "current_close_above_min_threshold": False,
-        "dip_condition_met": False
-    }
-
-    # Initialize condition tracking
     conditions_status = {
         "current_close_above_min_threshold": False,
         "dip_condition_met": False,
@@ -249,6 +243,7 @@ while True:
     }
 
     average_threshold_1m = None  # Store the average threshold for 1m candles
+    average_threshold_5m = None  # Store the average threshold for 5m candles
 
     for timeframe in timeframes:
         if timeframe in candle_map:
@@ -258,9 +253,11 @@ while True:
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            # Store the average threshold for the 1-minute timeframe
+            # Store the average thresholds for the respective timeframes
             if timeframe == '1m':
                 average_threshold_1m = avg_mtf
+            elif timeframe == '5m':
+                average_threshold_5m = avg_mtf
 
             # Find major reversals
             last_bottom, last_top = find_major_reversals(candle_map[timeframe])
@@ -323,9 +320,9 @@ while True:
                 if dist_to_min_sine_tf < dist_to_max_sine_tf:
                     conditions_status["dist_to_min_less_than_max"] = True
 
-            # Check if current close is below the average threshold from 1-minute candles
-            if average_threshold_1m is not None:
-                conditions_status["current_close_below_average_threshold"] = closes[-1] < average_threshold_1m
+            # Update conditions using 5m candles
+            if average_threshold_5m is not None:
+                conditions_status["current_close_below_average_threshold"] = closes[-1] < average_threshold_5m
 
             # Update conditions
             conditions_status["current_close_above_min_threshold"] = closes[-1] > min_threshold
