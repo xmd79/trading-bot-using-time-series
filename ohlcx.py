@@ -54,7 +54,7 @@ def get_price(symbol):
         raise KeyError("price key not found in API response")
 
 price = get_price(TRADE_SYMBOL)
-print(f"Current Price: {price}\n")
+print(f"Current Price: {price:.25f}\n")
 
 def get_close(timeframe):
     closes = []
@@ -85,17 +85,17 @@ for timeframe in timeframes:
     min_threshold, max_threshold, avg_mtf = calculate_thresholds(close, period=14, minimum_percentage=2, maximum_percentage=2)
 
     print(f"Timeframe: {timeframe}")
-    print("Minimum threshold:", min_threshold)
-    print("Maximum threshold:", max_threshold)
-    print("Average MTF:", avg_mtf)
+    print("Minimum threshold:", f"{min_threshold:.25f}")
+    print("Maximum threshold:", f"{max_threshold:.25f}")
+    print("Average MTF:", f"{avg_mtf:.25f}")
     
     closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - close[-1]))
     if closest_threshold == min_threshold:
         print("The last minimum value is closest to the current close.")
-        print("The last minimum value is", closest_threshold)
+        print("The last minimum value is", f"{closest_threshold:.25f}")
     elif closest_threshold == max_threshold:
         print("The last maximum value is closest to the current close.")
-        print("The last maximum value is", closest_threshold)
+        print("The last maximum value is", f"{closest_threshold:.25f}")
     else:
         print("No threshold value found.")
 
@@ -105,7 +105,7 @@ current_time = datetime.datetime.now()
 current_close = close[-1]
 
 print("Current local Time is now at: ", current_time)
-print("Current close price is at: ", current_close)
+print("Current close price is at: ", f"{current_close:.25f}")
 
 print()
 
@@ -120,10 +120,10 @@ def detect_reversal(candles):
     local_top_signal = "No Local close vs SMA Top"
 
     if closes[-1] < sma7[-1] and sma7[-1] < sma12[-1] and sma12[-1] < sma26[-1] and sma26[-1] < sma45[-1]:
-        local_dip_signal = f"Local Dip detected at price {closes[-1]}"
+        local_dip_signal = f"Local Dip detected at price {closes[-1]:.25f}"
 
     if closes[-1] > sma7[-1] and sma7[-1] > sma12[-1] and sma12[-1] > sma26[-1] and sma26[-1] > sma45[-1]:
-        local_top_signal = f"Local Top detected at price {closes[-1]}"
+        local_top_signal = f"Local Top detected at price {closes[-1]:.25f}"
 
     return local_dip_signal, local_top_signal
 
@@ -186,8 +186,8 @@ def analyze_market_mood(sine_wave, min_threshold, max_threshold, current_close):
         market_mood = "Bullish"  # Current close is closer to the last minimum
 
     print(f"Market Mood based on the sine wave: {market_mood}")
-    print(f"Last Maximum Value: {last_max}")
-    print(f"Last Minimum Value: {last_min}")
+    print(f"Last Maximum Value: {last_max:.25f}")
+    print(f"Last Minimum Value: {last_min:.25f}")
 
 for timeframe in timeframes:
     candles = candle_map[timeframe]
@@ -211,10 +211,10 @@ for timeframe in timeframes:
     # Check if last maximum or minimum value is closest to the current close
     if closest_threshold == thresholds[1]:  # Last maximum is closest
         next_reversal_target = find_next_reversal_target(sine_wave, "dip")
-        print(f"Starting a down cycle from last maximum price: {thresholds[1]:.2f}, expected next dip: {next_reversal_target:.2f}")
+        print(f"Starting a down cycle from last maximum price: {thresholds[1]:.25f}, expected next dip: {next_reversal_target:.25f}")
     else:  # Last minimum is closest
         next_reversal_target = find_next_reversal_target(sine_wave, "top")
-        print(f"Starting an up cycle from last minimum price: {thresholds[0]:.2f}, expected next top: {next_reversal_target:.2f}")
+        print(f"Starting an up cycle from last minimum price: {thresholds[0]:.25f}, expected next top: {next_reversal_target:.25f}")
 
     # Check for reversal based on daily open
     last_candle = candles[-1]
@@ -225,5 +225,5 @@ for timeframe in timeframes:
     print(f"Timeframe: {timeframe}")
     print(dip_signal)
     print(top_signal)
-    print(f"Next target reversal price expected: {next_reversal_target}")
+    print(f"Next target reversal price expected: {next_reversal_target:.25f}")
     print("\n" + "=" * 30 + "\n")
