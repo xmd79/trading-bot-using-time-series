@@ -7,7 +7,6 @@ import time
 import concurrent.futures
 import talib
 import gc
-from sklearn.linear_model import LinearRegression
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
@@ -82,53 +81,37 @@ def check_exit_condition(initial_investment, btc_balance):
     current_value = btc_balance * get_current_btc_price()
     return current_value >= (initial_investment * 1.012)
 
-# Calculate thresholds and averages based on min and max percentages
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
     min_close = np.nanmin(close_prices)
     max_close = np.nanmax(close_prices)
 
-    # Convert close_prices to numpy array
     close_prices = np.array(close_prices)
-
-    # Calculate momentum
     momentum = talib.MOM(close_prices, timeperiod=period)
-
-    # Get min/max momentum
-    min_momentum = np.nanmin(momentum)   
+    min_momentum = np.nanmin(momentum)
     max_momentum = np.nanmax(momentum)
 
-    # Calculate custom percentages 
     min_percentage_custom = minimum_percentage / 100  
     max_percentage_custom = maximum_percentage / 100
 
-    # Calculate thresholds       
     min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
     max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
 
-    # Calculate range of prices within a certain distance from the current close price
     range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
 
-    # Filter close prices
     with np.errstate(invalid='ignore'):
         filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
         filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
 
-    # Calculate average
     avg_mtf = np.nanmean(filtered_close)
-
-    # Get current momentum       
     current_momentum = momentum[-1]
 
-    # Calculate % to min/max momentum    
     with np.errstate(invalid='ignore', divide='ignore'):
         percent_to_min_momentum = ((max_momentum - current_momentum) / (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
         percent_to_max_momentum = ((current_momentum - min_momentum) / (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
 
-    # Calculate combined percentages              
     percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
     percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
-      
-    # Combined momentum signal     
+
     momentum_signal = percent_to_max_combined - percent_to_min_combined
 
     return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
@@ -176,7 +159,6 @@ def scale_to_sine(close_prices):
     sine_wave_min = np.nanmin(sine_wave)
     sine_wave_max = np.nanmax(sine_wave)
 
-    # Calculate % distances
     dist_from_close_to_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100 if (sine_wave_max - sine_wave_min) != 0 else 0
     dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100 if (sine_wave_max - sine_wave_min) != 0 else 0
 
@@ -190,24 +172,10 @@ def calculate_bullish_bearish_ratio(candle_map):
             sell_volume = sum(candle["volume"] for candle in candle_map[timeframe] if candle["close"] < candle["open"])
             total_volume = buy_volume + sell_volume
             if total_volume > 0:
-                volume_ratios[timeframe] = (buy_volume / total_volume) * 100
+                volume_ratios[timeframe] = (buy_volume, sell_volume, (buy_volume / total_volume) * 100)
             else:
-                volume_ratios[timeframe] = 0
+                volume_ratios[timeframe] = (0, 0, 0)
     return volume_ratios
-
-def linear_regression_forecast(candles):
-    if len(candles) < 2:  # Regression requires at least two points
-        return None
-    close_prices = np.array([candle['close'] for candle in candles])
-    time_points = np.array(range(len(candles))).reshape(-1, 1)
-    
-    model = LinearRegression()
-    model.fit(time_points, close_prices)
-    
-    future_time = np.array([[len(candles)]])  # Predict next point
-    forecasted_price = model.predict(future_time)[0]
-    
-    return forecasted_price
 
 def calculate_45_degree_projection(last_bottom, last_top):
     """ Calculate the price projection based on a 45-degree angle. """
@@ -221,10 +189,10 @@ def calculate_golden_ratio_projection(last_close, angle_projection):
     projected_price_golden = last_close + (angle_projection - last_close) * phi
     return projected_price_golden
 
-def log_entry_signal(timestamp, btc_price, forecast_price):
+def log_entry_signal(timestamp, btc_price, projected_price):
     """ Log the entry signal details into a text file. """
     with open("entry_signals.txt", "a") as f:
-        f.write(f"Timestamp: {timestamp}, BTC Price: {btc_price}, Forecast Price: {forecast_price}\n")
+        f.write(f"Timestamp: {timestamp}, BTC Price: {btc_price}, Projected Price: {projected_price}\n")
 
 # Initialize variables for tracking trade state
 TRADE_SYMBOL = "BTCUSDC"
@@ -257,13 +225,19 @@ while True:
         "min_dist": False,
         "sine_dist": False,
         "buy_volume": False,
-        "forecast_condition": False,
-        "bullish_volume_condition": False,
-        "increasing_volume_condition": False
+        "forecast_condition": False
     }
 
     for timeframe in timeframes:
         if timeframe in candle_map:
+            # Print volume conditions for 1m, 3m, and 5m
+            buy_vol = volume_ratios[timeframe][0]
+            sell_vol = volume_ratios[timeframe][1]
+            if buy_vol > sell_vol:
+                print(f"{timeframe} Volume Condition: Bullish (Buy Volume: {buy_vol:.2f}, Sell Volume: {sell_vol:.2f})")
+            else:
+                print(f"{timeframe} Volume Condition: Bearish (Buy Volume: {buy_vol:.2f}, Sell Volume: {sell_vol:.2f})")
+
             # Calculate thresholds
             closes = [candle['close'] for candle in candle_map[timeframe]]
             min_threshold, max_threshold, avg_mtf, momentum_signal, _ = calculate_thresholds(
@@ -278,7 +252,6 @@ while True:
             print(f"Average MTF: {avg_mtf:.2f}")
             print(f"Momentum Signal: {momentum_signal:.2f}")
             print(f"Volume Trend: {volume_trend_data[timeframe]['trend']}")
-            print(f"Buy Volume: {buy_volume[timeframe]:.2f}, Sell Volume: {sell_volume[timeframe]:.2f}")
 
             # Find major reversals
             last_bottom, last_top = find_major_reversals(candle_map[timeframe])
@@ -288,69 +261,28 @@ while True:
             projected_price_45 = calculate_45_degree_projection(last_bottom, last_top)
             print(f"Projected Price Using 45-Degree Angle: {projected_price_45:.2f}")
 
-            # Current Price Distances
-            distance_to_min = (closes[-1] - min_threshold) / (max_threshold - min_threshold) * 100
-            distance_to_max = (max_threshold - closes[-1]) / (max_threshold - min_threshold) * 100
-            print(f"Distance to Min Threshold: {distance_to_min:.2f}%")
-            print(f"Distance to Max Threshold: {distance_to_max:.2f}%")
-
             # Calculate Golden Ratio Projection
             projected_price_golden = calculate_golden_ratio_projection(closes[-1], projected_price_45)
             print(f"Projected Price Using Golden Ratio: {projected_price_golden:.2f}")
 
             # Check entry conditions
-            if current_btc_price < projected_price_45:
+            if projected_price_45 > current_btc_price and projected_price_golden > current_btc_price:
+                entry_trigger_conditions["forecast_condition"] = True
+            
+            if projected_price_45 > current_btc_price:  # Adding this condition for 45-degree forecast
                 entry_trigger_conditions["below_angle"] = True
-
-            if distance_to_min < distance_to_max:
-                entry_trigger_conditions["min_dist"] = True
-            
-            sine_dist_min, sine_dist_max, current_sine = scale_to_sine(closes)
-            if sine_dist_min < sine_dist_max:
-                entry_trigger_conditions["sine_dist"] = True
-            
-            # Assess Volume Condition
-            if buy_volume[timeframe] > sell_volume[timeframe]:
-                entry_trigger_conditions["buy_volume"] = True
-
-            # Current Momentum
-            momentum = talib.MOM(np.array(closes), timeperiod=14)
-            if len(momentum) > 1:
-                current_momentum = momentum[-1]
-                previous_momentum = momentum[-2]
-                momentum_trend = "Increasing" if current_momentum > previous_momentum else "Decreasing"
-                print(f"Current Momentum: {current_momentum:.2f} ({momentum_trend})")
 
     print()
 
-    # 1-Minute TF analysis for additional conditions
-    if '1m' in candle_map:
-        one_min_candles = candle_map['1m']
-        forecast_price = linear_regression_forecast(one_min_candles)
-        if forecast_price is not None:
-            print(f"Forecasted Price for 1-min TF: {forecast_price:.2f}")
-
-            if current_btc_price < forecast_price:
-                entry_trigger_conditions["forecast_condition"] = True
-
-        # Check bullish volume and increasing volume on 1-min TF
-        bullish_volume = buy_volume['1m'] > sell_volume['1m']
-        print(f"1m Bullish Volume Condition: {bullish_volume}")
-
-        if bullish_volume:
-            entry_trigger_conditions["bullish_volume_condition"] = True
-
-        if volume_trend_data['1m']['trend'] == "Increasing":
-            entry_trigger_conditions["increasing_volume_condition"] = True
+    # Use bullish volume condition from the 5-minute timeframe
+    if buy_volume['5m'] > sell_volume['5m']:
+        entry_trigger_conditions["buy_volume"] = True
 
     # Entry Logic
     if not position_open:
         if (entry_trigger_conditions["below_angle"] and
-            entry_trigger_conditions["min_dist"] and
             entry_trigger_conditions["buy_volume"] and
-            entry_trigger_conditions["forecast_condition"] and
-            entry_trigger_conditions["bullish_volume_condition"] and
-            entry_trigger_conditions["increasing_volume_condition"]):
+            entry_trigger_conditions["forecast_condition"]):
             
             amount_to_invest = usdc_balance
             btc_order = buy_btc(amount_to_invest)
@@ -360,7 +292,7 @@ while True:
                 print(f"New position opened with {amount_to_invest} USDC at price {current_btc_price:.2f}.")
                 
                 # Log the entry signal
-                log_entry_signal(current_local_time, current_btc_price, forecast_price)
+                log_entry_signal(current_local_time, current_btc_price, projected_price_45)
                 
                 position_open = True  # Mark position as open
 
@@ -384,34 +316,24 @@ while True:
     # Clean up references and collect garbage
     del candle_map, volume_trend_data, buy_volume, sell_volume
     gc.collect()  # Collect garbage to free memory
-    
+
     print()  # Print a new line for better readability
 
     # Print overall entry trigger conditions status at the end of the iteration
     print("Overall Entry Trigger Conditions Status:")
     print()
-    # Check if all conditions are true
+    
     below_angle = entry_trigger_conditions['below_angle']
-    min_dist = entry_trigger_conditions['min_dist']
-    sine_dist = entry_trigger_conditions['sine_dist']
     buy_volume = entry_trigger_conditions['buy_volume']
     forecast_condition = entry_trigger_conditions['forecast_condition']
-    bullish_volume_condition = entry_trigger_conditions['bullish_volume_condition']
-    increasing_volume_condition = entry_trigger_conditions['increasing_volume_condition']
 
     print(f"Below Angle: {below_angle} (True)" if below_angle else "Below Angle: False")
-    print(f"Min Distance < Max Distance: {min_dist} (True)" if min_dist else "Min Distance < Max Distance: False")
-    print(f"Sine Distance: {sine_dist} (True)" if sine_dist else "Sine Distance: False")
     print(f"Buy Volume > Sell Volume: {buy_volume} (True)" if buy_volume else "Buy Volume > Sell Volume: False")
     print(f"Forecast Condition: {forecast_condition} (True)" if forecast_condition else "Forecast Condition: False")
-    print(f"Bullish Volume Condition: {bullish_volume_condition} (True)" if bullish_volume_condition else "Bullish Volume Condition: False")
-    print(f"Increasing Volume Condition: {increasing_volume_condition} (True)" if increasing_volume_condition else "Increasing Volume Condition: False")
     print()
 
     # Check if all conditions are true
-    if (below_angle and min_dist and buy_volume and
-            forecast_condition and bullish_volume_condition and
-            increasing_volume_condition):
+    if (below_angle and buy_volume and forecast_condition):
         print("Entry signal: all conditions trigger found TRUE")
     else:
         print("Seeking entry conditions...")
