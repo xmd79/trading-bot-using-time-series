@@ -260,6 +260,14 @@ while True:
             projected_price_45 = calculate_45_degree_projection(last_bottom, last_top)
             print(f"Projected Price Using 45-Degree Angle: {projected_price_45:.2f}")
 
+            # Current price vs. 45-degree angle projection
+            if current_btc_price < projected_price_45:
+                print(f"Current Price: {current_btc_price:.2f} is BELOW the projected 45-degree angle price.")
+            elif current_btc_price > projected_price_45:
+                print(f"Current Price: {current_btc_price:.2f} is ABOVE the projected 45-degree angle price.")
+            else:
+                print(f"Current Price: {current_btc_price:.2f} is EQUAL to the projected 45-degree angle price.")
+
             # Calculate Golden Ratio Projection
             projected_price_golden = calculate_golden_ratio_projection(closes[-1], projected_price_45)
             print(f"Projected Price Using Golden Ratio: {projected_price_golden:.2f}")
