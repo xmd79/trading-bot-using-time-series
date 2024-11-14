@@ -150,6 +150,7 @@ def find_major_reversals(candles, current_close, min_threshold, max_threshold):
     closest_reversal = None
     closest_type = None
 
+    # Determine closest reversal and type (DIP or TOP)
     if last_bottom is not None and (closest_reversal is None or abs(last_bottom - current_close) < abs(closest_reversal - current_close)):
         closest_reversal = last_bottom
         closest_type = 'DIP'
@@ -296,10 +297,22 @@ while True:
 
             # Find major reversals close to the current close using thresholds
             last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
-            print(f"Last Bottom (Major Reversal): {last_bottom:.2f} at Dip")
-            print(f"Last Top (Major Reversal): {last_top:.2f} at Top")
+            print(f"Last Bottom (Major Reversal): {last_bottom:.2f} at Dip" if last_bottom else "No Last Bottom Found")
+            print(f"Last Top (Major Reversal): {last_top:.2f} at Top" if last_top else "No Last Top Found")
+            
+            # Determine if dip_condition_met is TRUE or FALSE
+            if closest_type == 'DIP':
+                conditions_status["dip_condition_met"] = True
+            elif closest_type == 'TOP':
+                conditions_status["dip_condition_met"] = False
+            
             if closest_reversal is not None:
                 print(f"Closest Major Reversal: {closest_reversal:.2f} at {closest_type}")
+
+            # Evaluate overall conditions
+            current_close = closes[-1]
+            conditions_status["current_close_above_min_threshold"] = current_close > min_threshold
+            print(f"Current Close Above Min Threshold: {conditions_status['current_close_above_min_threshold']}")
 
             # Print relevant details
             print(f"Current Close: {closes[-1]:.2f}")
