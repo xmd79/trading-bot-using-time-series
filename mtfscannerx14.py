@@ -15,7 +15,7 @@ def get_binance_client():
     return client
 
 client = get_binance_client()
-timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
+timeframes = ['1m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 
 # Function to fetch tradable pairs for USDC
 def fetch_usdc_pairs():
@@ -65,7 +65,7 @@ def detect_major_reversal(candles):
     closes = closes[~np.isnan(closes) & (closes > 0)]
 
     if len(closes) < 1:
-        return [], None, None  # Return empty signals and None values
+        return [], None, None  
 
     recent_price = closes[-1]
     sma_length = 56  
@@ -91,23 +91,26 @@ def analyze_volume(candles):
     bearish_volume = 0
 
     for candle in candles:
-        # Classify the volume based on the price action
         if candle['close'] > candle['open']:
             bullish_volume += candle['volume']
         elif candle['close'] < candle['open']:
             bearish_volume += candle['volume']
-
+    
     total_volume = bullish_volume + bearish_volume
-    if total_volume > 0:
-        bullish_percentage = (bullish_volume / total_volume) * 100
-        bearish_percentage = (bearish_volume / total_volume) * 100
+
+    # Calculate percentages
+    bullish_percentage = (bullish_volume / total_volume) * 100 if total_volume > 0 else 0
+    bearish_percentage = (bearish_volume / total_volume) * 100 if total_volume > 0 else 0
+    
+    # Adjust volume status logic
+    if bullish_percentage > bearish_percentage:
+        volume_status = "Bullish"
+    elif bearish_percentage > bullish_percentage:
+        volume_status = "Bearish"
     else:
-        bullish_percentage = 0
-        bearish_percentage = 0
+        volume_status = "Neutral"
 
-    volume_dominance = "Bullish" if bullish_volume >= bearish_volume else "Bearish"
-
-    return bullish_percentage, bearish_percentage, volume_dominance
+    return bullish_percentage, bearish_percentage, volume_status
 
 # Function to find volume support and resistance levels
 def volume_support_resistance(candles):
@@ -117,6 +120,23 @@ def volume_support_resistance(candles):
     resistance_level = np.percentile(volume_levels, 75) if volume_levels else 0
     
     return support_level, resistance_level, max_volume
+
+# Volume change calculation
+def calculate_volume_trend(candles):
+    if len(candles) < 2:
+        return 0, "N/A"  # Cannot calculate trend with less than 2 candles
+
+    recent_volume = candles[-1]['volume']
+    previous_volume = candles[-2]['volume']
+    
+    if previous_volume > 0:
+        trend_percentage = ((recent_volume - previous_volume) / previous_volume) * 100
+    else:
+        trend_percentage = 0  # Handle division by zero
+    
+    trend_direction = "Increasing" if trend_percentage > 0 else "Decreasing" if trend_percentage < 0 else "Stable"
+    
+    return trend_percentage, trend_direction
 
 # Function to analyze an asset based on its candles
 def analyze_asset(symbol):
@@ -130,14 +150,17 @@ def analyze_asset(symbol):
     
     for timeframe in timeframes:
         close_prices = np.array([candle['close'] for candle in candle_map[timeframe]])
-        # Extract volume data from each timeframe's candle
-        volumes = np.array([candle['volume'] for candle in candle_map[timeframe]])
         if len(close_prices) < 1:
             continue
 
+        # Calculate thresholds and major signals
         min_threshold, average_threshold, max_threshold = calculate_thresholds(close_prices)
         unique_signals, recent_price, sma56 = detect_major_reversal(candle_map[timeframe])  
         angle_price = calculate_45_degree_price(average_threshold)
+
+        # Get trends for both price and volume
+        price_trend_percentage, price_trend_direction = calculate_volume_trend(candle_map[timeframe])
+        volume_percentage, volume_direction = calculate_volume_trend(candle_map[timeframe])
 
         is_above_angle = "Above 45 Degree" if recent_price > angle_price else "Below 45 Degree"
         forecast = "N/A"
@@ -146,11 +169,10 @@ def analyze_asset(symbol):
         elif 'Major Top detected' in unique_signals:
             forecast = f"Downward to {min_threshold:.25f}" if recent_price > angle_price else "Stable"
 
-        # Analyze volume with the new logic
+        # Analyze volume using the updated logic
         bullish_ratio, bearish_ratio, volume_status = analyze_volume(candle_map[timeframe])
         support_level, resistance_level, max_volume = volume_support_resistance(candle_map[timeframe])
 
-        # Prepare analysis summary for the timeframe
         analysis_results[timeframe] = {
             "Min Threshold": f"{min_threshold:.25f}",
             "Average Threshold": f"{average_threshold:.25f}",
@@ -164,6 +186,10 @@ def analyze_asset(symbol):
             "Resistance Level": f"{resistance_level:.25f}",
             "Max Volume": f"{max_volume:.25f}",
             "Dominant Volume": volume_status,
+            "Price Trend Percentage": f"{price_trend_percentage:.2f}%",
+            "Price Trend Direction": price_trend_direction,
+            "Volume Trend Percentage": f"{volume_percentage:.2f}%",
+            "Volume Trend Direction": volume_direction,
             "Price Relation to Average Threshold": "Above Average" if recent_price > average_threshold else "Below Average"
         }
 
@@ -186,15 +212,14 @@ def main():
             except Exception as e:
                 print(f"Error analyzing symbol: {e}")
 
-    # Print the results neatly
+    # Print results in a formatted way
     print("\n" + "=" * 80)
-    print(f"{'Symbol':<15}{'Timeframe':<10}{'Min Threshold':<45}{'Avg Threshold':<45}{'Max Threshold':<45}{'45 Degree Angle Price':<45}{'Forecast':<45}{'Volume Status':<50}{'Above/Below Angle':<20}{'Price Relation to Average Threshold':<30}")
+    print(f"{'Symbol':<15}{'Timeframe':<10}{'Min Threshold':<45}{'Avg Threshold':<45}{'Max Threshold':<45}{'45 Degree Angle Price':<45}{'Forecast':<45}{'Volume Status':<50}{'Price Trend':<30}{'Price Relation to Avg':<25}")
     print("-" * 180)
 
     for symbol, results in overall_analysis.items():
         for timeframe, data in results.items():
-            # Print each row continuously
-            print(f"{symbol:<15}{timeframe:<10}{data['Min Threshold']:<45}{data['Average Threshold']:<45}{data['Max Threshold']:<45}{data['45 Degree Angle Price']:<45}{data['Forecast']:<45}{data['Volume Current Status']:<50}{data['Above/Below Angle']:<20}{data['Price Relation to Average Threshold']:<30}")
+            print(f"{symbol:<15}{timeframe:<10}{data['Min Threshold']:<45}{data['Average Threshold']:<45}{data['Max Threshold']:<45}{data['45 Degree Angle Price']:<45}{data['Forecast']:<45}{data['Volume Current Status']:<50}{data['Price Trend Percentage']:<30}{data['Price Relation to Average Threshold']:<25}")
 
     print("=" * 150)
 
