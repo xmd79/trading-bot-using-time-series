@@ -6,6 +6,9 @@ import time
 import concurrent.futures
 import talib
 import gc
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
@@ -77,6 +80,27 @@ def check_exit_condition(initial_investment, btc_balance):
     current_value = btc_balance * get_current_btc_price()
     return current_value >= (initial_investment * 1.01618)
 
+def backtest_model(candles):
+    closes = np.array([candle["close"] for candle in candles])
+    X = np.arange(len(closes)).reshape(-1, 1)  # Time steps (1, 2, ..., n)
+    y = closes
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+    
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+
+    predictions = model.predict(X_test)
+    mae = mean_absolute_error(y_test, predictions)
+
+    return model, mae, predictions, y_test
+
+def forecast_next_price(model, num_steps=1):
+    last_index = model.n_features_in_  # Last known index
+    future_steps = np.arange(last_index, last_index + num_steps).reshape(-1, 1)
+    forecasted_prices = model.predict(future_steps)
+    return forecasted_prices
+
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
     min_close = np.nanmin(close_prices)
     max_close = np.nanmax(close_prices)
@@ -84,10 +108,13 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
     momentum = talib.MOM(close_prices, timeperiod=period)
     min_momentum = np.nanmin(momentum)
     max_momentum = np.nanmax(momentum)
+    
     min_percentage_custom = minimum_percentage / 100  
     max_percentage_custom = maximum_percentage / 100
+    
     min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
     max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
+    
     range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
 
     with np.errstate(invalid='ignore'):
@@ -166,11 +193,9 @@ def scale_to_sine(close_prices, adjustment=False):
 
     if adjustment:
         if dist_from_close_to_min >= dist_from_close_to_max:
-            # Adjust sine wave logic: Shift the sine wave center for better alignment
             adjustment_factor = (dist_from_close_to_min + dist_from_close_to_max) / 2
             sine_wave_adjusted = sine_wave - (sine_wave_max - sine_wave_min) * adjustment_factor / 200
 
-            # Recalculate distances after adjustment
             sine_wave_min_adjusted = np.nanmin(sine_wave_adjusted)
             sine_wave_max_adjusted = np.nanmax(sine_wave_adjusted)
 
@@ -192,6 +217,10 @@ def calculate_golden_ratio_projection(last_close, angle_projection):
     phi = 1.618
     projected_price_golden = last_close + (angle_projection - last_close) * phi
     return projected_price_golden 
+
+def forecast_and_adjust_price(forecasted_price, min_threshold, max_threshold):
+    # Adjust the forecast to fit within min and max threshold
+    return np.clip(forecasted_price, min_threshold, max_threshold)
 
 def evaluate_forecast(current_price, support, resistance):
     if current_price < support:
@@ -234,6 +263,22 @@ while True:
     usdc_balance = get_balance('USDC')
     current_btc_price = get_current_btc_price()
 
+    # Instant backtesting on the last 100 candles of 1m timeframe
+    model, backtest_mae, last_predictions, actuals = None, None, None, None
+    if "1m" in candle_map:
+        model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
+        print(f"Backtest MAE: {backtest_mae:.2f}")
+
+    # Forecast next price using the ML model
+    adjusted_forecasted_price = None
+    if model is not None:
+        forecasted_prices = forecast_next_price(model, num_steps=1)
+        if "1m" in candle_map:
+            closes = [candle['close'] for candle in candle_map["1m"]]
+            min_threshold, max_threshold, _, _, _, _, _ = calculate_thresholds(closes)
+            adjusted_forecasted_price = forecast_and_adjust_price(forecasted_prices[-1], min_threshold, max_threshold)
+            print(f"Forecasted Price: {adjusted_forecasted_price:.2f}")
+
     # Calculate volume details
     buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
     volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
@@ -246,7 +291,8 @@ while True:
         "dist_to_min_less_than_max_5m": False,
         "current_close_below_average_threshold": False,
         "current_close_above_last_major_reversal": False,
-        "forecast_price_condition_met": False
+        "forecast_price_condition_met": False,
+        "current_close_below_angle_projection": False
     }
 
     for timeframe in timeframes:
@@ -273,11 +319,33 @@ while True:
                 forecast_price = min_threshold
                 conditions_status["dip_condition_met"] = False
             else:
-                forecast_price = None  
+                forecast_price = None
 
             # Calculate projections based on major reversals if available
             projected_price_45 = calculate_45_degree_projection(last_bottom, last_top) if last_bottom is not None and last_top is not None else None
             projected_price_golden = calculate_golden_ratio_projection(closes[-1], projected_price_45) if projected_price_45 is not None else None
+
+            # Print current price compared to the projected price
+            if projected_price_45 is not None:
+                print(f"Current Price: {current_close:.2f}")
+                print(f"45-Degree Angle Projected Price: {projected_price_45:.2f}")
+                if current_close > projected_price_45:
+                    print("Current price is ABOVE the 45-degree angle projected price.")
+                else:
+                    print("Current price is BELOW the 45-degree angle projected price.")
+                    conditions_status["current_close_below_angle_projection"] = True  # New condition added
+
+            # Calculate distances to min and max
+            dist_to_min, dist_to_max, current_sine = scale_to_sine(closes)
+
+            # Print distances for each timeframe
+            print(f"Distance to Min: {dist_to_min:.2f}% | Distance to Max: {dist_to_max:.2f}%")
+
+            # Check distance conditions for 1m and 5m timeframes correctly
+            if timeframe == "1m":
+                # Set condition for distance comparison
+                conditions_status["dist_to_min_less_than_max_1m"] = dist_to_min < dist_to_max
+                print(f"1-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_1m']}")
 
             # Set condition and perform checks before printing
             conditions_status["current_close_above_last_major_reversal"] = current_btc_price > closest_reversal if closest_reversal is not None else False
@@ -288,24 +356,6 @@ while True:
                 (closest_type == 'TOP' and current_close > forecast_price)
             )
             conditions_status["current_close_below_average_threshold"] = current_close < avg_mtf
-            
-            # Get distance to min and max using HT_SINE, applying adjustments if necessary
-            adjustment_needed = (conditions_status["dip_condition_met"] and closest_type == "DIP")
-            dist_to_min, dist_to_max, current_sine = scale_to_sine(closes, adjustment=adjustment_needed)
-
-            # Print distance to min and max for current timeframe
-            print(f"Distance to Min: {dist_to_min:.2f}% | Distance to Max: {dist_to_max:.2f}%")
-
-            # Check distance conditions for 1m and 5m timeframes correctly
-            if timeframe == "1m":
-                conditions_status["dist_to_min_less_than_max_1m"] = dist_to_min < dist_to_max
-                print(f"1-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_1m']}")
-            elif timeframe == "5m":
-                conditions_status["dist_to_min_less_than_max_5m"] = dist_to_min < dist_to_max
-                print(f"5-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_5m']}")
-
-            # Determine market trend based on the closest reversal type
-            market_trend = determine_market_trend(last_bottom, last_top, closest_type)
 
             # Print information related to the timeframe
             if closest_reversal is not None:
@@ -320,8 +370,12 @@ while True:
             print(f"Maximum Threshold: {max_threshold:.2f}")
             print(f"Average MTF: {avg_mtf:.2f}")
             print(f"Momentum Signal: {momentum_signal:.2f}")
-            print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.2f}% | Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.2f}% | Status: {volume_ratios[timeframe]['status']}")
+            print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.2f}%")
+            print(f"Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.2f}%")
+            print(f"Status: {volume_ratios[timeframe]['status']}")
             print(f"Forecast Price: {forecast_price:.2f}" if forecast_price is not None else "No Forecast Price")
+            print(f"ML Forecasted Price: {adjusted_forecasted_price:.2f}" if adjusted_forecasted_price is not None else "No ML Forecast Price")
+            market_trend = determine_market_trend(last_bottom, last_top, closest_type)
             print(f"Market Trend: {market_trend}" if market_trend else "Market Trend: Undefined")
 
             print()  # Extra line for spacing between timeframes
@@ -389,7 +443,9 @@ while True:
     gc.collect()  
 
     print()
-    print(f"Current USDC balance: {usdc_balance:.2f} | Current BTC balance: {btc_balance:.4f} BTC | Current BTC price: {current_btc_price:.2f}")
+    print(f"Current USDC balance: {usdc_balance:.2f}")
+    print(f"Current BTC balance: {btc_balance:.4f} BTC")
+    print(f"Current BTC price: {current_btc_price:.2f}")
     print()
 
     time.sleep(5)
