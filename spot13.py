@@ -9,6 +9,10 @@ import gc
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
+import websocket
+import json
+from collections import deque
+import threading  # Needed for threading functionality
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
@@ -346,6 +350,11 @@ while True:
                 # Set condition for distance comparison
                 conditions_status["dist_to_min_less_than_max_1m"] = dist_to_min < dist_to_max
                 print(f"1-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_1m']}")
+
+            if timeframe == "5m":
+                # Set condition for distance comparison for 5m timeframe
+                conditions_status["dist_to_min_less_than_max_5m"] = dist_to_min < dist_to_max
+                print(f"5-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_5m']}")
 
             # Set condition and perform checks before printing
             conditions_status["current_close_above_last_major_reversal"] = current_btc_price > closest_reversal if closest_reversal is not None else False
