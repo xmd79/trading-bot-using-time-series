@@ -75,7 +75,7 @@ def buy_btc(amount):
 
 def check_exit_condition(initial_investment, btc_balance):
     current_value = btc_balance * get_current_btc_price()
-    return current_value >= (initial_investment * 1.012)
+    return current_value >= (initial_investment * 1.01618)
 
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
     min_close = np.nanmin(close_prices)
@@ -198,27 +198,27 @@ def evaluate_forecast(current_price, support, resistance):
     else:
         return current_price  # Assuming sideways movement within support/resistance
 
-def calculate_stochastic_rsi(close_prices, high_prices, low_prices, length_rsi, length_stoch, smooth_k, smooth_d, lower_band, upper_band):
+def calculate_stochastic_rsi(close_prices, high_prices, low_prices, length_rsi, length_stoch, smooth_k, smooth_d, lower_band, upper_band, min_threshold, max_threshold):
     rsi = talib.RSI(np.array(close_prices), timeperiod=length_rsi)
 
     # Calculate Stochastic values
     stoch_k, stoch_d = talib.STOCHF(np.array(high_prices), np.array(low_prices), np.array(close_prices), fastk_period=length_stoch, fastd_period=smooth_d)
 
-    # Compute support and resistance
-    support_candidates = [close_prices[i] for i in range(len(stoch_k)) if stoch_k[i] < lower_band]
-    resistance_candidates = [close_prices[i] for i in range(len(stoch_k)) if stoch_k[i] > upper_band]
+    # Compute support and resistance based on thresholds instead of the current close prices
+    support_candidates = [close_prices[i] for i in range(len(stoch_k)) if stoch_k[i] < lower_band and close_prices[i] >= min_threshold]
+    resistance_candidates = [close_prices[i] for i in range(len(stoch_k)) if stoch_k[i] > upper_band and close_prices[i] <= max_threshold]
 
-    # Determine support
+    # Determine support using thresholds
     if support_candidates:
         support = np.nanmin(support_candidates)
     else:
-        support = close_prices[-1] * 0.99  # Default to 1% below current close
+        support = min_threshold  # Default to minimum threshold if no candidates found
 
-    # Determine resistance
+    # Determine resistance using thresholds
     if resistance_candidates:
         resistance = np.nanmax(resistance_candidates)
     else:
-        resistance = close_prices[-1] * 1.01  # Default to 1% above current close
+        resistance = max_threshold  # Default to maximum threshold if no candidates found
 
     return support, resistance
 
@@ -282,13 +282,16 @@ while True:
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            # Calculate Support/Resistance using Stochastic RSI
-            support, resistance = calculate_stochastic_rsi(closes, highs, lows, length_rsi, length_stoch, smooth_k, smooth_d, lower_band, upper_band)
+            # Calculate Support/Resistance using Stochastic RSI and thresholds
+            support, resistance = calculate_stochastic_rsi(closes, highs, lows, length_rsi, length_stoch, smooth_k, smooth_d, lower_band, upper_band, min_threshold, max_threshold)
 
             print(f"Calculated Support (Price): {support:.2f}, Calculated Resistance (Price): {resistance:.2f}")
 
-            # Forecast price
-            projected_forecast_price = evaluate_forecast(current_btc_price, support, resistance)
+            # Forecast price calculation based on dip confirmation
+            if conditions_status["dip_condition_met"]:
+                projected_forecast_price = max_threshold  # Use max threshold if dip is confirmed
+            else:
+                projected_forecast_price = min_threshold  # Use min threshold otherwise
 
             # Store the average thresholds for the respective timeframes
             if timeframe == '1m':
@@ -325,7 +328,7 @@ while True:
             print(f"Average MTF: {avg_mtf:.2f}")
             print(f"Momentum Signal: {momentum_signal:.2f}")
             print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.2f}% | Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.2f}% | Status: {volume_ratios[timeframe]['status']}")
-            print(f"Forecast Price: {projected_forecast_price:.2f}")
+            print(f"Forecast Price: {projected_forecast_price:.2f}")  # Print updated forecast price
 
             # Get distances to min and max on SINE
             dist_to_min_sine, dist_to_max_sine, current_sine = scale_to_sine(closes)
