@@ -103,12 +103,11 @@ def analyze_volume(candles):
     bearish_percentage = (bearish_volume / total_volume) * 100 if total_volume > 0 else 0
     
     # Adjust volume status logic
-    if bullish_percentage > bearish_percentage:
+    volume_status = "Neutral"  # Default to Neutral
+    if bullish_volume > bearish_volume:
         volume_status = "Bullish"
-    elif bearish_percentage > bullish_percentage:
+    elif bearish_volume > bullish_volume:
         volume_status = "Bearish"
-    else:
-        volume_status = "Neutral"
 
     return bullish_percentage, bearish_percentage, volume_status
 
@@ -138,6 +137,17 @@ def calculate_volume_trend(candles):
     
     return trend_percentage, trend_direction
 
+# Function to analyze price decline
+def analyze_price_decline(candles):
+    if len(candles) < 2:
+        return 0  # Can't calculate decline with less than 2 candles
+
+    recent_close = candles[-1]['close']
+    previous_close = candles[-2]['close']
+
+    decline_percentage = ((previous_close - recent_close) / previous_close) * 100 if previous_close > 0 else 0
+    return decline_percentage
+
 # Function to analyze an asset based on its candles
 def analyze_asset(symbol):
     candles = get_candles(symbol, timeframes)
@@ -159,9 +169,9 @@ def analyze_asset(symbol):
         angle_price = calculate_45_degree_price(average_threshold)
 
         # Get trends for both price and volume
-        price_trend_percentage, price_trend_direction = calculate_volume_trend(candle_map[timeframe])
         volume_percentage, volume_direction = calculate_volume_trend(candle_map[timeframe])
-
+        price_decline_percentage = analyze_price_decline(candle_map[timeframe])
+        
         is_above_angle = "Above 45 Degree" if recent_price > angle_price else "Below 45 Degree"
         forecast = "N/A"
         if 'Major Dip detected' in unique_signals:
@@ -173,6 +183,7 @@ def analyze_asset(symbol):
         bullish_ratio, bearish_ratio, volume_status = analyze_volume(candle_map[timeframe])
         support_level, resistance_level, max_volume = volume_support_resistance(candle_map[timeframe])
 
+        # Store results in analysis_results
         analysis_results[timeframe] = {
             "Min Threshold": f"{min_threshold:.25f}",
             "Average Threshold": f"{average_threshold:.25f}",
@@ -186,9 +197,7 @@ def analyze_asset(symbol):
             "Resistance Level": f"{resistance_level:.25f}",
             "Max Volume": f"{max_volume:.25f}",
             "Dominant Volume": volume_status,
-            "Price Trend Percentage": f"{price_trend_percentage:.2f}%",
-            "Price Trend Direction": price_trend_direction,
-            "Volume Trend Percentage": f"{volume_percentage:.2f}%",
+            "Price Trend Percentage": f"{price_decline_percentage:.2f}%",
             "Volume Trend Direction": volume_direction,
             "Price Relation to Average Threshold": "Above Average" if recent_price > average_threshold else "Below Average"
         }
