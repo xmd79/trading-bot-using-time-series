@@ -256,7 +256,8 @@ while True:
         "dip_condition_met": False,
         "volume_bullish_1m": False,
         "dist_to_min_less_than_max": False,
-        "current_close_below_average_threshold": False
+        "current_close_below_average_threshold": False,
+        "current_close_above_last_major_reversal": False  # Added condition
     }
 
     average_threshold_1m = None  
@@ -308,6 +309,9 @@ while True:
             
             if closest_reversal is not None:
                 print(f"Closest Major Reversal: {closest_reversal:.2f} at {closest_type}")
+
+            # Check if current close is above the last major reversal
+            conditions_status["current_close_above_last_major_reversal"] = current_btc_price > closest_reversal if closest_reversal else False
 
             # Evaluate overall conditions
             current_close = closes[-1]
@@ -384,7 +388,8 @@ while True:
                 conditions_status["dip_condition_met"] and
                 conditions_status["volume_bullish_1m"] and
                 conditions_status["dist_to_min_less_than_max"] and
-                conditions_status["current_close_below_average_threshold"]):
+                conditions_status["current_close_below_average_threshold"] and
+                conditions_status["current_close_above_last_major_reversal"]):  # Added condition
             if usdc_balance > 0:  # Check if there is enough balance
                 amount_to_invest = usdc_balance  # You can modify this logic to invest only a certain amount.
                 btc_order = buy_btc(amount_to_invest)
