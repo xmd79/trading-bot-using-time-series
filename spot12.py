@@ -80,18 +80,14 @@ def check_exit_condition(initial_investment, btc_balance):
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
     min_close = np.nanmin(close_prices)
     max_close = np.nanmax(close_prices)
-
     close_prices = np.array(close_prices)
     momentum = talib.MOM(close_prices, timeperiod=period)
     min_momentum = np.nanmin(momentum)
     max_momentum = np.nanmax(momentum)
-
     min_percentage_custom = minimum_percentage / 100  
     max_percentage_custom = maximum_percentage / 100
-
     min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
     max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
-
     range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
 
     with np.errstate(invalid='ignore'):
@@ -107,7 +103,6 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
 
     percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
     percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
-
     momentum_signal = percent_to_max_combined - percent_to_min_combined
 
     return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price, percent_to_min_momentum, percent_to_max_momentum
@@ -160,7 +155,7 @@ def find_major_reversals(candles, current_close, min_threshold, max_threshold):
 
     return last_bottom, last_top, closest_reversal, closest_type 
 
-def scale_to_sine(close_prices):
+def scale_to_sine(close_prices, adjustment=False):
     sine_wave, _ = talib.HT_SINE(np.array(close_prices))
     current_sine = np.nan_to_num(sine_wave)[-1]
     sine_wave_min = np.nanmin(sine_wave)
@@ -168,6 +163,19 @@ def scale_to_sine(close_prices):
 
     dist_from_close_to_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100 if (sine_wave_max - sine_wave_min) != 0 else 0
     dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100 if (sine_wave_max - sine_wave_min) != 0 else 0
+
+    if adjustment:
+        if dist_from_close_to_min >= dist_from_close_to_max:
+            # Adjust sine wave logic: Shift the sine wave center for better alignment
+            adjustment_factor = (dist_from_close_to_min + dist_from_close_to_max) / 2
+            sine_wave_adjusted = sine_wave - (sine_wave_max - sine_wave_min) * adjustment_factor / 200
+
+            # Recalculate distances after adjustment
+            sine_wave_min_adjusted = np.nanmin(sine_wave_adjusted)
+            sine_wave_max_adjusted = np.nanmax(sine_wave_adjusted)
+
+            dist_from_close_to_min = ((current_sine - sine_wave_min_adjusted) / (sine_wave_max_adjusted - sine_wave_min_adjusted)) * 100 if (sine_wave_max_adjusted - sine_wave_min_adjusted) != 0 else 0
+            dist_from_close_to_max = ((sine_wave_max_adjusted - current_sine) / (sine_wave_max_adjusted - sine_wave_min_adjusted)) * 100 if (sine_wave_max_adjusted - sine_wave_min_adjusted) != 0 else 0
 
     return dist_from_close_to_min, dist_from_close_to_max, current_sine 
 
@@ -234,7 +242,8 @@ while True:
         "current_close_above_min_threshold": False,
         "dip_condition_met": False,
         "volume_bullish_1m": False,
-        "dist_to_min_less_than_max": False,
+        "dist_to_min_less_than_max_1m": False,
+        "dist_to_min_less_than_max_5m": False,
         "current_close_below_average_threshold": False,
         "current_close_above_last_major_reversal": False,
         "forecast_price_condition_met": False
@@ -253,10 +262,10 @@ while True:
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            # Find major reversals close to the current close using thresholds
+            # Get the closest major reversals and determine their type
             last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
 
-            # Adjust forecast price based on last major reversal
+            # Set forecast price based on the closest reversal type
             if closest_type == 'DIP':
                 forecast_price = max_threshold
                 conditions_status["dip_condition_met"] = True
@@ -279,11 +288,26 @@ while True:
                 (closest_type == 'TOP' and current_close > forecast_price)
             )
             conditions_status["current_close_below_average_threshold"] = current_close < avg_mtf
+            
+            # Get distance to min and max using HT_SINE, applying adjustments if necessary
+            adjustment_needed = (conditions_status["dip_condition_met"] and closest_type == "DIP")
+            dist_to_min, dist_to_max, current_sine = scale_to_sine(closes, adjustment=adjustment_needed)
+
+            # Print distance to min and max for current timeframe
+            print(f"Distance to Min: {dist_to_min:.2f}% | Distance to Max: {dist_to_max:.2f}%")
+
+            # Check distance conditions for 1m and 5m timeframes correctly
+            if timeframe == "1m":
+                conditions_status["dist_to_min_less_than_max_1m"] = dist_to_min < dist_to_max
+                print(f"1-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_1m']}")
+            elif timeframe == "5m":
+                conditions_status["dist_to_min_less_than_max_5m"] = dist_to_min < dist_to_max
+                print(f"5-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_5m']}")
 
             # Determine market trend based on the closest reversal type
             market_trend = determine_market_trend(last_bottom, last_top, closest_type)
 
-            # Print information for the timeframe only if conditions are evaluated
+            # Print information related to the timeframe
             if closest_reversal is not None:
                 print(f"Most Recent Major Reversal Type: {closest_type}")
                 print(f"Last Major Reversal Found at Price: {closest_reversal:.2f}")
