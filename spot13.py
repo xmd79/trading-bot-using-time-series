@@ -9,10 +9,9 @@ import gc
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
-import websocket
-import json
-from collections import deque
-import threading  # Needed for threading functionality
+
+# Exchange constants
+TRADE_SYMBOL = "BTCUSDC"
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
@@ -86,11 +85,11 @@ def check_exit_condition(initial_investment, btc_balance):
 
 def backtest_model(candles):
     closes = np.array([candle["close"] for candle in candles])
-    X = np.arange(len(closes)).reshape(-1, 1)  # Time steps (1, 2, ..., n)
+    X = np.arange(len(closes)).reshape(-1, 1) 
     y = closes
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-    
+
     model = LinearRegression()
     model.fit(X_train, y_train)
 
@@ -100,7 +99,7 @@ def backtest_model(candles):
     return model, mae, predictions, y_test
 
 def forecast_next_price(model, num_steps=1):
-    last_index = model.n_features_in_  # Last known index
+    last_index = model.n_features_in_
     future_steps = np.arange(last_index, last_index + num_steps).reshape(-1, 1)
     forecasted_prices = model.predict(future_steps)
     return forecasted_prices
@@ -112,13 +111,13 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
     momentum = talib.MOM(close_prices, timeperiod=period)
     min_momentum = np.nanmin(momentum)
     max_momentum = np.nanmax(momentum)
-    
+
     min_percentage_custom = minimum_percentage / 100  
     max_percentage_custom = maximum_percentage / 100
-    
+
     min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
     max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
-    
+
     range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
 
     with np.errstate(invalid='ignore'):
@@ -175,7 +174,6 @@ def find_major_reversals(candles, current_close, min_threshold, max_threshold):
     closest_reversal = None
     closest_type = None
 
-    # Determine closest reversal and type (DIP or TOP)
     if last_bottom is not None and (closest_reversal is None or abs(last_bottom - current_close) < abs(closest_reversal - current_close)):
         closest_reversal = last_bottom
         closest_type = 'DIP'
@@ -223,7 +221,6 @@ def calculate_golden_ratio_projection(last_close, angle_projection):
     return projected_price_golden 
 
 def forecast_and_adjust_price(forecasted_price, min_threshold, max_threshold):
-    # Adjust the forecast to fit within min and max threshold
     return np.clip(forecasted_price, min_threshold, max_threshold)
 
 def evaluate_forecast(current_price, support, resistance):
@@ -236,10 +233,7 @@ def evaluate_forecast(current_price, support, resistance):
 
 def calculate_stochastic_rsi(close_prices, high_prices, low_prices, length_rsi, length_stoch, smooth_k, smooth_d, lower_band, upper_band, min_threshold, max_threshold):
     rsi = talib.RSI(np.array(close_prices), timeperiod=length_rsi)
-
-    # Calculate Stochastic values
     stoch_k, stoch_d = talib.STOCHF(np.array(high_prices), np.array(low_prices), np.array(close_prices), fastk_period=length_stoch, fastd_period=smooth_d)
-
     return stoch_k, stoch_d
 
 def determine_market_trend(last_bottom, last_top, last_major_reversal_type):
@@ -250,20 +244,29 @@ def determine_market_trend(last_bottom, last_top, last_major_reversal_type):
     else:
         return None  
 
-# Initialize variables for tracking trade state
-TRADE_SYMBOL = "BTCUSDC"
-timeframes = ['1m', '3m', '5m']
+def get_min_trade_size(symbol):
+    """Fetch the minimum trade size for a symbol from Binance."""
+    exchange_info = client.get_symbol_info(symbol)
+    for filter in exchange_info['filters']:
+        if filter['filterType'] == 'LOT_SIZE':
+            return float(filter['minQty'])
+    return 0.0
 
+# Instantiate the minimum trade size for the trading pair
+min_trade_size = get_min_trade_size(TRADE_SYMBOL)
+
+# Initialize variables for tracking trade state
 position_open = False
 initial_investment = 0.0
-btc_balance = 0.0 
+btc_balance = 0.0
 
+# Starting main trading loop
 while True:  
     current_local_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"Current Local Time: {current_local_time}")
 
     # Fetch candle data
-    candle_map = fetch_candles_in_parallel(timeframes)
+    candle_map = fetch_candles_in_parallel(['1m', '3m', '5m'])
     usdc_balance = get_balance('USDC')
     current_btc_price = get_current_btc_price()
 
@@ -299,7 +302,7 @@ while True:
         "current_close_below_angle_projection": False
     }
 
-    for timeframe in timeframes:
+    for timeframe in ['1m', '3m', '5m']:
         if timeframe in candle_map:
             print(f"--- {timeframe} ---")
             closes = [candle['close'] for candle in candle_map[timeframe]]
@@ -315,7 +318,8 @@ while True:
             # Get the closest major reversals and determine their type
             last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
 
-            # Set forecast price based on the closest reversal type
+            forecast_price = None
+            # Check forecast price based on the closest reversal type
             if closest_type == 'DIP':
                 forecast_price = max_threshold
                 conditions_status["dip_condition_met"] = True
@@ -333,11 +337,7 @@ while True:
             if projected_price_45 is not None:
                 print(f"Current Price: {current_close:.2f}")
                 print(f"45-Degree Angle Projected Price: {projected_price_45:.2f}")
-                if current_close > projected_price_45:
-                    print("Current price is ABOVE the 45-degree angle projected price.")
-                else:
-                    print("Current price is BELOW the 45-degree angle projected price.")
-                    conditions_status["current_close_below_angle_projection"] = True  # New condition added
+                conditions_status["current_close_below_angle_projection"] = current_close < projected_price_45
 
             # Calculate distances to min and max
             dist_to_min, dist_to_max, current_sine = scale_to_sine(closes)
@@ -347,16 +347,13 @@ while True:
 
             # Check distance conditions for 1m and 5m timeframes correctly
             if timeframe == "1m":
-                # Set condition for distance comparison
                 conditions_status["dist_to_min_less_than_max_1m"] = dist_to_min < dist_to_max
                 print(f"1-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_1m']}")
 
             if timeframe == "5m":
-                # Set condition for distance comparison for 5m timeframe
                 conditions_status["dist_to_min_less_than_max_5m"] = dist_to_min < dist_to_max
                 print(f"5-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_5m']}")
 
-            # Set condition and perform checks before printing
             conditions_status["current_close_above_last_major_reversal"] = current_btc_price > closest_reversal if closest_reversal is not None else False
             conditions_status["current_close_above_min_threshold"] = current_close > min_threshold
             conditions_status["volume_bullish_1m"] = buy_volume['1m'] > sell_volume['1m']
@@ -366,7 +363,6 @@ while True:
             )
             conditions_status["current_close_below_average_threshold"] = current_close < avg_mtf
 
-            # Print information related to the timeframe
             if closest_reversal is not None:
                 print(f"Most Recent Major Reversal Type: {closest_type}")
                 print(f"Last Major Reversal Found at Price: {closest_reversal:.2f}")
@@ -397,33 +393,27 @@ while True:
     for cond, status in conditions_status.items():
         print(f"{cond}: {'True' if status else 'False'}")
 
-    # 5-minute timeframe dip confirmation
-    if "5m" in candle_map:
-        five_min_closes = [candle['close'] for candle in candle_map['5m']]
-        five_min_last_bottom, five_min_last_top, five_min_closest_reversal, five_min_closest_type = find_major_reversals(candle_map['5m'], current_btc_price, min_threshold, max_threshold)
-
-        if five_min_closest_type == 'DIP':
-            print("5-Minute Timeframe Dip Confirmed.")
-            conditions_status["dip_condition_met"] = True
-        elif five_min_closest_type == 'TOP':
-            print("5-Minute Timeframe Top Confirmed.")
-            conditions_status["dip_condition_met"] = False
-
-    # Entry Logic
+    # Check all conditions before executing an entry trade
     if not position_open:
-        if (conditions_status["current_close_above_min_threshold"] and
-                conditions_status["dip_condition_met"] and
-                conditions_status["volume_bullish_1m"] and
-                conditions_status["current_close_above_last_major_reversal"] and
-                conditions_status["forecast_price_condition_met"]):  
+        # Ensure all conditions are true
+        all_conditions_met = all(conditions_status.values())
+        if all_conditions_met:
             if usdc_balance > 0:  
                 amount_to_invest = usdc_balance
-                btc_order = buy_btc(amount_to_invest)
-                if btc_order:
-                    initial_investment = amount_to_invest
-                    btc_balance += amount_to_invest / current_btc_price
-                    print(f"New position opened with {amount_to_invest} USDC at price {current_btc_price:.2f}.")
-                    position_open = True 
+                quantity_to_buy = amount_to_invest / current_btc_price
+                
+                # Check if the calculated quantity is greater than the minimum trade size
+                if quantity_to_buy >= min_trade_size:
+                    btc_order = buy_btc(quantity_to_buy)  # Place the order with the valid quantity
+                    if btc_order:
+                        initial_investment = amount_to_invest
+                        btc_balance += quantity_to_buy  # track the BTC amount purchased
+                        print(f"New position opened with {amount_to_invest} USDC at price {current_btc_price:.2f}.")
+                        position_open = True 
+                else:
+                    print(f"Cannot place order: Quantity {quantity_to_buy:.6f} is less than minimum trade size {min_trade_size:.6f}.")
+        else:
+            print("Conditions not met for placing a trade.")
 
     # Exit Logic
     if position_open and check_exit_condition(initial_investment, btc_balance):
@@ -457,4 +447,4 @@ while True:
     print(f"Current BTC price: {current_btc_price:.2f}")
     print()
 
-    time.sleep(5)
+    time.sleep(5)  # Wait before the next iteration
