@@ -110,6 +110,7 @@ if __name__ == "__main__":
     trader = Trader(filename)
 
     trading_pairs = trader.get_usdc_pairs()
+    dip_data = {}
     volume_data = {}
     timeframes_volume = ['1m', '3m', '5m']
     timeframes_dips = ['1d']
@@ -134,138 +135,44 @@ if __name__ == "__main__":
                 print(f'Error fetching data for {symbol} in {tf}: {e}')
 
     # Calculate average dips
-    dip_data = {}
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_to_symbol = {
-            executor.submit(trader.calculate_dips, symbol): symbol
-            for symbol in trading_pairs
-        }
+    for symbol in trading_pairs:
+        result = trader.calculate_dips(symbol)
+        if result:
+            symbol, sig_dip_5m, sig_dip_daily, rev_points_5m, rev_points_daily = result
+            dip_data[symbol] = {
+                '5m_dip': sig_dip_5m,
+                'daily_dip': sig_dip_daily,
+                '5m_reversals': rev_points_5m,
+                'daily_reversals': rev_points_daily
+            }
 
-        for future in concurrent.futures.as_completed(future_to_symbol):
-            symbol = future_to_symbol[future]
-            try:
-                result = future.result()
-                if result:
-                    symbol, sig_dip_5m, sig_dip_daily, rev_points_5m, rev_points_daily = result
-                    dip_data[symbol] = {
-                        '5m_dip': sig_dip_5m,
-                        'daily_dip': sig_dip_daily,
-                        '5m_reversals': rev_points_5m,
-                        'daily_reversals': rev_points_daily
-                    }
-            except Exception as e:
-                print(f'Error fetching dip data for {symbol}: {e}')
-
-    # Sort symbols by average dip
-    sorted_dips = sorted(dip_data.items(), key=lambda x: (x[1]['5m_dip'] is not None, x[1]['5m_dip']))
-    sorted_symbols = [symbol for symbol, dip_info in sorted_dips if dip_info['5m_dip'] is not None]
-
-    # Calculate bullish-to-bearish ratios for the best asset
+    # Select the most bullish dip while ensuring current price is below the 45-degree angle price
     best_symbol = None
-    highest_ratio = 0
+    best_bullish_volume = 0
+    best_dip_info = None
+    best_price_at_45_degree = None
 
-    for symbol in volume_data.keys():
-        total_bullish = sum(volume['bullish'] for volume in volume_data[symbol].values() if 'bullish' in volume)
-        total_bearish = sum(volume['bearish'] for volume in volume_data[symbol].values() if 'bearish' in volume)
+    for symbol in dip_data.keys():
+        if dip_data[symbol]['5m_dip'] is not None:
+            total_bullish = volume_data.get(symbol, {}).get('1m', {}).get('bullish', 0)
+            current_price = trader.client.get_symbol_ticker(symbol=symbol)['price']
+            price_at_45_degree = trader.calculate_45_degree_price(float(current_price))
 
-        if total_bearish > 0:  # Avoid division by zero
-            ratio = total_bullish / total_bearish
-            if ratio > highest_ratio:
-                highest_ratio = ratio
-                best_symbol = (symbol, total_bullish, total_bearish)
+            # Check if current price is below the 45-degree angle price
+            if float(current_price) < price_at_45_degree:
+                if total_bullish > best_bullish_volume:
+                    best_bullish_volume = total_bullish
+                    best_symbol = symbol
+                    best_dip_info = dip_data[symbol]
+                    best_price_at_45_degree = price_at_45_degree
 
-    # Enhanced: Check if best_symbol was found
+    # Output result
     if best_symbol:
-        symbol, total_bullish, total_bearish = best_symbol
-        print(f'The asset with the highest bullish/bearish volume ratio is: {symbol}')
-
-        # Calculate and print dominance ratios
-        total_volume = total_bullish + total_bearish
-        bullish_percentage = (total_bullish / total_volume) * 100 if total_volume > 0 else 0
-        bearish_percentage = (total_bearish / total_volume) * 100 if total_volume > 0 else 0
-
-        print(f'Bullish Volume: {total_bullish:.25f} ({bullish_percentage:.25f}%)')
-        print(f'Bearish Volume: {total_bearish:.25f} ({bearish_percentage:.25f}%)')
-
-        # Get price data for multiple timeframes
-        latest_prices = {}
-        for interval in ['1m', '3m', '5m']:
-            klines = trader.client.get_klines(symbol=symbol, interval=interval)
-            latest_prices[interval] = [float(entry[4]) for entry in klines]
-
-        # Forecast prices for each timeframe
-        forecast_prices = {}
-        for interval in ['1m', '3m', '5m']:
-            if len(latest_prices[interval]) > 0:
-                current_price = latest_prices[interval][-1]
-                amplitude = np.max(latest_prices[interval]) - np.min(latest_prices[interval])
-                forecast_price = trader.next_reversal_price(amplitude, current_price)
-                forecast_prices[interval] = forecast_price
-                print(f'Forecasted Price for {interval} timeframe: {forecast_price:.25f}')
-        
-        # Calculate 45 degree angle price values
-        for interval in ['1m', '3m', '5m']:
-            if interval in latest_prices:
-                current_price = latest_prices[interval][-1]
-                price_at_45_degree = trader.calculate_45_degree_price(current_price)
-                print(f'Current Close for {interval}: {current_price:.25f}')
-                print(f'Price value for 45-degree angle in {interval}: {price_at_45_degree:.25f}')
-
-                # Check if current close is below or above the 45-degree price value
-                if current_price > price_at_45_degree:
-                    print(f'Current price is above the 45-degree price value for {interval}.')
-                else:
-                    print(f'Current price is below the 45-degree price value for {interval}.')
-
-        # Get the latest price data for the selected symbol using 5-minute timeframe
-        sine_waves, support, resistance, offset = trader.envelope_and_forecast(latest_prices['5m'])
-
-        if sine_waves is not None and len(sine_waves) > 0:
-            current_price = latest_prices['5m'][-1]
-            amplitude = np.max(latest_prices['5m']) - np.min(latest_prices['5m'])
-
-            # Calculate forecast price
-            forecast_price = trader.next_reversal_price(amplitude, current_price, peak=current_price < (current_price + amplitude))
-
-            # Print market mood metrics
-            intensity, energy, angular_momentum, angle = trader.market_mood_metrics(current_price, forecast_price)
-            print(f'Current Close Price: {current_price:.25f}')
-            print(f'Forecasted Price for next reversal: {forecast_price:.25f}')
-            print(f'Market Mood Intensity: {intensity:.25f}')
-            print(f'Market Energy: {energy:.25f}')
-            print(f'Angular Momentum: {angular_momentum:.25f}')
-            print(f'Market Mood Angle: {angle:.25f} degrees')
-
-            # Plotting
-            plt.figure(figsize=(14, 7))
-            plt.plot(latest_prices['5m'], label='Price', color='blue')
-
-            key_points = {}
-            for i, sine_wave in enumerate(sine_waves):
-                x = np.arange(len(sine_wave))
-                plt.plot(sine_wave, label=f'Sine Wave {i + 1}', linestyle='--')
-
-                key_point_index = np.abs(sine_wave - current_price).argmin()
-                key_points[f'Wave {i + 1}'] = (x[key_point_index], sine_wave[key_point_index])
-                plt.annotate(f'Key Point {i + 1}: {sine_wave[key_point_index]:.25f}',
-                             xy=(x[key_point_index], sine_wave[key_point_index]),
-                             xytext=(x[key_point_index], sine_wave[key_point_index] + 0.5),
-                             arrowprops=dict(facecolor='black', arrowstyle='->'), fontsize=8)
-
-            plt.axhline(y=support, color='red', label='Support', linestyle='--')
-            plt.axhline(y=resistance, color='purple', label='Resistance', linestyle='--')
-            plt.axhline(y=current_price, color='orange', label='Current Close', linestyle='-.')
-            plt.axhline(y=forecast_price, color='green', label='Forecast Price', linestyle='-.')
-
-            plt.title(f"Price Forecast with Sine Wave Projection for {symbol}")
-            plt.xlabel('Time')
-            plt.ylabel('Price')
-            plt.legend()
-            plt.grid()
-            plt.show()
-        else:
-            print('No suitable asset found for projection.')
+        print(f'The asset with the best bullish dip is: {best_symbol}')
+        print(f'Best Dip (5m): {best_dip_info["5m_dip"]}')
+        print(f'Current Price: {current_price}')
+        print(f'Price at 45 Degree: {best_price_at_45_degree:.25f}')
     else:
-        print("No suitable symbol found based on volume analysis. Please check the trends or intervals.")
+        print('No suitable asset found below the 45 degree angle.')
 
     sys.exit(0)
