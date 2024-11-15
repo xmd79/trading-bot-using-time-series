@@ -63,21 +63,33 @@ class Trader:
         """ Calculate next potential price reversal based on amplitude. """
         return sym_center + (amplitude if peak else -amplitude)
 
-    def calculate_dips(self, symbol, interval):
-        """ Calculate average dips in the close prices. """
-        klines = self.client.get_klines(symbol=symbol, interval=interval)
-        close_prices = [float(entry[4]) for entry in klines]
+    def calculate_dips(self, symbol):
+        """ Calculate significant dips including daily and 5m historical close prices. """
+        # Fetch 5-minute candles
+        klines_5m = self.client.get_klines(symbol=symbol, interval='5m')
+        close_prices_5m = np.array([float(entry[4]) for entry in klines_5m])
         
-        if len(close_prices) < 2:
-            return symbol, None
+        # Fetch daily candles
+        klines_daily = self.client.get_klines(symbol=symbol, interval='1d')
+        close_prices_daily = np.array([float(entry[4]) for entry in klines_daily])
 
-        dips = []
-        for i in range(1, len(close_prices)):
-            if close_prices[i] < close_prices[i - 1]:  # Check for dip
-                dips.append(close_prices[i])
+        # Check if enough data is available
+        if len(close_prices_5m) < 2 and len(close_prices_daily) < 2:
+            return symbol, None, None, None, None  # Not enough data for analysis
 
-        average_dip = np.mean(dips) if dips else None
-        return symbol, average_dip
+        # Find dips in the 5m timeframe
+        dips_5m = np.where(np.diff(close_prices_5m) < 0)[0] + 1  # Find index of dips
+        significant_dip_5m = close_prices_5m[dips_5m].min() if dips_5m.size > 0 else None
+
+        # Find dips in the daily timeframe
+        dips_daily = np.where(np.diff(close_prices_daily) < 0)[0] + 1  # Find index of daily dips
+        significant_dip_daily = close_prices_daily[dips_daily].min() if dips_daily.size > 0 else None
+
+        # Find the major reversal points - at these lowest lows
+        reversal_points_5m = close_prices_5m[np.where(close_prices_5m == significant_dip_5m)[0]] if significant_dip_5m is not None else None
+        reversal_points_daily = close_prices_daily[np.where(close_prices_daily == significant_dip_daily)[0]] if significant_dip_daily is not None else None
+
+        return symbol, significant_dip_5m, significant_dip_daily, reversal_points_5m, reversal_points_daily
 
     def market_mood_metrics(self, current_price, forecast_price):
         """ Calculate market mood metrics based on current and forecast prices. """
@@ -123,8 +135,8 @@ if __name__ == "__main__":
     dip_data = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_to_symbol = {
-            executor.submit(trader.calculate_dips, symbol, tf): symbol
-            for symbol in trading_pairs for tf in timeframes_dips
+            executor.submit(trader.calculate_dips, symbol): symbol
+            for symbol in trading_pairs
         }
 
         for future in concurrent.futures.as_completed(future_to_symbol):
@@ -132,14 +144,19 @@ if __name__ == "__main__":
             try:
                 result = future.result()
                 if result:
-                    symbol, avg_dip = result
-                    dip_data[symbol] = avg_dip
+                    symbol, sig_dip_5m, sig_dip_daily, rev_points_5m, rev_points_daily = result
+                    dip_data[symbol] = {
+                        '5m_dip': sig_dip_5m,
+                        'daily_dip': sig_dip_daily,
+                        '5m_reversals': rev_points_5m,
+                        'daily_reversals': rev_points_daily
+                    }
             except Exception as e:
                 print(f'Error fetching dip data for {symbol}: {e}')
 
     # Sort symbols by average dip
-    sorted_dips = sorted(dip_data.items(), key=lambda x: (x[1] is not None, x[1]))
-    sorted_symbols = [symbol for symbol, dip in sorted_dips if dip is not None]
+    sorted_dips = sorted(dip_data.items(), key=lambda x: (x[1]['5m_dip'] is not None, x[1]['5m_dip']))
+    sorted_symbols = [symbol for symbol, dip_info in sorted_dips if dip_info['5m_dip'] is not None]
 
     # Calculate bullish-to-bearish ratios for the best asset
     best_symbol = None
