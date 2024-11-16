@@ -329,16 +329,25 @@ def analyze_fft(close_prices, n_frequencies=25):
     
     # Calculate the magnitudes of the frequencies
     magnitudes = np.abs(freq_data[:n_frequencies])
+    
+    # Ensure boundary conditions to prevent IndexError
+    num_magnitudes = len(magnitudes)
 
-    # Split into negative, neutral, and positive frequency ranges
-    negative_freqs = magnitudes[:12]
-    neutral_freq = magnitudes[12]
-    positive_freqs = magnitudes[13:25]
+    # Check size and handle edge cases
+    if num_magnitudes < 13:
+        neutral_freq = 0 if num_magnitudes < 13 else magnitudes[12]
+        positive_freqs = magnitudes[13:num_magnitudes]
+    else:
+        neutral_freq = magnitudes[12]
+        positive_freqs = magnitudes[13:25]
+
+    # Split into negative frequency ranges safely
+    negative_freqs = magnitudes[:min(12, num_magnitudes)]
 
     # Identify the average magnitudes in each range
-    avg_negative = np.mean(negative_freqs)
+    avg_negative = np.mean(negative_freqs) if len(negative_freqs) > 0 else 0
     avg_neutral = neutral_freq
-    avg_positive = np.mean(positive_freqs)
+    avg_positive = np.mean(positive_freqs) if len(positive_freqs) > 0 else 0
 
     # Determine the significant frequency category
     if avg_positive > avg_negative and avg_positive > avg_neutral:
@@ -381,31 +390,27 @@ for timeframe in timeframes:
     angle_price = calculate_45_degree_angle(close_prices)
 
     print(f"=== Timeframe: {timeframe} ===")
-    print("Minimum threshold:", min_threshold)
-    print("Maximum threshold:", max_threshold)
-    print("Average MTF:", avg_mtf)
-    print("Price at 45-degree angle specific to timeframe:", angle_price)
+    print(f"Minimum threshold: {min_threshold:.25f}")
+    print(f"Maximum threshold: {max_threshold:.25f}")
+    print(f"Average MTF: {avg_mtf:.25f}")
+    print(f"Price at 45-degree angle specific to timeframe: {angle_price:.25f}")
     
     # Volume calculation
     total_volume = sum(candle['volume'] for candle in candles)
     bullish_volume = sum(candle['volume'] for candle in candles if candle['close'] > candle['open'])
     bearish_volume = total_volume - bullish_volume
 
-    print(f"Total Volume: {total_volume:.2f}, Bullish Volume: {bullish_volume:.2f}, Bearish Volume: {bearish_volume:.2f}")
+    print(f"Total Volume: {total_volume:.25f}, Bullish Volume: {bullish_volume:.25f}, Bearish Volume: {bearish_volume:.25f}")
 
-    if bullish_volume > bearish_volume:
-        sentiment = "Bullish"
-    else:
-        sentiment = "Bearish"
-
+    sentiment = "Bullish" if bullish_volume > bearish_volume else "Bearish"
     print(f"Current sentiment: {sentiment}")
         
     # Merge new Hurst cycles and random walk logic
     hurst_value, last_price, forecasted_price = merge_hurst_and_random_walk(candles)
 
     # Print the Hurst exponent and forecasted price from random walk
-    print(f"Hurst Exponent: {hurst_value:.4f}")
-    print(f"Forecasted Price based on Random Walk: {forecasted_price:.2f}")
+    print(f"Hurst Exponent: {hurst_value:.25f}")
+    print(f"Forecasted Price based on Random Walk: {forecasted_price:.25f}")
 
     # FFT Analysis
     significant_category, avg_negative, avg_neutral, avg_positive = analyze_fft(close_prices)
@@ -414,37 +419,35 @@ for timeframe in timeframes:
     fft_forecasted_price = forecast_price_from_fft(close_prices)
 
     print(f"Currently mostly significant frequencies are: {significant_category}")
-    print(f"Average Negative Frequencies Magnitude: {avg_negative:.2f}")
-    print(f"Neutral Frequency Magnitude: {avg_neutral:.2f}")
-    print(f"Average Positive Frequencies Magnitude: {avg_positive:.2f}")
-    print(f"Forecasted price from FFT into the future: {fft_forecasted_price:.2f}")
+    print(f"Average Negative Frequencies Magnitude: {avg_negative:.25f}")
+    print(f"Neutral Frequency Magnitude: {avg_neutral:.25f}")
+    print(f"Average Positive Frequencies Magnitude: {avg_positive:.25f}")
+    print(f"Forecasted price from FFT into the future: {fft_forecasted_price:.25f}")
 
     # Linear Regression Forecast
     forecasted_prices = linear_regression_forecast(close_prices, forecast_steps=1)
 
     # Print forecasted price for the next period
-    print(f"Forecasted price for next period (Linear Regression): {forecasted_prices[-1]:.2f}")
+    print(f"Forecasted price for next period (Linear Regression): {forecasted_prices[-1]:.25f}")
 
     # Check the distance of current close to angle price
     current_close = close_prices[-1]
     if angle_price is not None:
         if current_close < angle_price:
             difference_percentage = ((angle_price - current_close) / angle_price) * 100
-            print(f"Current close is below the 45-degree angle price by {difference_percentage:.2f}%")
+            print(f"Current close is below the 45-degree angle price by {difference_percentage:.25f}%")
         elif current_close > angle_price:
             difference_percentage = ((current_close - angle_price) / angle_price) * 100
-            print(f"Current close is above the 45-degree angle price by {difference_percentage:.2f}%")
+            print(f"Current close is above the 45-degree angle price by {difference_percentage:.25f}%")
         else:
             print("Current close is exactly at the 45-degree angle price.")
 
     closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - current_close))
 
     if closest_threshold == min_threshold:
-        print("The last minimum value is closest to the current close.")
-        print("The last minimum value is", closest_threshold)
+        print(f"The last minimum value is closest to the current close: {closest_threshold:.25f}")
     elif closest_threshold == max_threshold:
-        print("The last maximum value is closest to the current close.")
-        print("The last maximum value is", closest_threshold)
+        print(f"The last maximum value is closest to the current close: {closest_threshold:.25f}")
     else:
         print("No threshold value found.")
 
@@ -452,9 +455,9 @@ for timeframe in timeframes:
     dip_signal, top_signal, sma56 = detect_reversal(candles)
 
     # Calculate channel using min and max threshold
-    print(f"Lower Channel: {channel['lower_channel']:.2f}")
-    print(f"Middle Channel: {channel['middle_channel']:.2f}")
-    print(f"Upper Channel: {channel['upper_channel']:.2f}")
+    print(f"Lower Channel: {channel['lower_channel']:.25f}")
+    print(f"Middle Channel: {channel['middle_channel']:.25f}")
+    print(f"Upper Channel: {channel['upper_channel']:.25f}")
 
     last_reversal = "dip" if "Dip" in dip_signal else "top"
     sine_wave = scale_to_sine(thresholds, last_reversal)
@@ -470,8 +473,8 @@ for timeframe in timeframes:
     distance_to_min_sine = ((current_close - min_sine) / (max_sine - min_sine)) * 100 if (max_sine - min_sine) > 0 else 0
     distance_to_max_sine = ((max_sine - current_close) / (max_sine - min_sine)) * 100 if (max_sine - min_sine) > 0 else 0
 
-    print(f"Distance to min of sine wave: {distance_to_min_sine:.2f}%")
-    print(f"Distance to max of sine wave: {distance_to_max_sine:.2f}%")
+    print(f"Distance to min of sine wave: {distance_to_min_sine:.25f}%")
+    print(f"Distance to max of sine wave: {distance_to_max_sine:.25f}%")
 
     # Corrected call to analyze_market_mood
     market_mood, last_max, last_min = analyze_market_mood(sine_wave, min_threshold, max_threshold, current_close)
@@ -482,7 +485,7 @@ for timeframe in timeframes:
     last_candle = candles[-1]
     reversal_signal = check_open_close_reversals(last_candle)
 
-    print(f"Next target reversal price expected: {next_reversal_target:.2f}")
+    print(f"Next target reversal price expected: {next_reversal_target:.25f}")
     print(reversal_signal)
 
     # Store results in MTF summary
@@ -508,9 +511,9 @@ for timeframe in timeframes:
 # MTF Summary
 print("=== MTF Summary ===")
 for summary in mtf_summary:
-    print(f"Timeframe: {summary['timeframe']}, Min Threshold: {summary['min_threshold']:.2f}, Max Threshold: {summary['max_threshold']:.2f}, "
-          f"Avg MTF: {summary['avg_mtf']:.2f}, Sentiment: {summary['sentiment']}, Hurst: {summary['hurst_value']:.4f}, "
-          f"Forecasted Price: {summary['forecasted_price']:.2f}, FFT Forecast: {summary['fft_forecasted_price']:.2f}, "
-          f"Linear Regression Forecast: {summary['linear_regression_forecast']:.2f}, Market Mood: {summary['market_mood']}")
+    print(f"Timeframe: {summary['timeframe']}, Min Threshold: {summary['min_threshold']:.25f}, Max Threshold: {summary['max_threshold']:.25f}, "
+          f"Avg MTF: {summary['avg_mtf']:.25f}, Sentiment: {summary['sentiment']}, Hurst: {summary['hurst_value']:.25f}, "
+          f"Forecasted Price: {summary['forecasted_price']:.25f}, FFT Forecast: {summary['fft_forecasted_price']:.25f}, "
+          f"Linear Regression Forecast: {summary['linear_regression_forecast']:.25f}, Market Mood: {summary['market_mood']}")
 
 print("All timeframe calculations completed.")
