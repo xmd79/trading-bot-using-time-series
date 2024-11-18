@@ -17,7 +17,7 @@ def get_binance_client():
 client = get_binance_client()
 
 TRADE_SYMBOL = "ACTUSDT"
-timeframes = ['1m', '3m', '5m']
+timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '4h']  # Added new timeframes
 
 # Function to get candles from the Binance API
 def get_candles(symbol, timeframes):
@@ -191,15 +191,20 @@ def scale_to_sine(timeframe):
     sine_wave_min = np.min(sine_wave)        
     sine_wave_max = np.max(sine_wave)
 
-    dist_min = ((current_sine - sine_wave_min) /  (sine_wave_max - sine_wave_min)) * 100 
-    dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
+    # Check for the case where max and min sine wave values are equal
+    if sine_wave_max == sine_wave_min:
+        dist_min = 0  # Handle division by zero
+        dist_max = 0  # Handle division by zero
+    else:
+        dist_min = ((current_sine - sine_wave_min) /  (sine_wave_max - sine_wave_min)) * 100 
+        dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
 
     return dist_min, dist_max, current_sine
 
 def calculate_angle_price(min_threshold, max_threshold):
     """Calculate the price corresponding to a 45-degree angle using linear interpolation."""
-    sin_45 = np.sqrt(2) / 2  # sin(45 degrees) = cos(45 degrees) = √2 / 2
-    angle_price = min_threshold + (max_threshold - min_threshold) * sin_45
+    price_change = (max_threshold - min_threshold) / 2  # This essentially identifies the midpoint of the two prices
+    angle_price = min_threshold + price_change  # The price at a 45-degree angle based on the min and max thresholds
     return angle_price
 
 # New Function to Calculate Pythagorean Price
@@ -250,7 +255,9 @@ for timeframe in timeframes:
 
     # Forecast potential reversals and prices
     avg_threshold = (min_threshold + max_threshold) / 2
-    current_angle_status = "Above 45 Degree Angle" if recent_close > (min_threshold + max_threshold) / 2 else "Below 45 Degree Angle"
+    current_angle_price = calculate_angle_price(min_threshold, max_threshold)
+
+    current_angle_status = "Above 45 Degree Angle" if recent_close > current_angle_price else "Below 45 Degree Angle"
     
     (current_reversal, next_reversal, forecast_direction, last_close, forecast_dip, forecast_top) = calculate_reversal_and_forecast(
         close_prices, min_threshold, max_threshold, avg_threshold, recent_close, current_angle_status
@@ -262,9 +269,6 @@ for timeframe in timeframes:
     # Calculate Fibonacci levels based on min and max thresholds
     fib_levels = calculate_fibonacci_levels(min_threshold, max_threshold)
 
-    # Calculate the price corresponding to the 45-degree angle between min and max thresholds
-    angle_price = calculate_angle_price(min_threshold, max_threshold)
-
     # Calculate projected price using Pythagorean Theorem
     pythagorean_price = calculate_pythagorean_price(min_threshold, max_threshold)
 
@@ -272,7 +276,7 @@ for timeframe in timeframes:
     phi_level = calculate_phi_level(min_threshold, max_threshold)
 
     # Determine if the current close is below the calculated angle price
-    is_below_angle = recent_close < angle_price
+    is_below_angle = recent_close < current_angle_price
 
     # Output details
     print(f"=== Timeframe: {timeframe} ===")
@@ -314,7 +318,7 @@ for timeframe in timeframes:
         print(f"Gann Median (Length {length}): {median:.25f}")
 
     # Print the price corresponding to the 45-degree angle
-    print(f"45-Degree Angle Price (Min/Max Thresholds): {angle_price:.25f}")
+    print(f"45-Degree Angle Price (Min/Max Thresholds): {current_angle_price:.25f}")
 
     # Print the Pythagorean price level
     print(f"Pythagorean Price Level: {pythagorean_price:.25f}")
@@ -323,18 +327,16 @@ for timeframe in timeframes:
     print(f"Golden Ratio (Phi) Level: {phi_level:.25f}")
 
     # Print whether the current close is below the angle price
-    print(f"Below 45 Degree Angle: {'TRUE' if is_below_angle else 'FALSE'}")
+    if is_below_angle:
+        print(f"The current close is below the 45-degree angle price: {current_angle_price:.25f} - TRUE")
+    else:
+        print(f"The current close is above the 45-degree angle price: {current_angle_price:.25f} - FALSE")
 
     # Incoming Reversal Information
     if abs(min_threshold - recent_close) < abs(max_threshold - recent_close):
         print(f"The current close is closer to the min threshold. An upcoming reversal minor might occur around {max_threshold:.25f}.")
     else:
         print(f"The current close is closer to the max threshold. An upcoming reversal minor might occur around {min_threshold:.25f}.")
-
-    # Check angle status based on actual calculated angle price
-    angle_price = calculate_angle_price(min_threshold, max_threshold)  # Re-compute if needed
-    current_angle_status = "Above 45 Degree Angle" if recent_close > angle_price else "Below 45 Degree Angle"
-    print(f"{current_angle_status}: {angle_price:.25f}")
 
     # Output projected prices using FFT
     print(f"Entry price: {entry_price:.25f}")
