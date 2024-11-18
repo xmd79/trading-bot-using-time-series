@@ -1,8 +1,9 @@
 import numpy as np
 from binance.client import Client as BinanceClient
 import datetime
-from scipy import fftpack
+import matplotlib.pyplot as plt
 import talib  # Ensure you have TALib installed: pip install TA-Lib
+from scipy import fftpack  # Importing fftpack for FFT functionality
 
 # Function to get Binance client credentials
 def get_binance_client():
@@ -16,7 +17,7 @@ def get_binance_client():
 # Initialize Binance client
 client = get_binance_client()
 
-TRADE_SYMBOL = "ACTUSDC"
+TRADE_SYMBOL = "ACTUSDT"
 timeframes = ['1m', '3m', '5m']
 
 # Function to get candles from the Binance API
@@ -80,10 +81,17 @@ def calculate_thresholds(close_prices):
     avg_mtf = np.mean(close_prices)
     return min_threshold, max_threshold, avg_mtf
 
+def calculate_fibonacci_levels(significant_low, significant_high):
+    """Calculate Fibonacci retracement levels from low to high."""
+    fib_levels = {}
+    fib_ratios = [0, 0.236, 0.382, 0.5, 0.618, 1]
+    for ratio in fib_ratios:
+        fib_levels[ratio] = significant_low + ratio * (significant_high - significant_low)
+    return fib_levels
+
 def calculate_gann_medians(candles, gann_lengths):
     """Calculate Gann medians based on the last available candles."""
     gann_medians = {}
-
     # Perform Gann calculations based on available data
     for length in gann_lengths:
         if len(candles) >= length:
@@ -98,18 +106,15 @@ def analyze_volume(candles):
     bullish_volume = sum(candle['volume'] for candle in candles if candle['close'] > candle['open'])
     bearish_volume = sum(candle['volume'] for candle in candles if candle['close'] < candle['open'])
     total_volume = sum(candle['volume'] for candle in candles)
-
     # Calculate volume ratios
     bullish_ratio = bullish_volume / total_volume if total_volume > 0 else 0
     bearish_ratio = bearish_volume / total_volume if total_volume > 0 else 0
-
     return bullish_volume, bearish_volume, total_volume, bullish_ratio, bearish_ratio
 
 def get_significant_volume_levels(candles, current_close):
     """Get support and resistance levels based on significant volume below and above current close."""
     volume_bullish_map = {}
     volume_bearish_map = {}
-
     for candle in candles:
         price = candle['close']
         if price < current_close:  # Collect bullish volumes below current close for support
@@ -117,10 +122,7 @@ def get_significant_volume_levels(candles, current_close):
         elif price > current_close:  # Collect bearish volumes above current close for resistance
             volume_bearish_map[price] = volume_bearish_map.get(price, 0) + candle['volume']
 
-    # Get the highest volume for support (bullish) below current close
     support_level = max(volume_bullish_map, key=volume_bullish_map.get) if volume_bullish_map else None
-
-    # Get the highest volume for resistance (bearish) above current close
     resistance_level = min(volume_bearish_map, key=volume_bearish_map.get) if volume_bearish_map else None
 
     return support_level, resistance_level
@@ -130,50 +132,40 @@ def get_next_minute_targets(closes, n_components):
     # Calculate FFT of closing prices
     fft = fftpack.fft(closes)
     frequencies = fftpack.fftfreq(len(closes))
-
     # Sort frequencies by magnitude and keep only the top n_components
     idx = np.argsort(np.abs(fft))[::-1][:n_components]
     top_frequencies = frequencies[idx]
-
     # Filter out the top frequencies and reconstruct the signal
     filtered_fft = np.zeros_like(fft)
     filtered_fft[idx] = fft[idx]
     filtered_signal = np.real(fftpack.ifft(filtered_fft))
-
     # Calculate the next target price as the last value in the filtered signal
     target_price = filtered_signal[-1]
-    
     # Calculate the entry price
     entry_price = closes[-1]
-    
     # Calculate standard deviation for additional target calculations
     std_dev = np.std(closes)
-    
     # Create multiple target levels based on standard deviation
-    targets = [
-        target_price + n * std_dev for n in range(1, 7)
-    ]
-
+    targets = [target_price + n * std_dev for n in range(1, 7)]
     return entry_price, target_price, targets
 
-def calculate_reversal_and_forecast(close, significant_low, significant_high):
-    """Calculate reversals and forecasts based on significant price levels."""
+def calculate_reversal_and_forecast(close, significant_low, significant_high, avg_threshold, recent_close, current_angle_status):
+    """Calculate reversals and forecasts based on significant price levels, avg threshold, and angle status."""
     current_reversal = None
     next_reversal = None
     forecast_dip = None
     forecast_top = None
 
     last_close = close[-1]
-
-    # Determine current reversal
-    if last_close < significant_low:
+    
+    # Determine current reversal based on the rules specified
+    if last_close > significant_low:
         current_reversal = "DIP"
         next_reversal = "TOP"
-    elif last_close > significant_high:
+    elif last_close < significant_high:
         current_reversal = "TOP"
         next_reversal = "DIP"
     else:
-        # Logic to define recent fluctuations
         if last_close <= (significant_high + significant_low) / 2:
             current_reversal = "DIP"
             next_reversal = "TOP"
@@ -181,45 +173,40 @@ def calculate_reversal_and_forecast(close, significant_low, significant_high):
             current_reversal = "TOP"
             next_reversal = "DIP"
 
-    # Calculate forecast dip and top
+    # Execute the logic for upward forecasts
     if current_reversal == "DIP":
-        forecast_dip = last_close - (last_close - significant_low) * 0.2  # Small dip below the current close
-        forecast_top = last_close + (significant_high - last_close) * 0.5  # Potential rally to mid-point
-    elif current_reversal == "TOP":
-        forecast_top = last_close + (significant_high - last_close) * 0.2  # Small increase above the current close
-        forecast_dip = last_close - (last_close - significant_low) * 0.5  # Potential drop to mid-point
+        if (last_close > significant_low and
+            last_close < (significant_high + significant_low) / 2 and
+            last_close < avg_threshold and 
+            current_angle_status == "Below 45 Degree Angle"):
+            forecast_dip = last_close - (last_close - significant_low) * 0.2
+            forecast_top = last_close + (significant_high - last_close) * 0.5
 
-    # Determine the forecast direction based on the last close and significant price levels
-    if last_close < significant_low:
-        forecast_direction = "Up"  # Expected recovery
-    elif last_close > significant_high:
-        forecast_direction = "Down"  # Expected correction
-    else:
-        forecast_direction = "Up" if current_reversal == "DIP" else "Down"  # Solve Neutral direction
+    # Execute the logic for downward forecasts
+    elif current_reversal == "TOP":
+        if (last_close < significant_high and
+            last_close > (significant_high + significant_low) / 2 and 
+            last_close > avg_threshold and 
+            current_angle_status == "Above 45 Degree Angle"):
+            forecast_top = last_close + (significant_high - last_close) * 0.2
+            forecast_dip = last_close - (last_close - significant_low) * 0.5
+
+    # Determine final forecast direction
+    forecast_direction = "Up" if forecast_dip is not None else "Down" if forecast_top is not None else "No Clear Direction"
 
     return current_reversal, next_reversal, forecast_direction, last_close, forecast_dip, forecast_top
 
 # Scale current close price to sine wave       
 def scale_to_sine(timeframe):  
     close_prices = np.array(get_close(timeframe))
-    # Get last close price 
     current_close = close_prices[-1]      
-        
-    # Calculate sine wave        
-    sine_wave, leadsine = talib.HT_SINE(close_prices)
-            
-    # Replace NaN values with 0        
+    sine_wave, _ = talib.HT_SINE(close_prices)
     sine_wave = np.nan_to_num(sine_wave)
-    #sine_wave = -sine_wave
-        
-    # Get the sine value for last close      
+    
     current_sine = sine_wave[-1]
-            
-    # Calculate the min and max sine           
     sine_wave_min = np.min(sine_wave)        
     sine_wave_max = np.max(sine_wave)
 
-    # Calculate % distances            
     dist_min = ((current_sine - sine_wave_min) /  (sine_wave_max - sine_wave_min)) * 100 
     dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
 
@@ -230,7 +217,6 @@ current_time = datetime.datetime.now()
 print("Current local Time is now at:", current_time)
 print()
 
-# Gann lengths definition
 gann_lengths = [5, 7, 9, 12, 14, 17, 21, 27, 45, 56, 100, 126, 147, 200, 258, 369]
 
 for timeframe in timeframes:
@@ -252,7 +238,7 @@ for timeframe in timeframes:
 
     # Analyze volume to build support and resistance
     bullish_volume, bearish_volume, total_volume, bullish_ratio, bearish_ratio = analyze_volume(candles)
-    
+
     # Get support and resistance that contains strongest volumes
     support, resistance = get_significant_volume_levels(candles, recent_close)
 
@@ -260,12 +246,18 @@ for timeframe in timeframes:
     entry_price, target_price, targets = get_next_minute_targets(close_prices, n_components=5)
 
     # Forecast potential reversals and prices
+    avg_threshold = (min_threshold + max_threshold) / 2
+    current_angle_status = "Above 45 Degree Angle" if recent_close > (significant_low + significant_high) / 2 else "Below 45 Degree Angle"
+    
     (current_reversal, next_reversal, forecast_direction, last_close, forecast_dip, forecast_top) = calculate_reversal_and_forecast(
-        close_prices, significant_low, significant_high
+        close_prices, significant_low, significant_high, avg_threshold, recent_close, current_angle_status
     )
 
     # Scale to sine
     dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
+
+    # Calculate Fibonacci levels
+    fib_levels = calculate_fibonacci_levels(significant_low, significant_high)
 
     # Output details
     print(f"=== Timeframe: {timeframe} ===")
@@ -278,9 +270,12 @@ for timeframe in timeframes:
     else:
         print("Bearish sentiment prevalent.")
 
-    # Print support and resistance levels
-    if support is not None and resistance is not None:
-        print(f"Support Level: {support:.25f}, Resistance Level: {resistance:.25f}")
+    print(f"Support Level: {support:.25f}, Resistance Level: {resistance:.25f}")
+
+    # Print Fibonacci levels
+    print("Fibonacci Levels:")
+    for level, price in fib_levels.items():
+        print(f"Fibonacci Level {level}: {price:.25f}")
 
     # Determine which threshold is closer to the recent close
     closest_threshold = ""
@@ -295,8 +290,6 @@ for timeframe in timeframes:
     for (length, median) in sorted_gann_medians:
         print(f"Gann Median (Length {length}): {median:.25f}")
 
-    print(f"Current Close Price: {recent_close:.25f}")
-
     # Find major highs and lows for current cycle
     print(f"Significant Low: {significant_low:.25f}, Significant High: {significant_high:.25f}")
 
@@ -307,7 +300,7 @@ for timeframe in timeframes:
         print(f"The current close is closer to the significant high. An upcoming reversal minor might occur around {significant_low:.25f}.")
 
     # Check if price is above or below the 45-degree angle
-    angle_slope = (significant_high - significant_low) / 45  # Assuming the price range represents 45 degrees change
+    angle_slope = (significant_high - significant_low) / 45  # Assuming the price range represents a 45 degrees change
     angle_intercept = significant_low  # The intersection point with significant low
     current_angle_status = "Above 45 Degree Angle" if recent_close > (angle_slope * len(close_prices) + angle_intercept) else "Below 45 Degree Angle"
     angle_price = angle_slope * len(close_prices) + angle_intercept
