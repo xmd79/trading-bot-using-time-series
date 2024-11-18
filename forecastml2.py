@@ -186,7 +186,7 @@ def scale_to_sine(timeframe):
     current_close = close_prices[-1]      
     sine_wave, _ = talib.HT_SINE(close_prices)
     sine_wave = np.nan_to_num(sine_wave)
-    
+    sine_wave = -sine_wave
     current_sine = sine_wave[-1]
     sine_wave_min = np.min(sine_wave)        
     sine_wave_max = np.max(sine_wave)
