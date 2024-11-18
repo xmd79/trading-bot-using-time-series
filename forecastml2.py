@@ -46,7 +46,7 @@ def clean_price_data(candles):
             cleaned_candles.append(c)
     return cleaned_candles
 
-# Initialize cleaned_candle_map
+# Initialize cleaned candle map
 cleaned_candle_map = {}
 candles = get_candles(TRADE_SYMBOL, timeframes)
 for candle in candles:
@@ -99,19 +99,35 @@ def analyze_volume(candles):
     bearish_ratio = bearish_volume / total_volume if total_volume > 0 else 0
     return bullish_volume, bearish_volume, total_volume, bullish_ratio, bearish_ratio
 
-def get_significant_volume_levels(candles, current_close):
-    """Get support and resistance levels."""
-    volume_bullish_map = {}
-    volume_bearish_map = {}
+def get_most_significant_volume_levels(candles, min_threshold, max_threshold):
+    """Get the most significant support and resistance levels based on consistent trading volume."""
+    volume_levels = {}
+    
     for candle in candles:
         price = candle['close']
-        if price < current_close:  # For support
-            volume_bullish_map[price] = volume_bullish_map.get(price, 0) + candle['volume']
-        elif price > current_close:  # For resistance
-            volume_bearish_map[price] = volume_bearish_map.get(price, 0) + candle['volume']
+        volume = candle['volume']
+        
+        if min_threshold <= price <= max_threshold:
+            if price not in volume_levels:
+                volume_levels[price] = []
+            volume_levels[price].append(volume)
 
-    support_level = max(volume_bullish_map, key=volume_bullish_map.get) if volume_bullish_map else None
-    resistance_level = min(volume_bearish_map, key=volume_bearish_map.get) if volume_bearish_map else None
+    support_level = None
+    resistance_level = None
+    max_avg_volume_below = 0
+    max_avg_volume_above = 0
+    
+    for price, volumes in volume_levels.items():
+        avg_volume = np.mean(volumes)
+        
+        if price < (min_threshold + max_threshold) / 2:  # Below mid-point for support
+            if avg_volume > max_avg_volume_below:
+                max_avg_volume_below = avg_volume
+                support_level = price
+        else:  # Above mid-point for resistance
+            if avg_volume > max_avg_volume_above:
+                max_avg_volume_above = avg_volume
+                resistance_level = price
 
     return support_level, resistance_level
 
@@ -180,11 +196,11 @@ def scale_to_sine(timeframe):
 
     return dist_min, dist_max, current_sine
 
-def calculate_angle_price_between_thresholds(min_threshold, max_threshold, candles_length):
-    """Calculate 45-degree angle price between min and max thresholds."""
-    angle_slope = (max_threshold - min_threshold) / candles_length  # Price change over a length equal to the number of candles
-    angle_price_between = min_threshold + angle_slope * (candles_length - 1)  # Compute based on the last candle's index
-    return angle_price_between
+def calculate_angle_price(min_threshold, max_threshold):
+    """Calculate the price corresponding to a 45-degree angle using linear interpolation."""
+    sin_45 = np.sqrt(2) / 2  # sin(45 degrees) = cos(45 degrees) = √2 / 2
+    angle_price = min_threshold + (max_threshold - min_threshold) * sin_45
+    return angle_price
 
 # Main Logic for Timeframes
 current_time = datetime.datetime.now()
@@ -211,8 +227,8 @@ for timeframe in timeframes:
     # Analyze volume to build support and resistance
     bullish_volume, bearish_volume, total_volume, bullish_ratio, bearish_ratio = analyze_volume(candles)
 
-    # Get support and resistance levels
-    support, resistance = get_significant_volume_levels(candles, recent_close)
+    # Get the most significant support and resistance levels
+    support, resistance = get_most_significant_volume_levels(candles, min_threshold, max_threshold)
 
     # Get FFT forecasts
     entry_price, target_price, targets = get_next_minute_targets(close_prices, n_components=5)
@@ -232,10 +248,10 @@ for timeframe in timeframes:
     fib_levels = calculate_fibonacci_levels(min_threshold, max_threshold)
 
     # Calculate the price corresponding to the 45-degree angle between min and max thresholds
-    angle_price_thresholds = calculate_angle_price_between_thresholds(min_threshold, max_threshold, len(candles))
+    angle_price = calculate_angle_price(min_threshold, max_threshold)
 
     # Determine if the current close is below the calculated angle price
-    is_below_angle = recent_close < angle_price_thresholds
+    is_below_angle = recent_close < angle_price
 
     # Output details
     print(f"=== Timeframe: {timeframe} ===")
@@ -248,7 +264,15 @@ for timeframe in timeframes:
     else:
         print("Bearish sentiment prevalent.")
 
-    print(f"Support Level: {support:.25f}, Resistance Level: {resistance:.25f}")
+    if support is None:
+        print("Support Level: Not available")
+    else:
+        print(f"Support Level: {support:.25f}")
+
+    if resistance is None:
+        print("Resistance Level: Not available")
+    else:
+        print(f"Resistance Level: {resistance:.25f}")
 
     # Print Fibonacci levels
     print("Fibonacci Levels:")
@@ -268,8 +292,8 @@ for timeframe in timeframes:
     for (length, median) in sorted_gann_medians:
         print(f"Gann Median (Length {length}): {median:.25f}")
 
-    # Print the price corresponding to the 45-degree angle between min and max thresholds
-    print(f"45-Degree Angle Price (Min/Max Thresholds): {angle_price_thresholds:.25f}")
+    # Print the price corresponding to the 45-degree angle
+    print(f"45-Degree Angle Price (Min/Max Thresholds): {angle_price:.25f}")
 
     # Print whether the current close is below the angle price
     print(f"Below 45 Degree Angle: {'TRUE' if is_below_angle else 'FALSE'}")
@@ -281,7 +305,7 @@ for timeframe in timeframes:
         print(f"The current close is closer to the max threshold. An upcoming reversal minor might occur around {min_threshold:.25f}.")
 
     # Check angle status based on actual calculated angle price
-    angle_price = calculate_angle_price_between_thresholds(min_threshold, max_threshold, len(close_prices))
+    angle_price = calculate_angle_price(min_threshold, max_threshold)  # Re-compute if needed
     current_angle_status = "Above 45 Degree Angle" if recent_close > angle_price else "Below 45 Degree Angle"
     print(f"{current_angle_status}: {angle_price:.25f}")
 
