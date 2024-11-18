@@ -202,6 +202,21 @@ def calculate_angle_price(min_threshold, max_threshold):
     angle_price = min_threshold + (max_threshold - min_threshold) * sin_45
     return angle_price
 
+# New Function to Calculate Pythagorean Price
+def calculate_pythagorean_price(min_threshold, max_threshold):
+    """Calculate a projected price using the Pythagorean theorem and the current price movement."""
+    # Assuming that the price movement can be represented as a right triangle
+    price_diff = max_threshold - min_threshold
+    pythagorean_price = (min_threshold**2 + price_diff**2) ** 0.5  # Hypotenuse value
+    return pythagorean_price
+
+# New Function to Calculate Phi Price Level
+def calculate_phi_level(min_threshold, max_threshold):
+    """Calculate a price level based on the Golden Ratio (Phi)."""
+    phi = (1 + np.sqrt(5)) / 2  # Approximately 1.618
+    phi_level = min_threshold + (max_threshold - min_threshold) * (phi - 1)  # Shifted by ratio
+    return phi_level
+
 # Main Logic for Timeframes
 current_time = datetime.datetime.now()
 print("Current local Time is now at:", current_time)
@@ -250,6 +265,12 @@ for timeframe in timeframes:
     # Calculate the price corresponding to the 45-degree angle between min and max thresholds
     angle_price = calculate_angle_price(min_threshold, max_threshold)
 
+    # Calculate projected price using Pythagorean Theorem
+    pythagorean_price = calculate_pythagorean_price(min_threshold, max_threshold)
+
+    # Calculate potential price based on the Golden Ratio (Phi)
+    phi_level = calculate_phi_level(min_threshold, max_threshold)
+
     # Determine if the current close is below the calculated angle price
     is_below_angle = recent_close < angle_price
 
@@ -294,6 +315,12 @@ for timeframe in timeframes:
 
     # Print the price corresponding to the 45-degree angle
     print(f"45-Degree Angle Price (Min/Max Thresholds): {angle_price:.25f}")
+
+    # Print the Pythagorean price level
+    print(f"Pythagorean Price Level: {pythagorean_price:.25f}")
+
+    # Print the Phi level
+    print(f"Golden Ratio (Phi) Level: {phi_level:.25f}")
 
     # Print whether the current close is below the angle price
     print(f"Below 45 Degree Angle: {'TRUE' if is_below_angle else 'FALSE'}")
