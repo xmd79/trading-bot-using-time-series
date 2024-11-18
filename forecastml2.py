@@ -17,7 +17,7 @@ def get_binance_client():
 client = get_binance_client()
 
 TRADE_SYMBOL = "ACTUSDT"
-timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '4h']  # Added new timeframes
+timeframes = ['1m', '3m', '5m', '15m', '30m', '1h']  # Added new timeframes
 
 # Function to get candles from the Binance API
 def get_candles(symbol, timeframes):
@@ -328,9 +328,9 @@ for timeframe in timeframes:
 
     # Print whether the current close is below the angle price
     if is_below_angle:
-        print(f"The current close is below the 45-degree angle price: {current_angle_price:.25f} - TRUE")
+        print(f"The current close is below the 45-degree angle price: TRUE")
     else:
-        print(f"The current close is above the 45-degree angle price: {current_angle_price:.25f} - FALSE")
+        print(f"The current close is above the 45-degree angle price: FALSE")
 
     # Incoming Reversal Information
     if abs(min_threshold - recent_close) < abs(max_threshold - recent_close):
