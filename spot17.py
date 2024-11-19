@@ -81,7 +81,7 @@ def buy_btc(amount):
 
 def check_exit_condition(initial_investment, btc_balance):
     current_value = btc_balance * get_current_btc_price()
-    return current_value >= (initial_investment * 1.0267)
+    return current_value >= (initial_investment * 1.01618)
 
 def backtest_model(candles):
     closes = np.array([candle["close"] for candle in candles])
@@ -234,18 +234,7 @@ def evaluate_forecast(current_price, support, resistance):
 def calculate_stochastic_rsi(close_prices, high_prices, low_prices, length_rsi, length_stoch, smooth_k, smooth_d, lower_band, upper_band):
     rsi = talib.RSI(np.array(close_prices), timeperiod=length_rsi)
     stoch_k, stoch_d = talib.STOCHF(np.array(high_prices), np.array(low_prices), np.array(close_prices), fastk_period=length_stoch, fastd_period=smooth_d)
-
-    # Generate signals based on Stochastic RSI
-    signals = []
-    for k, d in zip(stoch_k, stoch_d):
-        if k < lower_band and k > d:
-            signals.append("BUY")  # Possible dip buy signal
-        elif k > upper_band and k < d:
-            signals.append("SELL")  # Possible top sell signal
-        else:
-            signals.append("HOLD")  # No action
-
-    return stoch_k, stoch_d, signals
+    return stoch_k, stoch_d
 
 def determine_market_trend(last_bottom, last_top, last_major_reversal_type):
     if last_major_reversal_type == 'DIP':
@@ -301,6 +290,7 @@ while True:
     buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
     volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
 
+    # Enhance conditions status to include additional checks
     conditions_status = {
         "current_close_above_min_threshold": False,
         "dip_condition_met": False,
@@ -309,12 +299,11 @@ while True:
         "dist_to_min_less_than_max_5m": False,
         "current_close_below_average_threshold": False,
         "forecast_price_condition_met": False,
-        "current_close_below_angle_projection": False,
-        "mtf_dip_signal": False  # New condition for MTF dip signals
+        "mtf_bullish_signal": False,  # New flag for MTF bullish signal
     }
 
-    # Collect MTF Stochastic RSI signals
-    mtf_signals = {}
+    mtf_bullish_signals = []
+
     for timeframe in ['1m', '3m', '5m']:
         if timeframe in candle_map:
             print(f"--- {timeframe} ---")
@@ -328,9 +317,59 @@ while True:
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            # Get the closest major reversals and determine their type
-            last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
+            # Get stochastic RSI values
+            stoch_k, stoch_d = calculate_stochastic_rsi(closes, highs, lows, length_rsi=14, length_stoch=14, smooth_k=3, smooth_d=3, lower_band=20, upper_band=80)
+            current_stoch_k = stoch_k[-1]
+            current_stoch_d = stoch_d[-1]
 
+            # Calculate and print Stochastic RSI detail
+            print(f"Current Stochastic K: {current_stoch_k:.2f}")
+            print(f"Current Stochastic D: {current_stoch_d:.2f}")
+
+            # Calculate percentage ratio to min and max of Stochastic K
+            stoch_k_min = np.nanmin(stoch_k)
+            stoch_k_max = np.nanmax(stoch_k)
+            if stoch_k_max != stoch_k_min:
+                stoch_k_percentage = ((current_stoch_k - stoch_k_min) / (stoch_k_max - stoch_k_min)) * 100
+            else:
+                stoch_k_percentage = 0
+            
+            print(f"Stochastic K Percentage from Min: {stoch_k_percentage:.2f}%")
+            print(f"Stochastic K Percentage from Max: {100 - stoch_k_percentage:.2f}%")
+
+            # Determine if the MTF bullish signal condition is met
+            is_bullish_volume = volume_ratios[timeframe]['status'] == 'Bullish'
+            is_bearish_volume = volume_ratios[timeframe]['status'] == 'Bearish'
+
+            # Generate and print signals based on new logic
+            last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
+            
+            if closest_type == 'DIP':
+                # Check for reversal at DIP
+                if stoch_k_percentage < (100 - stoch_k_percentage) and is_bullish_volume:
+                    print("Signal: BUY (DIP Reversal & Bullish Volume)")
+                    mtf_bullish_signals.append(True)
+                elif stoch_k_percentage > (100 - stoch_k_percentage) and is_bearish_volume:
+                    print("Signal: SELL (DIP Reversal & Bearish Volume)")
+                    mtf_bullish_signals.append(False)
+            elif closest_type == 'TOP':
+                # Check for reversal at TOP
+                if stoch_k_percentage > (100 - stoch_k_percentage) and is_bearish_volume:
+                    print("Signal: SELL (TOP Reversal & Bearish Volume)")
+                    mtf_bullish_signals.append(False)
+                elif stoch_k_percentage < (100 - stoch_k_percentage) and is_bullish_volume:
+                    print("Signal: BUY (TOP Reversal & Bullish Volume)")
+                    mtf_bullish_signals.append(True)
+            else:
+                # General signal based on previous logic
+                if is_bullish_volume and stoch_k_percentage > (100 - stoch_k_percentage):
+                    print("Signal: BUY (Breaking Resistance)")
+                    mtf_bullish_signals.append(True)
+                elif is_bearish_volume and stoch_k_percentage < (100 - stoch_k_percentage):
+                    print("Signal: SELL (Breaking Support)")
+                    mtf_bullish_signals.append(False)
+
+            # Get the closest major reversals and determine their type
             forecast_price = None
             # Check forecast price based on the closest reversal type
             if closest_type == 'DIP':
@@ -342,31 +381,6 @@ while True:
             else:
                 forecast_price = None
 
-            # Calculate projections based on major reversals if available
-            projected_price_45 = calculate_45_degree_projection(last_bottom, last_top) if last_bottom is not None and last_top is not None else None
-            projected_price_golden = calculate_golden_ratio_projection(closes[-1], projected_price_45) if projected_price_45 is not None else None
-
-            # Print current price compared to the projected price
-            if projected_price_45 is not None:
-                print(f"Current Price: {current_close:.2f}")
-                print(f"45-Degree Angle Projected Price: {projected_price_45:.2f}")
-                conditions_status["current_close_below_angle_projection"] = current_close < projected_price_45
-
-            # Calculate distances to min and max
-            dist_to_min, dist_to_max, current_sine = scale_to_sine(closes)
-
-            # Print distances for each timeframe
-            print(f"Distance to Min: {dist_to_min:.2f}% | Distance to Max: {dist_to_max:.2f}%")
-
-            # Check distance conditions for 1m and 5m timeframes correctly
-            if timeframe == "1m":
-                conditions_status["dist_to_min_less_than_max_1m"] = dist_to_min < dist_to_max
-                print(f"1-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_1m']}")
-
-            if timeframe == "5m":
-                conditions_status["dist_to_min_less_than_max_5m"] = dist_to_min < dist_to_max
-                print(f"5-Minute Condition: Distance to Min < Distance to Max: {conditions_status['dist_to_min_less_than_max_5m']}")
-
             conditions_status["current_close_above_min_threshold"] = current_close > min_threshold
             conditions_status["volume_bullish_1m"] = buy_volume['1m'] > sell_volume['1m']
             conditions_status["forecast_price_condition_met"] = (forecast_price is not None) and (
@@ -375,13 +389,17 @@ while True:
             )
             conditions_status["current_close_below_average_threshold"] = current_close < avg_mtf
 
+            # Determine overall MTF bullish signal based on aggregated signals
+            conditions_status["mtf_bullish_signal"] = any(mtf_bullish_signals) and all(mtf_bullish_signals)
+
             if closest_reversal is not None:
                 print(f"Most Recent Major Reversal Type: {closest_type}")
                 print(f"Last Major Reversal Found at Price: {closest_reversal:.2f}")
             else:
                 print("No Major Reversal Found")
-            print(f"Projected Price Using 45-Degree Angle: {projected_price_45:.2f}" if projected_price_45 is not None else "No 45-Degree Projection")
-            print(f"Projected Price Using Golden Ratio: {projected_price_golden:.2f}" if projected_price_golden is not None else "No Golden Ratio Projection")
+
+            print(f"Projected Price Using 45-Degree Angle: {calculate_45_degree_projection(last_bottom, last_top):.2f}"
+                  if last_bottom is not None and last_top is not None else "No 45-Degree Projection")
             print(f"Current Close: {closes[-1]:.2f}")
             print(f"Minimum Threshold: {min_threshold:.2f}")
             print(f"Maximum Threshold: {max_threshold:.2f}")
@@ -396,20 +414,6 @@ while True:
             print(f"Market Trend: {market_trend}" if market_trend else "Market Trend: Undefined")
 
             print()  # Extra line for spacing between timeframes
-
-            # Calculate the Stochastic RSI and check the signals
-            stoch_k, stoch_d, signals = calculate_stochastic_rsi(closes, highs, lows, length_rsi=14, length_stoch=14, smooth_k=3, smooth_d=3, lower_band=20, upper_band=80)
-            print(f"Stochastic RSI Signals for {timeframe}: {signals[-1]}")  # Print the last signal for the timeframe
-
-            # Check for MTF DIP signal
-            if "BUY" in signals:
-                mtf_signals[timeframe] = "DIP"
-            else:
-                mtf_signals[timeframe] = "NO DIP"
-
-    # Check for MTF dip signal
-    conditions_status["mtf_dip_signal"] = any(signal == "DIP" for signal in mtf_signals.values())
-    print(f"Multi-Time Frame DIP Signal: {conditions_status['mtf_dip_signal']}")
 
     # Overall conditions summary
     true_conditions_count = sum(int(status) for status in conditions_status.values())
