@@ -331,21 +331,27 @@ while True:
 
     # MTF TSI Calculation
     if all(timeframe in tsi_values for timeframe in ['1m', '3m', '5m']):
-        avg_tsi_value = np.mean([tsi_values[tf][-1] for tf in ['1m', '3m', '5m']])
-        avg_tsi_signal = np.mean([tsi_signals[tf][-1] for tf in ['1m', '3m', '5m']])
+        # Compute the average values without ignoring negative values
+        tsi_last_values = [tsi_values[tf][-1] for tf in ['1m', '3m', '5m']]
         
-        # Calculate minimum and maximum TSI values from individual timeframes
-        min_mtf_tsi = min([tsi_values[tf][-1] for tf in ['1m', '3m', '5m']])
-        max_mtf_tsi = max([tsi_values[tf][-1] for tf in ['1m', '3m', '5m']])
+        # Ensuring we avoid None or NA values before calculating averages
+        tsi_last_values = [value for value in tsi_last_values if not np.isnan(value)]
 
-        # Calculate distances to min and max
+        avg_tsi_value = np.mean(tsi_last_values) if tsi_last_values else 0
+        avg_tsi_signal = np.mean([tsi_signals[tf][-1] for tf in ['1m', '3m', '5m'] if not np.isnan(tsi_signals[tf][-1])])
+
+        # Calculate minimum and maximum TSI values from individual timeframes
+        min_mtf_tsi = np.min(tsi_last_values) if tsi_last_values else 0
+        max_mtf_tsi = np.max(tsi_last_values) if tsi_last_values else 0
+
+        # Calculate distances to min and max for the MTF
         dist_to_min_mtf_tsi = ((avg_tsi_value - min_mtf_tsi) / (max_mtf_tsi - min_mtf_tsi)) * 100 if (max_mtf_tsi - min_mtf_tsi) != 0 else 0
         dist_to_max_mtf_tsi = ((max_mtf_tsi - avg_tsi_value) / (max_mtf_tsi - min_mtf_tsi)) * 100 if (max_mtf_tsi - min_mtf_tsi) != 0 else 0
 
         print(f"MTF TSI Value: {avg_tsi_value:.2f}")
         print(f"MTF TSI Signal: {avg_tsi_signal:.2f}")
         print(f"Distance to MTF TSI Min: {dist_to_min_mtf_tsi:.2f}% | Distance to MTF TSI Max: {dist_to_max_mtf_tsi:.2f}%")
-    
+
     # Enhance conditions status to include additional checks
     conditions_status = {
         "dip_condition_met": False,
