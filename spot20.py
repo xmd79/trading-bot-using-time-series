@@ -348,13 +348,11 @@ while True:
     
     # Enhance conditions status to include additional checks
     conditions_status = {
-        "current_close_above_min_threshold": False,
         "dip_condition_met": False,
         "volume_bullish_1m": False,
         "dist_to_min_less_than_max_1m": False,
         "dist_to_min_less_than_max_5m": False,
         "current_close_below_average_threshold": False,
-        "forecast_price_condition_met": False,
         "mtf_bullish_signal": False,  # New flag for MTF bullish signal
         "distance_to_mtf_condition": dist_to_min_mtf_tsi < dist_to_max_mtf_tsi  # New condition added here
     }
@@ -402,12 +400,8 @@ while True:
                     mtf_bullish_signals.append(True)
 
             # Check conditions
-            conditions_status["current_close_above_min_threshold"] = current_close > min_threshold
-            conditions_status["forecast_price_condition_met"] = (adjusted_forecasted_price is not None) and (
-                (closest_type == 'DIP' and current_close < adjusted_forecasted_price) or
-                (closest_type == 'TOP' and current_close > adjusted_forecasted_price)
-            )
-            conditions_status["current_close_below_average_threshold"] = current_close < avg_mtf
+            conditions_status["dip_condition_met"] = current_close < min_threshold  # Adjusted this condition based on your requirements
+            conditions_status["volume_bullish_1m"] = is_bullish_volume
 
             if closest_reversal is not None:
                 print(f"Most Recent Major Reversal Type: {closest_type}")
@@ -439,7 +433,7 @@ while True:
 
     # Check all conditions before executing an entry trade
     if not position_open:
-        # Ensure all conditions are true
+        # Ensure all conditions are true excluding removed ones
         all_conditions_met = all(conditions_status.values())
         # Include the new check for distance to MTF TSI Min < distance to MTF TSI Max
         if all_conditions_met and conditions_status["distance_to_mtf_condition"]:
