@@ -345,7 +345,7 @@ while True:
         print(f"MTF TSI Value: {avg_tsi_value:.2f}")
         print(f"MTF TSI Signal: {avg_tsi_signal:.2f}")
         print(f"Distance to MTF TSI Min: {dist_to_min_mtf_tsi:.2f}% | Distance to MTF TSI Max: {dist_to_max_mtf_tsi:.2f}%")
-
+    
     # Enhance conditions status to include additional checks
     conditions_status = {
         "current_close_above_min_threshold": False,
@@ -356,6 +356,7 @@ while True:
         "current_close_below_average_threshold": False,
         "forecast_price_condition_met": False,
         "mtf_bullish_signal": False,  # New flag for MTF bullish signal
+        "distance_to_mtf_condition": dist_to_min_mtf_tsi < dist_to_max_mtf_tsi  # New condition added here
     }
 
     mtf_bullish_signals = []
@@ -440,7 +441,8 @@ while True:
     if not position_open:
         # Ensure all conditions are true
         all_conditions_met = all(conditions_status.values())
-        if all_conditions_met:
+        # Include the new check for distance to MTF TSI Min < distance to MTF TSI Max
+        if all_conditions_met and conditions_status["distance_to_mtf_condition"]:
             if usdc_balance > 0:
                 amount_to_invest = usdc_balance
                 quantity_to_buy = amount_to_invest / current_btc_price
