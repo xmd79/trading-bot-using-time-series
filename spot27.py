@@ -349,10 +349,10 @@ def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_pr
     forecasted_price = None
 
     if volume_ratios['1m']['buy_ratio'] > 50:
-        forecasted_price = current_price + (current_price * 0.01)  # Assuming a bullish movement of 1%
+        forecasted_price = current_price + (current_price * 0.0267)  # Assuming a bullish movement of 1%
         print(f"Forecasting a potential bullish price increase to {forecasted_price:.2f} based on buy volume.")
     elif volume_ratios['1m']['sell_ratio'] > 50:
-        forecasted_price = current_price - (current_price * 0.267)  # Assuming a bearish movement of 26.7%
+        forecasted_price = current_price - (current_price * 0.0267)  # Assuming a bearish movement of 26.7%
         print(f"Forecasting a potential bearish price decrease to {forecasted_price:.2f} based on sell volume.")
     else:
         print("No clear forecast direction based on volume ratios.")
