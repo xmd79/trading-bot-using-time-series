@@ -31,9 +31,9 @@ def fetch_candles_in_parallel(timeframes, symbol='BTCUSDC', limit=100):
 
     return dict(zip(timeframes, results))
 
-def get_candles(TRADE_SYMBOL, timeframe, limit=100):
+def get_candles(symbol, timeframe, limit=100):
     try:
-        klines = client.get_klines(symbol=TRADE_SYMBOL, interval=timeframe, limit=limit)
+        klines = client.get_klines(symbol=symbol, interval=timeframe, limit=limit)
         candles = []
         for k in klines:
             candle = {
@@ -81,7 +81,7 @@ def buy_btc(amount):
 
 def check_exit_condition(initial_investment, btc_balance):
     current_value = btc_balance * get_current_btc_price()
-    return current_value >= (initial_investment * 1.0267)  # Corrected to 1.0267 (2.67% gain)
+    return current_value >= (initial_investment * 1.0267)
 
 def backtest_model(candles):
     closes = np.array([candle["close"] for candle in candles])
@@ -115,7 +115,6 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
     min_percentage_custom = minimum_percentage / 100  
     max_percentage_custom = maximum_percentage / 100
 
-    # Calculation of Thresholds
     min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
     max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
 
@@ -128,7 +127,6 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
     avg_mtf = np.nanmean(filtered_close)
     current_momentum = momentum[-1]
 
-    # Calculating percentages for momentum
     with np.errstate(invalid='ignore', divide='ignore'):
         percent_to_min_momentum = ((max_momentum - current_momentum) / (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
         percent_to_max_momentum = ((current_momentum - min_momentum) / (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
@@ -236,19 +234,14 @@ def calculate_45_degree_projection(last_bottom, last_top):
     """Calculate the projected price using a 45-degree angle."""
     if last_bottom is not None and last_top is not None:
         distance = last_top - last_bottom
-        projection = last_top + distance  # 45-degree projection
+        projection = last_top + distance
         return projection
     return None
 
-# Enhanced calculations for symmetry and normalization
 def find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_close):
-    """Identify specific support and resistance levels based on volume and thresholds with added filters."""
+    """Identify specific support and resistance levels based on volume and thresholds."""
     support_levels = []
     resistance_levels = []
-
-    # Volume analysis parameters
-    consolidation_threshold = 0.03  # 3% for consolidation
-    distribution_threshold = 0.1  # 10% for distribution spikes
 
     for timeframe in candle_map:
         candles = candle_map[timeframe]
@@ -258,125 +251,55 @@ def find_specific_support_resistance(candle_map, min_threshold, max_threshold, c
             if candle["close"] > current_close and candle["close"] <= max_threshold:
                 resistance_levels.append((candle["close"], candle["volume"]))
 
-    # Calculate total volumes at support and resistance prices
     support_volume_counts = {}
     for price, volume in support_levels:
-        if price in support_volume_counts:
-            support_volume_counts[price] += volume
-        else:
-            support_volume_counts[price] = volume
+        support_volume_counts[price] = support_volume_counts.get(price, 0) + volume
 
     resistance_volume_counts = {}
     for price, volume in resistance_levels:
-        if price in resistance_volume_counts:
-            resistance_volume_counts[price] += volume
-        else:
-            resistance_volume_counts[price] = volume
+        resistance_volume_counts[price] = resistance_volume_counts.get(price, 0) + volume
 
-    # Report support levels
     if support_volume_counts:
-        print("Support Levels based on Minimum Threshold:")
+        print("Support Levels:")
         for price, total_volume in support_volume_counts.items():
-            print(f"Support Price: {price:.2f}, Total Bullish Volume: {total_volume:.2f}")
+            print(f"Support Price: {price:.2f}, Volume: {total_volume:.2f}")
 
-    # Report resistance levels
     if resistance_volume_counts:
-        print("Resistance Levels based on Maximum Threshold:")
+        print("Resistance Levels:")
         for price, total_volume in resistance_volume_counts.items():
-            print(f"Resistance Price: {price:.2f}, Total Bearish Volume: {total_volume:.2f}")
+            print(f"Resistance Price: {price:.2f}, Volume: {total_volume:.2f}")
 
-    # Calculate distances to normalize based on min/max
-    if support_levels and resistance_levels:
-        min_support_price = min(support_volume_counts.keys())
-        max_resistance_price = max(resistance_volume_counts.keys())
-
-        # Distances calculation
-        distance_to_min = current_close - min_support_price
-        distance_to_max = max_resistance_price - current_close
-        print(f"Distance to Minimum Support: {distance_to_min:.2f}")
-        print(f"Distance to Maximum Resistance: {distance_to_max:.2f}")
-
-        # Normalizing distances to a symmetrical 0-100% scale
-        total_distance = distance_to_min + distance_to_max
-        if total_distance > 0:
-            normalized_distance_to_min = (distance_to_min / total_distance) * 100
-            normalized_distance_to_max = (distance_to_max / total_distance) * 100
-        else:
-            normalized_distance_to_min = 50
-            normalized_distance_to_max = 50
-
-        print(f"Normalized Distance to Minimum Support: {normalized_distance_to_min:.2f}%")
-        print(f"Normalized Distance to Maximum Resistance: {normalized_distance_to_max:.2f}%")
-        
-        # Momentum ratios
-        momentum_bull = sum(volume for price, volume in support_volume_counts.items() if price < current_close)
-        momentum_bear = sum(volume for price, volume in resistance_volume_counts.items() if price > current_close)
-        
-        total_momentum = momentum_bull + momentum_bear
-        if total_momentum > 0:
-            normalized_momentum_bull = (momentum_bull / total_momentum) * 100
-            normalized_momentum_bear = (momentum_bear / total_momentum) * 100
-        else:
-            normalized_momentum_bull = 50
-            normalized_momentum_bear = 50
-
-        print(f"Normalized Momentum Bullish Ratio: {normalized_momentum_bull:.2f}%")
-        print(f"Normalized Momentum Bearish Ratio: {normalized_momentum_bear:.2f}%")
-
-    # Return the top 3 unique support and resistance levels
     return list(support_volume_counts.keys())[:3], list(resistance_volume_counts.keys())[:3]
 
 def calculate_stochastic_rsi(close_prices, length_rsi=14, length_stoch=14, smooth_k=3, smooth_d=3):
-    # Calculate the Relative Strength Index (RSI)
+    """Calculate Stochastic RSI."""
     rsi = talib.RSI(np.array(close_prices), timeperiod=length_rsi)
-
-    # Calculate the Stochastic of RSI
     min_rsi = talib.MIN(rsi, timeperiod=length_stoch)
     max_rsi = talib.MAX(rsi, timeperiod=length_stoch)
-
-    # Calculate Stochastic K value
+    
     stoch_k = (rsi - min_rsi) / (max_rsi - min_rsi) * 100
-    # Smooth the K value
     stoch_k_smooth = talib.EMA(stoch_k, timeperiod=smooth_k)
-    # Smooth the D value
     stoch_d = talib.EMA(stoch_k_smooth, timeperiod=smooth_d)
 
     return stoch_k_smooth, stoch_d
 
-# New functions for enhanced logic
 def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_price):
-    """
-    Forecasts the expected price movement based on bullish or bearish volume.
-    :param volume_ratios: Dictionary containing buy and sell volume ratios
-    :param min_threshold: Minimum threshold for support price
-    :param current_price: Current market price of BTC
-    :return: Forecast price based on bullish or bearish conditions
-    """
     forecasted_price = None
 
     if volume_ratios['1m']['buy_ratio'] > 50:
-        forecasted_price = current_price + (current_price * 0.0267)  # Assuming a bullish movement of 2.67%
-        print(f"Forecasting a potential bullish price increase to {forecasted_price:.2f} based on buy volume.")
+        forecasted_price = current_price + (current_price * 0.0267)
+        print(f"Forecasting a bullish price increase to {forecasted_price:.2f}.")
     elif volume_ratios['1m']['sell_ratio'] > 50:
-        forecasted_price = current_price - (current_price * 0.0267)  # Assuming a bearish movement of 2.67%
-        print(f"Forecasting a potential bearish price decrease to {forecasted_price:.2f} based on sell volume.")
+        forecasted_price = current_price - (current_price * 0.0267)
+        print(f"Forecasting a bearish price decrease to {forecasted_price:.2f}.")
     else:
         print("No clear forecast direction based on volume ratios.")
 
     return forecasted_price
 
 def check_market_conditions_and_forecast(support_levels, resistance_levels, current_price):
-    """
-    Decide future price movements based on support and resistance levels,
-    and provide a forecast based on volume conditions.
-    :param support_levels: List of support price levels
-    :param resistance_levels: List of resistance price levels
-    :param current_price: Current price of BTC
-    :return: Forecast decision for buying or selling
-    """
     forecast_decision = None
 
-    # Add checks for support and resistance levels
     if not support_levels and not resistance_levels:
         print("No support or resistance levels found; trade cautiously.")
         return "No trading signals available."
@@ -385,14 +308,13 @@ def check_market_conditions_and_forecast(support_levels, resistance_levels, curr
     first_resistance = resistance_levels[0] if resistance_levels else None
 
     if first_support is not None and current_price < first_support:
-        forecast_decision = "The current price is below the key support level, consider selling."
-        print(f"Current price {current_price:.2f} is below the strongest support of {first_support:.2f}.")
+        forecast_decision = "Current price below key support level; consider selling."
+        print(f"Current price {current_price:.2f} is below support {first_support:.2f}.")
     elif first_resistance is not None and current_price > first_resistance:
-        forecast_decision = "The current price is above the key resistance level, consider buying."
-        print(f"Current price {current_price:.2f} is above the strongest resistance of {first_resistance:.2f}.")
+        forecast_decision = "Current price above key resistance level; consider buying."
+        print(f"Current price {current_price:.2f} is above resistance {first_resistance:.2f}.")
     else:
-        msg = f"Current price {current_price:.2f} is within the levels of support {first_support:.2f} and resistance {first_resistance:.2f}."
-        print(msg)
+        print(f"Current price {current_price:.2f} is within support {first_support} and resistance {first_resistance}.")
     
     return forecast_decision
 
@@ -403,11 +325,12 @@ min_trade_size = get_min_trade_size(TRADE_SYMBOL)
 position_open = False
 initial_investment = 0.0
 btc_balance = 0.0
+print("Trading Bot Initialized!")
 
 # Starting the main trading loop
 while True:
     current_local_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"Current Local Time: {current_local_time}")
+    print(f"\nCurrent Local Time: {current_local_time}")
 
     # Fetch candle data
     candle_map = fetch_candles_in_parallel(['1m', '3m', '5m'])
@@ -434,45 +357,53 @@ while True:
     buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
     volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
 
-    # Find specific support and resistance levels with added logic
+    # Find specific support and resistance levels
     support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
 
     # Forecast potential volumes based on conditions
     forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_btc_price)
     
-    # Check market conditions and determine forecast decisions based on support and resistance
+    # Check market conditions and determine forecast decisions
     forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_btc_price)
 
+    # Initialize conditions status
     conditions_status = {
         "volume_bullish_1m": False,
         "dist_to_min_less_than_max_1m": False,
         "dist_to_min_less_than_max_5m": False,
-        "current_close_below_average_threshold": False,
+        "current_close_below_average_threshold_5m": False,
         "dip_confirmed_1m": False,
         "dip_confirmed_5m": False,
+        "dist_to_min_sine_less_than_max_1m": False,
+        "dist_to_min_sine_less_than_max_5m": False
     }
 
     dominant_bullish_reversal = None
     dominant_bearish_reversal = None
 
-    for timeframe in ['1m', '3m', '5m']:
+    # Check conditions for each timeframe
+    for timeframe in ['1m', '5m']:  # Adjusted to only check 1m and 5m
         if timeframe in candle_map:
             print(f"--- {timeframe} ---")
             closes = [candle['close'] for candle in candle_map[timeframe]]
             current_close = closes[-1]
 
-            # Calculate thresholds and other indicators
             min_threshold, max_threshold, avg_mtf, momentum_signal, _, percent_to_min_momentum, percent_to_max_momentum = calculate_thresholds(
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            # Check for dip confirmation
             if timeframe == '1m':
                 conditions_status["dip_confirmed_1m"] = current_close < min_threshold
                 print(f"Dip Confirmed on 1min TF: {'True' if conditions_status['dip_confirmed_1m'] else 'False'}")
+                distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
+                conditions_status["dist_to_min_less_than_max_1m"] = distances_to_min < distances_to_max
+                conditions_status["dist_to_min_sine_less_than_max_1m"] = distances_to_min < distances_to_max
             elif timeframe == '5m':
                 conditions_status["dip_confirmed_5m"] = current_close < min_threshold
                 print(f"Dip Confirmed on 5min TF: {'True' if conditions_status['dip_confirmed_5m'] else 'False'}")
+                distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
+                conditions_status["dist_to_min_less_than_max_5m"] = distances_to_min < distances_to_max
+                conditions_status["dist_to_min_sine_less_than_max_5m"] = distances_to_min < distances_to_max
 
             # Calculate Stochastic RSI values
             stoch_k, stoch_d = calculate_stochastic_rsi(closes, length_rsi=14, length_stoch=14, smooth_k=3, smooth_d=3)
@@ -482,16 +413,12 @@ while True:
             print(f"Current Stochastic K: {current_stoch_k:.2f}")
             print(f"Current Stochastic D: {current_stoch_d:.2f}")
 
-            # Perform spectral analysis
             negative_freqs, negative_powers, positive_freqs, positive_powers = calculate_spectral_analysis(closes)
-
-            # Determine market sentiment based on predominant frequency
             market_sentiment = determine_market_sentiment(negative_freqs, negative_powers, positive_freqs, positive_powers)
             print(f"Market Sentiment: {market_sentiment}")
 
             last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
 
-            # Determine signaling based on the market sentiment and reversal types
             if market_sentiment == "Predominantly Positive":
                 if closest_type == 'DIP':
                     print("Signal: BUY (DIP Reversal & Predominantly Positive)")
@@ -505,11 +432,7 @@ while True:
                     print("Signal: BUY (TOP Reversal & Predominantly Negative)")
 
             conditions_status["volume_bullish_1m"] = buy_volume['1m'] > sell_volume['1m']
-            conditions_status["current_close_below_average_threshold"] = current_close < avg_mtf
-
-            if timeframe in ['1m', '5m']:
-                distances_to_min, distances_to_max, _ = scale_to_sine(closes)
-                conditions_status["dist_to_min_less_than_max_" + timeframe] = distances_to_min < distances_to_max
+            conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf
 
             if closest_reversal is not None:
                 print(f"Most Recent Major Reversal Type: {closest_type}")
@@ -517,7 +440,6 @@ while True:
             else:
                 print("No Major Reversal Found")
 
-            # Price projection using a 45-degree angle
             projected_price = calculate_45_degree_projection(last_bottom, last_top)
             print(f"Projected Price Using 45-Degree Angle: {projected_price:.2f}" if projected_price is not None else "No projection available")
             print(f"Current Close: {closes[-1]:.2f}")
@@ -531,7 +453,6 @@ while True:
 
     print()
 
-    # Overall conditions summary
     true_conditions_count = sum(int(status) for status in conditions_status.values())
     false_conditions_count = len(conditions_status) - true_conditions_count
     print(f"Overall Conditions Status: {true_conditions_count} True, {false_conditions_count} False")
@@ -541,19 +462,17 @@ while True:
 
     # Check all conditions before executing an entry trade
     if not position_open:
-        # Ensure all conditions are true
         all_conditions_met = all(conditions_status.values())
         if all_conditions_met:
             if usdc_balance > 0:  
                 amount_to_invest = usdc_balance
                 quantity_to_buy = amount_to_invest / current_btc_price
                 
-                # Check if the calculated quantity is greater than the minimum trade size
                 if quantity_to_buy >= min_trade_size:
-                    btc_order = buy_btc(quantity_to_buy)  # Place the order with the valid quantity
+                    btc_order = buy_btc(quantity_to_buy) 
                     if btc_order:
                         initial_investment = amount_to_invest
-                        btc_balance += quantity_to_buy  # track the BTC amount purchased
+                        btc_balance += quantity_to_buy  
                         print(f"New position opened with {amount_to_invest} USDC at price {current_btc_price:.2f}.")
                         position_open = True 
                 else:
@@ -575,7 +494,6 @@ while True:
             usdc_diff = exit_usdc_balance - initial_investment
             profit_percentage = (usdc_diff / initial_investment) * 100 if initial_investment > 0 else 0.0
 
-            # Log trade details
             print(f"Trade log: Time: {current_local_time}, Entry Price: {current_btc_price:.2f}, Exit Balance: {exit_usdc_balance:.2f}, Profit Percentage: {profit_percentage:.2f}%, Profit Amount: {usdc_diff:.2f}")
 
             position_open = False
