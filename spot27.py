@@ -115,6 +115,7 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
     min_percentage_custom = minimum_percentage / 100  
     max_percentage_custom = maximum_percentage / 100
 
+    # Calculation of Thresholds
     min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
     max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
 
@@ -127,6 +128,7 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
     avg_mtf = np.nanmean(filtered_close)
     current_momentum = momentum[-1]
 
+    # Calculating percentages for momentum
     with np.errstate(invalid='ignore', divide='ignore'):
         percent_to_min_momentum = ((max_momentum - current_momentum) / (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
         percent_to_max_momentum = ((current_momentum - min_momentum) / (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
@@ -238,7 +240,7 @@ def calculate_45_degree_projection(last_bottom, last_top):
         return projection
     return None
 
-# Enhanced these calculations for symmetry and normalization
+# Enhanced calculations for symmetry and normalization
 def find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_close):
     """Identify specific support and resistance levels based on volume and thresholds with added filters."""
     support_levels = []
@@ -349,10 +351,10 @@ def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_pr
     forecasted_price = None
 
     if volume_ratios['1m']['buy_ratio'] > 50:
-        forecasted_price = current_price + (current_price * 0.0267)  # Assuming a bullish movement of 1%
+        forecasted_price = current_price + (current_price * 0.0267)  # Assuming a bullish movement of 2.67%
         print(f"Forecasting a potential bullish price increase to {forecasted_price:.2f} based on buy volume.")
     elif volume_ratios['1m']['sell_ratio'] > 50:
-        forecasted_price = current_price - (current_price * 0.0267)  # Assuming a bearish movement of 26.7%
+        forecasted_price = current_price - (current_price * 0.0267)  # Assuming a bearish movement of 2.67%
         print(f"Forecasting a potential bearish price decrease to {forecasted_price:.2f} based on sell volume.")
     else:
         print("No clear forecast direction based on volume ratios.")
@@ -385,11 +387,7 @@ def check_market_conditions_and_forecast(support_levels, resistance_levels, curr
         forecast_decision = "The current price is above the key resistance level, consider buying."
         print(f"Current price {current_price:.2f} is above the strongest resistance of {first_resistance:.2f}.")
     else:
-        msg = "Current price {:.2f} is within the levels of support {} and resistance {}.".format(
-            current_price,
-            '{:.2f}'.format(first_support) if first_support is not None else 'N/A',
-            '{:.2f}'.format(first_resistance) if first_resistance is not None else 'N/A'
-        )
+        msg = f"Current price {current_price:.2f} is within the levels of support {first_support:.2f} and resistance {first_resistance:.2f}."
         print(msg)
     
     return forecast_decision
@@ -458,11 +456,12 @@ while True:
         print("No significant resistance levels found.")
 
     conditions_status = {
-        "dip_condition_met": False,
         "volume_bullish_1m": False,
         "dist_to_min_less_than_max_1m": False,
         "dist_to_min_less_than_max_5m": False,
         "current_close_below_average_threshold": False,
+        "dip_confirmed_1m": False,
+        "dip_confirmed_5m": False,
     }
 
     dominant_bullish_reversal = None
@@ -478,6 +477,14 @@ while True:
             min_threshold, max_threshold, avg_mtf, momentum_signal, _, percent_to_min_momentum, percent_to_max_momentum = calculate_thresholds(
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
+
+            # Check for dip confirmation
+            if timeframe == '1m':
+                conditions_status["dip_confirmed_1m"] = current_close < min_threshold
+                print(f"Dip Confirmed on 1min TF: {'True' if conditions_status['dip_confirmed_1m'] else 'False'}")
+            elif timeframe == '5m':
+                conditions_status["dip_confirmed_5m"] = current_close < min_threshold
+                print(f"Dip Confirmed on 5min TF: {'True' if conditions_status['dip_confirmed_5m'] else 'False'}")
 
             # Calculate Stochastic RSI values
             stoch_k, stoch_d = calculate_stochastic_rsi(closes, length_rsi=14, length_stoch=14, smooth_k=3, smooth_d=3)
@@ -533,6 +540,8 @@ while True:
             print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.2f}%")
             print(f"Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.2f}%")
             print(f"Status: {volume_ratios[timeframe]['status']}")
+
+    print()
 
     # Overall conditions summary
     true_conditions_count = sum(int(status) for status in conditions_status.values())
