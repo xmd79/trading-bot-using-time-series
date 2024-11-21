@@ -258,30 +258,37 @@ def find_specific_support_resistance(candle_map, min_threshold, max_threshold, c
             if candle["close"] > current_close and candle["close"] <= max_threshold:
                 resistance_levels.append((candle["close"], candle["volume"]))
 
-    # Sort by volume descending
-    support_levels.sort(key=lambda x: x[1], reverse=True)
-    resistance_levels.sort(key=lambda x: x[1], reverse=True)
+    # Calculate total volumes at support and resistance prices
+    support_volume_counts = {}
+    for price, volume in support_levels:
+        if price in support_volume_counts:
+            support_volume_counts[price] += volume
+        else:
+            support_volume_counts[price] = volume
 
-    if support_levels:
-        avg_support_volume = np.mean([lvl[1] for lvl in support_levels])
-        for price, volume in support_levels:
-            if volume < avg_support_volume * (1 + consolidation_threshold):
-                print(f"Support Price: {price:.2f} is in Consolidation with Volume: {volume:.2f}")
-            elif volume > avg_support_volume * (1 + distribution_threshold):
-                print(f"Support Price: {price:.2f} is a Distribution level with Volume: {volume:.2f}")
+    resistance_volume_counts = {}
+    for price, volume in resistance_levels:
+        if price in resistance_volume_counts:
+            resistance_volume_counts[price] += volume
+        else:
+            resistance_volume_counts[price] = volume
 
-    if resistance_levels:
-        avg_resistance_volume = np.mean([lvl[1] for lvl in resistance_levels])
-        for price, volume in resistance_levels:
-            if volume < avg_resistance_volume * (1 + consolidation_threshold):
-                print(f"Resistance Price: {price:.2f} is in Consolidation with Volume: {volume:.2f}")
-            elif volume > avg_resistance_volume * (1 + distribution_threshold):
-                print(f"Resistance Price: {price:.2f} is a Distribution level with Volume: {volume:.2f}")
+    # Report support levels
+    if support_volume_counts:
+        print("Support Levels based on Minimum Threshold:")
+        for price, total_volume in support_volume_counts.items():
+            print(f"Support Price: {price:.2f}, Total Bullish Volume: {total_volume:.2f}")
+
+    # Report resistance levels
+    if resistance_volume_counts:
+        print("Resistance Levels based on Maximum Threshold:")
+        for price, total_volume in resistance_volume_counts.items():
+            print(f"Resistance Price: {price:.2f}, Total Bearish Volume: {total_volume:.2f}")
 
     # Calculate distances to normalize based on min/max
     if support_levels and resistance_levels:
-        min_support_price = min(support_levels, key=lambda x: x[0])[0]
-        max_resistance_price = max(resistance_levels, key=lambda x: x[0])[0]
+        min_support_price = min(support_volume_counts.keys())
+        max_resistance_price = max(resistance_volume_counts.keys())
 
         # Distances calculation
         distance_to_min = current_close - min_support_price
@@ -302,8 +309,8 @@ def find_specific_support_resistance(candle_map, min_threshold, max_threshold, c
         print(f"Normalized Distance to Maximum Resistance: {normalized_distance_to_max:.2f}%")
         
         # Momentum ratios
-        momentum_bull = sum(volume for price, volume in support_levels if price < current_close)
-        momentum_bear = sum(volume for price, volume in resistance_levels if price > current_close)
+        momentum_bull = sum(volume for price, volume in support_volume_counts.items() if price < current_close)
+        momentum_bear = sum(volume for price, volume in resistance_volume_counts.items() if price > current_close)
         
         total_momentum = momentum_bull + momentum_bear
         if total_momentum > 0:
@@ -316,11 +323,8 @@ def find_specific_support_resistance(candle_map, min_threshold, max_threshold, c
         print(f"Normalized Momentum Bullish Ratio: {normalized_momentum_bull:.2f}%")
         print(f"Normalized Momentum Bearish Ratio: {normalized_momentum_bear:.2f}%")
 
-    # Select the top 3 unique support and resistance levels
-    support_levels = list(dict.fromkeys([level[0] for level in support_levels]))[:3]
-    resistance_levels = list(dict.fromkeys([level[0] for level in resistance_levels]))[:3]
-
-    return support_levels, resistance_levels
+    # Return the top 3 unique support and resistance levels
+    return list(support_volume_counts.keys())[:3], list(resistance_volume_counts.keys())[:3]
 
 def calculate_stochastic_rsi(close_prices, length_rsi=14, length_stoch=14, smooth_k=3, smooth_d=3):
     # Calculate the Relative Strength Index (RSI)
@@ -438,22 +442,6 @@ while True:
     
     # Check market conditions and determine forecast decisions based on support and resistance
     forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_btc_price)
-
-    if support_levels:
-        print("Support Levels based on Minimum Threshold:")
-        for price in support_levels:
-            total_volume = sum(candle["volume"] for candle in candle_map["1m"] if candle["close"] == price)
-            print(f"Support Price: {price:.2f}, Total Bullish Volume: {total_volume:.2f}")
-    else:
-        print("No significant support levels found.")
-
-    if resistance_levels:
-        print("Resistance Levels based on Maximum Threshold:")
-        for price in resistance_levels:
-            total_volume = sum(candle["volume"] for candle in candle_map["1m"] if candle["close"] == price)
-            print(f"Resistance Price: {price:.2f}, Total Bearish Volume: {total_volume:.2f}")
-    else:
-        print("No significant resistance levels found.")
 
     conditions_status = {
         "volume_bullish_1m": False,
