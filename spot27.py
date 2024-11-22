@@ -333,7 +333,7 @@ while True:
     print(f"\nCurrent Local Time: {current_local_time}")
 
     # Fetch candle data
-    candle_map = fetch_candles_in_parallel(['1m', '3m', '5m'])
+    candle_map = fetch_candles_in_parallel(['1m', '5m'])
     usdc_balance = get_balance('USDC')
     current_btc_price = get_current_btc_price()
 
@@ -378,11 +378,12 @@ while True:
         "dist_to_min_sine_less_than_max_5m": False
     }
 
-    dominant_bullish_reversal = None
-    dominant_bearish_reversal = None
+    # Variable to track major reversal types
+    last_bottom = None
+    last_top = None
 
     # Check conditions for each timeframe
-    for timeframe in ['1m', '5m']:  # Adjusted to only check 1m and 5m
+    for timeframe in ['1m', '5m']:  
         if timeframe in candle_map:
             print(f"--- {timeframe} ---")
             closes = [candle['close'] for candle in candle_map[timeframe]]
@@ -393,13 +394,15 @@ while True:
             )
 
             if timeframe == '1m':
-                conditions_status["dip_confirmed_1m"] = current_close < min_threshold
+                last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
+                conditions_status["dip_confirmed_1m"] = closest_type == 'DIP'
                 print(f"Dip Confirmed on 1min TF: {'True' if conditions_status['dip_confirmed_1m'] else 'False'}")
                 distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
                 conditions_status["dist_to_min_less_than_max_1m"] = distances_to_min < distances_to_max
                 conditions_status["dist_to_min_sine_less_than_max_1m"] = distances_to_min < distances_to_max
             elif timeframe == '5m':
-                conditions_status["dip_confirmed_5m"] = current_close < min_threshold
+                last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
+                conditions_status["dip_confirmed_5m"] = closest_type == 'DIP'
                 print(f"Dip Confirmed on 5min TF: {'True' if conditions_status['dip_confirmed_5m'] else 'False'}")
                 distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
                 conditions_status["dist_to_min_less_than_max_5m"] = distances_to_min < distances_to_max
@@ -417,12 +420,9 @@ while True:
             market_sentiment = determine_market_sentiment(negative_freqs, negative_powers, positive_freqs, positive_powers)
             print(f"Market Sentiment: {market_sentiment}")
 
-            last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
-
             if market_sentiment == "Predominantly Positive":
                 if closest_type == 'DIP':
                     print("Signal: BUY (DIP Reversal & Predominantly Positive)")
-                    dominant_bullish_reversal = closest_reversal  
                 elif closest_type == 'TOP':
                     print("Signal: SELL (TOP Reversal & Predominantly Positive)")
             elif market_sentiment == "Predominantly Negative":
