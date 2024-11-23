@@ -406,7 +406,7 @@ while True:
     if model is not None:
         forecasted_prices = forecast_next_price(model, num_steps=1)
         closes = [candle['close'] for candle in candle_map["1m"]]
-        min_threshold, max_threshold, _, _, _, _, _ = calculate_thresholds(closes)
+        min_threshold, max_threshold, avg_mtf, _, _, _, _ = calculate_thresholds(closes)
         adjusted_forecasted_price = np.clip(forecasted_prices[-1], min_threshold, max_threshold)
         print(f"Forecasted Price: {adjusted_forecasted_price:.2f}")
 
@@ -417,11 +417,11 @@ while True:
     # Find specific support and resistance levels
     support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
 
-    # Initialize conditions status with requested changes
+    # Calculate current close below average threshold for 5m timeframe
     conditions_status = {
-        "volume_bullish_1m": buy_volume['1m'] > sell_volume['1m'],  # Added check for bullish volume
-        "forecasted_price_above_current": adjusted_forecasted_price > current_btc_price, # New condition to check forecasted price
-        "current_close_below_average_threshold_5m": False,
+        "volume_bullish_1m": buy_volume['1m'] > sell_volume['1m'],
+        "forecasted_price_above_current": adjusted_forecasted_price > current_btc_price,
+        "current_close_below_average_threshold_5m": False,  # Placeholder for calculation
         "dip_confirmed_1m": False,
         "dip_confirmed_3m": False,
         "dip_confirmed_5m": False,
@@ -430,6 +430,15 @@ while True:
     # Variable to track major reversal types
     last_bottom = None
     last_top = None
+
+    # Determine current_close_below_average_threshold_5m
+    if "5m" in candle_map:
+        closes_5m = [candle['close'] for candle in candle_map["5m"]]
+        average_threshold_5m = np.nanmean(closes_5m)
+        current_close_5m = closes_5m[-1]  # Get the last close price of 5m timeframe
+        conditions_status["current_close_below_average_threshold_5m"] = current_close_5m < average_threshold_5m
+
+        print(f"Average MTF (5m): {average_threshold_5m:.2f}, Current Close (5m): {current_close_5m:.2f}")
 
     # Check conditions for each timeframe
     for timeframe in ['1m', '3m', '5m']:
