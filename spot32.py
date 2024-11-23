@@ -167,25 +167,18 @@ def calculate_volume_ratio(buy_volume, sell_volume):
             }
     return volume_ratio
 
-def find_major_reversals(candles, current_close, min_threshold, max_threshold):
-    lows = [candle['low'] for candle in candles if candle['low'] >= min_threshold]
-    highs = [candle['high'] for candle in candles if candle['high'] <= max_threshold]
+def find_major_reversals(candles, current_close):
+    """
+    Find major reversals based on volume for Support (below current close) and 
+    Resistance (above current close) levels.
+    """
+    support_levels = [candle['low'] for candle in candles if candle['low'] < current_close]
+    resistance_levels = [candle['high'] for candle in candles if candle['high'] > current_close]
 
-    last_bottom = np.nanmin(lows) if lows else None
-    last_top = np.nanmax(highs) if highs else None
+    last_bottom = np.nanmax(support_levels) if support_levels else None  # Highest support below current close
+    last_top = np.nanmin(resistance_levels) if resistance_levels else None  # Lowest resistance above current close
 
-    closest_reversal = None
-    closest_type = None
-
-    if last_bottom is not None and (closest_reversal is None or abs(last_bottom - current_close) < abs(closest_reversal - current_close)):
-        closest_reversal = last_bottom
-        closest_type = 'DIP'
-    
-    if last_top is not None and (closest_reversal is None or abs(last_top - current_close) < abs(closest_reversal - current_close)):
-        closest_reversal = last_top
-        closest_type = 'TOP'
-
-    return last_bottom, last_top, closest_reversal, closest_type
+    return last_bottom, last_top
 
 def scale_to_sine(close_prices):
     """Scale close prices to sine wave and return distances to min and max."""
@@ -286,9 +279,9 @@ def find_specific_support_resistance(candle_map, min_threshold, max_threshold, c
     for timeframe in candle_map:
         candles = candle_map[timeframe]
         for candle in candles:
-            if candle["close"] < current_close and candle["close"] >= min_threshold:
+            if candle["close"] < current_close and candle["close"] >= min_threshold:  # Always below current close for support
                 support_levels.append((candle["close"], candle["volume"], candle["time"]))
-            if candle["close"] > current_close and candle["close"] <= max_threshold:
+            if candle["close"] > current_close and candle["close"] <= max_threshold:  # Always above current close for resistance
                 resistance_levels.append((candle["close"], candle["volume"], candle["time"]))
 
     # Sort and select significant support and resistance levels
@@ -317,10 +310,10 @@ def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_pr
 
     if volume_ratios['1m']['buy_ratio'] > 50:
         forecasted_price = current_price + (current_price * 0.0267)
-        print(f"Forecasting a bullish price increase to {forecasted_price:.25f}.")
+        print(f"Forecasting a bullish price increase to {forecasted_price:.2f}.")
     elif volume_ratios['1m']['sell_ratio'] > 50:
         forecasted_price = current_price - (current_price * 0.0267)
-        print(f"Forecasting a bearish price decrease to {forecasted_price:.25f}.")
+        print(f"Forecasting a bearish price decrease to {forecasted_price:.2f}.")
     else:
         print("No clear forecast direction based on volume ratios.")
 
@@ -425,9 +418,16 @@ while True:
     # Find specific support and resistance levels
     support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
 
-    # Adding macro reversals - Fixed unpacking error
-    last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map['1d'], current_btc_price, min_threshold, max_threshold)
+    # Adding macro reversals - Ensuring correct handling of bottom and top determination
+    last_bottom, last_top = find_major_reversals(candle_map['1d'], current_btc_price)
     
+    # Define closest_type based on last bottom and last top
+    closest_type = None
+    if last_bottom is not None and last_bottom < current_btc_price:
+        closest_type = 'DIP'
+    elif last_top is not None and last_top > current_btc_price:
+        closest_type = 'TOP'
+
     # Safe printing handling for NoneTypes
     last_bottom_print = last_bottom if last_bottom is not None else "None"
     last_top_print = last_top if last_top is not None else "None"
@@ -446,10 +446,6 @@ while True:
         "dip_confirmed_5m": False,
     }
 
-    # Variable to track major reversal types
-    last_bottom = None
-    last_top = None
-
     # Check conditions for each timeframe
     for timeframe in ['1m', '3m', '5m']:
         if timeframe in candle_map:
@@ -462,8 +458,8 @@ while True:
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
-            conditions_status[f"dip_confirmed_{timeframe}"] = closest_type == 'DIP'
+            last_bottom, last_top = find_major_reversals(candle_map[timeframe], current_btc_price)
+            conditions_status[f"dip_confirmed_{timeframe}"] = current_close < last_bottom if last_bottom is not None else False
             print(f"Dip Confirmed on {timeframe} TF: {'True' if conditions_status[f'dip_confirmed_{timeframe}'] else 'False'}")
 
             # Check distances to minimum and maximum
@@ -525,9 +521,9 @@ while True:
             conditions_status["volume_bullish_1m"] = buy_volume['1m'] > sell_volume['1m']
             conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf
 
-            if closest_reversal is not None:
-                print(f"Most Recent Major Reversal Type: {closest_type}")
-                print(f"Last Major Reversal Found at Price: {closest_reversal:.2f}")
+            if last_bottom is not None:
+                print(f"Most Recent Major Reversal Type: {'DIP' if last_bottom < current_close else 'TOP'}")
+                print(f"Last Major Reversal Found at Price: {last_bottom:.2f}")
             else:
                 print("No Major Reversal Found")
 
