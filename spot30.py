@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException
@@ -14,7 +13,7 @@ from sklearn.metrics import mean_absolute_error
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"
 
-# Load credentials from a file
+# Load credentials from file
 with open("credentials.txt", "r") as f:
     lines = f.readlines()
     api_key = lines[0].strip()
@@ -54,7 +53,7 @@ def get_candles(symbol, timeframe, limit=100):
 
 def get_current_btc_price():
     try:
-        ticker = client.get_symbol_ticker(symbol=TRADE_SYMBOL)
+        ticker = client.get_symbol_ticker(symbol="BTCUSDC")
         return float(ticker['price'])
     except BinanceAPIException as e:
         print(f"Error fetching BTC price: {e.message}")
@@ -71,7 +70,7 @@ def get_balance(asset='USDC'):
 def buy_btc(amount):
     try:
         order = client.order_market_buy(
-            symbol=TRADE_SYMBOL,
+            symbol='BTCUSDC',
             quantity=amount
         )
         print(f"Market buy order executed: {order}")
@@ -89,7 +88,6 @@ def backtest_model(candles):
     X = np.arange(len(closes)).reshape(-1, 1) 
     y = closes
 
-    # Perform backtesting
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
 
     model = LinearRegression()
@@ -184,16 +182,11 @@ def find_major_reversals(candles, current_close, min_threshold, max_threshold):
         closest_reversal = last_top
         closest_type = 'TOP'
 
-    return last_bottom, last_top, closest_reversal, closest_type
+    return last_bottom, last_top, closest_reversal, closest_type 
 
 def scale_to_sine(close_prices):
     """Scale close prices to sine wave and return distances to min and max."""
     sine_wave, _ = talib.HT_SINE(np.array(close_prices))
-    
-    # Handle NaNs properly
-    if np.all(np.isnan(sine_wave)):
-        return 0, 0, np.nan
-
     current_sine = np.nan_to_num(sine_wave)[-1]
     sine_wave_min = np.nanmin(sine_wave)
     sine_wave_max = np.nanmax(sine_wave)
@@ -206,7 +199,7 @@ def scale_to_sine(close_prices):
 def calculate_spectral_analysis(prices):
     """Calculate the FFT of the closing prices and analyze frequencies."""
     fft_result = np.fft.fft(prices)
-    power_spectrum = np.abs(fft_result)**2
+    power_spectrum = np.abs(fft_result) ** 2
     frequencies = np.fft.fftfreq(len(prices))
 
     negative_freqs = frequencies[frequencies < 0]
@@ -217,39 +210,8 @@ def calculate_spectral_analysis(prices):
 
     return negative_freqs, negative_powers, positive_freqs, positive_powers
 
-def harmonic_sine_analysis(close_prices):
-    """Analyzes the harmonic sine characteristics of the closing prices."""
-    sine_wave, _ = talib.HT_SINE(np.array(close_prices))
-    current_sine = np.nan_to_num(sine_wave)[-1]
-    sine_wave_min = np.nanmin(sine_wave)
-    sine_wave_max = np.nanmax(sine_wave)
-
-    fft_result = np.fft.fft(close_prices)
-    power_spectrum = np.abs(fft_result)**2
-    frequencies = np.fft.fftfreq(len(close_prices))
-
-    negative_freqs = frequencies[frequencies < 0]
-    positive_freqs = frequencies[frequencies > 0]
-
-    significant_negative_freq = negative_freqs[power_spectrum[frequencies < 0].argsort()[-25:]] 
-    significant_positive_freq = positive_freqs[power_spectrum[frequencies > 0].argsort()[-25:]]  
-
-    total_negative_power = np.sum(power_spectrum[frequencies < 0])
-    total_positive_power = np.sum(power_spectrum[frequencies > 0])
-    predominant_frequency = "Negative" if total_positive_power > total_negative_power else "Positive"
-
-    results = {
-        "current_sine": current_sine,
-        "sine_wave_min": sine_wave_min,
-        "sine_wave_max": sine_wave_max,
-        "significant_negative_freq": significant_negative_freq,
-        "significant_positive_freq": significant_positive_freq,
-        "predominant_frequency": predominant_frequency
-    }
-
-    return results
-
 def determine_market_sentiment(negative_freqs, negative_powers, positive_freqs, positive_powers):
+    """Determine if the market is predominantly negative or positive based on frequencies."""
     total_negative_power = np.sum(negative_powers)
     total_positive_power = np.sum(positive_powers)
 
@@ -289,11 +251,12 @@ def find_specific_support_resistance(candle_map, min_threshold, max_threshold, c
             if candle["close"] > current_close and candle["close"] <= max_threshold:
                 resistance_levels.append((candle["close"], candle["volume"], candle["time"]))
 
-    support_levels.sort(key=lambda x: x[1], reverse=True)  
-    resistance_levels.sort(key=lambda x: x[1], reverse=True)  
+    # Sort and select significant support and resistance levels
+    support_levels.sort(key=lambda x: x[1], reverse=True)  # Sort by volume
+    resistance_levels.sort(key=lambda x: x[1], reverse=True)  # Sort by volume
 
-    significant_support = support_levels[:3]  
-    significant_resistance = resistance_levels[:3]  
+    significant_support = support_levels[:3]  # Get top 3 support levels
+    significant_resistance = resistance_levels[:3]  # Get top 3 resistance levels
 
     print("Most Significant Support Levels (Price, Volume):")
     for price, volume, timestamp in significant_support:
@@ -318,15 +281,17 @@ def calculate_stochastic_rsi(close_prices, length_rsi=14, length_stoch=14, smoot
     return stoch_k_smooth, stoch_d
 
 def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_price):
-    """Forecast the price based on volume ratios."""
     forecasted_price = None
-    price_adjustment = 0.0267  # Adjust this value based on trading strategy (in percentage)
-    
-    if volume_ratios['buy_ratio'] > 50:
-        forecasted_price = current_price + (current_price * price_adjustment)
-    elif volume_ratios['sell_ratio'] > 50:
-        forecasted_price = current_price - (current_price * price_adjustment)
-    
+
+    if volume_ratios['1m']['buy_ratio'] > 50:
+        forecasted_price = current_price + (current_price * 0.0267)
+        print(f"Forecasting a bullish price increase to {forecasted_price:.25f}.")
+    elif volume_ratios['1m']['sell_ratio'] > 50:
+        forecasted_price = current_price - (current_price * 0.0267)
+        print(f"Forecasting a bearish price decrease to {forecasted_price:.25f}.")
+    else:
+        print("No clear forecast direction based on volume ratios.")
+
     return forecasted_price
 
 def check_market_conditions_and_forecast(support_levels, resistance_levels, current_price):
@@ -341,35 +306,14 @@ def check_market_conditions_and_forecast(support_levels, resistance_levels, curr
 
     if first_support is not None and current_price < first_support:
         forecast_decision = "Current price below key support level; consider selling."
+        print(f"Current price {current_price:.2f} is below support {first_support:.2f}.")
     elif first_resistance is not None and current_price > first_resistance:
         forecast_decision = "Current price above key resistance level; consider buying."
+        print(f"Current price {current_price:.2f} is above resistance {first_resistance:.2f}.")
+    else:
+        print(f"Current price {current_price:.2f} is within support {first_support} and resistance {first_resistance}.")
     
     return forecast_decision
-
-def ema(series, length):
-    """Calculate Exponential Moving Average (EMA)."""
-    return series.ewm(span=length, adjust=False).mean()
-
-def calculate_smi(df, length_k=10, length_d=3, length_ema=3):
-    """Calculate the Stochastic Momentum Index (SMI) and its EMA."""
-    
-    df = df.sort_index()
-
-    # Primary SMI Calculation
-    highest_high = df['high'].rolling(window=length_k).max()
-    lowest_low = df['low'].rolling(window=length_k).min()
-    
-    highest_lowest_range = highest_high - lowest_low
-    relative_range = df['close'] - (highest_high + lowest_low) / 2
-
-    smi = 200 * (ema(relative_range, length_d) / ema(highest_lowest_range, length_d))
-    smi_ema = ema(smi, length_ema)
-
-    # Add current SMI to DataFrame
-    df['smi'] = smi
-    df['smi_ema'] = smi_ema
-
-    return df[['close', 'high', 'low', 'smi', 'smi_ema']]
 
 # Instantiate the minimum trade size for the trading pair
 min_trade_size = get_min_trade_size(TRADE_SYMBOL)
@@ -377,7 +321,7 @@ min_trade_size = get_min_trade_size(TRADE_SYMBOL)
 # Initialize variables for tracking trade state
 position_open = False
 initial_investment = 0.0
-btc_balance = 0.0 
+btc_balance = 0.0
 print("Trading Bot Initialized!")
 
 # Starting the main trading loop
@@ -386,7 +330,7 @@ while True:
     print(f"\nCurrent Local Time: {current_local_time}")
 
     # Fetch candle data
-    candle_map = fetch_candles_in_parallel(['1m', '3m', '5m'])  
+    candle_map = fetch_candles_in_parallel(['1m', '5m', '3m'])  # Added 3m timeframe
     usdc_balance = get_balance('USDC')
     current_btc_price = get_current_btc_price()
 
@@ -400,10 +344,11 @@ while True:
     adjusted_forecasted_price = None
     if model is not None:
         forecasted_prices = forecast_next_price(model, num_steps=1)
-        closes = [candle['close'] for candle in candle_map["1m"]]
-        min_threshold, max_threshold, avg_mtf, _, _, _, _ = calculate_thresholds(closes)
-        adjusted_forecasted_price = np.clip(forecasted_prices[-1], min_threshold, max_threshold)
-        print(f"Forecasted Price: {adjusted_forecasted_price:.2f}")
+        if "1m" in candle_map:
+            closes = [candle['close'] for candle in candle_map["1m"]]
+            min_threshold, max_threshold, _, _, _, _, _ = calculate_thresholds(closes)
+            adjusted_forecasted_price = np.clip(forecasted_prices[-1], min_threshold, max_threshold)
+            print(f"Forecasted Price: {adjusted_forecasted_price:.2f}")
 
     # Calculate volume details
     buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
@@ -412,29 +357,29 @@ while True:
     # Find specific support and resistance levels
     support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
 
-    # Calculate current close below average threshold for 5m timeframe
+    # Forecast potential volumes based on conditions
+    forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_btc_price)
+    
+    # Check market conditions and determine forecast decisions
+    forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_btc_price)
+
+    # Initialize conditions status
     conditions_status = {
-        "volume_bullish_1m": buy_volume['1m'] > sell_volume['1m'],
-        "forecasted_price_above_current": adjusted_forecasted_price > current_btc_price,
-        "current_close_below_average_threshold_5m": False,  # Placeholder for calculation
+        "volume_bullish_1m": False,
+        "ML_Forecasted_Price_over_Current_Close": False,
+        "dist_to_min_less_than_max_5m": False,
+        "current_close_below_average_threshold_5m": False,
         "dip_confirmed_1m": False,
-        "dip_confirmed_3m": False,
         "dip_confirmed_5m": False,
+        "dist_to_min_sine_less_than_max_3m": False
     }
 
     # Variable to track major reversal types
     last_bottom = None
     last_top = None
 
-    # Determine current_close_below_average_threshold_5m
-    if "5m" in candle_map:
-        closes_5m = [candle['close'] for candle in candle_map["5m"]]
-        average_threshold_5m = np.nanmean(closes_5m)
-        current_close_5m = closes_5m[-1]  # Get the last close price of 5m timeframe
-        conditions_status["current_close_below_average_threshold_5m"] = current_close_5m < average_threshold_5m
-
     # Check conditions for each timeframe
-    for timeframe in ['1m', '3m', '5m']:
+    for timeframe in ['1m', '3m', '5m']:  # Check 3m timeframe as well
         if timeframe in candle_map:
             print(f"--- {timeframe} ---")
             closes = [candle['close'] for candle in candle_map[timeframe]]
@@ -444,69 +389,64 @@ while True:
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
-            conditions_status[f"dip_confirmed_{timeframe}"] = closest_type == 'DIP'
+            if timeframe == '1m':
+                last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
+                conditions_status["dip_confirmed_1m"] = closest_type == 'DIP'
+                print(f"Dip Confirmed on 1min TF: {'True' if conditions_status['dip_confirmed_1m'] else 'False'}")
+                distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
+                conditions_status["dist_to_min_less_than_max_5m"] = distances_to_min < distances_to_max
+                conditions_status["ML_Forecasted_Price_over_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
+            elif timeframe == '3m':
+                last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
+                conditions_status["dip_confirmed_3m"] = closest_type == 'DIP'
+                print(f"Dip Confirmed on 3min TF: {'True' if conditions_status['dip_confirmed_3m'] else 'False'}")
+                distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
+                conditions_status["dist_to_min_sine_less_than_max_3m"] = distances_to_min < distances_to_max
+            elif timeframe == '5m':
+                last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
+                conditions_status["dip_confirmed_5m"] = closest_type == 'DIP'
+                print(f"Dip Confirmed on 5min TF: {'True' if conditions_status['dip_confirmed_5m'] else 'False'}")
+                distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
+                conditions_status["dist_to_min_less_than_max_5m"] = distances_to_min < distances_to_max
 
-            # New detailed log prints for each timeframe
-            print(f"Dip Confirmed on {timeframe} TF: {'True' if conditions_status[f'dip_confirmed_{timeframe}'] else 'False'}")
+            # Calculate Stochastic RSI values
+            stoch_k, stoch_d = calculate_stochastic_rsi(closes, length_rsi=14, length_stoch=14, smooth_k=3, smooth_d=3)
+            current_stoch_k = stoch_k[-1]
+            current_stoch_d = stoch_d[-1]
 
-            # Check distances to minimum and maximum
-            distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
-
-            # New Percentage Calculation
-            percent_distance_min = ((current_close - min_threshold) / (max_threshold - min_threshold)) * 100 if (max_threshold - min_threshold) != 0 else 0
-            percent_distance_max = ((max_threshold - current_close) / (max_threshold - min_threshold)) * 100 if (max_threshold - min_threshold) != 0 else 0
-
-            # Clipping to ensure proper bounds
-            percent_distance_min_symmetrical = np.clip(percent_distance_min, 0, 100)
-            percent_distance_max_symmetrical = np.clip(percent_distance_max, 0, 100)
-
-            # Calculate harmonic sine data
-            sine_data = harmonic_sine_analysis(closes)
-
-            # Print calculated distances and status
-            print(f"Distance to Min Threshold (TF {timeframe}): {percent_distance_min_symmetrical:.2f}%, Distance to Max Threshold: {percent_distance_max_symmetrical:.2f}%")
-            print(f"Predominant Frequency: {sine_data['predominant_frequency']}")
-            print(f"Distance to Min on {timeframe}: {distances_to_min:.2f}%, Distance to Max: {distances_to_max:.2f}%")
-            print(f"Current Close: {current_close:.2f}, Current Sine: {current_sine:.2f}")
-
-            # Get SMI data and calculate distance ratios
-            smi_df = calculate_smi(pd.DataFrame(candle_map[timeframe]))  # Convert current candles to a DataFrame for SMI calculation
-            current_smi = smi_df['smi'].iloc[-1]
-
-            # Calculate SMI thresholds
-            smi_min = smi_df['smi'].min()
-            smi_max = smi_df['smi'].max()
-
-            # Calculate distances and percentages for SMI
-            smi_dist_to_min = ((current_smi - smi_min) / (smi_max - smi_min)) * 100 if (smi_max - smi_min) != 0 else 0
-            smi_dist_to_max = ((smi_max - current_smi) / (smi_max - smi_min)) * 100 if (smi_max - smi_min) != 0 else 0
-            
-            # Print SMI details
-            print(f"Current SMI ({timeframe}): {current_smi:.2f} (Dist to Min: {smi_dist_to_min:.2f}%, Dist to Max: {smi_dist_to_max:.2f}%)")
+            print(f"Current Stochastic K: {current_stoch_k:.2f}")
+            print(f"Current Stochastic D: {current_stoch_d:.2f}")
 
             negative_freqs, negative_powers, positive_freqs, positive_powers = calculate_spectral_analysis(closes)
             market_sentiment = determine_market_sentiment(negative_freqs, negative_powers, positive_freqs, positive_powers)
             print(f"Market Sentiment: {market_sentiment}")
 
-            # Forecast for each timeframe based on volume ratios
-            volume_forecasted_price = forecast_volume_based_on_conditions(volume_ratios[timeframe], min_threshold, current_btc_price)
+            if market_sentiment == "Predominantly Positive":
+                if closest_type == 'DIP':
+                    print("Signal: BUY (DIP Reversal & Predominantly Positive)")
+                elif closest_type == 'TOP':
+                    print("Signal: SELL (TOP Reversal & Predominantly Positive)")
+            elif market_sentiment == "Predominantly Negative":
+                if closest_type == 'DIP':
+                    print("Signal: SELL (DIP Reversal & Predominantly Negative)")
+                elif closest_type == 'TOP':
+                    print("Signal: BUY (TOP Reversal & Predominantly Negative)")
 
-            if volume_forecasted_price is not None:
-                print(f"Volume-Based Forecast for {timeframe}: {volume_forecasted_price:.2f}")
+            conditions_status["volume_bullish_1m"] = buy_volume['1m'] > sell_volume['1m']
+            conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf
 
             if closest_reversal is not None:
                 print(f"Most Recent Major Reversal Type: {closest_type}")
-                print(f"Last Major Reversal Found at Price: {closest_reversal:.2f}")
+                print(f"Last Major Reversal Found at Price: {closest_reversal:.2f}")  # Removed datetime
             else:
                 print("No Major Reversal Found")
 
             projected_price = calculate_45_degree_projection(last_bottom, last_top)
             print(f"Projected Price Using 45-Degree Angle: {projected_price:.2f}" if projected_price is not None else "No projection available")
-
-            print(f"Current Close: {current_close:.2f}")
+            print(f"Current Close: {closes[-1]:.2f}")
             print(f"Minimum Threshold: {min_threshold:.2f}")
             print(f"Maximum Threshold: {max_threshold:.2f}")
+            print(f"Average MTF: {avg_mtf:.2f}")
             print(f"Momentum Signal: {momentum_signal:.2f}")
             print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.2f}%")
             print(f"Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.2f}%")
@@ -514,7 +454,6 @@ while True:
 
     print()
 
-    # Adjust the overall conditions status
     true_conditions_count = sum(int(status) for status in conditions_status.values())
     false_conditions_count = len(conditions_status) - true_conditions_count
     print(f"Overall Conditions Status: {true_conditions_count} True, {false_conditions_count} False")
@@ -546,7 +485,7 @@ while True:
     if position_open and check_exit_condition(initial_investment, btc_balance):
         try:
             sell_order = client.order_market_sell(
-                symbol=TRADE_SYMBOL,
+                symbol='BTCUSDC',
                 quantity=btc_balance
             )
             print(f"Market sell order executed: {sell_order}")
@@ -574,4 +513,4 @@ while True:
     print(f"Current BTC price: {current_btc_price:.15f}")
     print()
 
-    time.sleep(5)
+    time.sleep(5)  # Wait before the next iteration
