@@ -13,7 +13,7 @@ from sklearn.metrics import mean_absolute_error
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"
 
-# Load credentials from file
+# Load credentials from the file
 with open("credentials.txt", "r") as f:
     lines = f.readlines()
     api_key = lines[0].strip()
@@ -22,32 +22,8 @@ with open("credentials.txt", "r") as f:
 # Instantiate Binance client
 client = BinanceClient(api_key, api_secret)
 
-# Gann Price Cycle Calculation
-def calculate_gann_price_levels(price_low, price_high):
-    price_levels = {}
-    price_range = price_high - price_low
-    subdivisions = [1/8, 1/4, 1/2, 3/4, 7/8]
-
-    for n in subdivisions:
-        price_levels[f'{int(n * 8)}/8'] = price_low + n * price_range
-
-    return price_levels
-
-# Gann Time Cycle Calculation
-def calculate_gann_time_cycles():
-    # Instead of returning angles only, return future timestamps based on desired intervals
-    current_time = datetime.datetime.now()
-    time_cycles = {
-        '1/8': current_time + datetime.timedelta(minutes=15),
-        '2/8': current_time + datetime.timedelta(minutes=30),
-        '4/8': current_time + datetime.timedelta(minutes=45),
-        '6/8': current_time + datetime.timedelta(minutes=60),
-        '7/8': current_time + datetime.timedelta(minutes=75),
-    }
-    
-    return time_cycles
-
 def fetch_candles_in_parallel(timeframes, symbol='BTCUSDC', limit=100):
+    """Fetch candle data for given timeframes in parallel."""
     def fetch_candles(timeframe):
         return get_candles(symbol, timeframe, limit)
 
@@ -57,12 +33,13 @@ def fetch_candles_in_parallel(timeframes, symbol='BTCUSDC', limit=100):
     return dict(zip(timeframes, results))
 
 def get_candles(symbol, timeframe, limit=100):
+    """Fetch candles from Binance API."""
     try:
         klines = client.get_klines(symbol=symbol, interval=timeframe, limit=limit)
         candles = []
         for k in klines:
             candle = {
-                "time": k[0] / 1000,
+                "time": k[0] / 1000,  # Convert milliseconds to seconds
                 "open": float(k[1]),
                 "high": float(k[2]),
                 "low": float(k[3]),
@@ -77,6 +54,7 @@ def get_candles(symbol, timeframe, limit=100):
         return []
 
 def get_current_btc_price():
+    """Get the current price of BTC from Binance."""
     try:
         ticker = client.get_symbol_ticker(symbol="BTCUSDC")
         return float(ticker['price'])
@@ -85,6 +63,7 @@ def get_current_btc_price():
         return 0.0
 
 def get_balance(asset='USDC'):
+    """Get the balance of a given asset."""
     try:
         balance_info = client.get_asset_balance(asset)
         return float(balance_info['free']) if balance_info else 0.0
@@ -93,6 +72,7 @@ def get_balance(asset='USDC'):
         return 0.0
 
 def buy_btc(amount):
+    """Execute a market buy order for BTC."""
     try:
         order = client.order_market_buy(
             symbol='BTCUSDC',
@@ -102,13 +82,15 @@ def buy_btc(amount):
         return order
     except BinanceAPIException as e:
         print(f"Error executing buy order: {e.message}")
-        return None 
+        return None
 
 def check_exit_condition(initial_investment, btc_balance):
+    """Check if exit conditions are met for a position."""
     current_value = btc_balance * get_current_btc_price()
     return current_value >= (initial_investment * 1.0267)
 
 def backtest_model(candles):
+    """Perform a backtest on the provided candles."""
     closes = np.array([candle["close"] for candle in candles])
     X = np.arange(len(closes)).reshape(-1, 1)
     y = closes
@@ -124,6 +106,7 @@ def backtest_model(candles):
     return model, mae, predictions, y_test
 
 def forecast_next_price(model, num_steps=1):
+    """Forecast the next price using a trained ML model."""
     last_index = model.n_features_in_
     future_steps = np.arange(last_index, last_index + num_steps).reshape(-1, 1)
     forecasted_prices = model.predict(future_steps)
@@ -162,6 +145,57 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
 
     return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price, percent_to_min_momentum, percent_to_max_momentum
 
+def get_cardinal_prices(symbol, timeframe, client):
+    """
+    Fetch historical data and compute cardinal prices for the day: North (0°), East (90°),
+    South (180°), and West (270°) based on closest closing prices.
+    """
+    current_time = datetime.datetime.now()
+    current_date = current_time.date()
+
+    # Cardinal times in UTC
+    cardinal_times = {
+        "North (0°)": datetime.time(0, 0),
+        "East (90°)": datetime.time(6, 0),
+        "South (180°)": datetime.time(12, 0),
+        "West (270°)": datetime.time(18, 0),
+    }
+
+    # Fetch 1-day candle data to cover the necessary range for the current day
+    candles = client.get_klines(symbol=symbol, interval=timeframe, limit=150)
+    historical_candles = [
+        {
+            "time": datetime.datetime.fromtimestamp(kline[0] / 1000),
+            "close": float(kline[4]),
+        }
+        for kline in candles
+    ]
+
+    # Initialize cardinal prices dictionary
+    cardinal_prices = {direction: {"price": None, "datetime": None} for direction in cardinal_times.keys()}
+
+    for direction, target_time in cardinal_times.items():
+        closest_price = None
+        closest_datetime = None
+
+        for candle in historical_candles:
+            candle_time = candle["time"].time()
+            candle_date = candle["time"].date()
+
+            # Ensure the candle is for the current date and matches or precedes the target time
+            if candle_date == current_date and candle_time <= target_time:
+                closest_price = candle["close"]
+                closest_datetime = candle["time"]
+
+        # Update the cardinal prices
+        if closest_price is not None:
+            cardinal_prices[direction] = {
+                "price": closest_price,
+                "datetime": closest_datetime,
+            }
+
+    return cardinal_prices
+
 def calculate_buy_sell_volume(candle_map):
     buy_volume, sell_volume = {}, {}
     for timeframe in candle_map:
@@ -190,6 +224,7 @@ def calculate_volume_ratio(buy_volume, sell_volume):
     return volume_ratio
 
 def find_major_reversals(candles, current_close, min_threshold, max_threshold):
+    """Find major reversals in price data."""
     lows = [candle['low'] for candle in candles if candle['low'] >= min_threshold]
     highs = [candle['high'] for candle in candles if candle['high'] <= max_threshold]
 
@@ -214,18 +249,16 @@ def scale_to_sine(close_prices):
     sine_wave, _ = talib.HT_SINE(np.array(close_prices))
     current_sine = np.nan_to_num(sine_wave)[-1]
     
-    # Remove NaN values from sine wave for proper calculations
     sine_wave = np.nan_to_num(sine_wave)
     sine_wave_min = np.nanmin(sine_wave)
     sine_wave_max = np.nanmax(sine_wave)
 
     if sine_wave_max <= sine_wave_min:
-        return 0, 100, current_sine  # If the min and max are the same, avoid division errors.
+        return 0, 100, current_sine  # Avoid division errors.
 
     dist_from_close_to_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
     dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
 
-    # Normalize distance to ensure it remains between 0 and 100
     dist_from_close_to_min = np.clip(dist_from_close_to_min, 0, 100)
     dist_from_close_to_max = np.clip(dist_from_close_to_max, 0, 100)
 
@@ -311,7 +344,7 @@ def find_specific_support_resistance(candle_map, min_threshold, max_threshold, c
 
     print("Most Significant Resistance Levels (Price, Volume):")
     for price, volume, timestamp in significant_resistance:
-        print(f"Resistance Price: {price:.025f}, Volume: {volume:.25f}")
+        print(f"Resistance Price: {price:.25f}, Volume: {volume:.25f}")
 
     return [level[0] for level in significant_support], [level[0] for level in significant_resistance]
 
@@ -330,42 +363,6 @@ def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_pr
 
     return forecasted_price
 
-# Adding the missing calculate_entry_probability function
-def calculate_entry_probability(candles):
-    closes = np.array([candle['close'] for candle in candles])
-    volumes = np.array([candle['volume'] for candle in candles])
-    
-    minimum_period = 14  # Define your period for calculations
-    length = len(closes)  # Current length
-
-    # Calculate moving averages
-    volume_moving_avg = np.mean(volumes[-minimum_period:]) if length >= minimum_period else 0
-    current_volume = volumes[-1]
-    
-    # Calculate Bollinger Bands
-    upper_band, middle_band, lower_band = talib.BBANDS(closes, timeperiod=minimum_period, nbdevup=2, nbdevdn=2, matype=0)
-    current_close = closes[-1]
-    
-    # Check the relation of current close to Bollinger Bands
-    close_relation = {
-        'below_lower': current_close < lower_band[-1],
-        'above_upper': current_close > upper_band[-1],
-        'middle': middle_band[-1]
-    }
-
-    # Check conditions for entry based on Bollinger Bands
-    entry_condition = 0
-    if close_relation['below_lower']:
-        entry_condition = 1  # Potential buy signal
-    elif close_relation['above_upper']:
-        entry_condition = -1  # Potential sell signal
-
-    # Print Bollinger Bands information
-    print(f"Bollinger Bands: Lower: {lower_band[-1]:.2f}, Middle: {middle_band[-1]:.2f}, Upper: {upper_band[-1]:.2f}")
-    print(f"Current Close: {current_close:.2f}, Below Lower Band: {close_relation['below_lower']}, Above Upper Band: {close_relation['above_upper']}")
-
-    return entry_condition, close_relation
-
 # Instantiate the minimum trade size for the trading pair
 min_trade_size = get_min_trade_size(TRADE_SYMBOL)
 
@@ -382,28 +379,17 @@ while True:
 
     # Fetch candle data
     candle_map = fetch_candles_in_parallel(['1m', '3m', '5m'])  
+    
+    # Ensure candle_map is not empty
+    if not candle_map or '1m' not in candle_map:
+        print("No candle data retrieved. Skipping iteration.")
+        time.sleep(5)
+        continue
+    
     usdc_balance = get_balance('USDC')
     current_btc_price = get_current_btc_price()
 
-    # Calculate Gann Price and Time Cycles
-    price_low = min([candle['low'] for timeframe in candle_map for candle in candle_map[timeframe]])
-    price_high = max([candle['high'] for timeframe in candle_map for candle in candle_map[timeframe]])
-    
-    # Calculate Gann levels and time cycles
-    gann_price_levels = calculate_gann_price_levels(price_low, price_high)
-    gann_time_cycles = calculate_gann_time_cycles()
-
-    # Print Gann Price Levels with Corresponding Time Forecast
-    print("Gann Price Levels with Local Time Forecast:")
-    for ratio, price in gann_price_levels.items():
-        # Calculate future forecast time based on Gann time cycles
-        future_time = gann_time_cycles[ratio]
-        time_distance = (future_time - datetime.datetime.now()).total_seconds() / 60  # Distance in minutes
-        print(f"{ratio}: {price:.2f} (Forecasted at {future_time.strftime('%Y-%m-%d %H:%M:%S')}, ~{time_distance:.2f} minutes ahead)")
-
-    print("Gann Time Cycles (Degrees):", gann_time_cycles)
-
-    # Instant backtesting on the last 100 candles of 1m timeframe
+    # Instant backtesting on the last 100 candles of the 1m timeframe
     model, backtest_mae, last_predictions, actuals = None, None, None, None
     if "1m" in candle_map:
         model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
@@ -419,13 +405,25 @@ while True:
             adjusted_forecasted_price = np.clip(forecasted_prices[-1], min_threshold, max_threshold)
             print(f"Forecasted Price: {adjusted_forecasted_price:.2f}")
 
+    # Get cardinal prices for the day
+    cardinal_prices = get_cardinal_prices(TRADE_SYMBOL, '1h', client)
+
+    print("\nCardinal Prices of the Day:")
+    for direction, price_info in cardinal_prices.items():
+        price = price_info["price"]
+        timestamp = price_info["datetime"]
+        if price is not None:
+            print(f"{direction}: Price={price:.2f}, Time={timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+        else:
+            print(f"{direction}: No Price Data")
+
     # Calculate volume details
     buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
     volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
-
+    
     # Find specific support and resistance levels
     support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
-
+    
     # Forecast potential volumes based on conditions
     forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_btc_price)
 
@@ -439,6 +437,10 @@ while True:
         "dip_confirmed_5m": False,  # Added for dip confirmation
     }
 
+    # Variable to track major reversal types
+    last_bottom = None
+    last_top = None
+
     # Check conditions for each timeframe
     for timeframe in ['1m', '3m', '5m']:  # Check all timeframes
         if timeframe in candle_map:
@@ -450,13 +452,6 @@ while True:
             min_threshold, max_threshold, avg_mtf, momentum_signal, _, percent_to_min_momentum, percent_to_max_momentum = calculate_thresholds(
                 closes, period=14, minimum_percentage=5, maximum_percentage=5, range_distance=0.05
             )
-
-            # Timestamp extraction for min and max threshold
-            min_threshold_time = candle_map[timeframe][np.nanargmin(closes)]['time'] if closes else None
-            max_threshold_time = candle_map[timeframe][np.nanargmax(closes)]['time'] if closes else None
-
-            print(f"Minimum Threshold: {min_threshold:.2f} at {datetime.datetime.fromtimestamp(min_threshold_time).strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"Maximum Threshold: {max_threshold:.2f} at {datetime.datetime.fromtimestamp(max_threshold_time).strftime('%Y-%m-%d %H:%M:%S')}")
 
             # Calculate distances to thresholds
             distance_to_min = current_close - min_threshold
@@ -479,14 +474,6 @@ while True:
             print(f"Distance to Max of Sine {timeframe}: {distances_to_max_sine:.2f}")
             print(f"Current Sine value for {timeframe}: {current_sine:.2f}\n")
 
-            # Calculate Bollinger Bands and check relations
-            band_entry_condition, close_relation = calculate_entry_probability(candle_map[timeframe])
-            if band_entry_condition == 1:
-                print(f"Best reversal opportunity detected below lower BB in {timeframe}.")
-            elif band_entry_condition == -1:
-                print(f"Best reversal opportunity detected above upper BB in {timeframe}.")
-            print(f"BB Conditions: {close_relation}")
-
             # Major reversals
             last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
             if timeframe == '1m':
@@ -501,12 +488,28 @@ while True:
             current_stoch_k = stoch_k[-1]
             current_stoch_d = stoch_d[-1]
 
-            # Market Sentiment Analysis
+            print(f"Current Stochastic K: {current_stoch_k:.2f}")
+            print(f"Current Stochastic D: {current_stoch_d:.2f}")
+
+            # Calculate distances to Stochastic RSI min and max
+            stoch_rsi_min = np.nanmin(stoch_k) if np.any(~np.isnan(stoch_k)) else 0
+            stoch_rsi_max = np.nanmax(stoch_k) if np.any(~np.isnan(stoch_k)) else 100
+            
+            if stoch_rsi_max != stoch_rsi_min:
+                percent_dist_to_min_stoch = (current_stoch_k - stoch_rsi_min) / (stoch_rsi_max - stoch_rsi_min) * 100
+                percent_dist_to_max_stoch = (stoch_rsi_max - current_stoch_k) / (stoch_rsi_max - stoch_rsi_min) * 100
+            else:  # If min and max are the same
+                percent_dist_to_min_stoch = 0.0
+                percent_dist_to_max_stoch = 100.0 if current_stoch_k >= stoch_rsi_min else 0.0
+            
+            print(f"Percent Distance to Min Stoch RSI: {percent_dist_to_min_stoch:.2f}%")
+            print(f"Percent Distance to Max Stoch RSI: {percent_dist_to_max_stoch:.2f}%")
+
+            # Calculate spectral analysis
             negative_freqs, negative_powers, positive_freqs, positive_powers = calculate_spectral_analysis(closes)
             market_sentiment = determine_market_sentiment(negative_freqs, negative_powers, positive_freqs, positive_powers)
             print(f"Market Sentiment: {market_sentiment}")
 
-            # Update conditions
             conditions_status["volume_bullish_1m"] = buy_volume['1m'] > sell_volume['1m']
             conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf
 
@@ -514,7 +517,7 @@ while True:
             if adjusted_forecasted_price is not None:
                 conditions_status["ML_Forecasted_Price_over_Current_Close"] = current_close < adjusted_forecasted_price
 
-            # Check trading signals
+            # Check trading signals and display major reversal findings
             if market_sentiment == "Predominantly Positive":
                 if closest_type == 'DIP':
                     print("Signal: BUY (DIP Reversal & Predominantly Positive)")
