@@ -356,7 +356,7 @@ while True:
 
     # Find specific support and resistance levels
     support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
-
+    
     # Forecast potential volumes based on conditions
     forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_btc_price)
     
@@ -367,11 +367,10 @@ while True:
     conditions_status = {
         "volume_bullish_1m": False,
         "ML_Forecasted_Price_over_Current_Close": False,
-        "dist_to_min_less_than_max_5m": False,
         "current_close_below_average_threshold_5m": False,
         "dip_confirmed_1m": False,
+        "dip_confirmed_3m": False,
         "dip_confirmed_5m": False,
-        "dist_to_min_sine_less_than_max_3m": False
     }
 
     # Variable to track major reversal types
@@ -394,20 +393,15 @@ while True:
                 conditions_status["dip_confirmed_1m"] = closest_type == 'DIP'
                 print(f"Dip Confirmed on 1min TF: {'True' if conditions_status['dip_confirmed_1m'] else 'False'}")
                 distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
-                conditions_status["dist_to_min_less_than_max_5m"] = distances_to_min < distances_to_max
                 conditions_status["ML_Forecasted_Price_over_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
             elif timeframe == '3m':
                 last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
                 conditions_status["dip_confirmed_3m"] = closest_type == 'DIP'
                 print(f"Dip Confirmed on 3min TF: {'True' if conditions_status['dip_confirmed_3m'] else 'False'}")
-                distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
-                conditions_status["dist_to_min_sine_less_than_max_3m"] = distances_to_min < distances_to_max
             elif timeframe == '5m':
                 last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
                 conditions_status["dip_confirmed_5m"] = closest_type == 'DIP'
                 print(f"Dip Confirmed on 5min TF: {'True' if conditions_status['dip_confirmed_5m'] else 'False'}")
-                distances_to_min, distances_to_max, current_sine = scale_to_sine(closes)
-                conditions_status["dist_to_min_less_than_max_5m"] = distances_to_min < distances_to_max
 
             # Calculate Stochastic RSI values
             stoch_k, stoch_d = calculate_stochastic_rsi(closes, length_rsi=14, length_stoch=14, smooth_k=3, smooth_d=3)
