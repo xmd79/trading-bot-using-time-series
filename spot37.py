@@ -22,6 +22,7 @@ with open("credentials.txt", "r") as f:
 # Instantiate Binance client
 client = BinanceClient(api_key, api_secret)
 
+# Function to fetch candles in parallel
 def fetch_candles_in_parallel(timeframes, symbol='BTCUSDC', limit=100):
     def fetch_candles(timeframe):
         return get_candles(symbol, timeframe, limit)
@@ -238,6 +239,15 @@ def calculate_45_degree_projection(last_bottom, last_top):
         return projection
     return None
 
+def calculate_wave_price(t, avg, min_price, max_price, omega, phi):
+    """Calculate wave price using sine function."""
+    return avg + ((max_price - min_price) / 2) * np.sin(omega * t + phi)
+
+def calculate_independent_wave_price(current_price, avg, min_price, max_price, range_distance):
+    """Calculate an independent wave price based on noise."""
+    noise = np.random.uniform(-1, 1) * range_distance
+    return avg + (noise * (max_price - min_price) / 2)
+
 def find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_close):
     """Identify specific support and resistance levels based on volume and thresholds."""
     support_levels = []
@@ -280,6 +290,50 @@ def calculate_stochastic_rsi(close_prices, length_rsi=14, length_stoch=14, smoot
 
     return stoch_k_smooth, stoch_d
 
+# New Functions for Fibonacci Levels
+def calculate_fibonacci_levels(high, low):
+    """Calculate Fibonacci retracement and extension levels."""
+    price_range = high - low
+    levels = {
+        "0.236": high - (0.236 * price_range),
+        "0.382": high - (0.382 * price_range),
+        "0.5": high - (0.5 * price_range),
+        "0.618": high - (0.618 * price_range),
+        "0.786": high - (0.786 * price_range),
+        "1.618": low + (1.618 * price_range),
+        "2.618": low + (2.618 * price_range),
+        "3.618": low + (3.618 * price_range)
+    }
+    return levels
+
+def calculate_price_percentage(current_price, levels):
+    """Calculate percentage of current price relative to Fibonacci levels."""
+    percentages = {}
+    for level, price in levels.items():
+        if current_price > price:
+            percentages[level] = ((current_price - price) / price) * 100  # Positive
+        else:
+            percentages[level] = -((price - current_price) / price) * 100  # Negative
+    return percentages
+    
+def determine_market_mood(current_price, levels):
+    """Determine market mood based on current price and Fibonacci levels."""
+    if current_price < levels["0.786"]:
+        return "Bearish"
+    elif current_price > levels["1.618"]:
+        return "Bullish"
+    else:
+        return "Neutral"
+
+# Additional function for forecasting Fibonacci target price for incoming reversal
+def forecast_fibo_target_price(current_price, fib_levels):
+    """Forecast Fibonacci target prices for incoming reversal."""
+    if current_price > fib_levels["0.236"]:
+        return current_price + (current_price - fib_levels["1.618"])  # Using 1.618 for target
+    else:
+        return current_price - (fib_levels["1.618"] - current_price)
+
+# Forecast Volume Function
 def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_price):
     forecasted_price = None
 
@@ -356,10 +410,44 @@ while True:
 
     # Find specific support and resistance levels
     support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
-    
+
+    # Calculate the highest and lowest prices for Fibonacci levels
+    if '1m' in candle_map:
+        closes_1m = [candle['close'] for candle in candle_map['1m']]
+        high_1m = np.nanmax(closes_1m)
+        low_1m = np.nanmin(closes_1m)
+        fib_levels = calculate_fibonacci_levels(high_1m, low_1m)
+
+        print("Fibonacci Levels:")
+        for level, price in fib_levels.items():
+            print(f"Level {level}: {price:.2f}")
+        
+        # Calculate price percentages
+        price_percentages = calculate_price_percentage(current_btc_price, fib_levels)
+        print("Current Price Percentages Relative to Fibonacci Levels:")
+        for level, percentage in price_percentages.items():
+            print(f"Percentage to Level {level}: {'+' if percentage > 0 else ''}{percentage:.2f}%")
+
+        # Calculate distances to min and max Fibonacci levels
+        fib_min = low_1m
+        fib_max = high_1m
+        dist_to_min = (current_btc_price - fib_min) / (fib_max - fib_min) * 100 if fib_max > fib_min else 0
+        dist_to_max = (fib_max - current_btc_price) / (fib_max - fib_min) * 100 if fib_max > fib_min else 0
+
+        print(f"Distance to Minimum Fibonacci Level: {max(0, dist_to_min):.2f}%")
+        print(f"Distance to Maximum Fibonacci Level: {max(0, dist_to_max):.2f}%")
+
+        # Determine market mood
+        market_mood = determine_market_mood(current_btc_price, fib_levels)
+        print(f"Market Mood: {market_mood}")
+
+        # Forecast Fibonacci target prices for incoming reversals
+        fib_target_price = forecast_fibo_target_price(current_btc_price, fib_levels)
+        print(f"Forecast Price Target for Significant Reversal: {fib_target_price:.2f}")
+
     # Forecast potential volumes based on conditions
     forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_btc_price)
-    
+
     # Check market conditions and determine forecast decisions
     forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_btc_price)
 
@@ -431,7 +519,7 @@ while True:
 
             if closest_reversal is not None:
                 print(f"Most Recent Major Reversal Type: {closest_type}")
-                print(f"Last Major Reversal Found at Price: {closest_reversal:.2f}")  # Removed datetime
+                print(f"Last Major Reversal Found at Price: {closest_reversal:.2f}")
             else:
                 print("No Major Reversal Found")
 
@@ -445,6 +533,14 @@ while True:
             print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.2f}%")
             print(f"Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.2f}%")
             print(f"Status: {volume_ratios[timeframe]['status']}")
+
+            # Calculate wave prices using the new wave forecast
+            avg = (min_threshold + max_threshold) / 2
+            wave_price = calculate_wave_price(len(closes), avg, min_threshold, max_threshold, omega=0.1, phi=0)
+            print(f"Calculated Wave Price: {wave_price:.8f}")
+
+            independent_wave_price = calculate_independent_wave_price(current_btc_price, avg, min_threshold, max_threshold, range_distance=0.1)
+            print(f"Calculated Independent Wave Price: {independent_wave_price:.8f}")
 
     print()
 
