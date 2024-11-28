@@ -142,18 +142,17 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
 def calculate_buy_sell_volume(candle_map):
     buy_volume, sell_volume = {}, {}
     for timeframe in candle_map:
-        if timeframe in candle_map:
-            buy_volume[timeframe] = []
-            sell_volume[timeframe] = []
-            total_buy = 0
-            total_sell = 0
-            for candle in candle_map[timeframe]:
-                if candle["close"] > candle["open"]:
-                    total_buy += candle["volume"]
-                elif candle["close"] < candle["open"]:
-                    total_sell += candle["volume"]
-                buy_volume[timeframe].append(total_buy)
-                sell_volume[timeframe].append(total_sell)
+        buy_volume[timeframe] = []
+        sell_volume[timeframe] = []
+        total_buy = 0
+        total_sell = 0
+        for candle in candle_map[timeframe]:
+            if candle["close"] > candle["open"]:
+                total_buy += candle["volume"]
+            elif candle["close"] < candle["open"]:
+                total_sell += candle["volume"]
+            buy_volume[timeframe].append(total_buy)
+            sell_volume[timeframe].append(total_sell)
 
     return buy_volume, sell_volume 
 
@@ -308,6 +307,61 @@ def calculate_stochastic_rsi(close_prices, length_rsi=14, length_stoch=14, smoot
     stoch_d = talib.EMA(stoch_k_smooth, timeperiod=smooth_d)
 
     return stoch_k_smooth, stoch_d
+
+# Volume analysis functions
+def calculate_bullish_bearish_volume_ratios(candle_map):
+    """Calculate Bullish and Bearish volume ratios for each timeframe."""
+    volume_ratios = {}
+    for timeframe, candles in candle_map.items():
+        bullish_volume = 0
+        bearish_volume = 0
+        
+        for candle in candles:
+            if candle["close"] > candle["open"]:
+                bullish_volume += candle["volume"]
+            elif candle["close"] < candle["open"]:
+                bearish_volume += candle["volume"]
+
+        total_volume = bullish_volume + bearish_volume
+        ratio = bullish_volume / bearish_volume if bearish_volume > 0 else float('inf')  # Handle division by zero
+
+        volume_ratios[timeframe] = {
+            "bullish_volume": bullish_volume,
+            "bearish_volume": bearish_volume,
+            "ratio": ratio,
+            "status": "Bullish" if ratio > 1 else "Bearish" if ratio < 1 else "Neutral"
+        }
+
+        print(f"{timeframe} - Bullish Volume: {bullish_volume:.2f}, Bearish Volume: {bearish_volume:.2f}, Ratio: {ratio:.2f} ({volume_ratios[timeframe]['status']})")
+
+    return volume_ratios
+
+def analyze_volume_changes_over_time(candle_map):
+    """Analyze volume changes over time cycles for each timeframe."""
+    volume_trends = {}
+    
+    for timeframe, candles in candle_map.items():
+        if len(candles) < 2:
+            print(f"{timeframe} - Not enough data to analyze volume changes.")
+            continue
+            
+        # Calculate volume for the last two periods
+        last_volume = candles[-1]["volume"]
+        previous_volume = candles[-2]["volume"]
+        
+        volume_change = last_volume - previous_volume
+        change_status = "Increasing" if volume_change > 0 else "Decreasing" if volume_change < 0 else "Stable"
+
+        volume_trends[timeframe] = {
+            "last_volume": last_volume,
+            "previous_volume": previous_volume,
+            "change": volume_change,
+            "status": change_status
+        }
+
+        print(f"{timeframe} - Last Volume: {last_volume:.2f}, Previous Volume: {previous_volume:.2f}, Change: {volume_change:.2f} ({change_status})")
+
+    return volume_trends
 
 # Modified Fibonacci levels calculation logic
 def calculate_fibonacci_levels_from_reversal(last_reversal, max_threshold, min_threshold, last_major_reversal_type):
@@ -470,9 +524,13 @@ while True:
     # Find specific support and resistance levels
     support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
 
+    # Perform volume analysis
+    volume_ratios_details = calculate_bullish_bearish_volume_ratios(candle_map)
+    volume_trends_details = analyze_volume_changes_over_time(candle_map)
+
     # Calculate Fibonacci levels and identify last major reversals
     fib_info = {}
-    last_major_reverse_info = {}  # Store last reversals for each timeframe
+    last_major_reverse_info = {timeframe: None for timeframe in ['1m', '3m', '5m']}  # Ensure all timeframes are initialized
     for timeframe in ['1m', '3m', '5m']:
         if timeframe in candle_map:
             closes_tf = [candle['close'] for candle in candle_map[timeframe]]
@@ -615,13 +673,8 @@ while True:
             print(f"Market Mood (from FFT): {market_mood}")
 
             # Define reversal targets based on last major reversal type correctly
-            if last_major_reverse_info[timeframe] == 'TOP':
-                fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe], last_major_reverse_info[timeframe])
-                print(f"{timeframe} Incoming Fibonacci Reversal Target (DIP forecast): {fib_reversal_price:.2f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target (DIP forecast): price not available.") 
-                
-            elif last_major_reverse_info[timeframe] == 'DIP':
-                fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe], last_major_reverse_info[timeframe])
-                print(f"{timeframe} Incoming Fibonacci Reversal Target (TOP forecast): {fib_reversal_price:.2f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target (TOP forecast): price not available.")  
+            fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe], last_major_reverse_info[timeframe])
+            print(f"{timeframe} Incoming Fibonacci Reversal Target (Forecast): {fib_reversal_price:.2f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target: price not available.") 
 
     print()
 
