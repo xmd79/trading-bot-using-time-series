@@ -585,17 +585,12 @@ while True:
 
             # Define reversal targets based on last major reversal type correctly
             if last_major_reverse_info[timeframe] == 'TOP':
-                print(f"{timeframe} Incoming Reversal Type: DIP at Price: {closest_reversal:.2f}")
                 fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe], last_major_reverse_info[timeframe])
-                fft_reversal_price = fib_reversal_price  
-                print(f"{timeframe} Incoming Fibonacci Reversal Target (DIP forecast): {fib_reversal_price:.2f}")  # Target around the maximum threshold
-                print(f"{timeframe} Incoming FFT Reversal Target (DIP forecast): {fft_reversal_price:.2f}")  # Target around the maximum threshold
+                print(f"{timeframe} Incoming Fibonacci Reversal Target (DIP forecast): {fib_reversal_price:.2f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target (DIP forecast): price not available.") 
+                
             elif last_major_reverse_info[timeframe] == 'DIP':
-                print(f"{timeframe} Incoming Reversal Type: TOP at Price: {closest_reversal:.2f}")
                 fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe], last_major_reverse_info[timeframe])
-                fft_reversal_price = fib_reversal_price  
-                print(f"{timeframe} Incoming Fibonacci Reversal Target (TOP forecast): {fib_reversal_price:.2f}")  # Target around the min threshold
-                print(f"{timeframe} Incoming FFT Reversal Target (TOP forecast): {fft_reversal_price:.2f}")  # Target around the min threshold
+                print(f"{timeframe} Incoming Fibonacci Reversal Target (TOP forecast): {fib_reversal_price:.2f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target (TOP forecast): price not available.")  
 
     print()
 
