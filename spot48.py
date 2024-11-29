@@ -623,7 +623,7 @@ while True:
 
             # Calculate SMA with specified lengths
             valid_closes = np.array([c for c in closes if not np.isnan(c) and c > 0])
-            sma_lengths = [5, 7, 9, 12, 15, 18, 21, 24, 27]
+            sma_lengths = [5, 7, 9, 12]
             smas = {length: talib.SMA(valid_closes, timeperiod=length)[-1] for length in sma_lengths}
 
             # Filter out NaN and negative values
