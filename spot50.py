@@ -140,6 +140,8 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
 
     min_close = np.nanmin(close_prices)
     max_close = np.nanmax(close_prices)
+    
+    # Use talib for momentum calculation 
     momentum = talib.MOM(close_prices, timeperiod=period)
     min_momentum = np.nanmin(momentum)
     max_momentum = np.nanmax(momentum)
@@ -503,9 +505,10 @@ def get_target(closes, n_components, last_major_reversal_type, buy_volume, sell_
             market_mood = "Bullish"
     elif last_major_reversal_type == 'TOP':
         if sell_volume > buy_volume:
-            market_mood = "Bearish"
-        else:
-            market_mood = "Distribution"  
+            if np.sum(sell_volume) < np.sum(buy_volume):  # heuristic
+                market_mood = "Choppy"
+            else:
+                market_mood = "Bearish"
 
     return current_time, current_close, stop_loss, target_price, market_mood
 
@@ -539,7 +542,7 @@ while True:
     candle_map = fetch_candles_in_parallel(['1m', '3m', '5m']) 
     current_btc_price = get_current_btc_price()
 
-    # Instant backtesting on the last 100 candles of 1m timeframe
+    # Instant backtesting on the last 100 candles of the 1m timeframe
     model, backtest_mae, last_predictions, actuals = None, None, None, None
     if "1m" in candle_map:
         model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
@@ -587,12 +590,21 @@ while True:
             print(f"Fibonacci Levels for {timeframe}:")
             for level, price in fib_levels.items():
                 print(f"Level {level}: {price:.25f}")
-            last_major_reverse_info[timeframe] = last_reversal_type
-            
-            dist_to_min = (current_btc_price - low_tf) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
-            dist_to_max = (high_tf - current_btc_price) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
+
+            # Calculate distances to min and max
+            dist_to_min = ((current_btc_price - low_tf) / (high_tf - low_tf)) * 100 if (high_tf - low_tf) != 0 else 0
+            dist_to_max = ((high_tf - current_btc_price) / (high_tf - low_tf)) * 100 if (high_tf - low_tf) != 0 else 0
             print(f"Distance from Current Close to Min Threshold ({low_tf:.25f}): {dist_to_min:.25f}%")
             print(f"Distance from Current Close to Max Threshold ({high_tf:.25f}): {dist_to_max:.25f}%")
+
+            # Ensure symmetry between distance percentages
+            # Normalize to 100% scale for better analysis
+            symmetrical_min_distance = (high_tf - current_btc_price) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
+            symmetrical_max_distance = (current_btc_price - low_tf) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
+            
+            # These outputs are the desired normalized distance percentages:
+            print(f"Normalized Distance to Min Threshold (Symmetrical): {symmetrical_max_distance:.25f}%")
+            print(f"Normalized Distance to Max Threshold (Symmetrical): {symmetrical_min_distance:.25f}%")
 
     # Forecast potential volumes based on conditions
     forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_btc_price)
@@ -851,4 +863,4 @@ while True:
     print(f"Current BTC balance: {btc_balance:.25f} BTC")
     print(f"Current BTC price: {current_btc_price:.25f}\n")
 
-    time.sleep(5)  # Wait before the next iteration
+    time.sleep(5)  # Wait before the next iteration 
