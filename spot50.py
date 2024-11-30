@@ -81,7 +81,7 @@ def get_average_entry_price_for_btc():
 
         for trade in trades:
             print(trade)  # Debug: Print the trade to see its structure
-            if 'isBuyer' in trade and trade['isBuyer']:  # Adjust this according to actual key structure
+            if 'isBuyer' in trade and trade['isBuyer']:
                 price = float(trade['price'])
                 qty = float(trade['qty'])
                 total_cost += price * qty
@@ -411,16 +411,11 @@ def calculate_fibonacci_levels_from_reversal(last_reversal, max_threshold, min_t
     return levels
 
 # Forecasting Fibonacci target price for incoming reversal
-def forecast_fibo_target_price(fib_levels, last_major_reversal_type):
+def forecast_fibo_target_price(fib_levels):
     """Forecast Fibonacci target prices for incoming reversal."""
     if '1.0' not in fib_levels:
-        return None  # Early return if the level doesn't exist
-
-    if last_major_reversal_type == 'TOP':
-        return fib_levels['1.0']  # When a TOP, signify a downward movement (target around min threshold)
-    elif last_major_reversal_type == 'DIP':
-        return fib_levels['1.0']  # When a DIP, signify an upward movement (target around max threshold)
-    return None 
+        return None  # Return None if the level doesn't exist
+    return fib_levels['1.0']  # Return the '1.0' Fibonacci level directly
 
 # Forecast Volume Function
 def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_price):
@@ -598,11 +593,9 @@ while True:
             print(f"Distance from Current Close to Max Threshold ({high_tf:.25f}): {dist_to_max:.25f}%")
 
             # Ensure symmetry between distance percentages
-            # Normalize to 100% scale for better analysis
             symmetrical_min_distance = (high_tf - current_btc_price) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
             symmetrical_max_distance = (current_btc_price - low_tf) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
             
-            # These outputs are the desired normalized distance percentages:
             print(f"Normalized Distance to Min Threshold (Symmetrical): {symmetrical_max_distance:.25f}%")
             print(f"Normalized Distance to Max Threshold (Symmetrical): {symmetrical_min_distance:.25f}%")
 
@@ -702,19 +695,19 @@ while True:
             independent_wave_price = calculate_independent_wave_price(current_btc_price, avg, min_threshold, max_threshold, range_distance=0.1)
             print(f"Calculated Independent Wave Price: {independent_wave_price:.25f}")
 
-            current_time, entry_price, stop_loss, reversal_target, market_mood = get_target(
+            current_time, entry_price_usdc, stop_loss, reversal_target, market_mood = get_target(
                 closes, n_components=5, last_major_reversal_type=last_major_reversal_type, 
                 buy_volume=buy_volume[timeframe][-1], sell_volume=sell_volume[timeframe][-1]
             )
             
             print(f"Current Time: {current_time}")
-            print(f"Entry Price: {entry_price:.25f}")
+            print(f"Entry Price: {entry_price_usdc:.25f}")
             print(f"Stop Loss: {stop_loss:.25f}")
             print(f"Reversal Target: {reversal_target:.25f}")
             print(f"Market Mood (from FFT): {market_mood}")
 
-            fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe], last_major_reverse_info[timeframe])
-            print(f"{timeframe} Incoming Fibonacci Reversal Target (Forecast): {fib_reversal_price:.25f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target: price not available.") 
+            fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe])
+            print(f"{timeframe} Incoming Fibonacci Reversal Target (Forecast): {fib_reversal_price:.25f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target: price not available.")
 
     # Print checks for available balances
     usdc_balance = get_balance('USDC')
@@ -839,8 +832,7 @@ while True:
                     btc_order = buy_btc(quantity_to_buy)
                     if btc_order:
                         initial_investment = usdc_balance  # Use the entire USDC balance for the order
-                        # Print the initial entry price for BTC in USDC
-                        entry_price_usdc = float(btc_order['fills'][0]['price'])  # Assuming the order has fills, fetch the entry price
+                        entry_price_usdc = float(btc_order['fills'][0]['price'])  # Use the price from the order fill
                         print(f"BTC was bought at initial entry price of {entry_price_usdc:.25f} USDC for quantity: {quantity_to_buy:.25f} BTC.")
                         position_open = True  
                         print(f"New position opened with {usdc_balance:.25f} USDC at price {current_btc_price:.25f}.")
@@ -863,4 +855,4 @@ while True:
     print(f"Current BTC balance: {btc_balance:.25f} BTC")
     print(f"Current BTC price: {current_btc_price:.25f}\n")
 
-    time.sleep(5)  # Wait before the next iteration 
+    time.sleep(5)  # Wait before the next iteration
