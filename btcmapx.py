@@ -43,13 +43,14 @@ def remove_nans_and_zeros(*arrays):
     valid_mask = ~np.isnan(np.column_stack(arrays)).any(axis=1) & (np.column_stack(arrays) != 0).all(axis=1)
     return [array[valid_mask] for array in arrays]
 
-# Define functions for indicators
+# Function to calculate the Volume Weighted Average Price (VWAP)
 def calculate_vwap(candles):
     close_prices = np.array([c["close"] for c in candles])
     volumes = np.array([c["volume"] for c in candles])
     close_prices, volumes = remove_nans_and_zeros(close_prices, volumes)
     return np.sum(close_prices * volumes) / np.sum(volumes) if np.sum(volumes) != 0 else np.nan
 
+# Define more functions for indicators (all previous functions here)
 def calculate_ema(candles, timeperiod):
     close_prices = np.array([c["close"] for c in candles])
     close_prices, = remove_nans_and_zeros(close_prices)
@@ -80,20 +81,18 @@ def calculate_momentum(candles, timeperiod=10):
 def calculate_regression_channels(candles):
     if len(candles) < 50:
         print("Not enough data for regression channel calculation")
-        return None, None, None, None  # Not enough data to calculate regression channels
+        return None, None, None, None
     
     close_prices = np.array([c["close"] for c in candles])
     x = np.arange(len(close_prices))
     
-    # Remove NaNs and zeros
     close_prices, x = remove_nans_and_zeros(close_prices, x)
     
-    if len(x) < 2:  # Ensure at least 2 valid points for regression
+    if len(x) < 2: 
         print("Not enough valid data points for regression channel calculation")
         return None, None, None, None
     
     try:
-        # Perform linear regression using scipy.stats.linregress
         slope, intercept, _, _, _ = linregress(x, close_prices)
         regression_line = intercept + slope * x
         deviation = close_prices - regression_line
@@ -102,11 +101,9 @@ def calculate_regression_channels(candles):
         regression_upper = regression_line + std_dev
         regression_lower = regression_line - std_dev
         
-        # Return the last values of regression channels
         regression_upper_value = regression_upper[-1] if not np.isnan(regression_upper[-1]) and regression_upper[-1] != 0 else None
         regression_lower_value = regression_lower[-1] if not np.isnan(regression_lower[-1]) and regression_lower[-1] != 0 else None
         
-        # Get the current close value
         current_close_value = close_prices[-1] if len(close_prices) > 0 and not np.isnan(close_prices[-1]) and close_prices[-1] != 0 else None
         
         return regression_lower_value, regression_upper_value, (regression_upper_value + regression_lower_value) / 2, current_close_value
@@ -115,7 +112,6 @@ def calculate_regression_channels(candles):
         print(f"Error calculating regression channels: {e}")
         return None, None, None, None
 
-# New function for polynomial regression channels
 def calculate_polynomial_regression_channels(candles, degree=2):
     if len(candles) < 50:
         print("Not enough data for polynomial regression channel calculation")
@@ -124,15 +120,13 @@ def calculate_polynomial_regression_channels(candles, degree=2):
     close_prices = np.array([c["close"] for c in candles])
     x = np.arange(len(close_prices))
     
-    # Remove NaNs and zeros
     close_prices, x = remove_nans_and_zeros(close_prices, x)
     
-    if len(x) < 2:  # Ensure at least 2 valid points for regression
+    if len(x) < 2:  
         print("Not enough valid data points for polynomial regression channel calculation")
         return None, None, None, None
     
     try:
-        # Perform polynomial regression using numpy's Polynomial
         coeffs = Polynomial.fit(x, close_prices, degree).convert().coef
         poly = Polynomial(coeffs)
         regression_line = poly(x)
@@ -142,11 +136,9 @@ def calculate_polynomial_regression_channels(candles, degree=2):
         regression_upper = regression_line + std_dev
         regression_lower = regression_line - std_dev
         
-        # Return the last values of regression channels
         regression_upper_value = regression_upper[-1] if not np.isnan(regression_upper[-1]) and regression_upper[-1] != 0 else None
         regression_lower_value = regression_lower[-1] if not np.isnan(regression_lower[-1]) and regression_lower[-1] != 0 else None
         
-        # Get the current close value
         current_close_value = close_prices[-1] if len(close_prices) > 0 and not np.isnan(close_prices[-1]) and close_prices[-1] != 0 else None
         
         return regression_lower_value, regression_upper_value, (regression_upper_value + regression_lower_value) / 2, current_close_value
@@ -169,25 +161,21 @@ def calculate_fibonacci_retracement(high, low):
     return retracement_levels
 
 def calculate_zigzag_forecast(candles, depth=12, deviation=5, backstep=3):
-    # Extracting the high and low prices
     highs = np.array([c['high'] for c in candles])
     lows = np.array([c['low'] for c in candles])
     
-    # Remove NaNs and zeros
     highs, lows = remove_nans_and_zeros(highs, lows)
 
     if len(highs) < depth:
         return None, None, None
 
     def zigzag_indicator(highs, lows, depth, deviation, backstep):
-        """ Simple ZigZag indicator """
         zigzag = np.zeros_like(highs)
         last_pivot_low = 0
         last_pivot_high = 0
         current_trend = None
 
         for i in range(depth, len(highs) - depth):
-            # Find local high
             if highs[i] == max(highs[i - depth:i + depth]):
                 if highs[i] - lows[i] > deviation:
                     if last_pivot_high and highs[i] <= highs[last_pivot_high]:
@@ -196,7 +184,6 @@ def calculate_zigzag_forecast(candles, depth=12, deviation=5, backstep=3):
                     last_pivot_high = i
                     current_trend = 'down'
 
-            # Find local low
             if lows[i] == min(lows[i - depth:i + depth]):
                 if highs[i] - lows[i] > deviation:
                     if last_pivot_low and lows[i] >= lows[last_pivot_low]:
@@ -293,13 +280,24 @@ def calculate_distances_and_ratios(candles):
 
     return distance_to_high, distance_to_low, percent_to_high, percent_to_low, last_major_high, last_major_low
 
+# Function to calculate min/max thresholds based on the last 500 close prices
+def calculate_min_max_thresholds(candles):
+    if len(candles) < 500:
+        close_prices = np.array([c["close"] for c in candles])
+    else:
+        close_prices = np.array([c["close"] for c in candles[-500:]])  # Limit to last 500
+    close_prices, = remove_nans_and_zeros(close_prices)
+    min_close = np.nanmin(close_prices)
+    max_close = np.nanmax(close_prices)
+    return min_close, max_close
+
 # Main function to analyze timeframes
 def analyze_timeframes():
     global candle_map
     
     while True:
-        double_bottom_detection_summary = {}  # To hold double bottom summary for each timeframe
-        last_major_reversal_summary = {}  # To hold last major reversal for each timeframe
+        double_bottom_detection_summary = {}
+        last_major_reversal_summary = {}
 
         # Fetch new candles for all timeframes
         for timeframe in timeframes:
@@ -343,8 +341,9 @@ def analyze_timeframes():
             dist_min, dist_max, current_sine = scale_to_sine(timeframe)
             print(f"Sine Scaling Distance to Min: {dist_min:.2f}%, Max: {dist_max:.2f}%, Current Sine: {current_sine:.2f}")
 
-            min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-            print(f"Thresholds: Min {min_threshold:.2f}, Max {max_threshold:.2f}, Avg MTF: {avg_mtf:.2f}, Momentum Signal: {momentum_signal:.2f}")
+            # Calculate min and max thresholds based on the last 500 close prices
+            min_threshold, max_threshold, avg_mtf, current_momentum, range_price = calculate_thresholds(close_prices, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
+            print(f"Thresholds: Min {min_threshold:.2f}, Max {max_threshold:.2f}, Avg MTF: {avg_mtf:.2f}, Momentum Signal: {current_momentum:.2f}")
 
             distance_to_high, distance_to_low, percent_to_high, percent_to_low, last_major_high, last_major_low = calculate_distances_and_ratios(candles)
             print(f"Distance to Last Major High: {distance_to_high:.2f}, Low: {distance_to_low:.2f}, Percent High: {percent_to_high:.2f}%, Low: {percent_to_low:.2f}%")
@@ -354,7 +353,7 @@ def analyze_timeframes():
             distance_from_last_reversal = abs(last_major_reversal - close_prices[-1])
 
             reversal_type = "TOP" if last_major_high == last_major_reversal else "DIP"
-            last_major_reversal_summary[timeframe] = reversal_type  # Track the last reversal type for current timeframe
+            last_major_reversal_summary[timeframe] = reversal_type
 
             total_distance = distance_between_thresholds + distance_from_last_reversal
             symmetrical_percentage_thresholds = (distance_between_thresholds / total_distance) * 100 if total_distance != 0 else np.nan
@@ -380,20 +379,17 @@ def analyze_timeframes():
             elif symmetrical_percentage_thresholds > symmetrical_percentage_last_reversal and reversal_type == "TOP":
                 print("Potential double bottom not yet detected.")
 
-            double_bottom_detection_summary[timeframe] = double_bottom_detected  # Store double bottom detection for avg 
+            double_bottom_detection_summary[timeframe] = double_bottom_detected
 
         # Print overall results for each iteration
         print(f"\nOverall Double Bottom Pattern Detected: {'Yes' if any(double_bottom_detection_summary.values()) else 'No'}")
         print(f"Overall Last Major Reversal Found: {last_major_reversal_summary}")
 
-        # Print detailed summary for each timeframe
         for timeframe in timeframes:
             print(f"Timeframe: {timeframe} - Double Bottom Detected: {'Yes' if double_bottom_detection_summary[timeframe] else 'No'}, Last Major Reversal: {last_major_reversal_summary[timeframe]}")
 
-        # Garbage collection and sleep
         gc.collect()
-        time.sleep(5)  # Sleep for 5 seconds
+        time.sleep(5)
 
-# Execute the main function to analyze timeframes
 if __name__ == "__main__":
     analyze_timeframes()
