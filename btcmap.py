@@ -429,10 +429,10 @@ def analyze_timeframes():
 
         # New print for identifying double dip or double bottom pattern
         if symmetrical_percentage_thresholds <= symmetrical_percentage_last_reversal and reversal_type == "DIP":
-            print("Symmetrical Percentage Between Thresholds is less than Distance from Last Major Reversal to Current Price, potential double dip or double bottom detected.")
+            print("Symmetrical Percentage Between Thresholds is less than Distance from Last Major Reversal to Current Price, potential double bottom detected.")
 
         elif symmetrical_percentage_thresholds > symmetrical_percentage_last_reversal  and reversal_type == "TOP":
-            print("Symmetrical Percentage Between Thresholds is bigger then Distance from Last Major Reversal to Current Price, potential double dip or double bottom not yet detected.")
+            print("Symmetrical Percentage Between Thresholds is bigger then Distance from Last Major Reversal to Current Price, potential double bottom not yet detected.")
         
         print()
 
