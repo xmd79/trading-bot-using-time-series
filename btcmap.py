@@ -428,10 +428,10 @@ def analyze_timeframes():
         print(f"Is the last minimum value closest to current close? {'True' if is_closest_min else 'False'}")
 
         # New print for identifying double dip or double bottom pattern
-        if symmetrical_percentage_thresholds <= symmetrical_percentage_last_reversal and reversal_type = "DIP":
+        if symmetrical_percentage_thresholds <= symmetrical_percentage_last_reversal and reversal_type == "DIP":
             print("Symmetrical Percentage Between Thresholds is less than Distance from Last Major Reversal to Current Price, potential double dip or double bottom detected.")
 
-        elif symmetrical_percentage_thresholds > symmetrical_percentage_last_reversal  and reversal_type = "TOP":
+        elif symmetrical_percentage_thresholds > symmetrical_percentage_last_reversal  and reversal_type == "TOP":
             print("Symmetrical Percentage Between Thresholds is bigger then Distance from Last Major Reversal to Current Price, potential double dip or double bottom not yet detected.")
         
         print()
