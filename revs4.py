@@ -140,7 +140,6 @@ def find_reversals_and_volume_ratios(candles, current_close):
 
 # Function to retrieve astrological data for a specific datetime
 def get_astrological_data(reversal_datetime):
-    # Create an Observer at a specific location (Example: New York)
     observer = ephem.Observer()
     observer.lat = '40.7128'  # Latitude for New York
     observer.lon = '-74.0060'  # Longitude for New York
@@ -168,6 +167,55 @@ def get_astrological_data(reversal_datetime):
             'altitude': planet.alt
         }
     return data
+
+# Function to get current status of astrological data and ratios
+def get_current_astro_status():
+    current_time = ephem.now()  # Current time
+    cycle_start_time = ephem.Date(current_time) - 30  # Start 30 days ago
+    cycle_end_time = ephem.Date(current_time) + 30   # End in 30 days
+
+    # Retrieve astrological data for the start and end of the cycle
+    start_data = get_astrological_data(cycle_start_time)
+    end_data = get_astrological_data(cycle_end_time)
+    current_data = get_astrological_data(current_time)
+
+    ratio_results = {}
+
+    for planet in current_data:
+        start_azimuth = start_data[planet]['azimuth']
+        end_azimuth = end_data[planet]['azimuth']
+        current_azimuth = current_data[planet]['azimuth']
+
+        start_altitude = start_data[planet]['altitude']
+        end_altitude = end_data[planet]['altitude']
+        current_altitude = current_data[planet]['altitude']
+
+        # Calculate distances
+        azimuth_distance_to_start = abs(current_azimuth - start_azimuth)
+        azimuth_distance_to_end = abs(end_azimuth - current_azimuth)
+        altitude_distance_to_start = abs(current_altitude - start_altitude)
+        altitude_distance_to_end = abs(end_altitude - current_altitude)
+
+        total_distance_azimuth = azimuth_distance_to_start + azimuth_distance_to_end
+        total_distance_altitude = altitude_distance_to_start + altitude_distance_to_end
+        
+        # Normalize ratios
+        ratio_azimuth_start = (azimuth_distance_to_start / total_distance_azimuth) * 100 if total_distance_azimuth != 0 else 0
+        ratio_azimuth_end = (azimuth_distance_to_end / total_distance_azimuth) * 100 if total_distance_azimuth != 0 else 0
+        
+        ratio_altitude_start = (altitude_distance_to_start / total_distance_altitude) * 100 if total_distance_altitude != 0 else 0
+        ratio_altitude_end = (altitude_distance_to_end / total_distance_altitude) * 100 if total_distance_altitude != 0 else 0
+
+        ratio_results[planet] = {
+            'current_azimuth': current_azimuth,
+            'current_altitude': current_altitude,
+            'ratio_azimuth_start': ratio_azimuth_start,
+            'ratio_azimuth_end': ratio_azimuth_end,
+            'ratio_altitude_start': ratio_altitude_start,
+            'ratio_altitude_end': ratio_altitude_end,
+        }
+    
+    return ratio_results
 
 # Example Usage
 def main():
@@ -245,6 +293,14 @@ def main():
             print("Current timeframe is more bearish.")
         else:
             print("Current timeframe is neutral.")
+    
+    # Get and print the current status of the astrological data
+    current_astro_status = get_current_astro_status()
+    print("\nCurrent Astrological Status:")
+    for planet, data in current_astro_status.items():
+        print(f"{planet} - Current Azimuth: {data['current_azimuth']}, Current Altitude: {data['current_altitude']}")
+        print(f"Azimuth Start Ratio: {data['ratio_azimuth_start']:.2f}%, Azimuth End Ratio: {data['ratio_azimuth_end']:.2f}%")
+        print(f"Altitude Start Ratio: {data['ratio_altitude_start']:.2f}%, Altitude End Ratio: {data['ratio_altitude_end']:.2f}%")
 
 if __name__ == "__main__":
     main()
