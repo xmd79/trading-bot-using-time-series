@@ -44,17 +44,16 @@ def find_reversals(prices):
     major_top = maxima[-1] if maxima else None
     major_bottom = minima[-1] if minima else None
 
-    minor_top = minor_bottom = None
+    minor_top = max(minima) if minima else None
+    minor_bottom = min(maxima) if maxima else None
 
     if prices:
         recent_close = prices[-1]
+        candidate_min = [m for m in minima if m < recent_close]
+        candidate_max = [m for m in maxima if m > recent_close]
 
-        # Find nearest minor top below the current price
-        minor_top_candidates = [m for m in maxima if m < recent_close]
-        minor_bottom_candidates = [m for m in minima if m > recent_close]
-
-        minor_top = max(minor_top_candidates) if minor_top_candidates else None
-        minor_bottom = min(minor_bottom_candidates) if minor_bottom_candidates else None
+        minor_top = max(candidate_max) if candidate_max else minor_top
+        minor_bottom = min(candidate_min) if candidate_min else minor_bottom
 
     return (major_top, major_bottom), (minor_top, minor_bottom)
 
@@ -62,14 +61,14 @@ def calculate_bollinger_bands(prices, window=20, num_std=2):
     if len(prices) < window:
         return None, None
     rolling_mean = np.convolve(prices, np.ones(window) / window, mode='valid')
-    rolling_std = np.std(prices[-window:])  # Calculate std dev for the latest window
+    rolling_std = np.std(prices[-window:])
     upper_band = rolling_mean + (rolling_std * num_std)
     lower_band = rolling_mean - (rolling_std * num_std)
     return upper_band, lower_band
 
 def calculate_moving_averages(prices, short_window=10, long_window=50):
     if len(prices) < short_window or len(prices) < long_window:
-        return np.array([]), np.array([])  # Return empty arrays if there's not enough data
+        return np.array([]), np.array([])
     short_mavg = np.convolve(prices, np.ones(short_window) / short_window, mode='valid')
     long_mavg = np.convolve(prices, np.ones(long_window) / long_window, mode='valid')
     return short_mavg, long_mavg
@@ -110,6 +109,40 @@ def sanitize_value(value):
     """Returns 0 if value is NaN, None, or 0, else returns the value."""
     return value if value is not None and (not isinstance(value, float) or not np.isnan(value)) else 0
 
+# Scale current close price to sine wave       
+def scale_to_sine(close_prices, historical_min, historical_max):  
+    close_prices_np = np.array(close_prices)  # Ensure this is a numpy array
+    current_close = close_prices_np[-1]      
+        
+    # Calculate sine wave        
+    sine_wave, leadsine = talib.HT_SINE(close_prices_np)         
+    
+    # Replace NaN values with 0        
+    sine_wave = np.nan_to_num(sine_wave)        
+    
+    # Filter HT_SINE between historical min and max
+    valid_sine_wave = sine_wave[(sine_wave >= historical_min) & (sine_wave <= historical_max)]
+    
+    current_sine = sine_wave[-1]          
+    sine_wave_min = np.min(valid_sine_wave) if valid_sine_wave.size > 0 else historical_min        
+    sine_wave_max = np.max(valid_sine_wave) if valid_sine_wave.size > 0 else historical_max
+
+    # Calculate absolute distances
+    distance_to_sine_min = abs(current_sine - sine_wave_min)
+    distance_to_sine_max = abs(current_sine - sine_wave_max)
+
+    total_distance = distance_to_sine_min + distance_to_sine_max
+    
+    # Normalize distances to a scale of 0 to 100%
+    if total_distance > 0:
+        normalized_distance_to_min = (distance_to_sine_min / total_distance) * 100
+        normalized_distance_to_max = (distance_to_sine_max / total_distance) * 100
+    else:
+        normalized_distance_to_min = 0
+        normalized_distance_to_max = 0
+
+    return normalized_distance_to_min, normalized_distance_to_max, current_sine
+      
 filename = 'credentials.txt'
 trader = Trader(filename)
 
@@ -198,37 +231,12 @@ if best_symbol:
             print(f'Distance to Minor Top: {distance_to_minor_top:.25f}' if distance_to_minor_top is not None else 'Distance to Minor Top: 0.0000000000000000')
             print(f'Distance to Minor Bottom: {distance_to_minor_bottom:.25f}' if distance_to_minor_bottom is not None else 'Distance to Minor Bottom: 0.0000000000000000')
 
-            # Calculate the HT_SINE for the close prices
-            ht_sine = talib.HT_SINE(np.array(close_prices))
-            if ht_sine is not None and len(ht_sine) >= 2:
-                effective_ht_sine = ht_sine[-len(close_prices):]
+            # Calculate and print the HT_SINE values and their normalized distances
+            dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(close_prices, historical_min, historical_max)
 
-                # Calculate distances to min and max for HT_SINE
-                ht_sine_min = np.min(effective_ht_sine)
-                ht_sine_max = np.max(effective_ht_sine)
-
-                distance_to_ht_sine_min = abs(current_close - sanitize_value(ht_sine_min))
-                distance_to_ht_sine_max = abs(current_close - sanitize_value(ht_sine_max))
-
-                print(f'Distance to HT_Sine Min: {distance_to_ht_sine_min:.25f}')
-                print(f'Distance to HT_Sine Max: {distance_to_ht_sine_max:.25f}')
-            else:
-                print(f'Distance to HT_Sine Min: 0.0000000000000000')  # Handling NaN case
-                print(f'Distance to HT_Sine Max: 0.0000000000000000')  # Handling NaN case
-
-            # Calculate distances to historical min and max for the current timeframe
-            distance_to_historical_min = abs(current_close - historical_min)
-            distance_to_historical_max = abs(current_close - historical_max)
-
-            print(f'Distance to Historical Min: {distance_to_historical_min:.25f}')
-            print(f'Distance to Historical Max: {distance_to_historical_max:.25f}')
-
-            # Store most recent dip and top
-            most_recent_dip = sanitize_value(min(minor_bottom, major_bottom)) if (minor_bottom is not None and major_bottom is not None) else None
-            most_recent_top = sanitize_value(max(minor_top, major_top)) if (minor_top is not None and major_top is not None) else None
-            
-            print(f'Most Recent Dip: {most_recent_dip:.25f}' if most_recent_dip is not None else 'No Dips Found')
-            print(f'Most Recent Top: {most_recent_top:.25f}' if most_recent_top is not None else 'No Tops Found')
+            print(f'Distance to Sine Min: {dist_from_close_to_min:.2f}%')
+            print(f'Distance to Sine Max: {dist_from_close_to_max:.2f}%')
+            print(f'Current Sine Value: {current_sine:.25f}')
 
     print('\nHistorical Price Metrics:')
     for timeframe, metrics in historical_metrics.items():
@@ -249,14 +257,16 @@ if best_symbol:
         
         forecast_price = next_reversal_price(amplitude, current_price, peak=current_price < (current_price + amplitude))
 
-        distance_to_min = max(0, (current_price - historical_min) / (historical_max - historical_min) * 100 if historical_max != historical_min else 0)
-        distance_to_max = max(0, (historical_max - current_price) / (historical_max - historical_min) * 100 if historical_max != historical_min else 0)
+        # Calculate distance to min and max based on historical metrics
+        distance_to_min = abs(current_price - historical_min)
+        distance_to_max = abs(historical_max - current_price)
+
         symmetrical_total = distance_to_min + distance_to_max
 
         distance_to_min_percentage = (distance_to_min / symmetrical_total * 100) if symmetrical_total > 0 else 0
         distance_to_max_percentage = (distance_to_max / symmetrical_total * 100) if symmetrical_total > 0 else 0
 
-        market_mood = "Up" if current_price > forecast_price else "Down"
+        market_mood = "Up" if current_price < forecast_price else "Down"
         
         print(f'Current Close Price: {current_price:.25f}')
         print(f'Forecasted Price for next reversal: {forecast_price:.25f}')
