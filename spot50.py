@@ -68,42 +68,50 @@ def get_balance(asset='USDC'):
         print(f"Error fetching balance for {asset}: {e.message}")
         return 0.0 
 
-def get_average_entry_price_for_btc():
-    """Fetch the average entry price for the current BTC balance based on order history."""
+def get_last_buy_trade():
+    """Fetch the last buy trade to get the entry price accurately."""
     try:
         trades = client.get_my_trades(symbol=TRADE_SYMBOL)
         if not trades:
             print("No trades found.")
-            return 0.0
+            return None
         
-        total_cost = 0.0
-        total_quantity = 0.0
-
-        for trade in trades:
-            print(trade)  # Debug: Print the trade to see its structure
-            if 'isBuyer' in trade and trade['isBuyer']:
-                price = float(trade['price'])
-                qty = float(trade['qty'])
-                total_cost += price * qty
-                total_quantity += qty
-
-        if total_quantity > 0:
-            average_price = total_cost / total_quantity
-            return average_price  # Return the average entry price
-        return 0.0  # If no buy trades were found
-
+        # Fetch the most recent buy trade
+        for trade in reversed(trades):
+            if trade['isBuyer']:
+                return {
+                    "price": float(trade['price']),
+                    "qty": float(trade['qty']),
+                    "time": trade['time']
+                }
     except BinanceAPIException as e:
         print(f"Error fetching trade history: {e.message}")
-        return 0.0
+    
+    return None
+
+def get_average_entry_price_for_btc():
+    """Fetch the average entry price for the current BTC balance based on order history."""
+    last_trade = get_last_buy_trade()
+    if last_trade:
+        # Use the last trade price as the entry price
+        entry_price = last_trade['price']
+        print(f"Using last buy trade price as entry price: {entry_price:.25f}")
+        return entry_price  # Return the last entry price
+
+    print("No valid last buy trade found; cannot calculate entry price.")
+    return 0.0
 
 def buy_btc(amount):
+    """Execute a market buy order for BTC and return the entry price."""
     try:
         order = client.order_market_buy(
             symbol='BTCUSDC',
             quantity=amount
         )
         print(f"Market buy order executed: {order}")
-        return order
+        # Capture the entry price from the order details
+        entry_price = float(order['fills'][0]['price'])  # The price at which the BTC was bought
+        return entry_price  # Return the entry price
     except BinanceAPIException as e:
         print(f"Error executing buy order: {e.message}")
         return None 
@@ -141,7 +149,6 @@ def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_
     min_close = np.nanmin(close_prices)
     max_close = np.nanmax(close_prices)
     
-    # Use talib for momentum calculation 
     momentum = talib.MOM(close_prices, timeperiod=period)
     min_momentum = np.nanmin(momentum)
     max_momentum = np.nanmax(momentum)
@@ -331,7 +338,7 @@ def calculate_stochastic_rsi(close_prices, length_rsi=14, length_stoch=14, smoot
     rsi = talib.RSI(np.array(close_prices), timeperiod=length_rsi)
     min_rsi = talib.MIN(rsi, timeperiod=length_stoch)
     max_rsi = talib.MAX(rsi, timeperiod=length_stoch)
-    
+
     stoch_k = (rsi - min_rsi) / (max_rsi - min_rsi) * 100
     stoch_k_smooth = talib.EMA(stoch_k, timeperiod=smooth_k)
     stoch_d = talib.EMA(stoch_k_smooth, timeperiod=smooth_d)
@@ -521,12 +528,14 @@ usdc_balance = get_balance('USDC')  # Get initial USDC balance at start
 btc_balance = get_balance('BTC')    # Get initial BTC balance at start
 print("Trading Bot Initialized!")
 
-# Retrieve the average entry price for BTC
-average_entry_price = get_average_entry_price_for_btc()
-initial_investment = btc_balance * average_entry_price if average_entry_price else 0.0  # Calculate initial investment based on current BTC balance and average entry price
-entry_price = average_entry_price  # Set entry price from the average entry retrieved
+# Retrieve the accurate entry price for BTC based on recent trades
+entry_price = get_average_entry_price_for_btc()
 
-print(f"Initial USDC amount: {initial_investment:.25f}, Average Entry Price for current BTC balance: {entry_price:.25f}")
+# Calculate initial investment only if BTC is held
+initial_investment = btc_balance * entry_price if btc_balance > 0 and entry_price > 0 else 0.0
+
+# Print initial balances and entry price
+print(f"Initial USDC amount: {usdc_balance:.25f}, Entry Price for last BTC purchased: {entry_price:.25f}")
 
 # Starting the main trading loop
 while True:
@@ -829,11 +838,10 @@ while True:
 
                 # Check if the quantity to buy meets the minimum trade size requirement
                 if quantity_to_buy >= min_trade_size and usdc_balance > 0:
-                    btc_order = buy_btc(quantity_to_buy)
-                    if btc_order:
+                    entry_price = buy_btc(quantity_to_buy)  # Buy and capture the entry price directly
+                    if entry_price is not None:
                         initial_investment = usdc_balance  # Use the entire USDC balance for the order
-                        entry_price_usdc = float(btc_order['fills'][0]['price'])  # Use the price from the order fill
-                        print(f"BTC was bought at initial entry price of {entry_price_usdc:.25f} USDC for quantity: {quantity_to_buy:.25f} BTC.")
+                        print(f"BTC was bought at entry price of {entry_price:.25f} USDC for quantity: {quantity_to_buy:.25f} BTC.")
                         position_open = True  
                         print(f"New position opened with {usdc_balance:.25f} USDC at price {current_btc_price:.25f}.")
                     else:
@@ -848,7 +856,7 @@ while True:
 
     # Clean up references and collect garbage
     del candle_map
-    gc.collect()  
+    gc.collect()
 
     # Print balances at the end of the loop
     print(f"\nCurrent USDC balance: {usdc_balance:.25f}")
