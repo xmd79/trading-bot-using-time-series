@@ -118,7 +118,7 @@ def buy_btc(amount):
 
 def check_exit_condition(initial_investment, btc_balance):
     current_value = btc_balance * get_current_btc_price()
-    return current_value >= (initial_investment * 1.0167)
+    return current_value >= (initial_investment * 1.0154)  # Adjusted for 1.54%
 
 def backtest_model(candles):
     closes = np.array([candle["close"] for candle in candles])
@@ -741,8 +741,8 @@ while True:
         # Fetch accurate average entry price based on the BTC balance
         average_entry_price = get_average_entry_price_for_btc()
 
-        # Set target profit percentage
-        target_profit_percentage = 1.67
+        # Set target profit percentage to 1.54%
+        target_profit_percentage = 1.54
         target_value = btc_balance * average_entry_price * (1 + target_profit_percentage / 100)  # target value calculation
 
         # Calculate percentage differences
@@ -751,7 +751,7 @@ while True:
         
         # Display correct percentages
         print(f"Percentage distance to initial amount: {distance_to_initial_investment:.25f}%")
-        print(f"Percentage distance to target profit (1.67%): {distance_to_target_profit:.25f}%")
+        print(f"Percentage distance to target profit (1.54%): {distance_to_target_profit:.25f}%")
         print(f"Target Value for Profit Calculation: {target_value:.25f} USDC")
         
         # Calculate and display target price
@@ -773,7 +773,7 @@ while True:
 
         # Check if exit condition with the target profit is met
         if check_exit_condition(initial_investment, btc_balance):
-            print("Target profit of 1.67% reached or exceeded. Initiating exit...")
+            print("Target profit of 1.54% reached or exceeded. Initiating exit...")
 
             try:
                 sell_order = client.order_market_sell(
@@ -820,7 +820,7 @@ while True:
                 largest_balance = max(usdc_balance, current_value_in_usdc)  # Determine the largest balance between USDC and BTC value
                 
                 # Evaluate if we should exit the BTC position
-                if current_value_in_usdc >= (initial_investment * 1.0167):
+                if current_value_in_usdc >= (initial_investment * 1.0154):  # Update for 1.54%
                     print("Current BTC balance is sufficient; considering exit at profit.")
                     if check_exit_condition(initial_investment, btc_balance):
                         print("Exit conditions met for BTC; selling the position...")
