@@ -156,9 +156,27 @@ def analyze_market_mood(selected_pairs):
         last_info = selected_pair_info[-1]
         current_close = float(trader.client.get_klines(symbol=selected_pairs[-1], interval='1m')[-1][4])
         
-        dist_to_min = abs(current_close - last_info['last_bottom']) if last_info['last_bottom'] is not None else float('inf')
-        dist_to_max = abs(current_close - last_info['last_top']) if last_info['last_top'] is not None else float('inf')
+        # Convert to 25 decimal floats
+        current_close = round(current_close, 25)
+        last_bottom = round(last_info['last_bottom'], 25) if last_info['last_bottom'] is not None else None
+        last_top = round(last_info['last_top'], 25) if last_info['last_top'] is not None else None
         
+        # Calculate distances
+        dist_to_min = abs(current_close - last_bottom) if last_bottom is not None else float('inf')
+        dist_to_max = abs(current_close - last_top) if last_top is not None else float('inf')
+        
+        # Calculate normalized percentages (0-100%)
+        if last_bottom is not None and last_top is not None:
+            price_range = last_top - last_bottom
+            if price_range > 0:
+                perc_to_min = round(((current_close - last_bottom) / price_range) * 100, 25)
+                perc_to_max = round(((last_top - current_close) / price_range) * 100, 25)
+            else:
+                perc_to_min = perc_to_max = 50.0000000000000000000000000  # Default if no range
+        else:
+            perc_to_min = perc_to_max = float('inf')
+        
+        # Determine market mood
         if dist_to_min < dist_to_max and last_info['closest_type'] == 'DIP':
             mood = "UP CYCLE"
         elif dist_to_max < dist_to_min and last_info['closest_type'] == 'TOP':
@@ -166,9 +184,15 @@ def analyze_market_mood(selected_pairs):
         else:
             mood = "NEUTRAL"
             
+        # Format output with 25 decimal places
+        last_bottom_str = f"{last_bottom:.25f}" if last_bottom is not None else "N/A"
+        last_top_str = f"{last_top:.25f}" if last_top is not None else "N/A"
+        
         print(f"Market Mood: {mood}")
-        print(f"Distance to last bottom: {dist_to_min}")
-        print(f"Distance to last top: {dist_to_max}")
+        print(f"DIP value (last bottom): {last_bottom_str}")
+        print(f"TOP value (last top): {last_top_str}")
+        print(f"Distance to last bottom (%): {perc_to_min:.25f}")
+        print(f"Distance to last top (%): {perc_to_max:.25f}")
         print(f"Last major reversal type: {last_info['closest_type']}")
     else:
         print("Market Mood: NO DATA (no pairs selected)")
@@ -185,11 +209,11 @@ if len(selected_pair) > 1:
     print(selected_pair)
     min_distance = min([info['distance_to_reversal'] for info in selected_pair_info])
     position = [info['distance_to_reversal'] for info in selected_pair_info].index(min_distance)
-    print(f"Strongest dip: {selected_pair[position]} at distance {min_distance}")
+    print(f"Strongest dip: {selected_pair[position]} at distance {min_distance:.25f}")
 
 elif len(selected_pair) == 1:
     print('1 mtf dip found')   
-    print(f"{selected_pair[0]} at distance {selected_pair_info[0]['distance_to_reversal']}")
+    print(f"{selected_pair[0]} at distance {selected_pair_info[0]['distance_to_reversal']:.25f}")
 
 analyze_market_mood(selected_pair)
 
