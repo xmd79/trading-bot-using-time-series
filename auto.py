@@ -32,33 +32,44 @@ def fetch_candles_in_parallel(timeframes, symbol='BTCUSDC', limit=100):
 
     return dict(zip(timeframes, results))
 
-def get_candles(symbol, timeframe, limit=100):
-    try:
-        klines = client.get_klines(symbol=symbol, interval=timeframe, limit=limit)
-        candles = []
-        for k in klines:
-            candle = {
-                "time": k[0] / 1000,
-                "open": float(k[1]),
-                "high": float(k[2]),
-                "low": float(k[3]),
-                "close": float(k[4]),
-                "volume": float(k[5]),
-                "timeframe": timeframe
-            }
-            candles.append(candle)
-        return candles
-    except BinanceAPIException as e:
-        print(f"Error fetching candles: {e.message}")
-        return []
+def get_candles(symbol, timeframe, limit=100, retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            klines = client.get_klines(symbol=symbol, interval=timeframe, limit=limit)
+            candles = []
+            for k in klines:
+                candle = {
+                    "time": k[0] / 1000,
+                    "open": float(k[1]),
+                    "high": float(k[2]),
+                    "low": float(k[3]),
+                    "close": float(k[4]),
+                    "volume": float(k[5]),
+                    "timeframe": timeframe
+                }
+                candles.append(candle)
+            return candles
+        except BinanceAPIException as e:
+            print(f"Error fetching candles for {timeframe} (attempt {attempt + 1}): {e.message}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+    print(f"Failed to fetch candles for {timeframe} after {retries} attempts.")
+    return []
 
-def get_current_btc_price():
-    try:
-        ticker = client.get_symbol_ticker(symbol="BTCUSDC")
-        return float(ticker['price'])
-    except BinanceAPIException as e:
-        print(f"Error fetching BTC price: {e.message}")
-        return 0.0
+def get_current_btc_price(retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            ticker = client.get_symbol_ticker(symbol="BTCUSDC")
+            price = float(ticker['price'])
+            if price > 0:
+                return price
+            print(f"Invalid price {price} on attempt {attempt + 1}")
+        except BinanceAPIException as e:
+            print(f"Error fetching BTC price (attempt {attempt + 1}): {e.message}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+    print("Failed to fetch valid BTC price after retries.")
+    return 0.0
 
 def get_balance(asset='USDC'):
     try:
@@ -373,11 +384,11 @@ def forecast_fibo_target_price(fib_levels):
     return fib_levels.get('1.0')
 
 def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_price):
-    if volume_ratios['1m']['buy_ratio'] > 50:
+    if '1m' in volume_ratios and volume_ratios['1m']['buy_ratio'] > 50:
         forecasted_price = current_price + (current_price * 0.0267)
         print(f"Forecasting a bullish price increase to {forecasted_price:.25f}.")
         return forecasted_price
-    elif volume_ratios['1m']['sell_ratio'] > 50:
+    elif '1m' in volume_ratios and volume_ratios['1m']['sell_ratio'] > 50:
         forecasted_price = current_price - (current_price * 0.0267)
         print(f"Forecasting a bearish price decrease to {forecasted_price:.25f}.")
         return forecasted_price
@@ -427,35 +438,20 @@ def forecast_price_per_time_pythagorean(timeframe, candles, min_threshold, max_t
     Fixed Pythagorean forecast for up cycle, ensuring a realistic target price.
     Considers distance from last DIP to current price vs. min-to-max threshold range.
     """
-    # Calculate price distance between min and max thresholds (range)
     threshold_range = max_threshold - min_threshold
-    
-    # Time window in minutes
     time_leg = time_window_minutes
-    
-    # Pythagorean theorem: hypotenuse as price-time distance
     hypotenuse = np.sqrt(time_leg**2 + threshold_range**2)
-    
-    # Base price rate (fixed based on threshold range)
     price_per_minute = threshold_range / time_leg if time_leg > 0 else 0.0
-    
-    # Default forecast assumes reaching max_threshold in up cycle
-    forecast_price = max_threshold  # Fixed target for up cycle
-    
-    # Check if last reversal was a DIP (up cycle)
+    forecast_price = max_threshold  # Default target for up cycle
+
     if last_reversal_type == 'DIP' and last_reversal is not None:
         dist_from_dip = current_price - last_reversal
-        
-        # If distance from DIP to current price >= threshold range, indicate pump incoming
         if dist_from_dip >= threshold_range:
             print(f"Pump incoming detected for {timeframe}: Distance from DIP ({dist_from_dip:.25f}) >= Threshold Range ({threshold_range:.25f})")
-            # Adjust forecast to be more aggressive (e.g., 1.5x threshold range above DIP)
             forecast_price = last_reversal + (threshold_range * 1.5)
         else:
-            # Normal up cycle forecast: target max_threshold
             forecast_price = max_threshold
-    
-    # Detailed prints
+
     print(f"\n--- Fixed Pythagorean Forecast for {timeframe} ---")
     print(f"Min Threshold: {min_threshold:.25f}")
     print(f"Max Threshold: {max_threshold:.25f}")
@@ -490,9 +486,13 @@ while True:
     print(f"\nCurrent Local Time: {current_local_time}")
 
     candle_map = fetch_candles_in_parallel(['1m', '3m', '5m']) 
+    if not candle_map.get('1m'):
+        print("Error: '1m' candles not fetched. Check API connectivity or symbol.")
     current_btc_price = get_current_btc_price()
+    if current_btc_price == 0.0:
+        print("Warning: Current BTC price is 0.0. API may be failing.")
 
-    if "1m" in candle_map:
+    if "1m" in candle_map and candle_map['1m']:
         model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
         print(f"Backtest MAE: {backtest_mae:.25f}")
 
@@ -501,17 +501,20 @@ while True:
         min_threshold, max_threshold, _, _, _, _, _ = calculate_thresholds(closes)
         adjusted_forecasted_price = np.clip(forecasted_prices[-1], min_threshold, max_threshold)
         print(f"Forecasted Price: {adjusted_forecasted_price:.25f}")
+    else:
+        min_threshold, max_threshold, adjusted_forecasted_price = None, None, None
+        print("No 1m data available for forecasting.")
 
     buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
     volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
-    support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold, max_threshold, current_btc_price)
+    support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold or 0, max_threshold or float('inf'), current_btc_price)
     volume_ratios_details = calculate_bullish_bearish_volume_ratios(candle_map)
     volume_trends_details = analyze_volume_changes_over_time(candle_map)
 
     fib_info = {}
-    pythagorean_forecasts = {}
+    pythagorean_forecasts = {'1m': {'price': None, 'rate': None}, '3m': {'price': None, 'rate': None}, '5m': {'price': None, 'rate': None}}
     for timeframe in ['1m', '3m', '5m']:
-        if timeframe in candle_map:
+        if timeframe in candle_map and candle_map[timeframe]:
             closes_tf = [candle['close'] for candle in candle_map[timeframe]]
             high_tf = np.nanmax(closes_tf)
             low_tf = np.nanmin(closes_tf)
@@ -546,8 +549,10 @@ while True:
                 current_btc_price, time_window, last_reversal, last_reversal_type
             )
             pythagorean_forecasts[timeframe] = {'price': forecast_price, 'rate': price_rate}
+        else:
+            print(f"Warning: No candle data available for {timeframe}. Skipping forecast.")
 
-    forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_btc_price)
+    forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold or 0, current_btc_price)
     forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_btc_price)
 
     conditions_status = {
@@ -561,7 +566,7 @@ while True:
 
     last_major_reversal_type = None
     for timeframe in ['1m', '3m', '5m']:
-        if timeframe in candle_map:
+        if timeframe in candle_map and candle_map[timeframe]:
             print(f"--- {timeframe} ---")
             closes = [candle['close'] for candle in candle_map[timeframe]]
             current_close = closes[-1]
@@ -581,6 +586,7 @@ while True:
                 print(f"Dip Confirmed on 3min TF: {'True' if dip_confirmed else 'False'}")
             elif timeframe == '5m':
                 print(f"Dip Confirmed on 5min TF: {'True' if dip_confirmed else 'False'}")
+                conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf if avg_mtf is not None else False
 
             valid_closes = np.array([c for c in closes if not np.isnan(c) and c > 0])
             sma_lengths = [5, 7, 9, 12]
@@ -604,8 +610,7 @@ while True:
             market_sentiment = determine_market_sentiment(negative_freqs, negative_powers, positive_freqs, positive_powers, closest_type, buy_volume[timeframe][-1], sell_volume[timeframe][-1])
             print(f"Market Sentiment: {market_sentiment}")
 
-            conditions_status["volume_bullish_1m"] = buy_volume['1m'][-1] > sell_volume['1m'][-1]
-            conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf
+            conditions_status["volume_bullish_1m"] = buy_volume.get('1m', [0])[-1] > sell_volume.get('1m', [0])[-1]
 
             if closest_reversal is not None:
                 print(f"Most Recent Major Reversal Type: {closest_type}")
@@ -617,19 +622,19 @@ while True:
             projected_price = calculate_45_degree_projection(last_bottom, last_top)
             print(f"Projected Price Using 45-Degree Angle: {projected_price:.25f}" if projected_price is not None else "No projection available")
             print(f"Current Close: {closes[-1]:.25f}")
-            print(f"Minimum Threshold: {min_threshold:.25f}")
-            print(f"Maximum Threshold: {max_threshold:.25f}")
-            print(f"Average MTF: {avg_mtf:.25f}")
-            print(f"Momentum Signal: {momentum_signal:.25f}")
-            print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.25f}%")
-            print(f"Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.25f}%")
-            print(f"Status: {volume_ratios[timeframe]['status']}")
+            print(f"Minimum Threshold: {min_threshold:.25f}" if min_threshold is not None else "Minimum Threshold: Not available")
+            print(f"Maximum Threshold: {max_threshold:.25f}" if max_threshold is not None else "Maximum Threshold: Not available")
+            print(f"Average MTF: {avg_mtf:.25f}" if avg_mtf is not None else "Average MTF: Not available")
+            print(f"Momentum Signal: {momentum_signal:.25f}" if momentum_signal is not None else "Momentum Signal: Not available")
+            print(f"Volume Bullish Ratio: {volume_ratios[timeframe]['buy_ratio']:.25f}%" if timeframe in volume_ratios else "Volume Bullish Ratio: Not available")
+            print(f"Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.25f}%" if timeframe in volume_ratios else "Volume Bearish Ratio: Not available")
+            print(f"Status: {volume_ratios[timeframe]['status']}" if timeframe in volume_ratios else "Status: Not available")
 
-            avg = (min_threshold + max_threshold) / 2
-            wave_price = calculate_wave_price(len(closes), avg, min_threshold, max_threshold, omega=0.1, phi=0)
+            avg = (min_threshold + max_threshold) / 2 if min_threshold is not None and max_threshold is not None else current_btc_price
+            wave_price = calculate_wave_price(len(closes), avg, min_threshold or 0, max_threshold or float('inf'), omega=0.1, phi=0)
             print(f"Calculated Wave Price: {wave_price:.25f}")
 
-            independent_wave_price = calculate_independent_wave_price(current_btc_price, avg, min_threshold, max_threshold, range_distance=0.1)
+            independent_wave_price = calculate_independent_wave_price(current_btc_price, avg, min_threshold or 0, max_threshold or float('inf'), range_distance=0.1)
             print(f"Calculated Independent Wave Price: {independent_wave_price:.25f}")
 
             current_time, entry_price_usdc, stop_loss, reversal_target, market_mood = get_target(
@@ -643,10 +648,19 @@ while True:
             print(f"Reversal Target: {reversal_target:.25f}")
             print(f"Market Mood (from FFT): {market_mood}")
 
-            fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe])
+            fib_reversal_price = forecast_fibo_target_price(fib_info.get(timeframe, {}))
             print(f"{timeframe} Incoming Fibonacci Reversal Target (Forecast): {fib_reversal_price:.25f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target: price not available.")
-            print(f"Pythagorean Forecast Price for {timeframe}: {pythagorean_forecasts[timeframe]['price']:.25f}")
-            print(f"Pythagorean Price Rate for {timeframe}: {pythagorean_forecasts[timeframe]['rate']:.25f} USDC/min")
+            
+            if pythagorean_forecasts[timeframe]['price'] is not None:
+                print(f"Pythagorean Forecast Price for {timeframe}: {pythagorean_forecasts[timeframe]['price']:.25f}")
+            else:
+                print(f"Pythagorean Forecast Price for {timeframe}: Not available")
+            if pythagorean_forecasts[timeframe]['rate'] is not None:
+                print(f"Pythagorean Price Rate for {timeframe}: {pythagorean_forecasts[timeframe]['rate']:.25f} USDC/min")
+            else:
+                print(f"Pythagorean Price Rate for {timeframe}: Not available")
+        else:
+            print(f"--- {timeframe} --- No data available.")
 
     usdc_balance = get_balance('USDC')
     btc_balance = get_balance('BTC')
@@ -713,7 +727,7 @@ while True:
                     except BinanceAPIException as e:
                         print(f"Error executing sell order: {e.message}")
             else:
-                quantity_to_buy = usdc_balance / current_btc_price
+                quantity_to_buy = usdc_balance / current_btc_price if current_btc_price > 0 else 0
                 if quantity_to_buy >= min_trade_size and usdc_balance > 0:
                     entry_price = buy_btc(quantity_to_buy)
                     if entry_price is not None:
