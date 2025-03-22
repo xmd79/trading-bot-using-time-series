@@ -10,9 +10,10 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 import scipy.fftpack as fftpack
+import math
 
 # Exchange constants
-TRADE_SYMBOL = "MKRUSDC"
+TRADE_SYMBOL = "BTCUSDC"  # Change to "MKRUSDC" if intended
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
@@ -23,7 +24,7 @@ with open("credentials.txt", "r") as f:
 # Instantiate Binance client
 client = BinanceClient(api_key, api_secret)
 
-def fetch_candles_in_parallel(timeframes, symbol='BTCUSDC', limit=100):
+def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=100):
     def fetch_candles(timeframe):
         return get_candles(symbol, timeframe, limit)
 
@@ -56,19 +57,19 @@ def get_candles(symbol, timeframe, limit=100, retries=3, delay=2):
     print(f"Failed to fetch candles for {timeframe} after {retries} attempts.")
     return []
 
-def get_current_btc_price(retries=3, delay=2):
+def get_current_price(retries=3, delay=2):
     for attempt in range(retries):
         try:
-            ticker = client.get_symbol_ticker(symbol="BTCUSDC")
+            ticker = client.get_symbol_ticker(symbol=TRADE_SYMBOL)
             price = float(ticker['price'])
             if price > 0:
                 return price
             print(f"Invalid price {price} on attempt {attempt + 1}")
         except BinanceAPIException as e:
-            print(f"Error fetching BTC price (attempt {attempt + 1}): {e.message}")
+            print(f"Error fetching {TRADE_SYMBOL} price (attempt {attempt + 1}): {e.message}")
             if attempt < retries - 1:
                 time.sleep(delay)
-    print("Failed to fetch valid BTC price after retries.")
+    print(f"Failed to fetch valid {TRADE_SYMBOL} price after retries.")
     return 0.0
 
 def get_balance(asset='USDC'):
@@ -97,30 +98,102 @@ def get_last_buy_trade():
         print(f"Error fetching trade history: {e.message}")
     return None
 
-def get_average_entry_price_for_btc():
+def get_average_entry_price():
     last_trade = get_last_buy_trade()
     if last_trade:
         entry_price = last_trade['price']
         print(f"Using last buy trade price as entry price: {entry_price:.25f}")
         return entry_price
-    print("No valid last buy trade found; cannot calculate entry price.")
+    print(f"No valid last buy trade found for {TRADE_SYMBOL}; cannot calculate entry price.")
     return 0.0
 
-def buy_btc(amount):
+def get_symbol_lot_size_info(symbol):
     try:
+        exchange_info = client.get_symbol_info(symbol)
+        for filter in exchange_info['filters']:
+            if filter['filterType'] == 'LOT_SIZE':
+                return {
+                    'minQty': float(filter['minQty']),
+                    'stepSize': float(filter['stepSize'])
+                }
+        print(f"Could not find LOT_SIZE filter for {symbol}. Using defaults.")
+        return {'minQty': 0.00001, 'stepSize': 0.00001}  # Default for BTCUSDC
+    except BinanceAPIException as e:
+        print(f"Error fetching symbol info for {symbol}: {e.message}")
+        return {'minQty': 0.00001, 'stepSize': 0.00001}
+
+def buy_asset():
+    try:
+        # Fetch current price and balance at the time of buy
+        current_price = get_current_price()
+        if current_price <= 0:
+            print(f"Invalid current price {current_price} for buy order.")
+            return None, None
+        
+        usdc_balance = get_balance('USDC')
+        if usdc_balance <= 0:
+            print("No USDC balance available to place buy order.")
+            return None, None
+
+        # Calculate raw quantity using the entire USDC balance
+        raw_quantity = usdc_balance / current_price
+        print(f"Raw quantity calculated: {raw_quantity:.10f} (USDC: {usdc_balance:.2f}, Price: {current_price:.2f})")
+        
+        # Get precision from step_size (number of decimal places)
+        step_precision = int(-math.log10(step_size)) if step_size > 0 else 8  # Default to 8 if step_size is invalid
+        
+        # Adjust quantity to use maximum possible balance, floored to step_size
+        adjusted_quantity = math.floor(raw_quantity / step_size) * step_size
+        adjusted_quantity = round(adjusted_quantity, step_precision)
+        cost = adjusted_quantity * current_price
+        print(f"Adjusted quantity (max balance): {adjusted_quantity:.10f}, Cost: {cost:.2f} (Step size: {step_size}, Precision: {step_precision})")
+        
+        # Check minimum notional value (typically 10 USDC for Binance)
+        min_notional = 10.0  # Binance minimum trade value
+        if cost < min_notional:
+            print(f"Cost {cost:.2f} USDC is below minimum notional value {min_notional}. Adjusting quantity.")
+            min_quantity_for_notional = min_notional / current_price
+            adjusted_quantity = math.ceil(min_quantity_for_notional / step_size) * step_size
+            adjusted_quantity = round(adjusted_quantity, step_precision)
+            cost = adjusted_quantity * current_price
+            print(f"Re-adjusted quantity for notional: {adjusted_quantity:.10f}, New Cost: {cost:.2f}")
+
+        # Ensure quantity meets minimum trade size
+        if adjusted_quantity < min_trade_size:
+            print(f"Adjusted quantity {adjusted_quantity:.10f} is below minimum trade size {min_trade_size}. Cannot execute trade.")
+            return None, None
+        
+        # Verify cost doesn't exceed balance (shouldn't happen due to flooring, but safety check)
+        if cost > usdc_balance:
+            print(f"Cost {cost:.2f} exceeds available balance {usdc_balance:.2f}. This should not occur with proper flooring.")
+            adjusted_quantity = math.floor((usdc_balance / current_price) / step_size) * step_size
+            adjusted_quantity = round(adjusted_quantity, step_precision)
+            cost = adjusted_quantity * current_price
+            print(f"Re-adjusted quantity to fit balance: {adjusted_quantity:.10f}, Final Cost: {cost:.2f}")
+
+        # Final validation
+        if adjusted_quantity < min_trade_size:
+            print(f"Final adjusted quantity {adjusted_quantity:.10f} still below minimum trade size {min_trade_size}. Cannot execute trade.")
+            return None, None
+
+        # Calculate remaining balance
+        remaining_balance = usdc_balance - cost
+        print(f"Using {cost:.2f} of {usdc_balance:.2f} USDC, Remaining Balance: {remaining_balance:.2f} USDC")
+
+        # Execute the market buy order
         order = client.order_market_buy(
-            symbol='BTCUSDC',
-            quantity=amount
+            symbol=TRADE_SYMBOL,
+            quantity=adjusted_quantity
         )
         print(f"Market buy order executed: {order}")
         entry_price = float(order['fills'][0]['price'])
-        return entry_price
+        return entry_price, adjusted_quantity
     except BinanceAPIException as e:
         print(f"Error executing buy order: {e.message}")
-        return None 
+        return None, None
 
-def check_exit_condition(initial_investment, btc_balance):
-    current_value = btc_balance * get_current_btc_price()
+def check_exit_condition(initial_investment, asset_balance):
+    current_value = asset_balance * get_current_price()
     return current_value >= (initial_investment * 1.03)  # 3% profit target
 
 def backtest_model(candles):
@@ -267,13 +340,6 @@ def determine_market_sentiment(negative_freqs, negative_powers, positive_freqs, 
             return "Bearish" if total_positive_power > total_negative_power else "Distribution"
         return "Bullish"
     return "Neutral"
-
-def get_min_trade_size(symbol):
-    exchange_info = client.get_symbol_info(symbol)
-    for filter in exchange_info['filters']:
-        if filter['filterType'] == 'LOT_SIZE':
-            return float(filter['minQty'])
-    return 0.0
 
 def calculate_45_degree_projection(last_bottom, last_top):
     if last_bottom is not None and last_top is not None:
@@ -434,10 +500,6 @@ def get_target(closes, n_components, last_major_reversal_type, buy_volume, sell_
     return current_time, current_close, stop_loss, target_price, market_mood
 
 def forecast_price_per_time_pythagorean(timeframe, candles, min_threshold, max_threshold, current_price, time_window_minutes, last_reversal, last_reversal_type):
-    """
-    Fixed Pythagorean forecast for up cycle, ensuring a realistic target price.
-    Considers distance from last DIP to current price vs. min-to-max threshold range.
-    """
     threshold_range = max_threshold - min_threshold
     time_leg = time_window_minutes
     hypotenuse = np.sqrt(time_leg**2 + threshold_range**2)
@@ -466,18 +528,21 @@ def forecast_price_per_time_pythagorean(timeframe, candles, min_threshold, max_t
     
     return forecast_price, price_per_minute
 
-# Instantiate the minimum trade size for the trading pair
-min_trade_size = get_min_trade_size(TRADE_SYMBOL)
+# Instantiate the minimum trade size and step size for the trading pair
+lot_size_info = get_symbol_lot_size_info(TRADE_SYMBOL)
+min_trade_size = lot_size_info['minQty']
+step_size = lot_size_info['stepSize']
+print(f"Initialized {TRADE_SYMBOL} - Min Trade Size: {min_trade_size}, Step Size: {step_size}")
 
 # Initialize variables for tracking trade state
 position_open = False
 initial_investment = 0.0
-btc_balance = 0.0
+asset_balance = 0.0
 entry_price = 0.0
 
 # Initial balance check
 usdc_balance = get_balance('USDC')
-btc_balance = get_balance('BTC')
+asset_balance = get_balance(TRADE_SYMBOL.split('USDC')[0])
 print("Trading Bot Initialized!")
 
 # Main trading loop
@@ -488,9 +553,9 @@ while True:
     candle_map = fetch_candles_in_parallel(['1m', '3m', '5m']) 
     if not candle_map.get('1m'):
         print("Error: '1m' candles not fetched. Check API connectivity or symbol.")
-    current_btc_price = get_current_btc_price()
-    if current_btc_price == 0.0:
-        print("Warning: Current BTC price is 0.0. API may be failing.")
+    current_price = get_current_price()
+    if current_price == 0.0:
+        print(f"Warning: Current {TRADE_SYMBOL} price is 0.0. API may be failing.")
 
     if "1m" in candle_map and candle_map['1m']:
         model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
@@ -507,7 +572,7 @@ while True:
 
     buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
     volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
-    support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold or 0, max_threshold or float('inf'), current_btc_price)
+    support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold or 0, max_threshold or float('inf'), current_price)
     volume_ratios_details = calculate_bullish_bearish_volume_ratios(candle_map)
     volume_trends_details = analyze_volume_changes_over_time(candle_map)
 
@@ -519,7 +584,7 @@ while True:
             high_tf = np.nanmax(closes_tf)
             low_tf = np.nanmin(closes_tf)
 
-            last_bottom, last_top, last_reversal, last_reversal_type = find_major_reversals(candle_map[timeframe], current_btc_price, low_tf, high_tf)
+            last_bottom, last_top, last_reversal, last_reversal_type = find_major_reversals(candle_map[timeframe], current_price, low_tf, high_tf)
             fib_levels = calculate_fibonacci_levels_from_reversal(last_reversal, high_tf, low_tf, last_reversal_type)
             
             if not fib_levels:
@@ -532,13 +597,13 @@ while True:
             for level, price in fib_levels.items():
                 print(f"Level {level}: {price:.25f}")
 
-            dist_to_min = ((current_btc_price - low_tf) / (high_tf - low_tf)) * 100 if (high_tf - low_tf) != 0 else 0
-            dist_to_max = ((high_tf - current_btc_price) / (high_tf - low_tf)) * 100 if (high_tf - low_tf) != 0 else 0
+            dist_to_min = ((current_price - low_tf) / (high_tf - low_tf)) * 100 if (high_tf - low_tf) != 0 else 0
+            dist_to_max = ((high_tf - current_price) / (high_tf - low_tf)) * 100 if (high_tf - low_tf) != 0 else 0
             print(f"Distance from Current Close to Min Threshold ({low_tf:.25f}): {dist_to_min:.25f}%")
             print(f"Distance from Current Close to Max Threshold ({high_tf:.25f}): {dist_to_max:.25f}%")
 
-            symmetrical_min_distance = (high_tf - current_btc_price) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
-            symmetrical_max_distance = (current_btc_price - low_tf) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
+            symmetrical_min_distance = (high_tf - current_price) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
+            symmetrical_max_distance = (current_price - low_tf) / (high_tf - low_tf) * 100 if (high_tf - low_tf) != 0 else 0
             print(f"Normalized Distance to Min Threshold (Symmetrical): {symmetrical_max_distance:.25f}%")
             print(f"Normalized Distance to Max Threshold (Symmetrical): {symmetrical_min_distance:.25f}%")
 
@@ -546,14 +611,14 @@ while True:
             min_threshold_tf, max_threshold_tf, _, _, _, _, _ = calculate_thresholds(closes_tf)
             forecast_price, price_rate = forecast_price_per_time_pythagorean(
                 timeframe, candle_map[timeframe], min_threshold_tf, max_threshold_tf, 
-                current_btc_price, time_window, last_reversal, last_reversal_type
+                current_price, time_window, last_reversal, last_reversal_type
             )
             pythagorean_forecasts[timeframe] = {'price': forecast_price, 'rate': price_rate}
         else:
             print(f"Warning: No candle data available for {timeframe}. Skipping forecast.")
 
-    forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold or 0, current_btc_price)
-    forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_btc_price)
+    forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold or 0, current_price)
+    forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_price)
 
     conditions_status = {
         "volume_bullish_1m": False,
@@ -575,7 +640,7 @@ while True:
                 closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
             )
 
-            last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_btc_price, min_threshold, max_threshold)
+            last_bottom, last_top, closest_reversal, closest_type = find_major_reversals(candle_map[timeframe], current_price, min_threshold, max_threshold)
             dip_confirmed = closest_type == 'DIP'
             conditions_status[f'dip_confirmed_{timeframe}'] = dip_confirmed
 
@@ -630,11 +695,11 @@ while True:
             print(f"Volume Bearish Ratio: {volume_ratios[timeframe]['sell_ratio']:.25f}%" if timeframe in volume_ratios else "Volume Bearish Ratio: Not available")
             print(f"Status: {volume_ratios[timeframe]['status']}" if timeframe in volume_ratios else "Status: Not available")
 
-            avg = (min_threshold + max_threshold) / 2 if min_threshold is not None and max_threshold is not None else current_btc_price
+            avg = (min_threshold + max_threshold) / 2 if min_threshold is not None and max_threshold is not None else current_price
             wave_price = calculate_wave_price(len(closes), avg, min_threshold or 0, max_threshold or float('inf'), omega=0.1, phi=0)
             print(f"Calculated Wave Price: {wave_price:.25f}")
 
-            independent_wave_price = calculate_independent_wave_price(current_btc_price, avg, min_threshold or 0, max_threshold or float('inf'), range_distance=0.1)
+            independent_wave_price = calculate_independent_wave_price(current_price, avg, min_threshold or 0, max_threshold or float('inf'), range_distance=0.1)
             print(f"Calculated Independent Wave Price: {independent_wave_price:.25f}")
 
             current_time, entry_price_usdc, stop_loss, reversal_target, market_mood = get_target(
@@ -663,34 +728,41 @@ while True:
             print(f"--- {timeframe} --- No data available.")
 
     usdc_balance = get_balance('USDC')
-    btc_balance = get_balance('BTC')
+    asset_balance = get_balance(TRADE_SYMBOL.split('USDC')[0])
 
     if position_open:
-        current_value_in_usdc = btc_balance * current_btc_price
-        print(f"Current BTC Balance Value in USDC: {current_value_in_usdc:.25f}")
-        print(f"Initial USDC amount: {initial_investment:.25f}, Entry Price for last BTC purchased: {entry_price:.25f}")
+        current_value_in_usdc = asset_balance * current_price
+        print(f"Current {TRADE_SYMBOL.split('USDC')[0]} Balance Value in USDC: {current_value_in_usdc:.25f}")
+        print(f"Initial USDC amount: {initial_investment:.25f}, Entry Price for last {TRADE_SYMBOL.split('USDC')[0]} purchased: {entry_price:.25f}")
         
         percentage_change = ((current_value_in_usdc - initial_investment) / initial_investment) * 100 if initial_investment > 0 else 0
         print(f"Percentage Change from Initial Investment: {percentage_change:.25f}%")
 
-        if check_exit_condition(initial_investment, btc_balance):
+        if check_exit_condition(initial_investment, asset_balance):
             print("Target profit of 3% reached or exceeded. Initiating exit...")
             try:
-                sell_order = client.order_market_sell(
-                    symbol='BTCUSDC',
-                    quantity=btc_balance
-                )
-                print(f"Market sell order executed: {sell_order}")
-                exit_usdc_balance = get_balance('USDC')
-                profit = exit_usdc_balance - initial_investment
-                profit_percentage = (profit / initial_investment) * 100 if initial_investment > 0 else 0.0
+                step_precision = int(-math.log10(step_size)) if step_size > 0 else 8
+                sell_quantity = math.floor(asset_balance / step_size) * step_size
+                sell_quantity = round(sell_quantity, step_precision)
+                
+                if sell_quantity < min_trade_size:
+                    print(f"Cannot sell: Adjusted quantity {sell_quantity:.10f} is below minimum trade size {min_trade_size}.")
+                else:
+                    sell_order = client.order_market_sell(
+                        symbol=TRADE_SYMBOL,
+                        quantity=sell_quantity
+                    )
+                    print(f"Market sell order executed: {sell_order}")
+                    exit_usdc_balance = get_balance('USDC')
+                    profit = exit_usdc_balance - initial_investment
+                    profit_percentage = (profit / initial_investment) * 100 if initial_investment > 0 else 0.0
 
-                print(f"Position closed. Sold BTC for USDC: {current_value_in_usdc:.25f}")
-                print(f"Trade log: Time: {current_local_time}, Entry Price: {entry_price:.25f}, Exit Balance: {exit_usdc_balance:.25f}, Profit: {profit:.25f} USDC, Profit Percentage: {profit_percentage:.25f}%")
+                    print(f"Position closed. Sold {TRADE_SYMBOL.split('USDC')[0]} for USDC: {current_value_in_usdc:.25f}")
+                    print(f"Trade log: Time: {current_local_time}, Entry Price: {entry_price:.25f}, Exit Balance: {exit_usdc_balance:.25f}, Profit: {profit:.25f} USDC, Profit Percentage: {profit_percentage:.25f}%")
 
-                position_open = False
-                initial_investment = 0.0 
-                btc_balance = 0.0 
+                    position_open = False
+                    initial_investment = 0.0 
+                    asset_balance = 0.0 
             except BinanceAPIException as e:
                 print(f"Error executing sell order: {e.message}")
     else:
@@ -698,7 +770,7 @@ while True:
             print(f"Current USDC balance found: {usdc_balance:.25f}")
         else:
             print("No USDC balance available.")
-        print(f"Current BTC balance: {btc_balance:.25f} BTC")
+        print(f"Current {TRADE_SYMBOL.split('USDC')[0]} balance: {asset_balance:.25f} {TRADE_SYMBOL.split('USDC')[0]}")
 
     true_conditions_count = sum(int(status) for status in conditions_status.values())
     false_conditions_count = len(conditions_status) - true_conditions_count
@@ -709,47 +781,51 @@ while True:
 
     if not position_open:
         all_conditions_met = all(conditions_status.values())
+        print(f"All Conditions Met for Entry: {'Yes' if all_conditions_met else 'No'}")
         if all_conditions_met:
-            print(f"All Conditions Met for Entry: Yes")
-            usdc_balance = get_balance('USDC')
-            print(f"Current USDC Balance Found: {usdc_balance:.25f}")
-            
-            if btc_balance > 0:
-                current_value_in_usdc = btc_balance * current_btc_price
-                if check_exit_condition(initial_investment, btc_balance):
-                    print("Exit conditions met for existing BTC; selling the position...")
+            usdc_balance = get_balance('USDC')  # Refresh balance right before buy
+            if asset_balance > 0:
+                current_value_in_usdc = asset_balance * current_price
+                if check_exit_condition(initial_investment, asset_balance):
+                    print(f"Exit conditions met for existing {TRADE_SYMBOL.split('USDC')[0]}; selling the position...")
                     try:
-                        sell_order = client.order_market_sell(
-                            symbol='BTCUSDC',
-                            quantity=btc_balance
-                        )
-                        print(f"Market sell order executed for BTC position: {sell_order}")
+                        step_precision = int(-math.log10(step_size)) if step_size > 0 else 8
+                        sell_quantity = math.floor(asset_balance / step_size) * step_size
+                        sell_quantity = round(sell_quantity, step_precision)
+                        
+                        if sell_quantity < min_trade_size:
+                            print(f"Cannot sell: Adjusted quantity {sell_quantity:.10f} is below minimum trade size {min_trade_size}.")
+                        else:
+                            sell_order = client.order_market_sell(
+                                symbol=TRADE_SYMBOL,
+                                quantity=sell_quantity
+                            )
+                            print(f"Market sell order executed for {TRADE_SYMBOL.split('USDC')[0]} position: {sell_order}")
+                            asset_balance = get_balance(TRADE_SYMBOL.split('USDC')[0])
+                            usdc_balance = get_balance('USDC')
                     except BinanceAPIException as e:
                         print(f"Error executing sell order: {e.message}")
-            else:
-                quantity_to_buy = usdc_balance / current_btc_price if current_btc_price > 0 else 0
-                if quantity_to_buy >= min_trade_size and usdc_balance > 0:
-                    entry_price = buy_btc(quantity_to_buy)
-                    if entry_price is not None:
-                        initial_investment = usdc_balance
-                        print(f"BTC was bought at entry price of {entry_price:.25f} USDC for quantity: {quantity_to_buy:.25f} BTC.")
-                        position_open = True
-                        print(f"New position opened with {usdc_balance:.25f} USDC at price {current_btc_price:.25f}.")
-                    else:
-                        print("Error placing buy order.")
+            elif usdc_balance > 0:
+                print(f"Trigger signal detected! Attempting to buy {TRADE_SYMBOL} with entire USDC balance: {usdc_balance:.25f} at price {current_price:.2f}")
+                entry_price, quantity_bought = buy_asset()
+                if entry_price is not None and quantity_bought is not None:
+                    initial_investment = usdc_balance
+                    print(f"{TRADE_SYMBOL.split('USDC')[0]} was bought at entry price of {entry_price:.25f} USDC for quantity: {quantity_bought:.10f} {TRADE_SYMBOL.split('USDC')[0]}.")
+                    position_open = True
+                    print(f"New position opened with {usdc_balance:.25f} USDC at price {current_price:.25f}.")
+                    # Update balances after successful buy
+                    usdc_balance = get_balance('USDC')
+                    asset_balance = get_balance(TRADE_SYMBOL.split('USDC')[0])
                 else:
-                    if quantity_to_buy < min_trade_size:
-                        print(f"Cannot place order: Quantity {quantity_to_buy:.25f} is less than minimum trade size {min_trade_size:.25f}.")
-                    if usdc_balance <= 0:
-                        print("No USDC balance to invest in BTC.")
-        else:
-            print("All Conditions Met for Entry: No.")
+                    print("Error placing buy order.")
+            else:
+                print(f"No USDC balance to invest in {TRADE_SYMBOL.split('USDC')[0]}.")
 
     del candle_map
     gc.collect()
 
     print(f"\nCurrent USDC balance: {usdc_balance:.25f}")
-    print(f"Current BTC balance: {btc_balance:.25f} BTC")
-    print(f"Current BTC price: {current_btc_price:.25f}\n")
+    print(f"Current {TRADE_SYMBOL.split('USDC')[0]} balance: {asset_balance:.25f} {TRADE_SYMBOL.split('USDC')[0]}")
+    print(f"Current {TRADE_SYMBOL} price: {current_price:.25f}\n")
 
     time.sleep(5)
