@@ -41,7 +41,7 @@ def get_candles(symbol, timeframe, limit=1000):
 
 # Populate candle_map
 for timeframe in timeframes:
-    candle_map[timeframe] = get_candles(symbol, timeframe)
+    candle_map[timeframe] = get_candles(symbol, timeframe, limit=2000)  # Increased limit for more data
 
 # Helper function to remove NaNs and zeros
 def remove_nans_and_zeros(*arrays):
@@ -49,20 +49,33 @@ def remove_nans_and_zeros(*arrays):
     valid_mask = ~np.isnan(np.column_stack(arrays)).any(axis=1) & (np.column_stack(arrays) != 0).all(axis=1)
     return [array[valid_mask] for array in arrays]
 
-# Find major reversals with volume confirmation
+# Find major reversals with volume confirmation and bullish/bearish volume
 def find_major_reversals(candles):
     highs = np.array([c["high"] for c in candles])
     lows = np.array([c["low"] for c in candles])
     times = np.array([c["time"] for c in candles])
     volumes = np.array([c["volume"] for c in candles])
+    opens = np.array([c["open"] for c in candles])
+    closes = np.array([c["close"] for c in candles])
+    
     top_idx = np.argmax(highs)
     dip_idx = np.argmin(lows)
     avg_volume = np.mean(volumes) if len(volumes) > 0 else 0
-    vol_confirmed_top = volumes[top_idx] > avg_volume * 1.5 if top_idx < len(volumes) else False
-    vol_confirmed_dip = volumes[dip_idx] > avg_volume * 1.5 if dip_idx < len(volumes) else False
+    vol_confirmed_top = volumes[top_idx] > avg_volume * 1.2  # Lowered threshold to 1.2x
+    vol_confirmed_dip = volumes[dip_idx] > avg_volume * 1.2
+    
+    # Bullish vs Bearish volume
+    bullish_vol = sum(v for o, c, v in zip(opens, closes, volumes) if c > o)
+    bearish_vol = sum(v for o, c, v in zip(opens, closes, volumes) if c < o)
+    total_vol = bullish_vol + bearish_vol
+    bull_ratio = (bullish_vol / total_vol * 100) if total_vol > 0 else 50
+    bear_ratio = (bearish_vol / total_vol * 100) if total_vol > 0 else 50
+    
     return {
         'top': {'price': highs[top_idx], 'time': times[top_idx], 'volume_confirmed': vol_confirmed_top},
-        'dip': {'price': lows[dip_idx], 'time': times[dip_idx], 'volume_confirmed': vol_confirmed_dip}
+        'dip': {'price': lows[dip_idx], 'time': times[dip_idx], 'volume_confirmed': vol_confirmed_dip},
+        'bull_ratio': bull_ratio,
+        'bear_ratio': bear_ratio
     }
 
 def analyze_timeframes():
@@ -76,6 +89,9 @@ def analyze_timeframes():
             continue
         reversals = find_major_reversals(candles)
         mtf_reversals.append((timeframe, reversals))
+        print(f"\n=== {timeframe} Analysis ===")
+        print(f"Bullish Volume Ratio: {reversals['bull_ratio']:.2f}%")
+        print(f"Bearish Volume Ratio: {reversals['bear_ratio']:.2f}%")
 
     # Multi-timeframe harmonic oscillator analysis
     if mtf_reversals:
@@ -84,7 +100,7 @@ def analyze_timeframes():
         confirmed_dips = [(tf, r['dip']['price'], r['dip']['time']) for tf, r in mtf_reversals if r['dip']['volume_confirmed']]
 
         if not confirmed_tops or not confirmed_dips:
-            print("Insufficient volume-confirmed reversals for MTF analysis.")
+            print("Insufficient volume-confirmed reversals. Check API data or lower volume threshold.")
             return
 
         # ATH and ATL across all TFs
@@ -102,9 +118,8 @@ def analyze_timeframes():
         latest_tf, latest_price, latest_time, latest_type = latest_reversal
         latest_date_local = datetime.fromtimestamp(latest_time, tz=pytz.utc).astimezone(local_tz)
 
-        # Determine current cycle and counter-reversal
+        # Current cycle and target
         current_cycle = "UP" if latest_type == 'dip' else "DOWN"
-        counter_reversal = 'top' if latest_type == 'dip' else 'dip'
         tf_reversals = next(r for tf, r in mtf_reversals if tf == latest_tf)
         incoming_target = tf_reversals['top']['price'] if current_cycle == "UP" else tf_reversals['dip']['price']
 
@@ -114,79 +129,82 @@ def analyze_timeframes():
         mtf_amplitude = (mtf_high - mtf_low) / 4
         mtf_middle = (mtf_high + mtf_low) / 2
 
-        # Granulation ratios (1:3:5) and harmonic periods
-        tf_weights = {"1m": 1, "3m": 3, "5m": 5}
+        # FFT trend analysis
         reversal_times = sorted([t for _, _, t in confirmed_tops + confirmed_dips])
         if len(reversal_times) > 1:
-            avg_period_hours = np.mean(np.diff(reversal_times)) / 3600
+            time_diffs = np.diff(reversal_times) / 3600
+            fft_result = np.fft.fft(time_diffs)
+            fft_freq = np.fft.fftfreq(len(time_diffs))
+            spectral_power = np.abs(fft_result)
+            positive_freqs = fft_freq > 0
+            dominant_freq = fft_freq[positive_freqs][np.argmax(spectral_power[positive_freqs])] if any(positive_freqs) else 0
+            fft_trend = "UP" if dominant_freq > 0 else "DOWN"
+            avg_period_hours = 1 / dominant_freq if dominant_freq != 0 else np.mean(time_diffs)
         else:
+            fft_trend = "NEUTRAL"
             avg_period_hours = 24
 
-        # Harmonic ratios
-        harmonic_ratios = {
-            'octave': 2, '3rd': 4/3, '5th': 3/2, '7th': 7/4, '8th': 2, '9th': 9/4, '12th': 3
-        }
+        # Cycle strength and MTF dip confirmation
+        tf_weights = {"5m": 0.5, "3m": 0.3, "1m": 0.2}
+        dip_confirmed_tfs = [tf for tf, r in mtf_reversals if r['dip']['time'] == latest_time and r['dip']['volume_confirmed']]
+        cycle_strength = sum(tf_weights[tf] for tf in dip_confirmed_tfs if latest_type == 'dip') if dip_confirmed_tfs else 0
+        mtf_dip_confirmed = len(dip_confirmed_tfs) == 3 and latest_type == 'dip'
 
-        # Stationary harmonic wave with inner harmonics
-        current_time = datetime.now(pytz.utc).astimezone(local_tz)
-        time_since_start = (current_time - latest_date_local).total_seconds() / 3600
+        # 1m volume confirmation
+        one_min_reversals = next(r for tf, r in mtf_reversals if tf == "1m")
+        bull_ratio_1m = one_min_reversals['bull_ratio']
+        bear_ratio_1m = one_min_reversals['bear_ratio']
+        dip_volume_confirmed = bull_ratio_1m > bear_ratio_1m and latest_type == 'dip'
+
+        # MTF bullish/bearish volume ratio
+        mtf_bull_vol = sum(r['bull_ratio'] * tf_weights[tf] for tf, r in mtf_reversals)
+        mtf_bear_vol = sum(r['bear_ratio'] * tf_weights[tf] for tf, r in mtf_reversals)
+        mtf_total_vol = mtf_bull_vol + mtf_bear_vol
+        mtf_bull_ratio = (mtf_bull_vol / mtf_total_vol * 100) if mtf_total_vol > 0 else 50
+        mtf_bear_ratio = (mtf_bear_vol / mtf_total_vol * 100) if mtf_total_vol > 0 else 50
+
+        # Signal pattern trigger
+        signal = "BUY" if (mtf_dip_confirmed and dip_volume_confirmed and fft_trend == "UP" and cycle_strength > 0.5) else \
+                "SELL" if (latest_type == 'top' and fft_trend == "DOWN" and mtf_bear_ratio > mtf_bull_ratio) else "HOLD"
+
+        # Harmonic wave
+        time_since_start = (datetime.now(pytz.utc).astimezone(local_tz) - latest_date_local).total_seconds() / 3600
         forecast_hours = 24
         time_future = np.linspace(0, forecast_hours, 100)
-        
-        # Base wave and harmonics
         degrees = (360 / avg_period_hours) * time_future
         mtf_osc = mtf_middle + mtf_amplitude * np.sin(np.radians(degrees))
-        for harmonic, ratio in harmonic_ratios.items():
-            mtf_osc += (mtf_amplitude / ratio) * np.sin(np.radians(degrees * ratio))
-
-        # Quadrant mapping
-        phase = np.mod(degrees, 360)
-        quadrants = np.where(phase < 90, "Q2",
-                            np.where(phase < 180, "Q3",
-                                    np.where(phase < 270, "Q4", "Q1")))
         
-        # Q1 (dip) and Q4 (top) with volume confirmation
-        q1_idx = np.where(quadrants == "Q1")[0][0] if "Q1" in quadrants else None
-        q4_idx = np.where(quadrants == "Q4")[0][0] if "Q4" in quadrants else None
-        q1_price = mtf_osc[q1_idx] if q1_idx is not None else mtf_low
-        q4_price = mtf_osc[q4_idx] if q4_idx is not None else mtf_high
-        
-        # Adjust support/resistance with volume confirmation
+        # Support and resistance
         support_offset = (mtf_high - mtf_low) / 4
-        mtf_support = np.full_like(time_future, q1_price - support_offset) if q1_idx is not None else np.full_like(time_future, mtf_low)
-        mtf_top = np.full_like(time_future, q4_price + support_offset) if q4_idx is not None else np.full_like(time_future, mtf_high)
+        mtf_support = np.full_like(time_future, mtf_low - support_offset)
+        mtf_top = np.full_like(time_future, mtf_high + support_offset)
         mtf_middle_wave = np.full_like(time_future, mtf_middle)
-
-        # Thresholds
-        min_threshold = q1_price - support_offset if q1_idx is not None else mtf_low
-        max_threshold = q4_price + support_offset if q4_idx is not None else mtf_high
-        middle_threshold = mtf_middle
 
         # Print statements
         print(f"Most Recent Major Reversal: {latest_type.capitalize()} at {latest_price:.2f} on {latest_tf} ({latest_date_local.strftime('%Y-%m-%d %H:%M:%S %Z')})")
         print(f"Current Cycle: {current_cycle}")
-        print(f"Incoming Target: {counter_reversal.capitalize()} at {incoming_target:.2f} (from {latest_tf})")
-        print(f"MTF Price Range: Min (Q1 Support) = {min_threshold:.2f}, Middle = {middle_threshold:.2f}, Max (Q4 Resistance) = {max_threshold:.2f}")
+        print(f"Incoming Target: {('Top' if current_cycle == 'UP' else 'Dip')} at {incoming_target:.2f} (from {latest_tf})")
+        print(f"Cycle Strength (5m/3m/1m): {cycle_strength:.2f}")
+        print(f"MTF Dip Confirmed: {mtf_dip_confirmed}")
+        print(f"1m Volume - Bullish: {bull_ratio_1m:.2f}%, Bearish: {bear_ratio_1m:.2f}%")
+        print(f"MTF Volume - Bullish: {mtf_bull_ratio:.2f}%, Bearish: {mtf_bear_ratio:.2f}%")
+        print(f"FFT Trend: {fft_trend}")
         print(f"Average Cycle Period: {avg_period_hours:.2f} hours")
+        print(f"MTF Price Range: Min = {mtf_low - support_offset:.2f}, Middle = {mtf_middle:.2f}, Max = {mtf_high + support_offset:.2f}")
+        print(f"Signal Pattern Trigger: {signal}")
         print(f"Confirmed Tops: {len(confirmed_tops)} across TFs")
         print(f"Confirmed Dips: {len(confirmed_dips)} across TFs")
         print(f"Current Close (1m): {current_close:.2f}")
-        print(f"Q1 (Dip) Price: {q1_price:.2f}{' [Volume Confirmed]' if latest_type == 'dip' and tf_reversals['dip']['volume_confirmed'] else ''}")
-        print(f"Q4 (Top) Price: {q4_price:.2f}{' [Volume Confirmed]' if latest_type == 'top' and tf_reversals['top']['volume_confirmed'] else ''}")
 
         # Plot MTF harmonic oscillator
         plt.figure(figsize=(12, 6))
         plt.plot(time_future, mtf_osc, label='MTF Harmonic Oscillator', color='blue', linewidth=2)
-        plt.plot(time_future, mtf_middle_wave, label=f'Middle Wave ({middle_threshold:.2f})', color='gray', linestyle='--')
-        plt.plot(time_future, mtf_support, label=f'Support (Q1: {min_threshold:.2f})', color='green', linestyle='--')
-        plt.plot(time_future, mtf_top, label=f'Top (Q4: {max_threshold:.2f})', color='red', linestyle='--')
+        plt.plot(time_future, mtf_middle_wave, label=f'Middle Wave ({mtf_middle:.2f})', color='gray', linestyle='--')
+        plt.plot(time_future, mtf_support, label=f'Support ({mtf_low - support_offset:.2f})', color='green', linestyle='--')
+        plt.plot(time_future, mtf_top, label=f'Top ({mtf_high + support_offset:.2f})', color='red', linestyle='--')
         plt.axvline(time_since_start, color='black', linestyle='--', label='Current Time')
         plt.scatter(time_since_start, current_close, color='purple', label=f'Current Close: {current_close:.2f}', zorder=5)
-        if q1_idx is not None:
-            plt.scatter(time_future[q1_idx], q1_price, color='green', label=f'Q1 Dip: {q1_price:.2f}', zorder=5)
-        if q4_idx is not None:
-            plt.scatter(time_future[q4_idx], q4_price, color='red', label=f'Q4 Top: {q4_price:.2f}', zorder=5)
-        plt.title("Multi-Timeframe Harmonic Oscillator with Quadrants")
+        plt.title("Multi-Timeframe Harmonic Oscillator")
         plt.xlabel("Time (hours into forecast)")
         plt.ylabel("Price ($)")
         plt.legend()
