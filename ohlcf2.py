@@ -302,8 +302,8 @@ else:
 
 print("\nOverall Multi-Timeframe Analysis:")
 print("=" * 60)
-print(f"Average Bullish Volume (normalized): {avg_bullish_volume_scaled:.2f}%")
-print(f"Average Bearish Volume (normalized): {avg_bearish_volume_scaled:.2f}%")
+print(f"Average Bullish Volume: {avg_bullish_volume_scaled:.2f}%")
+print(f"Average Bearish Volume: {avg_bearish_volume_scaled:.2f}%")
 print(f"Total Volume: {total_mtf_volume:.2f}")  # Raw total volume still printed for completeness
 
 # MTF FFT Analysis
