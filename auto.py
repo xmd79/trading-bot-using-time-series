@@ -143,11 +143,11 @@ def buy_asset():
         current_price = get_current_price()
         if current_price <= Decimal('0'):
             print(f"Invalid current price {current_price:.25f} for buy order.")
-            return None, None, None
+            return None, None, None, None
         usdc_balance = get_balance('USDC')
         if usdc_balance <= Decimal('0'):
             print("No USDC balance available to place buy order.")
-            return None, None, None
+            return None, None, None, None
         raw_quantity = usdc_balance / current_price
         print(f"Raw quantity calculated: {raw_quantity:.25f} (USDC: {usdc_balance:.25f}, Price: {current_price:.25f})")
         step_precision = int(-math.log10(float(step_size))) if step_size > Decimal('0') else 8
@@ -165,7 +165,7 @@ def buy_asset():
             print(f"Re-adjusted quantity for notional: {adjusted_quantity:.25f}, New Cost: {cost:.25f}")
         if adjusted_quantity < min_trade_size:
             print(f"Adjusted quantity {adjusted_quantity:.25f} is below minimum trade size {min_trade_size:.25f}. Cannot execute trade.")
-            return None, None, None
+            return None, None, None, None
         if cost > usdc_balance:
             print(f"Cost {cost:.25f} exceeds available balance {usdc_balance:.25f}. Re-adjusting.")
             adjusted_quantity = ((usdc_balance / current_price) // step_size) * step_size
@@ -174,17 +174,17 @@ def buy_asset():
             print(f"Re-adjusted quantity to fit balance: {adjusted_quantity:.25f}, Final Cost: {cost:.25f}")
         if adjusted_quantity < min_trade_size:
             print(f"Final adjusted quantity {adjusted_quantity:.25f} still below minimum trade size {min_trade_size:.25f}. Cannot execute trade.")
-            return None, None, None
+            return None, None, None, None
         remaining_balance = usdc_balance - cost
         print(f"Using {cost:.25f} of {usdc_balance:.25f} USDC, Remaining Balance: {remaining_balance:.25f} USDC")
         order = client.order_market_buy(symbol=TRADE_SYMBOL, quantity=float(adjusted_quantity))
         print(f"Market buy order executed: {order}")
         entry_price = Decimal(str(order['fills'][0]['price']))
         entry_datetime = datetime.datetime.now()
-        return entry_price, adjusted_quantity, entry_datetime
+        return entry_price, adjusted_quantity, entry_datetime, cost
     except BinanceAPIException as e:
         print(f"Error executing buy order: {e.message}")
-        return None, None, None
+        return None, None, None, None
 
 def sell_asset(asset_balance):
     try:
@@ -206,10 +206,19 @@ def sell_asset(asset_balance):
         print(f"Error executing sell order: {e.message}")
         return False
 
-def check_exit_condition(initial_investment, asset_balance):
-    current_value = Decimal(str(asset_balance)) * get_current_price()
-    target_value = Decimal(str(initial_investment)) * Decimal('1.01')  # 1% profit target
-    return current_value >= target_value
+def check_exit_condition(initial_investment, asset_balance, entry_price):
+    if initial_investment <= Decimal('0.0') or asset_balance <= Decimal('0.0') or entry_price <= Decimal('0.0'):
+        print("Invalid initial investment, asset balance, or entry price for exit condition check.")
+        return False
+    current_price = get_current_price()
+    if current_price <= Decimal('0.0'):
+        print("Invalid current price for exit condition check.")
+        return False
+    current_value = asset_balance * current_price
+    target_value = initial_investment * Decimal('1.01')  # 1% profit target
+    target_price = target_value / asset_balance
+    print(f"Exit Check: Current Price: {current_price:.25f}, Target Price: {target_price:.25f}, Current Value: {current_value:.25f}, Target Value: {target_value:.25f}")
+    return current_price >= target_price
 
 # Analysis Functions
 def backtest_model(candles):
@@ -779,7 +788,7 @@ while True:
         print(f"Percentage Progress to 1% Profit Target: {percentage_progress:.25f}%")
         print()
 
-        if check_exit_condition(float(initial_investment), float(asset_balance)):
+        if check_exit_condition(initial_investment, asset_balance, entry_price):
             print("Target profit of 1% reached or exceeded. Initiating exit...")
             if sell_asset(float(asset_balance)):
                 exit_usdc_balance = get_balance('USDC')
@@ -790,6 +799,7 @@ while True:
                 position_open = False
                 initial_investment = Decimal('0.0')
                 asset_balance = Decimal('0.0')
+                entry_price = Decimal('0.0')
                 entry_datetime = None  # Reset entry datetime
     else:
         if usdc_balance > Decimal('0'):
@@ -812,13 +822,13 @@ while True:
             usdc_balance = get_balance('USDC')
             if usdc_balance > Decimal('0'):
                 print(f"Trigger signal detected! Attempting to buy {TRADE_SYMBOL} with entire USDC balance: {usdc_balance:.25f} at price {current_price:.25f}")
-                entry_price, quantity_bought, entry_datetime = buy_asset()
-                if entry_price is not None and quantity_bought is not None:
-                    initial_investment = usdc_balance
-                    print(f"BTC was bought at entry price of {entry_price:.25f} USDC for quantity: {quantity_bought:.25f} BTC.")
+                entry_price, quantity_bought, entry_datetime, cost = buy_asset()
+                if entry_price is not None and quantity_bought is not None and cost is not None:
+                    initial_investment = cost
+                    print(f"BTC was bought at entry price of {entry_price:.25f} USDC for quantity: {quantity_bought:.25f} BTC, Cost: {cost:.25f} USDC")
                     print(f"Entry Datetime: {entry_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
                     position_open = True
-                    print(f"New position opened with {usdc_balance:.25f} USDC at price {current_price:.25f}.")
+                    print(f"New position opened with {cost:.25f} USDC at price {entry_price:.25f}.")
                     usdc_balance = get_balance('USDC')
                     asset_balance = get_balance(TRADE_SYMBOL.split('USDC')[0])
                 else:
