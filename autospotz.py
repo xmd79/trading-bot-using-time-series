@@ -214,9 +214,9 @@ def check_exit_condition(initial_investment, asset_balance, entry_price):
     if current_price <= Decimal('0.0'):
         print("Invalid current price for exit condition check.")
         return False
+    target_price = entry_price * Decimal('1.01')  # Target is 1% above entry price
     current_value = asset_balance * current_price
-    target_value = initial_investment * Decimal('1.01')  # 1% profit target
-    target_price = target_value / asset_balance
+    target_value = asset_balance * target_price
     print(f"Exit Check: Current Price: {current_price:.25f}, Target Price: {target_price:.25f}, Current Value: {current_value:.25f}, Target Value: {target_value:.25f}")
     return current_price >= target_price
 
@@ -232,23 +232,10 @@ def backtest_model(candles):
     mae = Decimal(str(mean_absolute_error(y_test, predictions)))
     return model, mae, predictions, y_test
 
-def forecast_next_price(model, num_steps=1, current_price=None):
+def forecast_next_price(model, num_steps=1):
     last_index = model.n_features_in_
     future_steps = np.arange(last_index, last_index + num_steps).reshape(-1, 1)
-    forecasted_prices = [Decimal(str(price)) for price in model.predict(future_steps)]
-    if current_price is not None and num_steps == 1:
-        current_price_dec = Decimal(str(current_price))
-        min_diff_percent = Decimal('0.01')  # 1% minimum difference
-        forecasted_price = forecasted_prices[0]
-        price_diff_percent = abs(forecasted_price - current_price_dec) / current_price_dec
-        if price_diff_percent < min_diff_percent:
-            if forecasted_price >= current_price_dec:
-                adjusted_price = current_price_dec * (Decimal('1') + min_diff_percent)
-            else:
-                adjusted_price = current_price_dec * (Decimal('1') - min_diff_percent)
-            print(f"Forecasted price {forecasted_price:.25f} adjusted to {adjusted_price:.25f} to ensure 1% difference from current price {current_price_dec:.25f}")
-            forecasted_prices[0] = adjusted_price
-    return forecasted_prices
+    return [Decimal(str(price)) for price in model.predict(future_steps)]
 
 def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=Decimal('0.05')):
     close_prices = np.array([float(x) for x in close_prices if not np.isnan(x) and x > 0], dtype=np.float64)
@@ -327,31 +314,6 @@ def find_major_reversals(candles, current_close, min_threshold, max_threshold):
         closest_type = None
         closest_reversal = None
     return last_bottom, last_top, closest_reversal, closest_type
-
-def find_last_major_momentum(candles, current_close, period=14):
-    closes = np.array([float(candle["close"]) for candle in candles], dtype=np.float64)
-    if len(closes) < period:
-        print("Not enough data to calculate momentum.")
-        return None, None, None, None
-    momentum = talib.MOM(closes, timeperiod=period)
-    valid_momentum = [Decimal(str(m)) for m in momentum if not np.isnan(m)]
-    if not valid_momentum:
-        print("No valid momentum values found.")
-        return None, None, None, None
-    most_positive_momentum = max(valid_momentum)
-    most_negative_momentum = min(valid_momentum)
-    current_momentum = valid_momentum[-1]
-    closest_momentum = None
-    closest_type = None
-    if most_positive_momentum is not None:
-        if closest_momentum is None or abs(most_positive_momentum - current_momentum) < abs(closest_momentum - current_momentum):
-            closest_momentum = most_positive_momentum
-            closest_type = 'POSITIVE'
-    if most_negative_momentum is not None:
-        if closest_momentum is None or abs(most_negative_momentum - current_momentum) < abs(closest_momentum - current_momentum):
-            closest_momentum = most_negative_momentum
-            closest_type = 'NEGATIVE'
-    return most_positive_momentum, most_negative_momentum, closest_momentum, closest_type
 
 def scale_to_sine(close_prices):
     close_prices_np = np.array([float(x) for x in close_prices], dtype=np.float64)
@@ -594,7 +556,7 @@ position_open = False
 initial_investment = Decimal('0.0')
 asset_balance = Decimal('0.0')
 entry_price = Decimal('0.0')
-entry_datetime = None
+entry_datetime = None  # Added to track entry time
 
 # Initial balance check
 usdc_balance = get_balance('USDC')
@@ -642,7 +604,7 @@ while True:
     if "1m" in candle_map and candle_map['1m']:
         model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
         print(f"Backtest MAE: {backtest_mae:.25f}")
-        forecasted_prices = forecast_next_price(model, num_steps=1, current_price=current_price)
+        forecasted_prices = forecast_next_price(model, num_steps=1)
         closes = [candle['close'] for candle in candle_map["1m"]]
         min_threshold, max_threshold, _, _, _, _, _ = calculate_thresholds(closes)
         adjusted_forecasted_price = min(max(forecasted_prices[-1], min_threshold), max_threshold) if min_threshold is not None and max_threshold is not None else forecasted_prices[-1]
@@ -665,9 +627,7 @@ while True:
         "dip_confirmed_1m": False,
         "dip_confirmed_3m": False,
         "dip_confirmed_5m": False,
-        "volume_bullish_1m": False,
-        "negative_momentum_closer_1m": False,
-        "dist_to_min_less_than_max_1m": False
+        "dist_to_min_less_than_dist_to_max_1m": False
     }
     last_major_reversal_type = None
 
@@ -688,24 +648,13 @@ while True:
                 print("No Major Reversal Found")
             dip_confirmed = closest_type == 'DIP'
             conditions_status[f'dip_confirmed_{timeframe}'] = dip_confirmed
-            
-            most_positive_momentum, most_negative_momentum, closest_momentum, closest_momentum_type = find_last_major_momentum(candle_map[timeframe], current_price)
-            if closest_momentum is not None:
-                print(f"Most Recent Major Momentum Type: {closest_momentum_type}")
-                print(f"Last Major Momentum Found: {closest_momentum:.25f}")
-                print(f"Most Positive Momentum: {most_positive_momentum:.25f}")
-                print(f"Most Negative Momentum: {most_negative_momentum:.25f}")
-            else:
-                print("No Major Momentum Found")
-            
             if timeframe == '1m':
                 conditions_status["ML_Forecasted_Price_over_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
-                conditions_status["volume_bullish_1m"] = buy_volume.get('1m', [Decimal('0')])[-1] > sell_volume.get('1m', [Decimal('0')])[-1]
-                conditions_status["negative_momentum_closer_1m"] = closest_momentum_type == 'NEGATIVE'
-                dist_to_min = abs(current_close - low_tf) if low_tf is not None else Decimal('Infinity')
-                dist_to_max = abs(high_tf - current_close) if high_tf is not None else Decimal('Infinity')
-                conditions_status["dist_to_min_less_than_max_1m"] = dist_to_min < dist_to_max
-                print(f"Distance to Min Threshold Check: {dist_to_min:.25f} < {dist_to_max:.25f} -> {'True' if conditions_status['dist_to_min_less_than_max_1m'] else 'False'}")
+                dist_to_min = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
+                dist_to_max = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
+                conditions_status["dist_to_min_less_than_dist_to_max_1m"] = dist_to_min < dist_to_max
+                print(f"Distance to Min (1m): {dist_to_min:.25f}%, Distance to Max (1m): {dist_to_max:.25f}%")
+                print(f"Condition dist_to_min_less_than_dist_to_max_1m: {'True' if dist_to_min < dist_to_max else 'False'}")
             elif timeframe == '5m':
                 conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf if avg_mtf is not None else False
             valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
@@ -778,45 +727,118 @@ while True:
             print(f"Pythagorean Forecast Price for {timeframe}: {pythagorean_forecasts[timeframe]['price']:.25f}")
             print(f"Pythagorean Price Rate for {timeframe}: {pythagorean_forecasts[timeframe]['rate']:.25f} USDC/min")
 
-    print("\nIndividual Condition Status:")
-    for condition, status in conditions_status.items():
-        print(f"{condition}: {status}")
-    true_count = sum(1 for status in conditions_status.values() if status)
-    false_count = len(conditions_status) - true_count
-    print(f"Condition Summary: {true_count} True, {false_count} False")
-    all_conditions_met = all(conditions_status.values())
-    print(f"All Conditions Met for Entry: {'Yes' if all_conditions_met else 'No'}")
+    forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold or current_price * Decimal('0.95'), current_price)
+    forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_price)
 
-    if not position_open and all_conditions_met and usdc_balance > Decimal('10'):
-        print("All conditions met for BUY. Attempting to execute buy order...")
-        new_entry_price, new_quantity, new_entry_datetime, cost = buy_asset()
-        if new_entry_price is not None and new_quantity is not None:
-            position_open = True
-            entry_price = new_entry_price
-            initial_investment = cost
-            asset_balance = new_quantity
-            entry_datetime = new_entry_datetime
-            print(f"Buy order successful. Entry Price: {entry_price:.25f}, Quantity: {asset_balance:.25f}, Initial Investment: {initial_investment:.25f}, Entry Time: {entry_datetime}")
+    if position_open:
+        print()
+        print("Current In-Trade Status:")
+        current_value_in_usdc = asset_balance * current_price
+        if current_value_in_usdc < Decimal('0'):
+            print("Error: Current BTC Balance Value in USDC is negative. Check balance or price.")
+            current_value_in_usdc = Decimal('0.0')
+        print(f"Current BTC Balance Value in USDC: {current_value_in_usdc:.25f}")
+
+        target_price = entry_price * Decimal('1.01')  # Target is 1% above entry price
+        target_value = asset_balance * target_price
+        entry_time_str = entry_datetime.strftime("%H:%M") if entry_datetime else "Unknown"
+        time_span = (current_local_time - entry_datetime) if entry_datetime else None
+        if time_span:
+            total_seconds = int(time_span.total_seconds())
+            days = total_seconds // (24 * 3600)
+            hours = (total_seconds % (24 * 3600)) // 3600
+            minutes = (total_seconds % 3600) // 60
+            time_span_str = f"{days} days, {hours} hours, {minutes} minutes"
         else:
-            print("Buy order failed. Check balance, price, or API issues.")
+            time_span_str = "Unknown"
+        
+        if initial_investment <= Decimal('0'):
+            print("Error: Initial investment is zero or negative. Using default value for display.")
+            initial_investment_display = Decimal('1.0')
+        else:
+            initial_investment_display = initial_investment
+        print(f"Initial USDC amount: {initial_investment_display:.25f}, Expected USDC amount after exit: {target_value:.25f}, Entry Price for last BTC purchased: {entry_price:.25f}")
+        print(f"Entry Time (HH:MM): {entry_time_str}, Time Span from Entry: {time_span_str}")
 
-    if position_open and initial_investment > Decimal('0') and asset_balance > Decimal('0') and entry_price > Decimal('0'):
+        if initial_investment_display > Decimal('0'):
+            value_change_percentage = ((current_value_in_usdc - initial_investment) / initial_investment) * Decimal('100')
+        else:
+            value_change_percentage = Decimal('0.0')
+        print(f"Value Change Percentage from Initial Investment: {value_change_percentage:.25f}%")
+
+        if asset_balance > Decimal('0'):
+            print(f"Price for 1% Profit Target: {target_price:.25f}")
+        else:
+            target_price = Decimal('0.0')
+            print("Error: BTC balance is zero or negative. Target price set to 0.")
+            print(f"Price for 1% Profit Target: {target_price:.25f}")
+
+        if entry_price > Decimal('0') and target_price > entry_price:
+            if current_price >= target_price:
+                percentage_to_target = Decimal('0.0')
+            elif current_price >= entry_price:
+                percentage_to_target = ((target_price - current_price) / (target_price - entry_price)) * Decimal('100')
+            else:
+                percentage_to_target = Decimal('100.0') + (((entry_price - current_price) / (target_price - entry_price)) * Decimal('100'))
+        else:
+            percentage_to_target = Decimal('0.0')
+            print("Error: Invalid entry or target price for percentage to target calculation.")
+        print(f"Percentage Distance to 1% Profit Target: {percentage_to_target:.25f}%")
+
+        percentage_progress = Decimal('100.0') - percentage_to_target
+        print(f"Percentage Progress to 1% Profit Target: {percentage_progress:.25f}%")
+        print()
+
         if check_exit_condition(initial_investment, asset_balance, entry_price):
-            print("Exit condition met. Attempting to sell...")
-            if sell_asset(asset_balance):
+            print("Target profit of 1% reached or exceeded. Initiating exit...")
+            if sell_asset(float(asset_balance)):
+                exit_usdc_balance = get_balance('USDC')
+                profit = exit_usdc_balance - initial_investment
+                profit_percentage = (profit / initial_investment) * Decimal('100') if initial_investment > Decimal('0') else Decimal('0.0')
+                print(f"Position closed. Sold BTC for USDC: {exit_usdc_balance:.25f}")
+                print(f"Trade log: Time: {current_local_time_str}, Entry Price: {entry_price:.25f}, Exit Balance: {exit_usdc_balance:.25f}, Profit: {profit:.25f} USDC, Profit Percentage: {profit_percentage:.25f}%")
                 position_open = False
-                usdc_balance = get_balance('USDC')
-                print(f"Sell order successful. New USDC Balance: {usdc_balance:.25f}")
                 initial_investment = Decimal('0.0')
                 asset_balance = Decimal('0.0')
                 entry_price = Decimal('0.0')
                 entry_datetime = None
-            else:
-                print("Sell order failed. Retaining position.")
+    else:
+        if usdc_balance > Decimal('0'):
+            print(f"Current USDC balance found: {usdc_balance:.25f}")
         else:
-            current_value = asset_balance * current_price
-            profit_loss = current_value - initial_investment
-            print(f"Position Open: Current Value: {current_value:.25f}, P/L: {profit_loss:.25f} USDC")
+            print("No USDC balance available.")
+        print(f"Current BTC balance: {asset_balance:.25f} BTC")
 
+        true_conditions_count = sum(int(status) for status in conditions_status.values())
+        false_conditions_count = len(conditions_status) - true_conditions_count
+        print(f"Overall Conditions Status: {true_conditions_count} True, {false_conditions_count} False\n")
+        print("Individual Condition Status:")
+        for condition, status in conditions_status.items():
+            print(f"{condition}: {'True' if status else 'False'}")
+        all_conditions_met = all(conditions_status.values())
+        print(f"All Conditions Met for Entry: {'Yes' if all_conditions_met else 'No'}")
+        if all_conditions_met:
+            usdc_balance = get_balance('USDC')
+            if usdc_balance > Decimal('0'):
+                print(f"Trigger signal detected! Attempting to buy {TRADE_SYMBOL} with entire USDC balance: {usdc_balance:.25f} at price {current_price:.25f}")
+                entry_price, quantity_bought, entry_datetime, cost = buy_asset()
+                if entry_price is not None and quantity_bought is not None and cost is not None:
+                    initial_investment = cost
+                    print(f"BTC was bought at entry price of {entry_price:.25f} USDC for quantity: {quantity_bought:.25f} BTC, Cost: {cost:.25f} USDC")
+                    print(f"Entry Datetime: {entry_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                    position_open = True
+                    print(f"New position opened with {cost:.25f} USDC at price {entry_price:.25f}.")
+                    usdc_balance = get_balance('USDC')
+                    asset_balance = get_balance(TRADE_SYMBOL.split('USDC')[0])
+                else:
+                    print("Error placing buy order.")
+            else:
+                print("No USDC balance to invest in BTC.")
+
+    print(f"\nCurrent USDC balance: {usdc_balance:.25f}")
+    print(f"Current BTC balance: {asset_balance:.25f} BTC")
+    print(f"Current {TRADE_SYMBOL} price: {current_price:.25f}\n")
+
+    del candle_map
     gc.collect()
-    time.sleep(10)
+    time.sleep(5)
