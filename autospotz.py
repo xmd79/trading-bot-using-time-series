@@ -214,7 +214,7 @@ def check_exit_condition(initial_investment, asset_balance, entry_price):
     if current_price <= Decimal('0.0'):
         print("Invalid current price for exit condition check.")
         return False
-    target_price = entry_price * Decimal('1.01')  # Target is 1% above entry price
+    target_price = entry_price * Decimal('1.005')  # Target is 0.5% above entry price
     current_value = asset_balance * current_price
     target_value = asset_balance * target_price
     print(f"Exit Check: Current Price: {current_price:.25f}, Target Price: {target_price:.25f}, Current Value: {current_value:.25f}, Target Value: {target_value:.25f}")
@@ -322,8 +322,7 @@ def scale_to_sine(close_prices):
     sine_wave_min = Decimal(str(np.nanmin(sine_wave)))
     sine_wave_max = Decimal(str(np.nanmax(sine_wave)))
     dist_from_close_to_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * Decimal('100') if sine_wave_max != sine_wave_min else Decimal('0')
-    dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * Decimal('100') if sine_wave_max != sine_wave_min else Decimal('0')
-    return dist_from_close_to_min, dist_from_close_to_max, current_sine
+    dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * Decimal('100') if sine_wave_max != sine_wave_min else Decimal部分
 
 def calculate_spectral_analysis(prices):
     prices_np = np.array([float(x) for x in prices], dtype=np.float64)
@@ -513,7 +512,7 @@ def forecast_price_per_time_pythagorean(timeframe, candles, min_threshold, max_t
     current_price_dec = Decimal(str(current_price))
     if min_threshold is None or max_threshold is None:
         min_threshold = current_price_dec * Decimal('0.95')
-        max_threshold = current_price_dec * Decimal('1.05')
+        max_threshold =現在の価格_dec * Decimal('1.05')
     else:
         min_threshold = Decimal(str(min_threshold))
         max_threshold = Decimal(str(max_threshold))
@@ -739,7 +738,7 @@ while True:
             current_value_in_usdc = Decimal('0.0')
         print(f"Current BTC Balance Value in USDC: {current_value_in_usdc:.25f}")
 
-        target_price = entry_price * Decimal('1.01')  # Target is 1% above entry price
+        target_price = entry_price * Decimal('1.005')  # Target is 0.5% above entry price
         target_value = asset_balance * target_price
         entry_time_str = entry_datetime.strftime("%H:%M") if entry_datetime else "Unknown"
         time_span = (current_local_time - entry_datetime) if entry_datetime else None
@@ -751,7 +750,7 @@ while True:
             time_span_str = f"{days} days, {hours} hours, {minutes} minutes"
         else:
             time_span_str = "Unknown"
-        
+
         if initial_investment <= Decimal('0'):
             print("Error: Initial investment is zero or negative. Using default value for display.")
             initial_investment_display = Decimal('1.0')
@@ -767,11 +766,11 @@ while True:
         print(f"Value Change Percentage from Initial Investment: {value_change_percentage:.25f}%")
 
         if asset_balance > Decimal('0'):
-            print(f"Price for 1% Profit Target: {target_price:.25f}")
+            print(f"Price for 0.5% Profit Target: {target_price:.25f}")
         else:
             target_price = Decimal('0.0')
             print("Error: BTC balance is zero or negative. Target price set to 0.")
-            print(f"Price for 1% Profit Target: {target_price:.25f}")
+            print(f"Price for 0.5% Profit Target: {target_price:.25f}")
 
         if entry_price > Decimal('0') and target_price > entry_price:
             if current_price >= target_price:
@@ -783,14 +782,14 @@ while True:
         else:
             percentage_to_target = Decimal('0.0')
             print("Error: Invalid entry or target price for percentage to target calculation.")
-        print(f"Percentage Distance to 1% Profit Target: {percentage_to_target:.25f}%")
+        print(f"Percentage Distance to 0.5% Profit Target: {percentage_to_target:.25f}%")
 
         percentage_progress = Decimal('100.0') - percentage_to_target
-        print(f"Percentage Progress to 1% Profit Target: {percentage_progress:.25f}%")
+        print(f"Percentage Progress to 0.5% Profit Target: {percentage_progress:.25f}%")
         print()
 
         if check_exit_condition(initial_investment, asset_balance, entry_price):
-            print("Target profit of 1% reached or exceeded. Initiating exit...")
+            print("Target profit of 0.5% reached or exceeded. Initiating exit...")
             if sell_asset(float(asset_balance)):
                 exit_usdc_balance = get_balance('USDC')
                 profit = exit_usdc_balance - initial_investment
@@ -821,7 +820,7 @@ while True:
             usdc_balance = get_balance('USDC')
             if usdc_balance > Decimal('0'):
                 print(f"Trigger signal detected! Attempting to buy {TRADE_SYMBOL} with entire USDC balance: {usdc_balance:.25f} at price {current_price:.25f}")
-                entry_price, quantity_bought, entry_datetime, cost = buy_asset()
+                entry_price, quantity_bought, entry_datetime, cost = buy_por_asset()
                 if entry_price is not None and quantity_bought is not None and cost is not None:
                     initial_investment = cost
                     print(f"BTC was bought at entry price of {entry_price:.25f} USDC for quantity: {quantity_bought:.25f} BTC, Cost: {cost:.25f} USDC")
