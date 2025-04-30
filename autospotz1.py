@@ -627,10 +627,8 @@ while True:
         "dip_confirmed_1m": False,
         "dip_confirmed_3m": False,
         "dip_confirmed_5m": False,
-        "dist_to_min_less_than_dist_to_max_5m": False,
-        "last_three_momentum_increasing_1m": False,
-        "min_momentum_closer_1m": False,
-        "fib_reversal_above_close_5m": False
+        "dist_to_min_less_than_dist_to_max_3m": False,
+        "fib_reversal_above_close_3m": False
     }
     last_major_reversal_type = None
 
@@ -653,37 +651,15 @@ while True:
             conditions_status[f'dip_confirmed_{timeframe}'] = dip_confirmed
             if timeframe == '1m':
                 conditions_status["ML_Forecasted_Price_over_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
-                # Calculate momentum for 1m timeframe conditions
-                close_prices_np = np.array([float(x) for x in closes if not np.isnan(x) and x > 0], dtype=np.float64)
-                momentum = talib.MOM(close_prices_np, timeperiod=14)
-                if len(momentum) >= 3 and not np.any(np.isnan(momentum[-3:])):
-                    conditions_status["last_three_momentum_increasing_1m"] = momentum[-3] < momentum[-2] < momentum[-1]
-                    print(f"Last 3 Momentum Values (1m): {momentum[-3]:.25f}, {momentum[-2]:.25f}, {momentum[-1]:.25f}")
-                    print(f"Condition last_three_momentum_increasing_1m: {'True' if conditions_status['last_three_momentum_increasing_1m'] else 'False'}")
-                else:
-                    conditions_status["last_three_momentum_increasing_1m"] = False
-                    print("Not enough momentum data for last_three_momentum_increasing_1m check.")
-                if not np.any(np.isnan(momentum)):
-                    min_momentum = np.nanmin(momentum)
-                    max_momentum = np.nanmax(momentum)
-                    current_momentum = momentum[-1]
-                    dist_to_min_momentum = abs(current_momentum - min_momentum)
-                    dist_to_max_momentum = abs(current_momentum - max_momentum)
-                    conditions_status["min_momentum_closer_1m"] = dist_to_min_momentum < dist_to_max_momentum
-                    print(f"Min Momentum (1m): {min_momentum:.25f}, Max Momentum (1m): {max_momentum:.25f}, Current Momentum: {current_momentum:.25f}")
-                    print(f"Distance to Min Momentum: {dist_to_min_momentum:.25f}, Distance to Max Momentum: {dist_to_max_momentum:.25f}")
-                    print(f"Condition min_momentum_closer_1m: {'True' if conditions_status['min_momentum_closer_1m'] else 'False'}")
-                else:
-                    conditions_status["min_momentum_closer_1m"] = False
-                    print("Invalid momentum data for min_momentum_closer_1m check.")
-            elif timeframe == '5m':
-                conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf if avg_mtf is not None else False
-                # Calculate distance to min and max for 5m timeframe
+            elif timeframe == '3m':
+                # Calculate distance to min and max for 3m timeframe
                 dist_to_min = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
                 dist_to_max = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-                conditions_status["dist_to_min_less_than_dist_to_max_5m"] = dist_to_min < dist_to_max
-                print(f"Distance to Min (5m): {dist_to_min:.25f}%, Distance to Max (5m): {dist_to_max:.25f}%")
-                print(f"Condition dist_to_min_less_than_dist_to_max_5m: {'True' if conditions_status['dist_to_min_less_than_dist_to_max_5m'] else 'False'}")
+                conditions_status["dist_to_min_less_than_dist_to_max_3m"] = dist_to_min < dist_to_max
+                print(f"Distance to Min (3m): {dist_to_min:.25f}%, Distance to Max (3m): {dist_to_max:.25f}%")
+                print(f"Condition dist_to_min_less_than_dist_to_max_3m: {'True' if conditions_status['dist_to_min_less_than_dist_to_max_3m'] else 'False'}")
+            elif timeframe == '5m':
+                conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf if avg_mtf is not None else False
             valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
             sma_lengths = [5, 7, 9, 12]
             smas = {length: Decimal(str(talib.SMA(valid_closes, timeperiod=length)[-1])) for length in sma_lengths if not np.isnan(talib.SMA(valid_closes, timeperiod=length)[-1])}
@@ -728,9 +704,9 @@ while True:
                 print(f"Level {level}: {price:.25f}")
             fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe])
             print(f"{timeframe} Incoming Fibonacci Reversal Target (Forecast): {fib_reversal_price:.25f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target: price not available.")
-            if timeframe == '5m':
-                conditions_status["fib_reversal_above_close_5m"] = fib_reversal_price is not None and fib_reversal_price > current_close
-                print(f"Condition fib_reversal_above_close_5m: {'True' if conditions_status['fib_reversal_above_close_5m'] else 'False'}")
+            if timeframe == '3m':
+                conditions_status["fib_reversal_above_close_3m"] = fib_reversal_price is not None and fib_reversal_price > current_close
+                print(f"Condition fib_reversal_above_close_3m: {'True' if conditions_status['fib_reversal_above_close_3m'] else 'False'}")
             dist_to_min = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
             dist_to_max = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
             print(f"Distance from Current Close to Min Threshold ({low_tf:.25f}): {dist_to_min:.25f}%")
