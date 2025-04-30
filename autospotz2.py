@@ -15,15 +15,12 @@ from decimal import Decimal, getcontext
 import requests
 import hmac
 import hashlib
-import json
 
 # Set Decimal precision to 25
 getcontext().prec = 25
 
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"
-QUOTE_ENDPOINT = 'https://api.binance.com/sapi/v1/convert/getQuote'
-ACCEPT_ENDPOINT = 'https://api.binance.com/sapi/v1/convert/acceptQuote'
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
@@ -33,109 +30,6 @@ with open("credentials.txt", "r") as f:
 
 # Initialize Binance client with increased timeout
 client = BinanceClient(api_key, api_secret, requests_params={"timeout": 30})
-
-# Conversion Utility Functions
-def create_signature(params, secret_key):
-    query_string = '&'.join([f"{key}={params[key]}" for key in sorted(params)])
-    return hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-
-def get_quote(from_asset, to_asset, amount, retries=5, delay=5):
-    for attempt in range(retries):
-        try:
-            timestamp = int(time.time() * 1000)
-            params = {
-                'fromAsset': from_asset,
-                'toAsset': to_asset,
-                'amount': str(amount),
-                'timestamp': timestamp
-            }
-            signature = create_signature(params, api_secret)
-            headers = {'X-MBX-APIKEY': api_key}
-            params['signature'] = signature
-            response = requests.post(QUOTE_ENDPOINT, headers=headers, params=params)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"Failed to get quote (attempt {attempt + 1}/{retries}): {response.text}")
-                if attempt < retries - 1:
-                    time.sleep(delay * (attempt + 1))
-        except Exception as e:
-            print(f"Error getting quote (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-    return None
-
-def accept_quote(quote_id, retries=5, delay=5):
-    for attempt in range(retries):
-        try:
-            timestamp = int(time.time() * 1000)
-            params = {
-                'quoteId': quote_id,
-                'timestamp': timestamp
-            }
-            signature = create_signature(params, api_secret)
-            headers = {'X-MBX-APIKEY': api_key}
-            params['signature'] = signature
-            response = requests.post(ACCEPT_ENDPOINT, headers=headers, params=params)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"Failed to accept quote (attempt {attempt + 1}/{retries}): {response.text}")
-                if attempt < retries - 1:
-                    time.sleep(delay * (attempt + 1))
-        except Exception as e:
-            print(f"Error accepting quote (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-    return None
-
-def get_balance(asset, retries=5, delay=5):
-    for attempt in range(retries):
-        try:
-            balance_info = client.get_asset_balance(asset)
-            balance = Decimal(str(balance_info['free'])) if balance_info else Decimal('0.0')
-            if balance > Decimal('0'):
-                return balance
-            print(f"Invalid balance {balance:.25f} for {asset} on attempt {attempt + 1}/{retries}")
-        except BinanceAPIException as e:
-            print(f"Error fetching {asset} balance (attempt {attempt + 1}/{retries}): {e.message}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-        except requests.exceptions.ReadTimeout as e:
-            print(f"Read Timeout fetching {asset} balance (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-    print(f"Failed to fetch valid {asset} balance after {retries} attempts.")
-    return Decimal('0.0')
-
-def perform_conversion(from_asset, to_asset, amount=None):
-    balance = get_balance(from_asset)
-    if amount:
-        amount = Decimal(str(amount)).quantize(Decimal('0.00000001'))
-        if amount > balance:
-            print(f"Requested amount {amount:.8f} {from_asset} exceeds available balance {balance:.8f}.")
-            return False, None, None
-    else:
-        amount = balance
-    if amount <= Decimal('0'):
-        print(f"No {from_asset} balance available for conversion.")
-        return False, None, None
-    print(f"Converting {amount:.8f} {from_asset} to {to_asset}...")
-    quote_result = get_quote(from_asset, to_asset, amount)
-    if quote_result and 'quoteId' in quote_result:
-        quote_id = quote_result['quoteId']
-        to_amount = Decimal(str(quote_result.get('toAmount', '0')))
-        conversion_price = Decimal(str(quote_result.get('price', '0')))
-        conversion_result = accept_quote(quote_id)
-        if conversion_result and 'orderStatus' in conversion_result:
-            print(f"Conversion successful: {conversion_result}")
-            return True, to_amount, conversion_price
-        else:
-            print(f"Failed to accept quote: {conversion_result}")
-            return False, None, None
-    else:
-        print(f"Failed to get quote: {quote_result}")
-        return False, None, None
 
 # Utility Functions
 def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=100):
@@ -196,6 +90,38 @@ def get_current_price(retries=5, delay=5):
     print(f"Failed to fetch valid {TRADE_SYMBOL} price after {retries} attempts.")
     return Decimal('0.0')
 
+def get_balance(asset, retries=3, delay=5):
+    for attempt in range(retries):
+        try:
+            account_info = client.get_account()
+            for balance in account_info['balances']:
+                if balance['asset'] == asset:
+                    free_balance = Decimal(str(balance['free'])) if balance['free'] else Decimal('0.0')
+                    if free_balance > Decimal('0'):
+                        print(f"Balance for {asset}: {free_balance:.25f}")
+                    else:
+                        print(f"Zero balance for {asset} confirmed.")
+                    return free_balance
+            print(f"Asset {asset} not found in account. Returning zero balance.")
+            return Decimal('0.0')
+        except BinanceAPIException as e:
+            print(f"Binance API Exception fetching {asset} balance (attempt {attempt + 1}/{retries}): {e.status_code} - {e.message}")
+            if e.status_code == 403:
+                print("API key lacks permission to access balance. Check API restrictions.")
+                return Decimal('0.0')
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+        except requests.exceptions.ReadTimeout as e:
+            print(f"Read Timeout fetching {asset} balance (attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+        except Exception as e:
+            print(f"Unexpected error fetching {asset} balance (attempt {attempt + 1}/{retries}): {type(e).__name__} - {str(e)}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+    print(f"Failed to fetch {asset} balance after {retries} attempts. Returning zero balance.")
+    return Decimal('0.0')
+
 def get_last_buy_trade():
     try:
         trades = client.get_my_trades(symbol=TRADE_SYMBOL)
@@ -222,6 +148,119 @@ def get_average_entry_price():
     print(f"No valid last buy trade found for {TRADE_SYMBOL}; cannot calculate entry price.")
     return Decimal('0.0')
 
+def get_symbol_lot_size_info(symbol):
+    try:
+        exchange_info = client.get_symbol_info(symbol)
+        for filter in exchange_info['filters']:
+            if filter['filterType'] == 'LOT_SIZE':
+                return {
+                    'minQty': Decimal(str(filter['minQty'])),
+                    'stepSize': Decimal(str(filter['stepSize']))
+                }
+        print(f"Could not find LOT_SIZE filter for {symbol}. Using defaults.")
+        return {'minQty': Decimal('0.00001'), 'stepSize': Decimal('0.00001')}
+    except BinanceAPIException as e:
+        print(f"Error fetching symbol info for {symbol}: {e.message}")
+        return {'minQty': Decimal('0.00001'), 'stepSize': Decimal('0.00001')}
+
+def create_signature(params, secret_key):
+    query_string = '&'.join([f"{key}={params[key]}" for key in sorted(params)])
+    return hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
+
+def get_quote(from_asset, to_asset, amount, retries=3, delay=5):
+    for attempt in range(retries):
+        try:
+            timestamp = int(time.time() * 1000)
+            params = {
+                'fromAsset': from_asset,
+                'toAsset': to_asset,
+                'amount': str(amount),
+                'timestamp': timestamp
+            }
+            signature = create_signature(params, api_secret)
+            headers = {'X-MBX-APIKEY': api_key}
+            params['signature'] = signature
+            response = requests.post('https://api.binance.com/sapi/v1/convert/getQuote', headers=headers, params=params)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"Failed to get quote (attempt {attempt + 1}/{retries}): {response.text}")
+                if attempt < retries - 1:
+                    time.sleep(delay * (attempt + 1))
+        except Exception as e:
+            print(f"Error getting quote (attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+    return None
+
+def accept_quote(quote_id, retries=3, delay=5):
+    for attempt in range(retries):
+        try:
+            timestamp = int(time.time() * 1000)
+            params = {
+                'quoteId': quote_id,
+                'timestamp': timestamp
+            }
+            signature = create_signature(params, api_secret)
+            headers = {'X-MBX-APIKEY': api_key}
+            params['signature'] = signature
+            response = requests.post('https://api.binance.com/sapi/v1/convert/acceptQuote', headers=headers, params=params)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"Failed to accept quote (attempt {attempt + 1}/{retries}): {response.text}")
+                if attempt < retries - 1:
+                    time.sleep(delay * (attempt + 1))
+        except Exception as e:
+            print(f"Error accepting quote (attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+    return None
+
+def perform_conversion(from_asset, to_asset):
+    balance = get_balance(from_asset)
+    if balance <= Decimal('0'):
+        print(f"No {from_asset} balance available for conversion.")
+        return False, None, None
+    lot_size_info = get_symbol_lot_size_info(TRADE_SYMBOL)
+    min_trade_size = lot_size_info['minQty']
+    step_size = lot_size_info['stepSize']
+    if from_asset == 'BTC':
+        step_precision = int(-math.log10(float(step_size))) if step_size > Decimal('0') else 8
+        amount = (balance // step_size) * step_size
+        amount = amount.quantize(Decimal('0.' + '0' * step_precision))
+        if amount < min_trade_size:
+            print(f"Conversion amount {amount:.25f} {from_asset} is below minimum trade size {min_trade_size:.25f}. Cannot convert.")
+            return False, None, None
+    else:
+        amount = balance.quantize(Decimal('0.01'))
+        min_notional = Decimal('10.0')
+        current_price = get_current_price()
+        if current_price > Decimal('0'):
+            estimated_btc = amount / current_price
+            if estimated_btc < min_trade_size:
+                print(f"Estimated BTC {estimated_btc:.25f} from {amount:.25f} USDC is below minimum trade size {min_trade_size:.25f}. Cannot convert.")
+                return False, None, None
+            if amount < min_notional:
+                print(f"Amount {amount:.25f} USDC is below minimum notional value {min_notional:.25f}. Cannot convert.")
+                return False, None, None
+    print(f"Converting {amount:.25f} {from_asset} to {to_asset}...")
+    quote_result = get_quote(from_asset, to_asset, amount)
+    if quote_result and 'quoteId' in quote_result:
+        quote_id = quote_result['quoteId']
+        to_amount = Decimal(str(quote_result.get('toAmount', '0')))
+        conversion_price = Decimal(str(quote_result.get('price', '0')))
+        conversion_result = accept_quote(quote_id)
+        if conversion_result and 'orderStatus' in conversion_result:
+            print(f"Conversion successful: {conversion_result}")
+            return True, to_amount, conversion_price
+        else:
+            print(f"Failed to accept quote: {conversion_result}")
+            return False, None, None
+    else:
+        print(f"Failed to get quote: {quote_result}")
+        return False, None, None
+
 def check_exit_condition(initial_investment, asset_balance, entry_price):
     if initial_investment <= Decimal('0.0') or asset_balance <= Decimal('0.0') or entry_price <= Decimal('0.0'):
         print("Invalid initial investment, asset balance, or entry price for exit condition check.")
@@ -230,7 +269,7 @@ def check_exit_condition(initial_investment, asset_balance, entry_price):
     if current_price <= Decimal('0.0'):
         print("Invalid current price for exit condition check.")
         return False
-    target_price = entry_price * Decimal('1.005')  # Target is 0.5% above entry price
+    target_price = entry_price * Decimal('1.005')
     current_value = asset_balance * current_price
     target_value = asset_balance * target_price
     print(f"Exit Check: Current Price: {current_price:.25f}, Target Price: {target_price:.25f}, Current Value: {current_value:.25f}, Target Value: {target_value:.25f}")
@@ -561,6 +600,12 @@ def forecast_price_per_time_pythagorean(timeframe, candles, min_threshold, max_t
     print(f"Fixed Forecast Price: {forecast_price:.25f}")
     return forecast_price, price_per_minute
 
+# Initialize lot size info
+lot_size_info = get_symbol_lot_size_info(TRADE_SYMBOL)
+min_trade_size = lot_size_info['minQty']
+step_size = lot_size_info['stepSize']
+print(f"Initialized {TRADE_SYMBOL} - Min Trade Size: {min_trade_size:.25f}, Step Size: {step_size:.25f}")
+
 # Initialize trade state
 position_open = False
 initial_investment = Decimal('0.0')
@@ -827,7 +872,7 @@ while True:
             print("No USDC balance available.")
         print(f"Current BTC balance: {asset_balance:.25f} BTC")
 
-        true_conditions_count = sum(int(status) for status in conditions_status.values())
+        trueconditions_count = sum(int(status) for status in conditions_status.values())
         false_conditions_count = len(conditions_status) - true_conditions_count
         print(f"Overall Conditions Status: {true_conditions_count} True, {false_conditions_count} False\n")
         print("Individual Condition Status:")
