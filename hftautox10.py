@@ -40,7 +40,7 @@ from statistics import mean
 import scipy.fftpack as fftpack
 import gc
 
-from discord_webhook import DiscordWebhook
+#from discord_webhook import DiscordWebhook
 
 ##################################################
 ##################################################
@@ -65,20 +65,20 @@ client = BinanceClient(api_key, api_secret)
 ##################################################
 ##################################################
 
-# Define a function to get the account balance in BUSD
+# Define a function to get the account balance in USDC
 
 def get_account_balance():
     accounts = client.futures_account_balance()
     for account in accounts:
-        if account['asset'] == 'USDT':
-            bUSD_balance = float(account['balance'])
-            return bUSD_balance
+        if account['asset'] == 'USDC':
+            usdc_balance = float(account['balance'])
+            return usdc_balance
 
-# Get the USDT balance of the futures account
-bUSD_balance = float(get_account_balance())
+# Get the USDC balance of the futures account
+usdc_balance = float(get_account_balance())
 
 # Print account balance
-print("USDT Futures balance:", bUSD_balance)
+print("USDC Futures balance:", usdc_balance)
 
 print()
 
@@ -107,7 +107,7 @@ client = get_binance_client()
 
 # Initialize variables for tracking trade state:
 
-TRADE_SYMBOL = "BTCUSDT"
+TRADE_SYMBOL = "BTCUSDC"
 
 ##################################################
 ##################################################
@@ -211,7 +211,7 @@ def get_price(symbol):
         print(f"Error fetching price for {symbol}: {e}")
         return 0
 
-price = get_price("BTCUSDT")
+price = get_price("BTCUSDC")
 
 print(price)
 
@@ -6198,14 +6198,14 @@ def main():
             url = "https://fapi.binance.com/fapi/v1/ticker/price"
 
             params = {
-                "symbol": "BTCUSDT" 
+                "symbol": "BTCUSDC" 
                 }
 
             response = requests.get(url, params=params)
             data = response.json()
 
             price = data["price"]
-            #print(f"Current BTCUSDT price: {price}")
+            #print(f"Current BTCUSDC price: {price}")
 
             # Define the current time and close price
             current_time = datetime.datetime.now()
@@ -7446,7 +7446,7 @@ def main():
             ##################################################
 
             take_profit = 5
-            stop_loss = -15
+            stop_loss = -25
 
             # Current timestamp in milliseconds
             timestamp = int(time.time() * 1000)
