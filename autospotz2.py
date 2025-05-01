@@ -15,6 +15,7 @@ from decimal import Decimal, getcontext
 import requests
 import hmac
 import hashlib
+import urllib.parse
 
 # Set Decimal precision to 25
 getcontext().prec = 25
@@ -23,15 +24,39 @@ getcontext().prec = 25
 TRADE_SYMBOL = "BTCUSDC"
 
 # Load credentials from file
-with open("credentials.txt", "r") as f:
-    lines = f.readlines()
-    api_key = lines[0].strip()
-    api_secret = lines[1].strip()
+try:
+    with open("credentials.txt", "r") as f:
+        lines = f.readlines()
+        if len(lines) < 2:
+            raise ValueError("credentials.txt must contain API key and secret on separate lines")
+        api_key = lines[0].strip()
+        api_secret = lines[1].strip()
+except Exception as e:
+    print(f"Error reading credentials.txt: {e}")
+    exit(1)
 
 # Initialize Binance client with increased timeout
-client = BinanceClient(api_key, api_secret, requests_params={"timeout": 30})
+try:
+    client = BinanceClient(api_key, api_secret, requests_params={"timeout": 30})
+except Exception as e:
+    print(f"Error initializing Binance client: {e}")
+    exit(1)
 
 # Utility Functions
+def get_server_time(retries=5, delay=5):
+    for attempt in range(retries):
+        try:
+            server_time = client.get_server_time()
+            return int(server_time['serverTime'])
+        except BinanceAPIException as e:
+            print(f"Error fetching server time (attempt {attempt + 1}/{retries}): {e.message}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request error fetching server time (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))  # Exponential backoff
+    print(f"Failed to fetch server time after {retries} attempts. Using local time.")
+    return int(time.time() * 1000)
+
 def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=100):
     def fetch_candles(timeframe):
         return get_candles(symbol, timeframe, limit)
@@ -43,31 +68,22 @@ def get_candles(symbol, timeframe, limit=100, retries=5, delay=5):
     for attempt in range(retries):
         try:
             klines = client.get_klines(symbol=symbol, interval=timeframe, limit=limit)
-            candles = []
-            for k in klines:
-                candle = {
-                    "time": k[0] / 1000,
-                    "open": float(k[1]),
-                    "high": float(k[2]),
-                    "low": float(k[3]),
-                    "close": float(k[4]),
-                    "volume": float(k[5]),
-                    "timeframe": timeframe
-                }
-                candles.append(candle)
+            candles = [{
+                "time": k[0] / 1000,
+                "open": float(k[1]),
+                "high": float(k[2]),
+                "low": float(k[3]),
+                "close": float(k[4]),
+                "volume": float(k[5]),
+                "timeframe": timeframe
+            } for k in klines]
             return candles
         except BinanceAPIException as e:
             print(f"Binance API Error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e.message}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-        except requests.exceptions.ReadTimeout as e:
-            print(f"Read Timeout fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-        except Exception as e:
-            print(f"Unexpected error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
+        except requests.exceptions.RequestException as e:
+            print(f"Request error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
     print(f"Failed to fetch candles for {timeframe} after {retries} attempts. Skipping timeframe.")
     return []
 
@@ -81,185 +97,212 @@ def get_current_price(retries=5, delay=5):
             print(f"Invalid price {price:.25f} on attempt {attempt + 1}/{retries}")
         except BinanceAPIException as e:
             print(f"Error fetching {TRADE_SYMBOL} price (attempt {attempt + 1}/{retries}): {e.message}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-        except requests.exceptions.ReadTimeout as e:
-            print(f"Read Timeout fetching price (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
+        except requests.exceptions.RequestException as e:
+            print(f"Request error fetching price (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
     print(f"Failed to fetch valid {TRADE_SYMBOL} price after {retries} attempts.")
     return Decimal('0.0')
 
-def get_balance(asset, retries=3, delay=5):
+def get_balance(asset, retries=5, delay=5):
     for attempt in range(retries):
         try:
             account_info = client.get_account()
             for balance in account_info['balances']:
                 if balance['asset'] == asset:
                     free_balance = Decimal(str(balance['free'])) if balance['free'] else Decimal('0.0')
-                    if free_balance > Decimal('0'):
-                        print(f"Balance for {asset}: {free_balance:.25f}")
-                    else:
-                        print(f"Zero balance for {asset} confirmed.")
+                    if free_balance < Decimal('0'):
+                        print(f"Warning: Negative balance detected for {asset}: {free_balance:.25f}. Setting to 0.")
+                        free_balance = Decimal('0.0')
                     return free_balance
-            print(f"Asset {asset} not found in account. Returning zero balance.")
             return Decimal('0.0')
         except BinanceAPIException as e:
-            print(f"Binance API Exception fetching {asset} balance (attempt {attempt + 1}/{retries}): {e.status_code} - {e.message}")
-            if e.status_code == 403:
-                print("API key lacks permission to access balance. Check API restrictions.")
-                return Decimal('0.0')
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-        except requests.exceptions.ReadTimeout as e:
-            print(f"Read Timeout fetching {asset} balance (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-        except Exception as e:
-            print(f"Unexpected error fetching {asset} balance (attempt {attempt + 1}/{retries}): {type(e).__name__} - {str(e)}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-    print(f"Failed to fetch {asset} balance after {retries} attempts. Returning zero balance.")
+            print(f"Error fetching {asset} balance (attempt {attempt + 1}/{retries}): {e.message}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request error fetching {asset} balance (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
+    print(f"Failed to fetch {asset} balance after {retries} attempts. Assuming zero balance.")
     return Decimal('0.0')
 
-def get_last_buy_trade():
-    try:
-        trades = client.get_my_trades(symbol=TRADE_SYMBOL)
-        if not trades:
-            print("No trades found.")
-            return None
-        for trade in reversed(trades):
-            if trade['isBuyer']:
-                return {
-                    "price": Decimal(str(trade['price'])),
-                    "qty": Decimal(str(trade['qty'])),
-                    "time": trade['time']
-                }
-    except BinanceAPIException as e:
-        print(f"Error fetching trade history: {e.message}")
-    return None
-
-def get_average_entry_price():
-    last_trade = get_last_buy_trade()
-    if last_trade:
-        entry_price = last_trade['price']
-        print(f"Using last buy trade price as entry price: {entry_price:.25f}")
-        return entry_price
-    print(f"No valid last buy trade found for {TRADE_SYMBOL}; cannot calculate entry price.")
-    return Decimal('0.0')
-
-def get_symbol_lot_size_info(symbol):
-    try:
-        exchange_info = client.get_symbol_info(symbol)
-        for filter in exchange_info['filters']:
-            if filter['filterType'] == 'LOT_SIZE':
-                return {
-                    'minQty': Decimal(str(filter['minQty'])),
-                    'stepSize': Decimal(str(filter['stepSize']))
-                }
-        print(f"Could not find LOT_SIZE filter for {symbol}. Using defaults.")
-        return {'minQty': Decimal('0.00001'), 'stepSize': Decimal('0.00001')}
-    except BinanceAPIException as e:
-        print(f"Error fetching symbol info for {symbol}: {e.message}")
-        return {'minQty': Decimal('0.00001'), 'stepSize': Decimal('0.00001')}
-
-def create_signature(params, secret_key):
-    query_string = '&'.join([f"{key}={params[key]}" for key in sorted(params)])
-    return hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-
-def get_quote(from_asset, to_asset, amount, retries=3, delay=5):
+def get_symbol_lot_size_info(symbol, retries=5, delay=5):
     for attempt in range(retries):
         try:
-            timestamp = int(time.time() * 1000)
+            info = client.get_symbol_info(symbol)
+            for filt in info['filters']:
+                if filt['filterType'] == 'LOT_SIZE':
+                    return {
+                        'minQty': Decimal(str(filt['minQty'])),
+                        'maxQty': Decimal(str(filt['maxQty'])),
+                        'stepSize': Decimal(str(filt['stepSize']))
+                    }
+            print(f"No LOT_SIZE filter found for {symbol}. Using defaults.")
+            return {'minQty': Decimal('0.00000100'), 'maxQty': Decimal('1000.0'), 'stepSize': Decimal('0.00000100')}
+        except BinanceAPIException as e:
+            print(f"Error fetching lot size info for {symbol} (attempt {attempt + 1}/{retries}): {e.message}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request error fetching lot size info (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
+    print(f"Failed to fetch lot size info for {symbol} after {retries} attempts. Using defaults.")
+    return {'minQty': Decimal('0.00000100'), 'maxQty': Decimal('1000.0'), 'stepSize': Decimal('0.00000100')}
+
+def get_average_entry_price(retries=5, delay=5):
+    for attempt in range(retries):
+        try:
+            trades = client.get_my_trades(symbol=TRADE_SYMBOL)
+            buy_trades = [trade for trade in trades if trade['isBuyer'] and Decimal(str(trade['price'])) > Decimal('0')]
+            if not buy_trades:
+                return Decimal('0.0')
+            total_price = sum(Decimal(str(trade['price'])) * Decimal(str(trade['qty'])) for trade in buy_trades)
+            total_qty = sum(Decimal(str(trade['qty'])) for trade in buy_trades)
+            return total_price / total_qty if total_qty > Decimal('0') else Decimal('0.0')
+        except BinanceAPIException as e:
+            print(f"Error fetching trade history (attempt {attempt + 1}/{retries}): {e.message}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request error fetching trade history (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
+    print(f"Failed to fetch trade history after {retries} attempts.")
+    return Decimal('0.0')
+
+def get_last_buy_trade(retries=5, delay=5):
+    for attempt in range(retries):
+        try:
+            trades = client.get_my_trades(symbol=TRADE_SYMBOL)
+            buy_trades = [trade for trade in trades if trade['isBuyer']]
+            return max(buy_trades, key=lambda x: x['time'], default=None)
+        except BinanceAPIException as e:
+            print(f"Error fetching last buy trade (attempt {attempt + 1}/{retries}): {e.message}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request error fetching last buy trade (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
+    print(f"Failed to fetch last buy trade after {retries} attempts.")
+    return None
+
+def get_quote(from_asset, to_asset, amount, retries=5, delay=5):
+    endpoint = '/sapi/v1/convert/getQuote'
+    amount_str = f"{amount:.8f}".rstrip('0').rstrip('.')
+    for attempt in range(retries):
+        try:
+            timestamp = get_server_time()
+            if timestamp is None:
+                print(f"Failed to get server time for quote (attempt {attempt + 1}/{retries}).")
+                time.sleep(delay * (2 ** attempt))
+                continue
             params = {
                 'fromAsset': from_asset,
                 'toAsset': to_asset,
-                'amount': str(amount),
+                'fromAmount': amount_str,
+                'recvWindow': 10000,
                 'timestamp': timestamp
             }
-            signature = create_signature(params, api_secret)
-            headers = {'X-MBX-APIKEY': api_key}
+            query_string = urllib.parse.urlencode(params)
+            signature = hmac.new(api_secret.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
             params['signature'] = signature
-            response = requests.post('https://api.binance.com/sapi/v1/convert/getQuote', headers=headers, params=params)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"Failed to get quote (attempt {attempt + 1}/{retries}): {response.text}")
-                if attempt < retries - 1:
-                    time.sleep(delay * (attempt + 1))
+            headers = {'X-MBX-APIKEY': api_key}
+            response = requests.get(f"https://api.binance.com{endpoint}", params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            result = response.json()
+            if 'quoteId' in result:
+                return result
+            print(f"Failed to get quote (attempt {attempt + 1}/{retries}): {result}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request error getting quote (attempt {attempt + 1}/{retries}): {e}")
         except Exception as e:
-            print(f"Error getting quote (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
+            print(f"Unexpected error getting quote (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
+    print(f"Failed to get quote for {amount_str} {from_asset} to {to_asset} after {retries} attempts.")
     return None
 
-def accept_quote(quote_id, retries=3, delay=5):
+def accept_quote(quote_id, retries=5, delay=5):
+    endpoint = '/sapi/v1/convert/acceptQuote'
     for attempt in range(retries):
         try:
-            timestamp = int(time.time() * 1000)
+            timestamp = get_server_time()
+            if timestamp is None:
+                print(f"Failed to get server time for accepting quote (attempt {attempt + 1}/{retries}).")
+                time.sleep(delay * (2 ** attempt))
+                continue
             params = {
                 'quoteId': quote_id,
+                'recvWindow': 10000,
                 'timestamp': timestamp
             }
-            signature = create_signature(params, api_secret)
-            headers = {'X-MBX-APIKEY': api_key}
+            query_string = urllib.parse.urlencode(params)
+            signature = hmac.new(api_secret.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
             params['signature'] = signature
-            response = requests.post('https://api.binance.com/sapi/v1/convert/acceptQuote', headers=headers, params=params)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"Failed to accept quote (attempt {attempt + 1}/{retries}): {response.text}")
-                if attempt < retries - 1:
-                    time.sleep(delay * (attempt + 1))
+            headers = {'X-MBX-APIKEY': api_key}
+            response = requests.post(f"https://api.binance.com{endpoint}", params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            result = response.json()
+            if 'orderStatus' in result and result['orderStatus'] == 'SUCCESS':
+                return result
+            print(f"Failed to accept quote (attempt {attempt + 1}/{retries}): {result}")
+        except requests.exceptions.RequestException as e:
+            print(f"Request error accepting quote (attempt {attempt + 1}/{retries}): {e}")
         except Exception as e:
-            print(f"Error accepting quote (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
+            print(f"Unexpected error accepting quote (attempt {attempt + 1}/{retries}): {e}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
+    print(f"Failed to accept quote {quote_id} after {retries} attempts.")
     return None
 
-def perform_conversion(from_asset, to_asset):
-    balance = get_balance(from_asset)
-    if balance <= Decimal('0'):
-        print(f"No {from_asset} balance available for conversion.")
+def perform_conversion(from_asset, to_asset, retries=5, delay=5):
+    amount = get_balance(from_asset)
+    if amount <= Decimal('0'):
+        print(f"No {from_asset} balance available to convert to {to_asset}.")
         return False, None, None
+
     lot_size_info = get_symbol_lot_size_info(TRADE_SYMBOL)
     min_trade_size = lot_size_info['minQty']
     step_size = lot_size_info['stepSize']
-    if from_asset == 'BTC':
-        step_precision = int(-math.log10(float(step_size))) if step_size > Decimal('0') else 8
-        amount = (balance // step_size) * step_size
-        amount = amount.quantize(Decimal('0.' + '0' * step_precision))
-        if amount < min_trade_size:
-            print(f"Conversion amount {amount:.25f} {from_asset} is below minimum trade size {min_trade_size:.25f}. Cannot convert.")
-            return False, None, None
-    else:
-        amount = balance.quantize(Decimal('0.01'))
-        min_notional = Decimal('10.0')
-        current_price = get_current_price()
-        if current_price > Decimal('0'):
-            estimated_btc = amount / current_price
-            if estimated_btc < min_trade_size:
-                print(f"Estimated BTC {estimated_btc:.25f} from {amount:.25f} USDC is below minimum trade size {min_trade_size:.25f}. Cannot convert.")
-                return False, None, None
-            if amount < min_notional:
-                print(f"Amount {amount:.25f} USDC is below minimum notional value {min_notional:.25f}. Cannot convert.")
-                return False, None, None
-    print(f"Converting {amount:.25f} {from_asset} to {to_asset}...")
-    quote_result = get_quote(from_asset, to_asset, amount)
-    if quote_result and 'quoteId' in quote_result:
-        quote_id = quote_result['quoteId']
-        to_amount = Decimal(str(quote_result.get('toAmount', '0')))
-        conversion_price = Decimal(str(quote_result.get('price', '0')))
-        conversion_result = accept_quote(quote_id)
-        if conversion_result and 'orderStatus' in conversion_result:
-            print(f"Conversion successful: {conversion_result}")
-            return True, to_amount, conversion_price
-        else:
-            print(f"Failed to accept quote: {conversion_result}")
-            return False, None, None
-    else:
-        print(f"Failed to get quote: {quote_result}")
+    current_price = get_current_price()
+
+    if current_price <= Decimal('0'):
+        print("Failed to fetch current price for conversion.")
         return False, None, None
+
+    # Adjust amount to comply with lot size rules
+    if from_asset == 'BTC':
+        adjusted_amount = (amount // step_size) * step_size
+        if adjusted_amount < min_trade_size:
+            print(f"Adjusted BTC amount {adjusted_amount:.25f} is below minimum trade size {min_trade_size:.25f}. Cannot convert.")
+            return False, None, None
+    else:  # USDC
+        btc_amount = amount / current_price
+        adjusted_btc = (btc_amount // step_size) * step_size
+        if adjusted_btc < min_trade_size:
+            print(f"Estimated BTC amount {adjusted_btc:.25f} from {amount:.25f} USDC is below minimum trade size {min_trade_size:.25f}. Cannot convert.")
+            return False, None, None
+        adjusted_amount = amount  # Use full USDC balance
+
+    print(f"Converting {adjusted_amount:.25f} {from_asset} to {to_asset} at market price ~{current_price:.25f}...")
+    
+    for attempt in range(retries):
+        quote_result = get_quote(from_asset, to_asset, adjusted_amount)
+        if quote_result and 'quoteId' in quote_result:
+            quote_id = quote_result['quoteId']
+            to_amount = Decimal(str(quote_result.get('toAmount', '0')))
+            conversion_price = Decimal(str(quote_result.get('price', '0')))
+            if to_amount <= Decimal('0') or conversion_price <= Decimal('0'):
+                print(f"Invalid quote response (attempt {attempt + 1}/{retries}): toAmount={to_amount}, price={conversion_price}")
+                if attempt < retries - 1:
+                    time.sleep(delay * (2 ** attempt))
+                continue
+            conversion_result = accept_quote(quote_id)
+            if conversion_result and 'orderStatus' in conversion_result and conversion_result['orderStatus'] == 'SUCCESS':
+                print(f"Conversion successful: {adjusted_amount:.25f} {from_asset} to {to_amount:.25f} {to_asset} at price {conversion_price:.25f}")
+                return True, to_amount, conversion_price
+            print(f"Failed to accept quote (attempt {attempt + 1}/{retries}): {conversion_result}")
+        else:
+            print(f"Failed to get quote (attempt {attempt + 1}/{retries}): {quote_result}")
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
+    print(f"Failed to convert {adjusted_amount:.25f} {from_asset} to {to_asset} after {retries} attempts.")
+    return False, None, None
 
 def check_exit_condition(initial_investment, asset_balance, entry_price):
     if initial_investment <= Decimal('0.0') or asset_balance <= Decimal('0.0') or entry_price <= Decimal('0.0'):
@@ -276,6 +319,22 @@ def check_exit_condition(initial_investment, asset_balance, entry_price):
     return current_price >= target_price
 
 # Analysis Functions
+def calculate_rsi(candles, period=14):
+    closes = np.array([float(candle["close"]) for candle in candles], dtype=np.float64)
+    if len(closes) < period:
+        return None, "Insufficient Data"
+    rsi = talib.RSI(closes, timeperiod=period)
+    current_rsi = Decimal(str(rsi[-1])) if not np.isnan(rsi[-1]) else None
+    if current_rsi is None:
+        return None, "Invalid RSI"
+    if current_rsi < Decimal('30'):
+        status = "Oversold"
+    elif current_rsi > Decimal('70'):
+        status = "Overbought"
+    else:
+        status = "Neutral"
+    return current_rsi, status
+
 def backtest_model(candles):
     closes = np.array([float(candle["close"]) for candle in candles], dtype=np.float64)
     X = np.arange(len(closes)).reshape(-1, 1)
@@ -653,8 +712,15 @@ while True:
     candle_map = fetch_candles_in_parallel(['1m', '3m', '5m'])
     if not candle_map.get('1m'):
         print("Error: '1m' candles not fetched. Check API connectivity or symbol.")
+        time.sleep(5)
+        continue
     if current_price == Decimal('0.0'):
         print(f"Warning: Current {TRADE_SYMBOL} price is {current_price:.25f}. API may be failing.")
+        time.sleep(5)
+        continue
+
+    # Initialize RSI status dictionary
+    rsi_status = {}
 
     if "1m" in candle_map and candle_map['1m']:
         model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
@@ -683,13 +749,34 @@ while True:
         "dip_confirmed_3m": False,
         "dip_confirmed_5m": False,
         "dist_to_min_less_than_dist_to_max_3m": False,
-        "fib_reversal_above_close_3m": False
+        "fib_reversal_above_close_3m": False,
+        "rsi_oversold_5m": False
     }
     last_major_reversal_type = None
 
+    # Calculate and print RSI for all timeframes
+    print("\n--- RSI Status Across Timeframes ---")
     for timeframe in ['1m', '3m', '5m']:
         if timeframe in candle_map and candle_map[timeframe]:
-            print(f"--- {timeframe} ---")
+            current_rsi, rsi_state = calculate_rsi(candle_map[timeframe])
+            rsi_status[timeframe] = {"rsi": current_rsi, "status": rsi_state}
+            if current_rsi is not None:
+                print(f"{timeframe} RSI: {current_rsi:.2f} ({rsi_state})")
+                if rsi_state == "Overbought":
+                    print(f"Warning: {timeframe} is overbought (RSI > 70). Potential local top.")
+                elif rsi_state == "Oversold":
+                    print(f"Alert: {timeframe} is oversold (RSI < 30). Potential local dip.")
+            else:
+                print(f"{timeframe} RSI: Not available ({rsi_state})")
+            if timeframe == '5m' and current_rsi is not None:
+                conditions_status["rsi_oversold_5m"] = current_rsi < Decimal('30')
+        else:
+            rsi_status[timeframe] = {"rsi": None, "status": "No Data"}
+            print(f"{timeframe} RSI: Not available (No Data)")
+
+    for timeframe in ['1m', '3m', '5m']:
+        if timeframe in candle_map and candle_map[timeframe]:
+            print(f"\n--- {timeframe} ---")
             closes = [candle['close'] for candle in candle_map[timeframe]]
             current_close = Decimal(str(closes[-1]))
             high_tf = Decimal(str(np.nanmax([float(x) for x in closes])))
@@ -714,6 +801,7 @@ while True:
                 print(f"Condition dist_to_min_less_than_dist_to_max_3m: {'True' if conditions_status['dist_to_min_less_than_dist_to_max_3m'] else 'False'}")
             elif timeframe == '5m':
                 conditions_status["current_close_below_average_threshold_5m"] = current_close < avg_mtf if avg_mtf is not None else False
+                print(f"Condition rsi_oversold_5m: {'True' if conditions_status['rsi_oversold_5m'] else 'False'}")
             valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
             sma_lengths = [5, 7, 9, 12]
             smas = {length: Decimal(str(talib.SMA(valid_closes, timeperiod=length)[-1])) for length in sma_lengths if not np.isnan(talib.SMA(valid_closes, timeperiod=length)[-1])}
@@ -775,7 +863,7 @@ while True:
             print(f"Pythagorean Forecast Price for {timeframe}: {pythagorean_forecasts[timeframe]['price']:.25f}")
             print(f"Pythagorean Price Rate for {timeframe}: {pythagorean_forecasts[timeframe]['rate']:.25f} USDC/min")
         else:
-            print(f"--- {timeframe} --- No data available.")
+            print(f"\n--- {timeframe} --- No data available.")
             fib_levels = calculate_fibonacci_levels_from_reversal(None, None, None, 'DIP', current_price)
             fib_info[timeframe] = fib_levels
             print(f"Fibonacci Levels for {timeframe} (Fallback):")
@@ -791,8 +879,7 @@ while True:
     forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_price)
 
     if position_open:
-        print()
-        print("Current In-Trade Status:")
+        print("\nCurrent In-Trade Status:")
         current_value_in_usdc = asset_balance * current_price
         if current_value_in_usdc < Decimal('0'):
             print("Error: Current BTC Balance Value in USDC is negative. Check balance or price.")
@@ -849,6 +936,9 @@ while True:
         print(f"Percentage Progress to 0.5% Profit Target: {percentage_progress:.25f}%")
         print()
 
+        if rsi_status.get('5m', {}).get('status') == 'Overbought':
+            print("Warning: 5m TF is overbought (RSI > 70). Consider monitoring for potential exit.")
+
         if check_exit_condition(initial_investment, asset_balance, entry_price):
             print("Target profit of 0.5% reached or exceeded. Initiating exit...")
             success, usdc_amount, exit_price = perform_conversion('BTC', 'USDC')
@@ -864,7 +954,7 @@ while True:
                 entry_price = Decimal('0.0')
                 entry_datetime = None
             else:
-                print("Failed to convert BTC to USDC. Position remains open.")
+                print("Failed to convert BTC to USDC. Retrying in next loop.")
     else:
         if usdc_balance > Decimal('0'):
             print(f"Current USDC balance found: {usdc_balance:.25f}")
@@ -873,8 +963,8 @@ while True:
         print(f"Current BTC balance: {asset_balance:.25f} BTC")
 
         trueconditions_count = sum(int(status) for status in conditions_status.values())
-        false_conditions_count = len(conditions_status) - true_conditions_count
-        print(f"Overall Conditions Status: {true_conditions_count} True, {false_conditions_count} False\n")
+        false_conditions_count = len(conditions_status) - trueconditions_count
+        print(f"Overall Conditions Status: {trueconditions_count} True, {false_conditions_count} False\n")
         print("Individual Condition Status:")
         for condition, status in conditions_status.items():
             print(f"{condition}: {'True' if status else 'False'}")
@@ -883,7 +973,7 @@ while True:
         if all_conditions_met:
             usdc_balance = get_balance('USDC')
             if usdc_balance > Decimal('0'):
-                print(f"Trigger signal detected! Attempting to convert {usdc_balance:.25f} USDC to BTC at price {current_price:.25f}")
+                print(f"Trigger signal detected! Attempting to convert {usdc_balance:.25f} USDC to BTC at price ~{current_price:.25f}")
                 success, btc_amount, conversion_price = perform_conversion('USDC', 'BTC')
                 if success and btc_amount and conversion_price:
                     initial_investment = usdc_balance
@@ -897,7 +987,7 @@ while True:
                     usdc_balance = get_balance('USDC')
                     asset_balance = get_balance(TRADE_SYMBOL.split('USDC')[0])
                 else:
-                    print("Error converting USDC to BTC.")
+                    print("Error converting USDC to BTC. Retrying in next loop.")
             else:
                 print("No USDC balance to convert to BTC.")
 
