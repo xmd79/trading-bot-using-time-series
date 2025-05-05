@@ -15,8 +15,6 @@ api_secret = "YOUR_API_SECRET"
 client = BinanceClient(api_key, api_secret, requests_params={"timeout": 30})
 
 
-# Utility Functions
-
 def get_candles(symbol, timeframe, limit=100, retries=5, delay=5):
     for attempt in range(retries):
         try:
@@ -151,7 +149,7 @@ def symmetrize_wave(df, timeframe):
     df['time'] = pd.to_datetime(df['time'], unit='s')
     df.set_index('time', inplace=True)
 
-    # Find the major DIP (lowest close) and TOP (highest close)
+    # Find major DIP (lowest close) and TOP (highest close)
     dip_idx = df['close'].idxmin()
     top_idx = df['close'].idxmax()
     dip_price = df.loc[dip_idx]['close']
@@ -160,7 +158,7 @@ def symmetrize_wave(df, timeframe):
     current_price = df['close'].iloc[-1]
     latest_time = df.index[-1]
 
-    # Determine which major reversal is closest to current price
+    # Decide closest major reversal
     dist_to_dip = abs(current_price - dip_price)
     dist_to_top = abs(current_price - top_price)
 
@@ -175,13 +173,11 @@ def symmetrize_wave(df, timeframe):
         reversal_price = top_price
         next_forecast_target = 'DIP'
 
-    # Phase angle calculation based on the major reversal
+    # Angle and cycle stage
     total_time_span = (df.index[-1] - df.index[0]).total_seconds()
     reversal_time_span = (latest_time - reversal_idx).total_seconds()
     phase_angle = (reversal_time_span / total_time_span) * 360
     phase_angle = normalize_angle(phase_angle)
-
-    # Determine stage and action based on phase angle
     stage, action = determine_cycle_stage(phase_angle)
 
     # Thresholds
@@ -189,10 +185,23 @@ def symmetrize_wave(df, timeframe):
     max_threshold = top_price
     middle_threshold = (dip_price + top_price) / 2
 
-    # FFT forecast
+    # FFT forecast and enforce direction
     smoothed, forecast = compute_fft_forecast(df['close'].values)
     forecast_price = forecast[-1]
 
+    # Enforce direction & clip within bounds
+    if last_major_reversal == 'DIP':
+        # Make sure forecast is ABOVE current close & between middle and max
+        if forecast_price <= current_price:
+            forecast_price = max(current_price * 1.01, middle_threshold)
+        forecast_price = min(forecast_price, max_threshold)
+    elif last_major_reversal == 'TOP':
+        # Make sure forecast is BELOW current close & between min and middle
+        if forecast_price >= current_price:
+            forecast_price = min(current_price * 0.99, middle_threshold)
+        forecast_price = max(forecast_price, min_threshold)
+
+    # Volume % and momentum
     bullish_percentage, bearish_percentage = compare_bullish_bearish_volume(df)
     dist_to_high_pct, dist_to_low_pct = normalize_distances(current_price, top_price, dip_price)
     momentum = calculate_momentum(df)
@@ -204,6 +213,7 @@ def symmetrize_wave(df, timeframe):
     print(f"Min Threshold (DIP): {min_threshold:.2f}")
     print(f"Max Threshold (TOP): {max_threshold:.2f}")
     print(f"Middle Threshold: {middle_threshold:.2f}")
+    print(f"Current Close: {current_price:.2f} ({'Above' if current_price > middle_threshold else 'Below'} Middle Threshold)")
     print(f"Bullish Volume Percentage: {bullish_percentage:.2f}%")
     print(f"Bearish Volume Percentage: {bearish_percentage:.2f}%")
     print(f"Distance to High: {dist_to_high_pct:.2f}%")
@@ -212,9 +222,9 @@ def symmetrize_wave(df, timeframe):
     print("-" * 60)
 
     if last_major_reversal == 'DIP':
-        print(f"Incoming Reversal Expected: TOP at {forecast_price:.2f}")
+        print(f"Incoming Reversal Expected: TOP at {forecast_price:.2f} (ABOVE current close)")
     elif last_major_reversal == 'TOP':
-        print(f"Incoming Reversal Expected: DIP at {forecast_price:.2f}")
+        print(f"Incoming Reversal Expected: DIP at {forecast_price:.2f} (BELOW current close)")
 
     analyze_trends(df, timeframe)
 
@@ -238,6 +248,6 @@ def real_time_update(timeframes, fetch_candles_in_parallel, interval=30):
         time.sleep(interval)
 
 
-# Example: Run the real-time update with multiple timeframes
+# Example run
 timeframes = ['1m', '3m', '5m', '15m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
 real_time_update(timeframes, fetch_candles_in_parallel, interval=30)
