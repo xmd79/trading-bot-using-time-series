@@ -21,7 +21,7 @@ getcontext().prec = 25
 TRADE_SYMBOL = "BTCUSDC"  # Futures use USDC
 LEVERAGE = 20
 TAKE_PROFIT_ROI = Decimal('4.0')  # 4% TP based on initial USDC balance
-STOP_LOSS_ROI = Decimal('-1.0')   # 1% SL based on initial USDC balance
+STOP_LOSS_ROI = Decimal('-4.0')   # 4% SL based on initial USDC balance
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
@@ -356,27 +356,76 @@ def calculate_volume_ratio(buy_volume, sell_volume):
     return volume_ratio
 
 def find_major_reversals(candles, current_close, min_threshold, max_threshold):
-    lows = [Decimal(str(candle['low'])) for candle in candles if Decimal(str(candle['low'])) >= min_threshold]
-    highs = [Decimal(str(candle['high'])) for candle in candles if Decimal(str(candle['high'])) <= max_threshold]
+    """
+    Find the most recent major reversal (DIP or TOP) within the given thresholds.
+    Always returns the closest valid reversal (DIP or TOP) to the current close.
+    
+    Args:
+        candles (list): List of candle dictionaries with 'low' and 'high' prices.
+        current_close (Decimal): Current closing price.
+        min_threshold (Decimal): Minimum price threshold for valid reversals.
+        max_threshold (Decimal): Maximum price threshold for valid reversals.
+    
+    Returns:
+        tuple: (last_bottom, last_top, closest_reversal, closest_type)
+    """
+    # Extract lows and highs within thresholds
+    lows = [Decimal(str(candle['low'])) for candle in candles 
+            if min_threshold <= Decimal(str(candle['low'])) <= max_threshold]
+    highs = [Decimal(str(candle['high'])) for candle in candles 
+             if min_threshold <= Decimal(str(candle['high'])) <= max_threshold]
+    
+    # Initialize return values
     last_bottom = min(lows) if lows else None
     last_top = max(highs) if highs else None
     closest_reversal = None
     closest_type = None
     current_close_dec = Decimal(str(current_close))
+    
+    # If no valid lows or highs, relax thresholds to include at least one reversal
+    if not lows and not highs:
+        lows = [Decimal(str(candle['low'])) for candle in candles]
+        highs = [Decimal(str(candle['high'])) for candle in candles]
+        last_bottom = min(lows) if lows else None
+        last_top = max(highs) if highs else None
+    
+    # Calculate distances to find the closest reversal
+    min_distance = Decimal('Infinity')
+    
     if last_bottom is not None:
-        if closest_reversal is None or abs(last_bottom - current_close_dec) < abs(closest_reversal - current_close_dec):
+        distance_to_bottom = abs(current_close_dec - last_bottom)
+        if distance_to_bottom < min_distance:
+            min_distance = distance_to_bottom
             closest_reversal = last_bottom
             closest_type = 'DIP'
+    
     if last_top is not None:
-        if closest_reversal is None or abs(last_top - current_close_dec) < abs(closest_reversal - current_close_dec):
+        distance_to_top = abs(current_close_dec - last_top)
+        if distance_to_top < min_distance:
+            min_distance = distance_to_top
             closest_reversal = last_top
             closest_type = 'TOP'
-    if closest_type == 'TOP' and closest_reversal <= current_close_dec:
-        closest_type = None
-        closest_reversal = None
-    elif closest_type == 'DIP' and closest_reversal >= current_close_dec:
-        closest_type = None
-        closest_reversal = None
+    
+    # Ensure the reversal is on the correct side of the current price
+    if closest_type == 'DIP' and closest_reversal >= current_close_dec:
+        closest_reversal = last_top
+        closest_type = 'TOP' if last_top is not None and last_top <= current_close_dec else None
+    elif closest_type == 'TOP' and closest_reversal <= current_close_dec:
+        closest_reversal = last_bottom
+        closest_type = 'DIP' if last_bottom is not None and last_bottom >= current_close_dec else None
+    
+    # Fallback: If no valid reversal type after checks, choose the closest price
+    if closest_type is None and (last_bottom is not None or last_top is not None):
+        if last_bottom is not None and last_top is not None:
+            closest_reversal = last_bottom if abs(current_close_dec - last_bottom) <= abs(current_close_dec - last_top) else last_top
+            closest_type = 'DIP' if closest_reversal == last_bottom else 'TOP'
+        elif last_bottom is not None:
+            closest_reversal = last_bottom
+            closest_type = 'DIP'
+        elif last_top is not None:
+            closest_reversal = last_top
+            closest_type = 'TOP'
+    
     return last_bottom, last_top, closest_reversal, closest_type
 
 def scale_to_sine(close_prices):
