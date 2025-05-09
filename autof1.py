@@ -333,88 +333,84 @@ def calculate_buy_sell_volume(candle_map):
     for timeframe in candle_map:
         buy_volume[timeframe] = []
         sell_volume[timeframe] = []
-        total_buy = Decimal('0.0')
-        total_sell = Decimal('0.0')
         for candle in candle_map[timeframe]:
-            if Decimal(str(candle["close"])) > Decimal(str(candle["open"])):
-                total_buy += Decimal(str(candle["volume"]))
-            elif Decimal(str(candle["close"])) < Decimal(str(candle["open"])):
-                total_sell += Decimal(str(candle["volume"]))
-            buy_volume[timeframe].append(total_buy)
-            sell_volume[timeframe].append(total_sell)
+            total_volume = Decimal(str(candle["volume"]))
+            close_price = Decimal(str(candle["close"]))
+            open_price = Decimal(str(candle["open"]))
+            high_price = Decimal(str(candle["high"]))
+            low_price = Decimal(str(candle["low"]))
+            if high_price == low_price:
+                buy_vol = total_volume / Decimal('2')
+                sell_vol = total_volume / Decimal('2')
+            else:
+                price_range = high_price - low_price
+                bullish_strength = (close_price - low_price) / price_range if price_range > Decimal('0') else Decimal('0.5')
+                bearish_strength = (high_price - close_price) / price_range if price_range > Decimal('0') else Decimal('0.5')
+                buy_vol = total_volume * bullish_strength
+                sell_vol = total_volume * bearish_strength
+            buy_volume[timeframe].append(buy_vol)
+            sell_volume[timeframe].append(sell_vol)
+            print(f"{timeframe} - Candle Time: {datetime.datetime.fromtimestamp(candle['time'])} - Buy Volume: {buy_vol:.25f}, Sell Volume: {sell_vol:.25f}")
     return buy_volume, sell_volume
 
 def calculate_volume_ratio(buy_volume, sell_volume):
     volume_ratio = {}
     for timeframe in buy_volume.keys():
-        total_volume = buy_volume[timeframe][-1] + sell_volume[timeframe][-1]
-        if total_volume > Decimal('0'):
-            ratio = (buy_volume[timeframe][-1] / total_volume) * Decimal('100')
-            volume_ratio[timeframe] = {"buy_ratio": ratio, "sell_ratio": Decimal('100') - ratio, "status": "Bullish" if ratio > Decimal('50') else "Bearish" if ratio < Decimal('50') else "Neutral"}
+        buy_vols = np.array([float(v) for v in buy_volume[timeframe][-3:]], dtype=np.float64)
+        sell_vols = np.array([float(v) for v in sell_volume[timeframe][-3:]], dtype=np.float64)
+        if len(buy_vols) >= 3:
+            buy_ema = Decimal(str(talib.EMA(buy_vols, timeperiod=3)[-1]))
+            sell_ema = Decimal(str(talib.EMA(sell_vols, timeperiod=3)[-1]))
         else:
-            volume_ratio[timeframe] = {"buy_ratio": Decimal('0'), "sell_ratio": Decimal('0'), "status": "No Activity"}
+            buy_ema = sum(buy_volume[timeframe][-3:]) / Decimal(str(len(buy_volume[timeframe][-3:]))) if buy_volume[timeframe] else Decimal('0')
+            sell_ema = sum(sell_volume[timeframe][-3:]) / Decimal(str(len(sell_volume[timeframe][-3:]))) if sell_volume[timeframe] else Decimal('0')
+        total_ema = buy_ema + sell_ema
+        if total_ema > Decimal('0'):
+            buy_ratio = (buy_ema / total_ema) * Decimal('100')
+            sell_ratio = Decimal('100') - buy_ratio
+            status = "Bullish" if buy_ratio > Decimal('50') else "Bearish" if buy_ratio < Decimal('50') else "Neutral"
+        else:
+            buy_ratio = Decimal('0')
+            sell_ratio = Decimal('0')
+            status = "No Activity"
+        volume_ratio[timeframe] = {"buy_ratio": buy_ratio, "sell_ratio": sell_ratio, "status": status}
+        print(f"{timeframe} - Smoothed Buy Ratio: {buy_ratio:.25f}%, Sell Ratio: {sell_ratio:.25f}%, Status: {status}")
     return volume_ratio
 
 def find_major_reversals(candles, current_close, min_threshold, max_threshold):
-    """
-    Find the most recent major reversal (DIP or TOP) within the given thresholds.
-    Always returns the closest valid reversal (DIP or TOP) to the current close.
-    
-    Args:
-        candles (list): List of candle dictionaries with 'low' and 'high' prices.
-        current_close (Decimal): Current closing price.
-        min_threshold (Decimal): Minimum price threshold for valid reversals.
-        max_threshold (Decimal): Maximum price threshold for valid reversals.
-    
-    Returns:
-        tuple: (last_bottom, last_top, closest_reversal, closest_type)
-    """
-    # Extract lows and highs within thresholds
     lows = [Decimal(str(candle['low'])) for candle in candles 
             if min_threshold <= Decimal(str(candle['low'])) <= max_threshold]
     highs = [Decimal(str(candle['high'])) for candle in candles 
              if min_threshold <= Decimal(str(candle['high'])) <= max_threshold]
-    
-    # Initialize return values
     last_bottom = min(lows) if lows else None
     last_top = max(highs) if highs else None
     closest_reversal = None
     closest_type = None
     current_close_dec = Decimal(str(current_close))
-    
-    # If no valid lows or highs, relax thresholds to include at least one reversal
     if not lows and not highs:
         lows = [Decimal(str(candle['low'])) for candle in candles]
         highs = [Decimal(str(candle['high'])) for candle in candles]
         last_bottom = min(lows) if lows else None
         last_top = max(highs) if highs else None
-    
-    # Calculate distances to find the closest reversal
     min_distance = Decimal('Infinity')
-    
     if last_bottom is not None:
         distance_to_bottom = abs(current_close_dec - last_bottom)
         if distance_to_bottom < min_distance:
             min_distance = distance_to_bottom
             closest_reversal = last_bottom
             closest_type = 'DIP'
-    
     if last_top is not None:
         distance_to_top = abs(current_close_dec - last_top)
         if distance_to_top < min_distance:
             min_distance = distance_to_top
             closest_reversal = last_top
             closest_type = 'TOP'
-    
-    # Ensure the reversal is on the correct side of the current price
     if closest_type == 'DIP' and closest_reversal >= current_close_dec:
         closest_reversal = last_top
         closest_type = 'TOP' if last_top is not None and last_top <= current_close_dec else None
     elif closest_type == 'TOP' and closest_reversal <= current_close_dec:
         closest_reversal = last_bottom
         closest_type = 'DIP' if last_bottom is not None and last_bottom >= current_close_dec else None
-    
-    # Fallback: If no valid reversal type after checks, choose the closest price
     if closest_type is None and (last_bottom is not None or last_top is not None):
         if last_bottom is not None and last_top is not None:
             closest_reversal = last_bottom if abs(current_close_dec - last_bottom) <= abs(current_close_dec - last_top) else last_top
@@ -425,7 +421,6 @@ def find_major_reversals(candles, current_close, min_threshold, max_threshold):
         elif last_top is not None:
             closest_reversal = last_top
             closest_type = 'TOP'
-    
     return last_bottom, last_top, closest_reversal, closest_type
 
 def scale_to_sine(close_prices):
@@ -521,36 +516,77 @@ def calculate_stochastic_rsi(close_prices, length_rsi=14, length_stoch=14, smoot
 def calculate_bullish_bearish_volume_ratios(candle_map):
     volume_ratios = {}
     for timeframe, candles in candle_map.items():
-        bullish_volume = sum(Decimal(str(candle["volume"])) for candle in candles if Decimal(str(candle["close"])) > Decimal(str(candle["open"])))
-        bearish_volume = sum(Decimal(str(candle["volume"])) for candle in candles if Decimal(str(candle["close"])) < Decimal(str(candle["open"])))
+        bullish_volume = Decimal('0')
+        bearish_volume = Decimal('0')
+        recent_volumes = []
+        for candle in candles[-5:]:
+            total_volume = Decimal(str(candle["volume"]))
+            close_price = Decimal(str(candle["close"]))
+            open_price = Decimal(str(candle["open"]))
+            high_price = Decimal(str(candle["high"]))
+            low_price = Decimal(str(candle["low"]))
+            if high_price == low_price:
+                buy_vol = total_volume / Decimal('2')
+                sell_vol = total_volume / Decimal('2')
+            else:
+                price_range = high_price - low_price
+                bullish_strength = (close_price - low_price) / price_range if price_range > Decimal('0') else Decimal('0.5')
+                bearish_volume += total_volume * (Decimal('1') - bullish_strength)
+                bullish_volume += total_volume * bullish_strength
+            recent_volumes.append((bullish_volume, bearish_volume))
         total_volume = bullish_volume + bearish_volume
         ratio = bullish_volume / bearish_volume if bearish_volume > Decimal('0') else Decimal('Infinity')
+        volume_trend = "Increasing Bullish" if len(recent_volumes) >= 2 and recent_volumes[-1][0] > recent_volumes[-2][0] else \
+                      "Increasing Bearish" if len(recent_volumes) >= 2 and recent_volumes[-1][1] > recent_volumes[-2][1] else "Stable"
         volume_ratios[timeframe] = {
             "bullish_volume": bullish_volume,
             "bearish_volume": bearish_volume,
             "ratio": ratio,
-            "status": "Bullish" if ratio > Decimal('1') else "Bearish" if ratio < Decimal('1') else "Neutral"
+            "status": "Bullish" if ratio > Decimal('1') else "Bearish" if ratio < Decimal('1') else "Neutral",
+            "trend": volume_trend
         }
-        print(f"{timeframe} - Bullish Volume: {bullish_volume:.25f}, Bearish Volume: {bearish_volume:.25f}, Ratio: {ratio:.25f} ({volume_ratios[timeframe]['status']})")
+        print(f"{timeframe} - Bullish Volume: {bullish_volume:.25f}, Bearish Volume: {bearish_volume:.25f}, Ratio: {ratio:.25f}, Status: {volume_ratios[timeframe]['status']}, Trend: {volume_trend}")
     return volume_ratios
 
 def analyze_volume_changes_over_time(candle_map):
     volume_trends = {}
     for timeframe, candles in candle_map.items():
-        if len(candles) < 2:
+        if len(candles) < 3:
             print(f"{timeframe} - Not enough data to analyze volume changes.")
             continue
-        last_volume = Decimal(str(candles[-1]["volume"]))
-        previous_volume = Decimal(str(candles[-2]["volume"]))
+        volumes = [Decimal(str(candle["volume"])) for candle in candles[-3:]]
+        bullish_volumes = []
+        bearish_volumes = []
+        for candle in candles[-3:]:
+            total_volume = Decimal(str(candle["volume"]))
+            close_price = Decimal(str(candle["close"]))
+            open_price = Decimal(str(candle["open"]))
+            high_price = Decimal(str(candle["high"]))
+            low_price = Decimal(str(candle["low"]))
+            if high_price == low_price:
+                buy_vol = total_volume / Decimal('2')
+                sell_vol = total_volume / Decimal('2')
+            else:
+                price_range = high_price - low_price
+                bullish_strength = (close_price - low_price) / price_range if price_range > Decimal('0') else Decimal('0.5')
+                buy_vol = total_volume * bullish_strength
+                sell_vol = total_volume * (Decimal('1') - bullish_strength)
+            bullish_volumes.append(buy_vol)
+            bearish_volumes.append(sell_vol)
+        last_volume = volumes[-1]
+        previous_volume = volumes[-2]
         volume_change = last_volume - previous_volume
-        change_status = "Increasing" if volume_change > Decimal('0') else "Decreasing" if volume_change < Decimal('0') else "Stable"
+        percent_change = (volume_change / previous_volume * Decimal('100')) if previous_volume > Decimal('0') else Decimal('0')
+        trend_direction = "Bullish" if bullish_volumes[-1] > bearish_volumes[-1] and bullish_volumes[-1] > bullish_volumes[-2] else \
+                         "Bearish" if bearish_volumes[-1] > bullish_volumes[-1] and bearish_volumes[-1] > bearish_volumes[-2] else "Neutral"
         volume_trends[timeframe] = {
             "last_volume": last_volume,
             "previous_volume": previous_volume,
             "change": volume_change,
-            "status": change_status
+            "percent_change": percent_change,
+            "trend_direction": trend_direction
         }
-        print(f"{timeframe} - Last Volume: {last_volume:.25f}, Previous Volume: {previous_volume:.25f}, Change: {volume_change:.25f} ({change_status})")
+        print(f"{timeframe} - Last Volume: {last_volume:.25f}, Previous Volume: {previous_volume:.25f}, Change: {volume_change:.25f}, Percent Change: {percent_change:.25f}%, Trend: {trend_direction}")
     return volume_trends
 
 def calculate_fibonacci_levels_from_reversal(last_reversal, max_threshold, min_threshold, last_major_reversal_type, current_price):
