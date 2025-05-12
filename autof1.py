@@ -21,7 +21,7 @@ getcontext().prec = 25
 TRADE_SYMBOL = "BTCUSDC"  # Futures use USDC
 LEVERAGE = 20
 TAKE_PROFIT_ROI = Decimal('2.55')  # % TP based on initial USDC balance
-STOP_LOSS_ROI = Decimal('-10.0')   # % SL based on initial USDC balance
+STOP_LOSS_ROI = Decimal('-25.50')   # % SL based on initial USDC balance
 
 # Load credentials from file
 with open("credentials.txt", "r") as f:
