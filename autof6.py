@@ -1008,7 +1008,7 @@ while True:
     print(f"\nFinal Long Summary: {long_true} True, {len(long_conditions) - long_true} False")
     print(f"Final Short Summary: {short_true} True, {len(short_conditions) - short_true} False")
     if long_true > 0 and short_true > 0:
-        pass  # Removed the print statement as requested
+        pass
     elif long_true > short_true:
         print("Note: Bullish bias detected.")
     elif short_true > long_true:
