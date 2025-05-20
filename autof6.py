@@ -109,7 +109,7 @@ def get_balance(asset='USDC', retries=5, delay=5):
                     balance = Decimal(str(asset_info['availableBalance']))
                     print(f"Balance: {balance:.25f} {asset}")
                     if balance <= Decimal('0'):
-                        print("Zero balance detected. Running in simulation mode.")
+                        print("Zero balance detected. Generating signals only.")
                     return balance
             print(f"No {asset} found.")
             return Decimal('0.0')
@@ -180,15 +180,8 @@ def open_long_position(balance):
             print("Invalid price for long position.")
             return None, None, None, None
         if balance <= Decimal('0'):
-            print("Simulating LONG: No balance available.")
-            notional = Decimal('1000.0') * Decimal(str(LEVERAGE))  # Simulate with $1000
-            quantity = notional / current_price
-            step_precision = int(-math.log10(float(step_size))) if step_size > 0 else 8
-            quantity = (quantity // step_size) * step_size
-            quantity = quantity.quantize(Decimal('0.' + '0' * step_precision))
-            cost = quantity * current_price / Decimal(str(LEVERAGE))
-            print(f"Simulated LONG: Qty {quantity:.25f}, Cost {cost:.25f}, Price {current_price:.25f}")
-            return current_price, quantity, datetime.datetime.now(), cost
+            print("Insufficient USDC balance for LONG position. Skipping trade.")
+            return None, None, None, None
         notional = balance * Decimal(str(LEVERAGE))
         raw_quantity = notional / current_price
         step_precision = int(-math.log10(float(step_size))) if step_size > 0 else 8
@@ -220,15 +213,8 @@ def open_short_position(balance):
             print("Invalid price for short position.")
             return None, None, None, None
         if balance <= Decimal('0'):
-            print("Simulating SHORT: No balance available.")
-            notional = Decimal('1000.0') * Decimal(str(LEVERAGE))  # Simulate with $1000
-            quantity = notional / current_price
-            step_precision = int(-math.log10(float(step_size))) if step_size > 0 else 8
-            quantity = (quantity // step_size) * step_size
-            quantity = quantity.quantize(Decimal('0.' + '0' * step_precision))
-            cost = quantity * current_price / Decimal(str(LEVERAGE))
-            print(f"Simulated SHORT: Qty {quantity:.25f}, Cost {cost:.25f}, Price {current_price:.25f}")
-            return current_price, quantity, datetime.datetime.now(), cost
+            print("Insufficient USDC balance for SHORT position. Skipping trade.")
+            return None, None, None, None
         notional = balance * Decimal(str(LEVERAGE))
         raw_quantity = notional / current_price
         step_precision = int(-math.log10(float(step_size))) if step_size > 0 else 8
@@ -1056,7 +1042,7 @@ while True:
                 initial_investment = cost
                 print(f"Opened LONG: Qty {quantity:.25f}, Entry {entry_price:.25f}")
             else:
-                print("Simulated LONG signal due to zero balance or error.")
+                print("LONG signal active but trade not executed (insufficient balance or error).")
         elif short_signal and not long_signal:
             print(f"SHORT signal detected!")
             entry_price, quantity, entry_datetime, cost = open_short_position(usdc_balance)
@@ -1066,7 +1052,7 @@ while True:
                 initial_investment = cost
                 print(f"Opened SHORT: Qty {quantity:.25f}, Entry {entry_price:.25f}")
             else:
-                print("Simulated SHORT signal due to zero balance or error.")
+                print("SHORT signal active but trade not executed (insufficient balance or error).")
         elif long_signal and short_signal:
             print("Error: Both signals active. Skipping trade.")
         else:
