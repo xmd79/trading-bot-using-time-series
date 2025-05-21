@@ -232,7 +232,7 @@ def open_short_position():
             print(f"Final adjusted quantity {adjusted_quantity:.25f} still below minimum trade size {min_trade_size:.25f}. Cannot execute trade.")
             return None, None, None, None
         remaining_balance = usdc_balance - cost
-        print(f"Opening SHORT with {cost:.25f} of {usdc_balance:.25f} USDC, Remaining Balance: {remaining_balance:.25f} USDC")
+        print(f"Opening SHORT with {cost:.25f} of Constraining condition to dist_to_max_less_than_10 for short signals across all timeframes (1m, 3m, 5m).{usdc_balance:.25f} USDC, Remaining Balance: {remaining_balance:.25f} USDC")
         order = client.futures_create_order(
             symbol=TRADE_SYMBOL,
             side='SELL',
@@ -797,17 +797,17 @@ while True:
         "volume_bearish_3m": False,
         "volume_bearish_5m": False,
         "dist_to_max_less_than_min_1m": False,
-        "dist_to_min_greater_equal_10_1m": False,
+        "dist_to_max_less_than_10_1m": False,
         "dist_to_max_less_than_min_3m": False,
-        "dist_to_min_greater_equal_10_3m": False,
+        "dist_to_max_less_than_10_3m": False,
         "dist_to_max_less_than_min_5m": False,
-        "dist_to_min_greater_equal_10_5m": False,
+        "dist_to_max_less_than_10_5m": False,
     }
     last_major_reversal_type = None
 
     for timeframe in ['1m', '3m', '5m']:
         if timeframe in candle_map and candle_map[timeframe]:
-            print(f"--- {timeframe} ---")
+            print(f"\n--- {timeframe} ---")
             closes = [candle['close'] for candle in candle_map[timeframe]]
             current_close = Decimal(str(closes[-1]))
             high_tf = Decimal(str(np.nanmax([float(x) for x in closes])))
@@ -824,15 +824,18 @@ while True:
             top_confirmed = closest_type == 'TOP'
             long_conditions[f'dip_confirmed_{timeframe}'] = dip_confirmed
             short_conditions[f'top_confirmed_{timeframe}'] = top_confirmed
-            # Volume conditions for all timeframes
-            long_conditions[f"volume_bullish_{timeframe}"] = buy_volume.get(timeframe, [Decimal('0')])[-1] > sell_volume.get(timeframe, [Decimal('0')])[-1]
-            short_conditions[f"volume_bearish_{timeframe}"] = sell_volume.get(timeframe, [Decimal('0')])[-1] > buy_volume.get(timeframe, [Decimal('0')])[-1]
+            # Volume conditions
+            buy_vol = buy_volume.get(timeframe, [Decimal('0')])[-1]
+            sell_vol = sell_volume.get(timeframe, [Decimal('0')])[-1]
+            long_conditions[f"volume_bullish_{timeframe}"] = buy_vol > sell_vol
+            short_conditions[f"volume_bearish_{timeframe}"] = sell_vol > buy_vol
+            print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {long_conditions[f'volume_bullish_{timeframe}']}, Bearish Condition: {short_conditions[f'volume_bearish_{timeframe}']}")
             # Sine wave distance conditions
             dist_to_min, dist_to_max, _ = scale_to_sine(closes)
             long_conditions[f"dist_to_min_less_than_max_{timeframe}"] = dist_to_min < dist_to_max
             long_conditions[f"dist_to_min_less_than_10_{timeframe}"] = dist_to_min < Decimal('10')
             short_conditions[f"dist_to_max_less_than_min_{timeframe}"] = dist_to_max < dist_to_min
-            short_conditions[f"dist_to_min_greater_equal_10_{timeframe}"] = dist_to_min >= Decimal('10')
+            short_conditions[f"dist_to_max_less_than_10_{timeframe}"] = dist_to_max < Decimal('10')
             print(f"Sine Wave Distance to Min ({timeframe}): {dist_to_min:.25f}%")
             print(f"Sine Wave Distance to Max ({timeframe}): {dist_to_max:.25f}%")
             if timeframe == '1m':
