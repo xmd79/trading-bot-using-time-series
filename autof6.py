@@ -781,7 +781,7 @@ while True:
         "volume_bullish_3m": False,
         "volume_bullish_5m": False,
         "dist_to_min_less_than_max_1m": False,
-        "dist_to_min_less_than_10_1m": False,
+        "dist_to_min_less_than_20_1m": False,
         "dist_to_min_less_than_max_3m": False,
         "dist_to_min_less_than_10_3m": False,
         "dist_to_min_less_than_max_5m": False,
@@ -797,7 +797,7 @@ while True:
         "volume_bearish_3m": False,
         "volume_bearish_5m": False,
         "dist_to_max_less_than_min_1m": False,
-        "dist_to_max_less_than_10_1m": False,
+        "dist_to_max_less_than_20_1m": False,
         "dist_to_max_less_than_min_3m": False,
         "dist_to_max_less_than_10_3m": False,
         "dist_to_max_less_than_min_5m": False,
@@ -820,23 +820,29 @@ while True:
                 last_major_reversal_type = closest_type
             else:
                 print("No Major Reversal Found")
+            # Reversal conditions (mutually exclusive)
             dip_confirmed = closest_type == 'DIP'
             top_confirmed = closest_type == 'TOP'
             long_conditions[f'dip_confirmed_{timeframe}'] = dip_confirmed
             short_conditions[f'top_confirmed_{timeframe}'] = top_confirmed
-            # Volume conditions
+            # Volume conditions (mutually exclusive)
             buy_vol = buy_volume.get(timeframe, [Decimal('0')])[-1]
             sell_vol = sell_volume.get(timeframe, [Decimal('0')])[-1]
-            long_conditions[f"volume_bullish_{timeframe}"] = buy_vol > sell_vol
-            short_conditions[f"volume_bearish_{timeframe}"] = sell_vol > buy_vol
+            is_bullish = buy_vol > sell_vol
+            long_conditions[f"volume_bullish_{timeframe}"] = is_bullish
+            short_conditions[f"volume_bearish_{timeframe}"] = not is_bullish
             print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {long_conditions[f'volume_bullish_{timeframe}']}, Bearish Condition: {short_conditions[f'volume_bearish_{timeframe}']}")
             # Distance conditions based on min/max thresholds
             dist_to_min = ((current_close - min_threshold_tf) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if min_threshold_tf is not None and max_threshold_tf is not None and max_threshold_tf != min_threshold_tf else Decimal('0')
             dist_to_max = ((max_threshold_tf - current_close) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if min_threshold_tf is not None and max_threshold_tf is not None and max_threshold_tf != min_threshold_tf else Decimal('0')
-            long_conditions[f"dist_to_min_less_than_max_{timeframe}"] = dist_to_min < dist_to_max
-            long_conditions[f"dist_to_min_less_than_10_{timeframe}"] = dist_to_min < Decimal('10')
-            short_conditions[f"dist_to_max_less_than_min_{timeframe}"] = dist_to_max < dist_to_min
-            short_conditions[f"dist_to_max_less_than_10_{timeframe}"] = dist_to_max < Decimal('10')
+            is_closer_to_min = dist_to_min < dist_to_max
+            long_conditions[f"dist_to_min_less_than_max_{timeframe}"] = is_closer_to_min
+            short_conditions[f"dist_to_max_less_than_min_{timeframe}"] = not is_closer_to_min
+            # Set distance threshold based on timeframe
+            dist_threshold = Decimal('20') if timeframe == '1m' else Decimal('10')
+            is_dist_to_min_low = dist_to_min < dist_threshold
+            long_conditions[f"dist_to_min_less_than_{'20' if timeframe == '1m' else '10'}_{timeframe}"] = is_dist_to_min_low
+            short_conditions[f"dist_to_max_less_than_{'20' if timeframe == '1m' else '10'}_{timeframe}"] = not is_dist_to_min_low
             print(f"Distance to Min Threshold ({timeframe}): {dist_to_min:.25f}%")
             print(f"Distance to Max Threshold ({timeframe}): {dist_to_max:.25f}%")
             # Log sine wave distances (unchanged, for reference)
@@ -844,11 +850,13 @@ while True:
             print(f"Sine Wave Distance to Min ({timeframe}): {sine_dist_to_min:.25f}%")
             print(f"Sine Wave Distance to Max ({timeframe}): {sine_dist_to_max:.25f}%")
             if timeframe == '1m':
-                long_conditions["ML_Forecasted_Price_over_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
-                short_conditions["ML_Forecasted_Price_below_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price < current_close
+                is_forecast_bullish = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
+                long_conditions["ML_Forecasted_Price_over_Current_Close"] = is_forecast_bullish
+                short_conditions["ML_Forecasted_Price_below_Current_Close"] = not is_forecast_bullish
             elif timeframe == '5m':
-                long_conditions["current_close_below_average_threshold_5m"] = current_close < avg_mtf if avg_mtf is not None else False
-                short_conditions["current_close_above_average_threshold_5m"] = current_close > avg_mtf if avg_mtf is not None else False
+                is_below_avg = current_close < avg_mtf if avg_mtf is not None else False
+                long_conditions["current_close_below_average_threshold_5m"] = is_below_avg
+                short_conditions["current_close_above_average_threshold_5m"] = not is_below_avg
             valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
             sma_lengths = [5, 7, 9, 12]
             smas = {length: Decimal(str(talib.SMA(valid_closes, timeperiod=length)[-1])) for length in sma_lengths if not np.isnan(talib.SMA(valid_closes, timeperiod=length)[-1])}
