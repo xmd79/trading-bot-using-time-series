@@ -18,41 +18,25 @@ import requests
 getcontext().prec = 25
 
 # Exchange constants
-TRADE_SYMBOL = "BTCUSDC"
+TRADE_SYMBOL = "BTCUSDC"  # Futures use USDC
 LEVERAGE = 20
-TAKE_PROFIT_ROI = Decimal('2.55')
-STOP_LOSS_ROI = Decimal('-25.50')
+TAKE_PROFIT_ROI = Decimal('2.55')  # % TP based on initial USDC balance
+STOP_LOSS_ROI = Decimal('-25.50')   # % SL based on initial USDC balance
 
-# Load credentials
+# Load credentials from file
 with open("credentials.txt", "r") as f:
     lines = f.readlines()
     api_key = lines[0].strip()
     api_secret = lines[1].strip()
 
-# Initialize Binance client
+# Initialize Binance client with increased timeout
 client = BinanceClient(api_key, api_secret, requests_params={"timeout": 30})
-client.API_URL = 'https://fapi.binance.com'
+client.API_URL = 'https://fapi.binance.com'  # Futures API endpoint
 
-# Validate symbol
-def validate_symbol(symbol):
-    try:
-        exchange_info = client.futures_exchange_info()
-        symbols = [s['symbol'] for s in exchange_info['symbols']]
-        if symbol not in symbols:
-            print(f"Error: {symbol} not found in futures market. Available symbols: {symbols[:10]}...")
-            return False
-        return True
-    except BinanceAPIException as e:
-        print(f"Error validating symbol {symbol}: {e.message}")
-        return False
-
-# Set leverage
+# Set leverage for the symbol
 try:
-    if validate_symbol(TRADE_SYMBOL):
-        client.futures_change_leverage(symbol=TRADE_SYMBOL, leverage=LEVERAGE)
-        print(f"Leverage set to {LEVERAGE}x for {TRADE_SYMBOL}")
-    else:
-        raise Exception(f"Invalid symbol {TRADE_SYMBOL}")
+    client.futures_change_leverage(symbol=TRADE_SYMBOL, leverage=LEVERAGE)
+    print(f"Leverage set to {LEVERAGE}x for {TRADE_SYMBOL}")
 except BinanceAPIException as e:
     print(f"Error setting leverage: {e.message}")
 
@@ -60,6 +44,7 @@ except BinanceAPIException as e:
 def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=100):
     def fetch_candles(timeframe):
         return get_candles(symbol, timeframe, limit)
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         results = list(executor.map(fetch_candles, timeframes))
     return dict(zip(timeframes, results))
@@ -68,21 +53,32 @@ def get_candles(symbol, timeframe, limit=100, retries=5, delay=5):
     for attempt in range(retries):
         try:
             klines = client.futures_klines(symbol=symbol, interval=timeframe, limit=limit)
-            candles = [{
-                "time": k[0] / 1000,
-                "open": float(k[1]),
-                "high": float(k[2]),
-                "low": float(k[3]),
-                "close": float(k[4]),
-                "volume": float(k[5]),
-                "timeframe": timeframe
-            } for k in klines]
+            candles = []
+            for k in klines:
+                candle = {
+                    "time": k[0] / 1000,
+                    "open": float(k[1]),
+                    "high": float(k[2]),
+                    "low": float(k[3]),
+                    "close": float(k[4]),
+                    "volume": float(k[5]),
+                    "timeframe": timeframe
+                }
+                candles.append(candle)
             return candles
-        except (BinanceAPIException, requests.exceptions.ReadTimeout) as e:
-            print(f"Error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e}")
+        except BinanceAPIException as e:
+            print(f"Binance API Error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e.message}")
             if attempt < retries - 1:
                 time.sleep(delay * (attempt + 1))
-    print(f"Failed to fetch candles for {timeframe} after {retries} attempts.")
+        except requests.exceptions.ReadTimeout as e:
+            print(f"Read Timeout fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+        except Exception as e:
+            print(f"Unexpected error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+    print(f"Failed to fetch candles for {timeframe} after {retries} attempts. Skipping timeframe.")
     return []
 
 def get_current_price(retries=5, delay=5):
@@ -93,171 +89,176 @@ def get_current_price(retries=5, delay=5):
             if price > Decimal('0'):
                 return price
             print(f"Invalid price {price:.25f} on attempt {attempt + 1}/{retries}")
-        except (BinanceAPIException, requests.exceptions.ReadTimeout) as e:
-            print(f"Error fetching price (attempt {attempt + 1}/{retries}): {e}")
+        except BinanceAPIException as e:
+            print(f"Error fetching {TRADE_SYMBOL} price (attempt {attempt + 1}/{retries}): {e.message}")
             if attempt < retries - 1:
                 time.sleep(delay * (attempt + 1))
-    print("Failed to fetch price.")
+        except requests.exceptions.ReadTimeout as e:
+            print(f"Read Timeout fetching price (attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+    print(f"Failed to fetch valid {TRADE_SYMBOL} price after {retries} attempts.")
     return Decimal('0.0')
 
-def get_balance(asset='USDC', retries=5, delay=5):
-    for attempt in range(retries):
-        try:
-            account = client.futures_account()
-            for asset_info in account['assets']:
-                if asset_info['asset'] == asset:
-                    balance = Decimal(str(asset_info['availableBalance']))
-                    print(f"Balance: {balance:.25f} {asset}")
-                    if balance <= Decimal('0'):
-                        print("Zero balance detected. Generating signals only.")
-                    return balance
-            print(f"No {asset} found.")
-            return Decimal('0.0')
-        except (BinanceAPIException, requests.exceptions.ReadTimeout) as e:
-            print(f"Error fetching balance (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-    print("Failed to fetch balance.")
-    return Decimal('0.0')
+def get_balance(asset='USDC'):
+    try:
+        account = client.futures_account()
+        for asset_info in account['assets']:
+            if asset_info['asset'] == asset:
+                return Decimal(str(asset_info['availableBalance']))
+        return Decimal('0.0')
+    except BinanceAPIException as e:
+        print(f"Error fetching balance for {asset}: {e.message}")
+        return Decimal('0.0')
 
-def get_position(retries=5, delay=5):
-    for attempt in range(retries):
-        try:
-            positions = client.futures_position_information(symbol=TRADE_SYMBOL)
-            if not positions:
-                print(f"No positions found for {TRADE_SYMBOL} (attempt {attempt + 1}/{retries}).")
-                return {
-                    "quantity": Decimal('0.0'),
-                    "entry_price": Decimal('0.0'),
-                    "side": "NONE",
-                    "unrealized_pnl": Decimal('0.0')
-                }
-            position = positions[0]
-            quantity = Decimal(str(position['positionAmt']))
-            return {
-                "quantity": quantity,
-                "entry_price": Decimal(str(position['entryPrice'])),
-                "side": "LONG" if quantity > Decimal('0') else "SHORT" if quantity < Decimal('0') else "NONE",
-                "unrealized_pnl": Decimal(str(position['unrealizedProfit']))
-            }
-        except (BinanceAPIException, requests.exceptions.ReadTimeout) as e:
-            print(f"Error fetching position (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-    print(f"Failed to fetch position after {retries} attempts.")
-    return {
-        "quantity": Decimal('0.0'),
-        "entry_price": Decimal('0.0'),
-        "side": "NONE",
-        "unrealized_pnl": Decimal('0.0')
-    }
+def get_position():
+    try:
+        positions = client.futures_position_information(symbol=TRADE_SYMBOL)
+        if not positions:
+            print(f"No position data returned for {TRADE_SYMBOL}. Assuming no open position.")
+            return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0')}
+        position = positions[0]
+        quantity = Decimal(str(position['positionAmt']))
+        entry_price = Decimal(str(position['entryPrice']))
+        return {
+            "quantity": quantity,
+            "entry_price": entry_price,
+            "side": "LONG" if quantity > Decimal('0') else "SHORT" if quantity < Decimal('0') else "NONE",
+            "unrealized_pnl": Decimal(str(position['unrealizedProfit']))
+        }
+    except BinanceAPIException as e:
+        print(f"Error fetching position info: {e.message}")
+        return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0')}
 
-def get_symbol_lot_size_info(symbol, retries=5, delay=5):
-    for attempt in range(retries):
-        try:
-            exchange_info = client.futures_exchange_info()
-            for symbol_info in exchange_info['symbols']:
-                if symbol_info['symbol'] == symbol:
-                    for f in symbol_info['filters']:
-                        if f['filterType'] == 'LOT_SIZE':
-                            return {
-                                'minQty': Decimal(str(f['minQty'])),
-                                'stepSize': Decimal(str(f['stepSize']))
-                            }
-            print(f"No lot size info for {symbol}. Using defaults.")
-            return {'minQty': Decimal('0.00001'), 'stepSize': Decimal('0.00001')}
-        except (BinanceAPIException, requests.exceptions.ReadTimeout) as e:
-            print(f"Error fetching lot size (attempt {attempt + 1}/{retries}): {e}")
-            if attempt < retries - 1:
-                time.sleep(delay * (attempt + 1))
-    print("Failed to fetch lot size.")
-    return {'minQty': Decimal('0.00001'), 'stepSize': Decimal('0.00001')}
+def get_symbol_lot_size_info(symbol):
+    try:
+        exchange_info = client.futures_exchange_info()
+        for symbol_info in exchange_info['symbols']:
+            if symbol_info['symbol'] == symbol:
+                for filter in symbol_info['filters']:
+                    if filter['filterType'] == 'LOT_SIZE':
+                        return {
+                            'minQty': Decimal(str(filter['minQty'])),
+                            'stepSize': Decimal(str(filter['stepSize']))
+                        }
+        print(f"Could not find LOT_SIZE filter for {symbol}. Using defaults.")
+        return {'minQty': Decimal('0.00001'), 'stepSize': Decimal('0.00001')}
+    except BinanceAPIException as e:
+        print(f"Error fetching symbol info for {symbol}: {e.message}")
+        return {'minQty': Decimal('0.00001'), 'stepSize': Decimal('0.00001')}
 
-def open_long_position(balance):
+def open_long_position():
     try:
         current_price = get_current_price()
         if current_price <= Decimal('0'):
-            print("Invalid price for long position.")
+            print(f"Invalid current price {current_price:.25f} for long position.")
             return None, None, None, None
-        if balance <= Decimal('0'):
-            print("Insufficient USDC balance for LONG position. Skipping trade.")
+        usdc_balance = get_balance('USDC')
+        if usdc_balance <= Decimal('0'):
+            print("No USDC balance available to open long position.")
             return None, None, None, None
-        notional = balance * Decimal(str(LEVERAGE))
+        notional = usdc_balance * Decimal(str(LEVERAGE))
         raw_quantity = notional / current_price
-        step_precision = int(-math.log10(float(step_size))) if step_size > 0 else 8
-        quantity = (raw_quantity // step_size) * step_size
-        quantity = quantity.quantize(Decimal('0.' + '0' * step_precision))
-        cost = quantity * current_price / Decimal(str(LEVERAGE))
-        if quantity < min_trade_size:
-            print(f"Quantity {quantity:.25f} below min trade size {min_trade_size:.25f}.")
+        step_precision = int(-math.log10(float(step_size))) if step_size > Decimal('0') else 8
+        adjusted_quantity = (raw_quantity // step_size) * step_size
+        adjusted_quantity = adjusted_quantity.quantize(Decimal('0.' + '0' * step_precision))
+        cost = adjusted_quantity * current_price / Decimal(str(LEVERAGE))
+        min_notional = Decimal('10.0')
+        if cost < min_notional:
+            print(f"Cost {cost:.25f} USDC is below minimum notional value {min_notional:.25f}. Adjusting quantity.")
+            min_quantity_for_notional = min_notional * Decimal(str(LEVERAGE)) / current_price
+            adjusted_quantity = ((min_quantity_for_notional + step_size - Decimal('1E-25')) // step_size) * step_size
+            adjusted_quantity = adjusted_quantity.quantize(Decimal('0.' + '0' * step_precision))
+            cost = adjusted_quantity * current_price / Decimal(str(LEVERAGE))
+        if adjusted_quantity < min_trade_size:
+            print(f"Adjusted quantity {adjusted_quantity:.25f} is below minimum trade size {min_trade_size:.25f}. Cannot execute trade.")
             return None, None, None, None
-        if cost > balance:
-            print(f"Cost {cost:.25f} exceeds balance {balance:.25f}.")
+        if cost > usdc_balance:
+            print(f"Cost {cost:.25f} exceeds available balance {usdc_balance:.25f}. Re-adjusting.")
+            adjusted_quantity = ((usdc_balance * Decimal(str(LEVERAGE)) / current_price) // step_size) * step_size
+            adjusted_quantity = adjusted_quantity.quantize(Decimal('0.' + '0' * step_precision))
+            cost = adjusted_quantity * current_price / Decimal(str(LEVERAGE))
+        if adjusted_quantity < min_trade_size:
+            print(f"Final adjusted quantity {adjusted_quantity:.25f} still below minimum trade size {min_trade_size:.25f}. Cannot execute trade.")
             return None, None, None, None
+        remaining_balance = usdc_balance - cost
+        print(f"Opening LONG with {cost:.25f} of {usdc_balance:.25f} USDC, Remaining Balance: {remaining_balance:.25f} USDC")
         order = client.futures_create_order(
             symbol=TRADE_SYMBOL,
             side='BUY',
             type='MARKET',
-            quantity=float(quantity)
+            quantity=float(adjusted_quantity)
         )
-        print(f"Long opened: {order}")
-        return Decimal(str(order['avgPrice'])), quantity, datetime.datetime.now(), cost
+        print(f"Long position opened: {order}")
+        entry_price = Decimal(str(order['avgPrice'])) if 'avgPrice' in order else current_price
+        entry_datetime = datetime.datetime.now()
+        return entry_price, adjusted_quantity, entry_datetime, cost
     except BinanceAPIException as e:
-        print(f"Error opening long: {e.message}")
+        print(f"Error opening long position: {e.message}")
         return None, None, None, None
 
-def open_short_position(balance):
+def open_short_position():
     try:
         current_price = get_current_price()
         if current_price <= Decimal('0'):
-            print("Invalid price for short position.")
+            print(f"Invalid current price {current_price:.25f} for short position.")
             return None, None, None, None
-        if balance <= Decimal('0'):
-            print("Insufficient USDC balance for SHORT position. Skipping trade.")
+        usdc_balance = get_balance('USDC')
+        if usdc_balance <= Decimal('0'):
+            print("No USDC balance available to open short position.")
             return None, None, None, None
-        notional = balance * Decimal(str(LEVERAGE))
+        notional = usdc_balance * Decimal(str(LEVERAGE))
         raw_quantity = notional / current_price
-        step_precision = int(-math.log10(float(step_size))) if step_size > 0 else 8
-        quantity = (raw_quantity // step_size) * step_size
-        quantity = quantity.quantize(Decimal('0.' + '0' * step_precision))
-        cost = quantity * current_price / Decimal(str(LEVERAGE))
-        if quantity < min_trade_size:
-            print(f"Quantity {quantity:.25f} below min trade size {min_trade_size:.25f}.")
+        step_precision = int(-math.log10(float(step_size))) if step_size > Decimal('0') else 8
+        adjusted_quantity = (raw_quantity // step_size) * step_size
+        adjusted_quantity = adjusted_quantity.quantize(Decimal('0.' + '0' * step_precision))
+        cost = adjusted_quantity * current_price / Decimal(str(LEVERAGE))
+        min_notional = Decimal('10.0')
+        if cost < min_notional:
+            print(f"Cost {cost:.25f} USDC is below minimum notional value {min_notional:.25f}. Adjusting quantity.")
+            min_quantity_for_notional = min_notional * Decimal(str(LEVERAGE)) / current_price
+            adjusted_quantity = ((min_quantity_for_notional + step_size - Decimal('1E-25')) // step_size) * step_size
+            adjusted_quantity = adjusted_quantity.quantize(Decimal('0.' + '0' * step_precision))
+            cost = adjusted_quantity * current_price / Decimal(str(LEVERAGE))
+        if adjusted_quantity < min_trade_size:
+            print(f"Adjusted quantity {adjusted_quantity:.25f} is below minimum trade size {min_trade_size:.25f}. Cannot execute trade.")
             return None, None, None, None
-        if cost > balance:
-            print(f"Cost {cost:.25f} exceeds balance {balance:.25f}.")
+        if cost > usdc_balance:
+            print(f"Cost {cost:.25f} exceeds available balance {usdc_balance:.25f}. Re-adjusting.")
+            adjusted_quantity = ((usdc_balance * Decimal(str(LEVERAGE)) / current_price) // step_size) * step_size
+            adjusted_quantity = adjusted_quantity.quantize(Decimal('0.' + '0' * step_precision))
+            cost = adjusted_quantity * current_price / Decimal(str(LEVERAGE))
+        if adjusted_quantity < min_trade_size:
+            print(f"Final adjusted quantity {adjusted_quantity:.25f} still below minimum trade size {min_trade_size:.25f}. Cannot execute trade.")
             return None, None, None, None
+        remaining_balance = usdc_balance - cost
+        print(f"Opening SHORT with {cost:.25f} of {usdc_balance:.25f} USDC, Remaining Balance: {remaining_balance:.25f} USDC")
         order = client.futures_create_order(
             symbol=TRADE_SYMBOL,
             side='SELL',
             type='MARKET',
-            quantity=float(quantity)
+            quantity=float(adjusted_quantity)
         )
-        print(f"Short opened: {order}")
-        return Decimal(str(order['avgPrice'])), quantity, datetime.datetime.now(), cost
+        print(f"Short position opened: {order}")
+        entry_price = Decimal(str(order['avgPrice'])) if 'avgPrice' in order else current_price
+        entry_datetime = datetime.datetime.now()
+        return entry_price, adjusted_quantity, entry_datetime, cost
     except BinanceAPIException as e:
-        print(f"Error opening short: {e.message}")
+        print(f"Error opening short position: {e.message}")
         return None, None, None, None
 
 def close_position(side, quantity):
     try:
-        if quantity == Decimal('0'):
-            print("No position to close (quantity is zero).")
-            return False
         current_price = get_current_price()
         if current_price <= Decimal('0'):
-            print("Invalid price for closing.")
+            print(f"Invalid current price {current_price:.25f} for closing position.")
             return False
-        step_precision = int(-math.log10(float(step_size))) if step_size > 0 else 8
+        step_precision = int(-math.log10(float(step_size))) if step_size > Decimal('0') else 8
         close_quantity = (abs(quantity) // step_size) * step_size
         close_quantity = close_quantity.quantize(Decimal('0.' + '0' * step_precision))
         if close_quantity < min_trade_size:
-            print(f"Close quantity {close_quantity:.25f} below min {min_trade_size:.25f}.")
+            print(f"Cannot close: Quantity {close_quantity:.25f} is below minimum trade size {min_trade_size:.25f}.")
             return False
-        usdc_balance = get_balance('USDC')
-        if usdc_balance <= Decimal('0'):
-            print(f"Simulating CLOSE {side}: Qty {close_quantity:.25f}, Price {current_price:.25f}")
-            return True
         order_side = 'SELL' if side == 'LONG' else 'BUY'
         order = client.futures_create_order(
             symbol=TRADE_SYMBOL,
@@ -268,20 +269,20 @@ def close_position(side, quantity):
         print(f"Position closed ({side}): {order}")
         return True
     except BinanceAPIException as e:
-        print(f"Error closing {side}: {e.message}")
+        print(f"Error closing {side} position: {e.message}")
         return False
 
 def check_exit_condition(initial_investment, position, current_price):
-    if initial_investment <= Decimal('0') or position['quantity'] == Decimal('0'):
-        print("Invalid investment or position for exit check.")
+    if initial_investment <= Decimal('0.0') or position['quantity'] == Decimal('0.0'):
+        print("Invalid initial investment or position quantity for exit condition check.")
         return False, None
     unrealized_pnl = position['unrealized_pnl']
     current_balance = get_balance('USDC') + unrealized_pnl
     roi = ((current_balance - initial_investment) / initial_investment) * Decimal('100')
-    take_profit = roi >= TAKE_PROFIT_ROI
-    stop_loss = roi <= STOP_LOSS_ROI
-    print(f"Exit Check: ROI: {roi:.2f}%, TP: {TAKE_PROFIT_ROI:.2f}%, SL: {STOP_LOSS_ROI:.2f}%")
-    return take_profit or stop_loss, "TP" if take_profit else "SL" if stop_loss else None
+    take_profit_met = roi >= TAKE_PROFIT_ROI
+    stop_loss_met = roi <= STOP_LOSS_ROI
+    print(f"Exit Check: ROI: {roi:.25f}%, TP: {TAKE_PROFIT_ROI:.25f}%, SL: {STOP_LOSS_ROI:.25f}%")
+    return take_profit_met or stop_loss_met, "TP" if take_profit_met else "SL" if stop_loss_met else None
 
 # Analysis Functions
 def backtest_model(candles):
@@ -622,6 +623,14 @@ def forecast_volume_based_on_conditions(volume_ratios, min_threshold, current_pr
     print("No clear forecast direction based on volume ratios.")
     return None
 
+def forecasted_price_to_current_close_comparison(forecasted_price, current_close):
+    if forecasted_price > current_close:
+        return "Bullish"
+    elif forecasted_price < current_close:
+        return "Bearish"
+    else:
+        return "Neutral"
+
 def check_market_conditions_and_forecast(support_levels, resistance_levels, current_price):
     current_price_dec = Decimal(str(current_price))
     if not support_levels and not resistance_levels:
@@ -693,13 +702,13 @@ def forecast_price_per_time_pythagorean(timeframe, candles, min_threshold, max_t
     print(f"Fixed Forecast Price: {forecast_price:.25f}")
     return forecast_price, price_per_minute
 
-# Initialize lot size
+# Initialize lot size info
 lot_size_info = get_symbol_lot_size_info(TRADE_SYMBOL)
 min_trade_size = lot_size_info['minQty']
 step_size = lot_size_info['stepSize']
-print(f"Min Trade Size: {min_trade_size:.25f}, Step Size: {step_size:.25f}")
+print(f"Initialized {TRADE_SYMBOL} - Min Trade Size: {min_trade_size:.25f}, Step Size: {step_size:.25f}")
 
-# Trade state
+# Initialize trade state
 position_open = False
 initial_investment = Decimal('0.0')
 position_side = "NONE"
@@ -707,31 +716,60 @@ quantity = Decimal('0.0')
 entry_price = Decimal('0.0')
 entry_datetime = None
 
-# Main loop
+# Initial balance check
+usdc_balance = get_balance('USDC')
+print("Futures Trading Bot Initialized!")
+
+# Main trading loop
 while True:
-    current_time = datetime.datetime.now()
-    print(f"\nTime: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    current_local_time = datetime.datetime.now()
+    current_local_time_str = current_local_time.strftime("%Y-%m-%d %H:%M:%S")
+    print(f"\nCurrent Local Time: {current_local_time_str}")
 
     usdc_balance = get_balance('USDC')
     current_price = get_current_price()
     position = get_position()
     position_side = position['side']
     quantity = position['quantity']
+    position_value = abs(quantity) * current_price
 
     if position_side != "NONE" and not position_open:
+        print(f"Position detected ({position_side}): Quantity {quantity:.25f}, Value {position_value:.25f} USDC")
         position_open = True
         entry_price = position['entry_price']
-        initial_investment = abs(quantity) * entry_price / Decimal(str(LEVERAGE))
-        entry_datetime = current_time
-        print(f"Position detected: {position_side}, Qty: {quantity:.25f}, Entry: {entry_price:.25f}")
+        initial_investment = usdc_balance - position['unrealized_pnl']
+        if initial_investment <= Decimal('0'):
+            initial_investment = abs(quantity) * entry_price / Decimal(str(LEVERAGE))
+        print(f"Estimated Initial Investment: {initial_investment:.25f} USDC, Entry Price: {entry_price:.25f}")
+        entry_datetime = current_local_time
+        print(f"Entry Datetime set to current time: {entry_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
 
     candle_map = fetch_candles_in_parallel(['1m', '3m', '5m'])
     if not candle_map.get('1m'):
-        print("Error: No 1m candles. Skipping cycle.")
-        time.sleep(60)
-        continue
+        print("Error: '1m' candles not fetched. Check API connectivity or symbol.")
+    if current_price == Decimal('0.0'):
+        print(f"Warning: Current {TRADE_SYMBOL} price is {current_price:.25f}. API may be failing.")
 
-    # Initialize conditions
+    if "1m" in candle_map and candle_map['1m']:
+        model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
+        print(f"Backtest MAE: {backtest_mae:.25f}")
+        forecasted_prices = forecast_next_price(model, num_steps=1)
+        closes = [candle['close'] for candle in candle_map["1m"]]
+        min_threshold, max_threshold, _, _, _, _, _ = calculate_thresholds(closes)
+        adjusted_forecasted_price = min(max(forecasted_prices[-1], min_threshold), max_threshold) if min_threshold is not None and max_threshold is not None else forecasted_prices[-1]
+        print(f"Forecasted Price: {adjusted_forecasted_price:.25f}")
+    else:
+        min_threshold, max_threshold, adjusted_forecasted_price = None, None, None
+        print("No 1m data available for forecasting.")
+
+    buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
+    volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
+    support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold or current_price * Decimal('0.95'), max_threshold or current_price * Decimal('1.05'), current_price)
+    volume_ratios_details = calculate_bullish_bearish_volume_ratios(candle_map)
+    volume_trends_details = analyze_volume_changes_over_time(candle_map)
+
+    fib_info = {}
+    pythagorean_forecasts = {'1m': {'price': None, 'rate': None}, '3m': {'price': None, 'rate': None}, '5m': {'price': None, 'rate': None}}
     long_conditions = {
         "ML_Forecasted_Price_over_Current_Close": False,
         "current_close_below_average_threshold_5m": False,
@@ -741,9 +779,12 @@ while True:
         "volume_bullish_1m": False,
         "volume_bullish_3m": False,
         "volume_bullish_5m": False,
-        "dist_to_min_1m_less_10pct": False,
-        "dist_to_min_3m_less_10pct": False,
-        "dist_to_min_5m_less_10pct": False
+        "dist_to_min_less_than_max_1m": False,
+        "dist_to_min_less_than_10_1m": False,
+        "dist_to_min_less_than_max_3m": False,
+        "dist_to_min_less_than_10_3m": False,
+        "dist_to_min_less_than_max_5m": False,
+        "dist_to_min_less_than_10_5m": False,
     }
     short_conditions = {
         "ML_Forecasted_Price_below_Current_Close": False,
@@ -754,67 +795,14 @@ while True:
         "volume_bearish_1m": False,
         "volume_bearish_3m": False,
         "volume_bearish_5m": False,
-        "dist_to_max_1m_less_10pct": False,
-        "dist_to_max_3m_less_10pct": False,
-        "dist_to_max_5m_less_10pct": False
+        "dist_to_max_less_than_min_1m": False,
+        "dist_to_min_greater_equal_10_1m": False,
+        "dist_to_max_less_than_min_3m": False,
+        "dist_to_min_greater_equal_10_3m": False,
+        "dist_to_max_less_than_min_5m": False,
+        "dist_to_min_greater_equal_10_5m": False,
     }
-
-    # Analyze data
-    buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
-    volume_ratios = calculate_volume_ratio(buy_volume, sell_volume)
-    min_threshold, max_threshold, adjusted_forecasted_price = None, None, None
-    if "1m" in candle_map and candle_map['1m']:
-        model, backtest_mae, last_predictions, actuals = backtest_model(candle_map["1m"])
-        print(f"Backtest MAE: {backtest_mae:.25f}")
-        forecasted_prices = forecast_next_price(model, num_steps=1)
-        closes = [candle['close'] for candle in candle_map["1m"]]
-        min_threshold, max_threshold, _, _, _, _, _ = calculate_thresholds(closes)
-        adjusted_forecasted_price = min(max(forecasted_prices[-1], min_threshold), max_threshold) if min_threshold is not None and max_threshold is not None else forecasted_prices[-1]
-        print(f"Forecasted Price: {adjusted_forecasted_price:.25f}")
-
-    support_levels, resistance_levels = find_specific_support_resistance(candle_map, min_threshold or current_price * Decimal('0.95'), max_threshold or current_price * Decimal('1.05'), current_price)
-    volume_ratios_details = calculate_bullish_bearish_volume_ratios(candle_map)
-    volume_trends_details = analyze_volume_changes_over_time(candle_map)
-
-    fib_info = {}
-    pythagorean_forecasts = {'1m': {'price': None, 'rate': None}, '3m': {'price': None, 'rate': None}, '5m': {'price': None, 'rate': None}}
     last_major_reversal_type = None
-
-    # Calculate confidence scores
-    confidence_scores = {}
-    for timeframe in ['1m', '3m', '5m']:
-        if timeframe in candle_map and candle_map[timeframe]:
-            closes = [candle['close'] for candle in candle_map[timeframe]]
-            current_close = Decimal(str(closes[-1]))
-            high_tf = Decimal(str(np.nanmax([float(x) for x in closes])))
-            low_tf = Decimal(str(np.nanmin([float(x) for x in closes])))
-            min_threshold_tf, max_threshold_tf, avg_mtf, momentum_signal, _, _, _ = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2)
-
-            # Confidence for ML forecast
-            if timeframe == '1m':
-                forecast_diff = abs(adjusted_forecasted_price - current_close) / current_close if adjusted_forecasted_price is not None else Decimal('0')
-                confidence_scores['ML_Forecasted_Price'] = float(forecast_diff)
-
-            # Confidence for threshold conditions (5m)
-            if timeframe == '5m':
-                threshold_diff = abs(current_close - (min_threshold_tf + max_threshold_tf) / Decimal('2')) / current_close if min_threshold_tf is not None and max_threshold_tf is not None else Decimal('0')
-                confidence_scores['current_close_threshold_5m'] = float(threshold_diff)
-
-            # Confidence for dip/top confirmation
-            _, _, closest_reversal, _ = find_major_reversals(candle_map[timeframe], current_price, min_threshold_tf, max_threshold_tf)
-            reversal_confidence = abs(current_close - closest_reversal) / current_close if closest_reversal is not None else Decimal('0')
-            confidence_scores[f'reversal_{timeframe}'] = float(reversal_confidence)
-
-            # Confidence for volume conditions
-            buy_vol = buy_volume.get(timeframe, [Decimal('0')])[-1]
-            sell_vol = sell_volume.get(timeframe, [Decimal('0')])[-1]
-            volume_diff = abs(buy_vol - sell_vol) / (buy_vol + sell_vol) if (buy_vol + sell_vol) > Decimal('0') else Decimal('0')
-            confidence_scores[f'volume_{timeframe}'] = float(volume_diff)
-
-            # Confidence for distance to min/max
-            dist_to_min = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-            dist_to_max = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-            confidence_scores[f'dist_{timeframe}'] = float(min(dist_to_min, dist_to_max))
 
     for timeframe in ['1m', '3m', '5m']:
         if timeframe in candle_map and candle_map[timeframe]:
@@ -835,27 +823,23 @@ while True:
             top_confirmed = closest_type == 'TOP'
             long_conditions[f'dip_confirmed_{timeframe}'] = dip_confirmed
             short_conditions[f'top_confirmed_{timeframe}'] = top_confirmed
+            # Volume conditions for all timeframes
+            long_conditions[f"volume_bullish_{timeframe}"] = buy_volume.get(timeframe, [Decimal('0')])[-1] > sell_volume.get(timeframe, [Decimal('0')])[-1]
+            short_conditions[f"volume_bearish_{timeframe}"] = sell_volume.get(timeframe, [Decimal('0')])[-1] > buy_volume.get(timeframe, [Decimal('0')])[-1]
+            # Sine wave distance conditions
+            dist_to_min, dist_to_max, _ = scale_to_sine(closes)
+            long_conditions[f"dist_to_min_less_than_max_{timeframe}"] = dist_to_min < dist_to_max
+            long_conditions[f"dist_to_min_less_than_10_{timeframe}"] = dist_to_min < Decimal('10')
+            short_conditions[f"dist_to_max_less_than_min_{timeframe}"] = dist_to_max < dist_to_min
+            short_conditions[f"dist_to_min_greater_equal_10_{timeframe}"] = dist_to_min >= Decimal('10')
+            print(f"Sine Wave Distance to Min ({timeframe}): {dist_to_min:.25f}%")
+            print(f"Sine Wave Distance to Max ({timeframe}): {dist_to_max:.25f}%")
             if timeframe == '1m':
                 long_conditions["ML_Forecasted_Price_over_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
                 short_conditions["ML_Forecasted_Price_below_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price < current_close
-                long_conditions["volume_bullish_1m"] = buy_volume.get('1m', [Decimal('0')])[-1] > sell_volume.get('1m', [Decimal('0')])[-1]
-                short_conditions["volume_bearish_1m"] = sell_volume.get('1m', [Decimal('0')])[-1] > buy_volume.get('1m', [Decimal('0')])[-1]
-                print(f"Debug: ML Forecast: {adjusted_forecasted_price:.2f}, Close: {current_close:.2f}, Long: {long_conditions['ML_Forecasted_Price_over_Current_Close']}, Short: {short_conditions['ML_Forecasted_Price_below_Current_Close']}")
-            elif timeframe == '3m':
-                long_conditions["volume_bullish_3m"] = buy_volume.get('3m', [Decimal('0')])[-1] > sell_volume.get('3m', [Decimal('0')])[-1]
-                short_conditions["volume_bearish_3m"] = sell_volume.get('3m', [Decimal('0')])[-1] > buy_volume.get('3m', [Decimal('0')])[-1]
             elif timeframe == '5m':
                 long_conditions["current_close_below_average_threshold_5m"] = current_close < avg_mtf if avg_mtf is not None else False
                 short_conditions["current_close_above_average_threshold_5m"] = current_close > avg_mtf if avg_mtf is not None else False
-                long_conditions["volume_bullish_5m"] = buy_volume.get('5m', [Decimal('0')])[-1] > sell_volume.get('5m', [Decimal('0')])[-1]
-                short_conditions["volume_bearish_5m"] = sell_volume.get('5m', [Decimal('0')])[-1] > buy_volume.get('5m', [Decimal('0')])[-1]
-            dist_to_min = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-            dist_to_max = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-            long_conditions[f"dist_to_min_{timeframe}_less_10pct"] = dist_to_min < Decimal('10.0')
-            short_conditions[f"dist_to_max_{timeframe}_less_10pct"] = dist_to_max < Decimal('10.0')
-            print(f"Debug: {timeframe} - Dip: {dip_confirmed}, Top: {top_confirmed}")
-            print(f"Debug: {timeframe} - Buy Vol: {buy_volume.get(timeframe, [Decimal('0')])[-1]:.2f}, Sell Vol: {sell_volume.get(timeframe, [Decimal('0')])[-1]:.2f}")
-            print(f"Debug: {timeframe} - Dist Min: {dist_to_min:.2f}%, Dist Max: {dist_to_max:.2f}%")
             valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
             sma_lengths = [5, 7, 9, 12]
             smas = {length: Decimal(str(talib.SMA(valid_closes, timeperiod=length)[-1])) for length in sma_lengths if not np.isnan(talib.SMA(valid_closes, timeperiod=length)[-1])}
@@ -900,6 +884,14 @@ while True:
                 print(f"Level {level}: {price:.25f}")
             fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe])
             print(f"{timeframe} Incoming Fibonacci Reversal Target (Forecast): {fib_reversal_price:.25f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target: price not available.")
+            dist_to_min_price = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
+            dist_to_max_price = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
+            print(f"Distance from Current Close to Min Threshold ({low_tf:.25f}): {dist_to_min_price:.25f}%")
+            print(f"Distance from Current Close to Max Threshold ({high_tf:.25f}): {dist_to_max_price:.25f}%")
+            symmetrical_min_distance = (high_tf - current_price) / (high_tf - low_tf) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
+            symmetrical_max_distance = (current_price - low_tf) / (high_tf - low_tf) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
+            print(f"Normalized Distance to Min Threshold (Symmetrical): {symmetrical_max_distance:.25f}%")
+            print(f"Normalized Distance to Max Threshold (Symmetrical): {symmetrical_min_distance:.25f}%")
             time_window = {'1m': 1, '3m': 3, '5m': 5}[timeframe]
             forecast_price, price_rate = forecast_price_per_time_pythagorean(timeframe, candle_map[timeframe], min_threshold_tf, max_threshold_tf, current_price, time_window, closest_reversal, closest_type)
             pythagorean_forecasts[timeframe] = {'price': forecast_price, 'rate': price_rate}
@@ -918,110 +910,54 @@ while True:
             print(f"Pythagorean Forecast Price for {timeframe}: {pythagorean_forecasts[timeframe]['price']:.25f}")
             print(f"Pythagorean Price Rate for {timeframe}: {pythagorean_forecasts[timeframe]['rate']:.25f} USDC/min")
 
-    # Verify condition mirroring
-    condition_pairs = [
-        ("ML_Forecasted_Price_over_Current_Close", "ML_Forecasted_Price_below_Current_Close", 'ML_Forecasted_Price'),
-        ("current_close_below_average_threshold_5m", "current_close_above_average_threshold_5m", 'current_close_threshold_5m'),
-        ("dip_confirmed_1m", "top_confirmed_1m", 'reversal_1m'),
-        ("dip_confirmed_3m", "top_confirmed_3m", 'reversal_3m'),
-        ("dip_confirmed_5m", "top_confirmed_5m", 'reversal_5m'),
-        ("volume_bullish_1m", "volume_bearish_1m", 'volume_1m'),
-        ("volume_bullish_3m", "volume_bearish_3m", 'volume_3m'),
-        ("volume_bullish_5m", "volume_bearish_5m", 'volume_5m'),
-        ("dist_to_min_1m_less_10pct", "dist_to_max_1m_less_10pct", 'dist_1m'),
-        ("dist_to_min_3m_less_10pct", "dist_to_max_3m_less_10pct", 'dist_3m'),
-        ("dist_to_min_5m_less_10pct", "dist_to_max_5m_less_10pct", 'dist_5m')
-    ]
+    forecasted_price = forecast_volume_based_on_conditions(volume_ratios, min_threshold or current_price * Decimal('0.95'), current_price)
+    forecast_decision = check_market_conditions_and_forecast(support_levels, resistance_levels, current_price)
 
-    # Ensure mutual exclusivity
-    for long_key, short_key, conf_key in condition_pairs:
-        long_val = long_conditions[long_key]
-        short_val = short_conditions[short_key]
-        if long_val and short_val:
-            # Choose the condition with higher confidence
-            confidence = confidence_scores.get(conf_key, 0)
-            if confidence > 0.5:  # Arbitrary threshold for confidence
-                short_conditions[short_key] = False
-                print(f"Resolved conflict: Kept {long_key}, set {short_key} to False (Confidence: {confidence:.2f})")
-            else:
-                long_conditions[long_key] = False
-                print(f"Resolved conflict: Kept {short_key}, set {long_key} to False (Confidence: {confidence:.2f})")
-        elif not long_val and not short_val:
-            # If both are False, set one to True based on market sentiment
-            market_sentiment = determine_market_sentiment(
-                *calculate_spectral_analysis([candle['close'] for candle in candle_map.get('1m', [])]),
-                last_major_reversal_type,
-                buy_volume.get('1m', [Decimal('0')])[-1],
-                sell_volume.get('1m', [Decimal('0')])[-1]
-            )
-            if market_sentiment in ["Bullish", "Accumulation"]:
-                long_conditions[long_key] = True
-                print(f"Set {long_key} to True based on {market_sentiment} sentiment")
-            elif market_sentiment in ["Bearish", "Distribution"]:
-                short_conditions[short_key] = True
-                print(f"Set {short_key} to True based on {market_sentiment} sentiment")
+    # Print LONG and SHORT signal status
+    print("\nTrade Signal Status:")
+    long_signal = all(long_conditions.values())
+    short_signal = all(short_conditions.values())
+    print(f"LONG Signal: {'Active' if long_signal else 'Inactive'}")
+    print(f"SHORT Signal: {'Active' if short_signal else 'Inactive'}")
 
-    # Adjust to enforce mirror condition
-    long_true = sum(1 for v in long_conditions.values() if v)
-    short_true = sum(1 for v in short_conditions.values() if v)
-    target_long_true = long_true
-    target_short_true = 11 - long_true
+    # Print condition statuses
+    print("\nLong Conditions Status:")
+    for condition, status in long_conditions.items():
+        print(f"{condition}: {'True' if status else 'False'}")
+    print("\nShort Conditions Status:")
+    for condition, status in short_conditions.items():
+        print(f"{condition}: {'True' if status else 'False'}")
 
-    if long_true + short_true != 11:
-        print(f"Adjusting conditions: Long True={long_true}, Short True={short_true}")
-        # Sort pairs by confidence to decide which to flip
-        sorted_pairs = sorted(
-            [(long_key, short_key, confidence_scores.get(conf_key, 0)) for long_key, short_key, conf_key in condition_pairs],
-            key=lambda x: x[2]
-        )
-        current_long_true = long_true
-        current_short_true = short_true
-        for long_key, short_key, _ in sorted_pairs:
-            if current_long_true > target_long_true:
-                if long_conditions[long_key]:
-                    long_conditions[long_key] = False
-                    short_conditions[short_key] = True
-                    current_long_true -= 1
-                    current_short_true += 1
-                    print(f"Flipped {long_key} to False, {short_key} to True")
-            elif current_short_true > target_short_true:
-                if short_conditions[short_key]:
-                    short_conditions[short_key] = False
-                    long_conditions[long_key] = True
-                    current_short_true -= 1
-                    current_long_true += 1
-                    print(f"Flipped {short_key} to False, {long_key} to True")
-            if current_long_true == target_long_true and current_short_true == target_short_true:
-                break
-
-    # Print conditions
-    print("\nLong Conditions:")
-    for k, v in long_conditions.items():
-        print(f"{k}: {v}")
-    print("\nShort Conditions:")
-    for k, v in short_conditions.items():
-        print(f"{k}: {v}")
-
-    # Final counts
-    long_true = sum(1 for v in long_conditions.values() if v)
-    short_true = sum(1 for v in short_conditions.values() if v)
-    print(f"\nFinal Long Summary: {long_true} True, {len(long_conditions) - long_true} False")
-    print(f"Final Short Summary: {short_true} True, {len(short_conditions) - short_true} False")
-    if long_true > 0 and short_true > 0:
-        pass
-    elif long_true > short_true:
-        print("Note: Bullish bias detected.")
-    elif short_true > long_true:
-        print("Note: Bearish bias detected.")
-
-    # Position management
     if position_open:
-        should_exit, reason = check_exit_condition(initial_investment, position, current_price)
+        print("\nCurrent Position Status:")
+        print(f"Position Side: {position_side}")
+        print(f"Quantity: {quantity:.25f} BTC")
+        print(f"Entry Price: {entry_price:.25f} USDC")
+        print(f"Current Price: {current_price:.25f} USDC")
+        print(f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC")
+        current_balance = usdc_balance + position['unrealized_pnl']
+        print(f"Current Total Balance: {current_balance:.25f} USDC")
+        target_value = initial_investment * (Decimal('1.0') + TAKE_PROFIT_ROI / Decimal('100'))
+        stop_loss_value = initial_investment * (Decimal('1.0') + STOP_LOSS_ROI / Decimal('100'))
+        entry_time_str = entry_datetime.strftime("%H:%M") if entry_datetime else "Unknown"
+        time_span = (current_local_time - entry_datetime) if entry_datetime else None
+        time_span_str = f"{time_span.days} days, {time_span.seconds // 3600} hours, {(time_span.seconds % 3600) // 60} minutes" if time_span else "Unknown"
+        print(f"Initial Investment: {initial_investment:.25f} USDC")
+        print(f"Target Value (2.55% ROI): {target_value:.25f} USDC")
+        print(f"Stop Loss Value (25.5% Loss): {stop_loss_value:.25f} USDC")
+        print(f"Entry Time (HH:MM): {entry_time_str}")
+        print(f"Time Span from Entry: {time_span_str}")
+        roi = ((current_balance - initial_investment) / initial_investment) * Decimal('100') if initial_investment > Decimal('0') else Decimal('0.0')
+        print(f"Current ROI: {roi:.25f}%")
+        should_exit, exit_reason = check_exit_condition(initial_investment, position, current_price)
         if should_exit:
+            print(f"Exit condition met ({exit_reason}). Closing {position_side} position...")
             if close_position(position_side, quantity):
                 final_balance = get_balance('USDC')
                 profit = final_balance - initial_investment
-                print(f"Closed {position_side}: Profit {profit:.25f} USDC")
+                profit_percentage = (profit / initial_investment) * Decimal('100') if initial_investment > Decimal('0') else Decimal('0.0')
+                print(f"Position closed. Final Balance: {final_balance:.25f} USDC")
+                print(f"Trade log: Time: {current_local_time_str}, Entry Price: {entry_price:.25f}, Final Balance: {final_balance:.25f}, Profit: {profit:.25f} USDC, Profit Percentage: {profit_percentage:.25f}%")
                 position_open = False
                 initial_investment = Decimal('0.0')
                 position_side = "NONE"
@@ -1029,34 +965,47 @@ while True:
                 entry_price = Decimal('0.0')
                 entry_datetime = None
     else:
-        long_signal = all(long_conditions.values())
-        short_signal = all(short_conditions.values())
-        print(f"\nLONG Signal: {'Active' if long_signal else 'Inactive'}")
-        print(f"SHORT Signal: {'Active' if short_signal else 'Inactive'}")
-        if long_signal and not short_signal:
-            print(f"LONG signal detected!")
-            entry_price, quantity, entry_datetime, cost = open_long_position(usdc_balance)
-            if entry_price and cost:
-                position_open = True
-                position_side = "LONG"
-                initial_investment = cost
-                print(f"Opened LONG: Qty {quantity:.25f}, Entry {entry_price:.25f}")
-            else:
-                print("LONG signal active but trade not executed (insufficient balance or error).")
-        elif short_signal and not long_signal:
-            print(f"SHORT signal detected!")
-            entry_price, quantity, entry_datetime, cost = open_short_position(usdc_balance)
-            if entry_price and cost:
-                position_open = True
-                position_side = "SHORT"
-                initial_investment = cost
-                print(f"Opened SHORT: Qty {quantity:.25f}, Entry {entry_price:.25f}")
-            else:
-                print("SHORT signal active but trade not executed (insufficient balance or error).")
-        elif long_signal and short_signal:
-            print("Error: Both signals active. Skipping trade.")
-        else:
-            print("No trade signals.")
+        print(f"\nNo open position. USDC Balance: {usdc_balance:.25f}")
+        if usdc_balance <= Decimal('0'):
+            print("No USDC balance available for trading.")
+
+    if not position_open:
+        long_true_count = sum(int(status) for status in long_conditions.values())
+        long_false_count = len(long_conditions) - long_true_count
+        short_true_count = sum(int(status) for status in short_conditions.values())
+        short_false_count = len(short_conditions) - short_true_count
+        print(f"\nLong Conditions Summary: {long_true_count} True, {long_false_count} False")
+        print(f"Short Conditions Summary: {short_true_count} True, {short_false_count} False")
+        if long_signal:
+            usdc_balance = get_balance('USDC')
+            if usdc_balance > Decimal('0'):
+                print(f"LONG signal detected! Opening long position with {usdc_balance:.25f} USDC at price {current_price:.25f}")
+                entry_price, quantity_bought, entry_datetime, cost = open_long_position()
+                if entry_price is not None and quantity_bought is not None and cost is not None:
+                    initial_investment = cost
+                    position_side = "LONG"
+                    quantity = quantity_bought
+                    print(f"Long position opened at {entry_price:.25f} USDC for quantity: {quantity_bought:.25f} BTC, Cost: {cost:.25f} USDC")
+                    print(f"Entry Datetime: {entry_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                    position_open = True
+                    usdc_balance = get_balance('USDC')
+                else:
+                    print("Error opening long position.")
+        elif short_signal:
+            usdc_balance = get_balance('USDC')
+            if usdc_balance > Decimal('0'):
+                print(f"SHORT signal detected! Opening short position with {usdc_balance:.25f} USDC at price {current_price:.25f}")
+                entry_price, quantity_sold, entry_datetime, cost = open_short_position()
+                if entry_price is not None and quantity_sold is not None and cost is not None:
+                    initial_investment = cost
+                    position_side = "SHORT"
+                    quantity = -quantity_sold
+                    print(f"Short position opened at {entry_price:.25f} USDC for quantity: {quantity_sold:.25f} BTC, Cost: {cost:.25f} USDC")
+                    print(f"Entry Datetime: {entry_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                    position_open = True
+                    usdc_balance = get_balance('USDC')
+                else:
+                    print("Error opening short position.")
 
     print(f"\nCurrent USDC Balance: {usdc_balance:.25f}")
     print(f"Current Position: {position_side}, Quantity: {quantity:.25f} BTC")
