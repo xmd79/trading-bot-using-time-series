@@ -232,7 +232,7 @@ def open_short_position():
             print(f"Final adjusted quantity {adjusted_quantity:.25f} still below minimum trade size {min_trade_size:.25f}. Cannot execute trade.")
             return None, None, None, None
         remaining_balance = usdc_balance - cost
-        print(f"Opening SHORT with {cost:.25f} of Constraining condition to dist_to_max_less_than_10 for short signals across all timeframes (1m, 3m, 5m).{usdc_balance:.25f} USDC, Remaining Balance: {remaining_balance:.25f} USDC")
+        print(f"Opening SHORT with {cost:.25f} of {usdc_balance:.25f} USDC, Remaining Balance: {remaining_balance:.25f} USDC")
         order = client.futures_create_order(
             symbol=TRADE_SYMBOL,
             side='SELL',
@@ -830,14 +830,19 @@ while True:
             long_conditions[f"volume_bullish_{timeframe}"] = buy_vol > sell_vol
             short_conditions[f"volume_bearish_{timeframe}"] = sell_vol > buy_vol
             print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {long_conditions[f'volume_bullish_{timeframe}']}, Bearish Condition: {short_conditions[f'volume_bearish_{timeframe}']}")
-            # Sine wave distance conditions
-            dist_to_min, dist_to_max, _ = scale_to_sine(closes)
+            # Distance conditions based on min/max thresholds
+            dist_to_min = ((current_close - min_threshold_tf) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if min_threshold_tf is not None and max_threshold_tf is not None and max_threshold_tf != min_threshold_tf else Decimal('0')
+            dist_to_max = ((max_threshold_tf - current_close) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if min_threshold_tf is not None and max_threshold_tf is not None and max_threshold_tf != min_threshold_tf else Decimal('0')
             long_conditions[f"dist_to_min_less_than_max_{timeframe}"] = dist_to_min < dist_to_max
             long_conditions[f"dist_to_min_less_than_10_{timeframe}"] = dist_to_min < Decimal('10')
             short_conditions[f"dist_to_max_less_than_min_{timeframe}"] = dist_to_max < dist_to_min
             short_conditions[f"dist_to_max_less_than_10_{timeframe}"] = dist_to_max < Decimal('10')
-            print(f"Sine Wave Distance to Min ({timeframe}): {dist_to_min:.25f}%")
-            print(f"Sine Wave Distance to Max ({timeframe}): {dist_to_max:.25f}%")
+            print(f"Distance to Min Threshold ({timeframe}): {dist_to_min:.25f}%")
+            print(f"Distance to Max Threshold ({timeframe}): {dist_to_max:.25f}%")
+            # Log sine wave distances (unchanged, for reference)
+            sine_dist_to_min, sine_dist_to_max, _ = scale_to_sine(closes)
+            print(f"Sine Wave Distance to Min ({timeframe}): {sine_dist_to_min:.25f}%")
+            print(f"Sine Wave Distance to Max ({timeframe}): {sine_dist_to_max:.25f}%")
             if timeframe == '1m':
                 long_conditions["ML_Forecasted_Price_over_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
                 short_conditions["ML_Forecasted_Price_below_Current_Close"] = adjusted_forecasted_price is not None and adjusted_forecasted_price < current_close
@@ -890,12 +895,12 @@ while True:
             print(f"{timeframe} Incoming Fibonacci Reversal Target (Forecast): {fib_reversal_price:.25f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target: price not available.")
             dist_to_min_price = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
             dist_to_max_price = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-            print(f"Distance from Current Close to Min Threshold ({low_tf:.25f}): {dist_to_min_price:.25f}%")
-            print(f"Distance from Current Close to Max Threshold ({high_tf:.25f}): {dist_to_max_price:.25f}%")
+            print(f"Distance from Current Close to Min Price ({low_tf:.25f}): {dist_to_min_price:.25f}%")
+            print(f"Distance from Current Close to Max Price ({high_tf:.25f}): {dist_to_max_price:.25f}%")
             symmetrical_min_distance = (high_tf - current_price) / (high_tf - low_tf) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
             symmetrical_max_distance = (current_price - low_tf) / (high_tf - low_tf) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-            print(f"Normalized Distance to Min Threshold (Symmetrical): {symmetrical_max_distance:.25f}%")
-            print(f"Normalized Distance to Max Threshold (Symmetrical): {symmetrical_min_distance:.25f}%")
+            print(f"Normalized Distance to Min Price (Symmetrical): {symmetrical_max_distance:.25f}%")
+            print(f"Normalized Distance to Max Price (Symmetrical): {symmetrical_min_distance:.25f}%")
             time_window = {'1m': 1, '3m': 3, '5m': 5}[timeframe]
             forecast_price, price_rate = forecast_price_per_time_pythagorean(timeframe, candle_map[timeframe], min_threshold_tf, max_threshold_tf, current_price, time_window, closest_reversal, closest_type)
             pythagorean_forecasts[timeframe] = {'price': forecast_price, 'rate': price_rate}
@@ -974,9 +979,9 @@ while True:
             print("No USDC balance available for trading.")
 
     if not position_open:
-        long_true_count = sum(int(status) for status in long_conditions.values())
+        long_true_count = sum(1 for status in long_conditions.values() if status)
         long_false_count = len(long_conditions) - long_true_count
-        short_true_count = sum(int(status) for status in short_conditions.values())
+        short_true_count = sum(1 for status in short_conditions.values() if status)
         short_false_count = len(short_conditions) - short_true_count
         print(f"\nLong Conditions Summary: {long_true_count} True, {long_false_count} False")
         print(f"Short Conditions Summary: {short_true_count} True, {short_false_count} False")
