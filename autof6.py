@@ -105,7 +105,11 @@ def get_balance(asset='USDC'):
         account = client.futures_account()
         for asset_info in account['assets']:
             if asset_info['asset'] == asset:
-                return Decimal(str(asset_info['availableBalance']))
+                wallet_balance = Decimal(str(asset_info['walletBalance']))
+                available_balance = Decimal(str(asset_info['availableBalance']))
+                print(f"{asset} Balance - Wallet: {wallet_balance:.25f}, Available: {available_balance:.25f}")
+                return wallet_balance
+        print(f"{asset} not found in account assets: {[a['asset'] for a in account['assets']]}")
         return Decimal('0.0')
     except BinanceAPIException as e:
         print(f"Error fetching balance for {asset}: {e.message}")
