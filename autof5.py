@@ -426,6 +426,7 @@ def find_major_reversals(candles, current_close, min_threshold, max_threshold):
 def scale_to_sine(close_prices):
     close_prices_np = np.array([float(x) for x in close_prices], dtype=np.float64)
     sine_wave, _ = talib.HT_SINE(close_prices_np)
+    sine_wave = -sine_wave
     current_sine = Decimal(str(np.nan_to_num(sine_wave)[-1]))
     sine_wave_min = Decimal(str(np.nanmin(sine_wave)))
     sine_wave_max = Decimal(str(np.nanmax(sine_wave)))
