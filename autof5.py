@@ -836,19 +836,19 @@ while True:
             long_conditions[f"volume_bullish_{timeframe}"] = is_bullish
             short_conditions[f"volume_bearish_{timeframe}"] = not is_bullish
             print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {long_conditions[f'volume_bullish_{timeframe}']}, Bearish Condition: {short_conditions[f'volume_bearish_{timeframe}']}")
-            # Distance conditions based on min/max thresholds
-            dist_to_min = ((current_close - min_threshold_tf) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if min_threshold_tf is not None and max_threshold_tf is not None and max_threshold_tf != min_threshold_tf else Decimal('0')
-            dist_to_max = ((max_threshold_tf - current_close) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if min_threshold_tf is not None and max_threshold_tf is not None and max_threshold_tf != min_threshold_tf else Decimal('0')
-            is_closer_to_min = dist_to_min < dist_to_max
+            # Distance conditions based on thresholds
+            dist_to_min_price = ((current_close - min_threshold_tf) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if (max_threshold_tf - min_threshold_tf) != Decimal('0') else Decimal('0')
+            dist_to_max_price = ((max_threshold_tf - current_close) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if (max_threshold_tf - min_threshold_tf) != Decimal('0') else Decimal('0')
+            is_closer_to_min = dist_to_min_price < dist_to_max_price
             long_conditions[f"dist_to_min_less_than_max_{timeframe}"] = is_closer_to_min
             short_conditions[f"dist_to_max_less_than_min_{timeframe}"] = not is_closer_to_min
             # Set distance threshold based on timeframe
             dist_threshold = Decimal('20') if timeframe == '1m' else Decimal('10')
-            is_dist_to_min_low = dist_to_min < dist_threshold
+            is_dist_to_min_low = dist_to_min_price < dist_threshold
             long_conditions[f"dist_to_min_less_than_{'20' if timeframe == '1m' else '10'}_{timeframe}"] = is_dist_to_min_low
             short_conditions[f"dist_to_max_less_than_{'20' if timeframe == '1m' else '10'}_{timeframe}"] = not is_dist_to_min_low
-            print(f"Distance to Min Threshold ({timeframe}): {dist_to_min:.25f}%")
-            print(f"Distance to Max Threshold ({timeframe}): {dist_to_max:.25f}%")
+            print(f"Distance to Min Threshold ({timeframe}): {dist_to_min_price:.25f}%")
+            print(f"Distance to Max Threshold ({timeframe}): {dist_to_max_price:.25f}%")
             # Log sine wave distances (unchanged, for reference)
             sine_dist_to_min, sine_dist_to_max, _ = scale_to_sine(closes)
             print(f"Sine Wave Distance to Min ({timeframe}): {sine_dist_to_min:.25f}%")
