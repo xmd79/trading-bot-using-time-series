@@ -667,8 +667,8 @@ def get_target(closes, n_components, last_major_reversal_type, buy_volume, sell_
     market_mood = "Neutral"
     if last_major_reversal_type == 'DIP' and buy_volume > sell_volume:
         market_mood = "Bullish"
-    elif last_major_reversal_type == 'TOP' and sell_volume > buy_volume:
-        market_mood = "Bearish" if float(sell_volume) >= float(buy_volume) else "Choppy"
+    elif last_major_reversal_type == 'TOP' and buy_volume < sell_volume:
+        market_mood = "Bearish"
     return current_time, current_close, stop_loss, target_price, market_mood
 
 def forecast_price_per_time_pythagorean(timeframe, candles, min_threshold, max_threshold, current_price, time_window_minutes, last_reversal, last_reversal_type):
@@ -829,27 +829,40 @@ while True:
             top_confirmed = closest_type == 'TOP'
             long_conditions[f'dip_confirmed_{timeframe}'] = dip_confirmed
             short_conditions[f'top_confirmed_{timeframe}'] = top_confirmed
+            # Validate mutual exclusivity
+            if dip_confirmed and top_confirmed:
+                print(f"Error: Both dip and top confirmed for {timeframe}. Resetting to False.")
+                long_conditions[f'dip_confirmed_{timeframe}'] = False
+                short_conditions[f'top_confirmed_{timeframe}'] = False
             # Volume conditions (mutually exclusive)
             buy_vol = buy_volume.get(timeframe, [Decimal('0')])[-1]
             sell_vol = sell_volume.get(timeframe, [Decimal('0')])[-1]
             is_bullish = buy_vol > sell_vol
-            long_conditions[f"volume_bullish_{timeframe}"] = is_bullish
-            short_conditions[f"volume_bearish_{timeframe}"] = not is_bullish
+            long_conditions[f'volume_bullish_{timeframe}'] = is_bullish
+            short_conditions[f'volume_bearish_{timeframe}'] = not is_bullish
             print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {long_conditions[f'volume_bullish_{timeframe}']}, Bearish Condition: {short_conditions[f'volume_bearish_{timeframe}']}")
-            # Distance conditions based on thresholds
+            # Distance conditions
             dist_to_min_price = ((current_close - min_threshold_tf) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if (max_threshold_tf - min_threshold_tf) != Decimal('0') else Decimal('0')
             dist_to_max_price = ((max_threshold_tf - current_close) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if (max_threshold_tf - min_threshold_tf) != Decimal('0') else Decimal('0')
             is_closer_to_min = dist_to_min_price < dist_to_max_price
-            long_conditions[f"dist_to_min_less_than_max_{timeframe}"] = is_closer_to_min
-            short_conditions[f"dist_to_max_less_than_min_{timeframe}"] = not is_closer_to_min
-            # Set distance threshold based on timeframe
+            long_conditions[f'dist_to_min_less_than_max_{timeframe}'] = is_closer_to_min
+            short_conditions[f'dist_to_max_less_than_min_{timeframe}'] = dist_to_max_price <= dist_to_min_price
+            # Validate distance threshold
             dist_threshold = Decimal('20') if timeframe == '1m' else Decimal('10')
-            is_dist_to_min_low = dist_to_min_price < dist_threshold
-            long_conditions[f"dist_to_min_less_than_{'20' if timeframe == '1m' else '10'}_{timeframe}"] = is_dist_to_min_low
-            short_conditions[f"dist_to_max_less_than_{'20' if timeframe == '1m' else '10'}_{timeframe}"] = not is_dist_to_min_low
+            long_conditions[f'dist_to_min_less_than_{"20" if timeframe == "1m" else "10"}_{timeframe}'] = dist_to_min_price < dist_threshold
+            short_conditions[f'dist_to_max_less_than_{"20" if timeframe == "1m" else "10"}_{timeframe}'] = dist_to_max_price < dist_threshold
+            # Enforce mutual exclusivity for distance conditions
+            if long_conditions[f'dist_to_min_less_than_max_{timeframe}'] and short_conditions[f'dist_to_max_less_than_min_{timeframe}']:
+                print(f"Error: Conflicting distance conditions for {timeframe}. Resetting to False.")
+                long_conditions[f'dist_to_min_less_than_max_{timeframe}'] = False
+                short_conditions[f'dist_to_max_less_than_min_{timeframe}'] = False
+            if long_conditions[f'dist_to_min_less_than_{"20" if timeframe == "1m" else "10"}_{timeframe}'] and short_conditions[f'dist_to_max_less_than_{"20" if timeframe == "1m" else "10"}_{timeframe}']:
+                print(f"Error: Conflicting distance threshold conditions for {timeframe}. Resetting to False.")
+                long_conditions[f'dist_to_min_less_than_{"20" if timeframe == "1m" else "10"}_{timeframe}'] = False
+                short_conditions[f'dist_to_max_less_than_{"20" if timeframe == "1m" else "10"}_{timeframe}'] = False
             print(f"Distance to Min Threshold ({timeframe}): {dist_to_min_price:.25f}%")
             print(f"Distance to Max Threshold ({timeframe}): {dist_to_max_price:.25f}%")
-            # Log sine wave distances (unchanged, for reference)
+            # Log sine wave distances
             sine_dist_to_min, sine_dist_to_max, _ = scale_to_sine(closes)
             print(f"Sine Wave Distance to Min ({timeframe}): {sine_dist_to_min:.25f}%")
             print(f"Sine Wave Distance to Max ({timeframe}): {sine_dist_to_max:.25f}%")
@@ -857,10 +870,18 @@ while True:
                 is_forecast_bullish = adjusted_forecasted_price is not None and adjusted_forecasted_price > current_close
                 long_conditions["ML_Forecasted_Price_over_Current_Close"] = is_forecast_bullish
                 short_conditions["ML_Forecasted_Price_below_Current_Close"] = not is_forecast_bullish
+                if long_conditions["ML_Forecasted_Price_over_Current_Close"] and short_conditions["ML_Forecasted_Price_below_Current_Close"]:
+                    print("Error: Conflicting ML forecast conditions. Resetting to False.")
+                    long_conditions["ML_Forecasted_Price_over_Current_Close"] = False
+                    short_conditions["ML_Forecasted_Price_below_Current_Close"] = False
             elif timeframe == '5m':
                 is_below_avg = current_close < avg_mtf if avg_mtf is not None else False
                 long_conditions["current_close_below_average_threshold_5m"] = is_below_avg
                 short_conditions["current_close_above_average_threshold_5m"] = not is_below_avg
+                if long_conditions["current_close_below_average_threshold_5m"] and short_conditions["current_close_above_average_threshold_5m"]:
+                    print("Error: Conflicting average threshold conditions for 5m. Resetting to False.")
+                    long_conditions["current_close_below_average_threshold_5m"] = False
+                    short_conditions["current_close_above_average_threshold_5m"] = False
             valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
             sma_lengths = [5, 7, 9, 12]
             smas = {length: Decimal(str(talib.SMA(valid_closes, timeperiod=length)[-1])) for length in sma_lengths if not np.isnan(talib.SMA(valid_closes, timeperiod=length)[-1])}
