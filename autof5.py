@@ -105,11 +105,7 @@ def get_balance(asset='USDC'):
         account = client.futures_account()
         for asset_info in account['assets']:
             if asset_info['asset'] == asset:
-                wallet_balance = Decimal(str(asset_info['walletBalance']))
-                available_balance = Decimal(str(asset_info['availableBalance']))
-                print(f"{asset} Balance - Wallet: {wallet_balance:.25f}, Available: {available_balance:.25f}")
-                return wallet_balance
-        print(f"{asset} not found in account assets: {[a['asset'] for a in account['assets']]}")
+                return Decimal(str(asset_info['availableBalance']))
         return Decimal('0.0')
     except BinanceAPIException as e:
         print(f"Error fetching balance for {asset}: {e.message}")
@@ -430,7 +426,6 @@ def find_major_reversals(candles, current_close, min_threshold, max_threshold):
 def scale_to_sine(close_prices):
     close_prices_np = np.array([float(x) for x in close_prices], dtype=np.float64)
     sine_wave, _ = talib.HT_SINE(close_prices_np)
-    sine_wave = -sine_wave
     current_sine = Decimal(str(np.nan_to_num(sine_wave)[-1]))
     sine_wave_min = Decimal(str(np.nanmin(sine_wave)))
     sine_wave_max = Decimal(str(np.nanmax(sine_wave)))
@@ -667,8 +662,8 @@ def get_target(closes, n_components, last_major_reversal_type, buy_volume, sell_
     market_mood = "Neutral"
     if last_major_reversal_type == 'DIP' and buy_volume > sell_volume:
         market_mood = "Bullish"
-    elif last_major_reversal_type == 'TOP' and buy_volume < sell_volume:
-        market_mood = "Bearish"
+    elif last_major_reversal_type == 'TOP' and sell_volume > buy_volume:
+        market_mood = "Bearish" if float(sell_volume) >= float(buy_volume) else "Choppy"
     return current_time, current_close, stop_loss, target_price, market_mood
 
 def forecast_price_per_time_pythagorean(timeframe, candles, min_threshold, max_threshold, current_price, time_window_minutes, last_reversal, last_reversal_type):
@@ -926,10 +921,10 @@ while True:
                 print(f"Level {level}: {price:.25f}")
             fib_reversal_price = forecast_fibo_target_price(fib_info[timeframe])
             print(f"{timeframe} Incoming Fibonacci Reversal Target (Forecast): {fib_reversal_price:.25f}" if fib_reversal_price is not None else f"{timeframe} Incoming Fibonacci Reversal Target: price not available.")
-            dist_to_min_price = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-            dist_to_max_price = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-            print(f"Distance from Current Close to Min Price ({low_tf:.25f}): {dist_to_min_price:.25f}%")
-            print(f"Distance from Current Close to Max Price ({high_tf:.25f}): {dist_to_max_price:.25f}%")
+            dist_to_min = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
+            dist_to_max = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
+            print(f"Distance from Current Close to Min Price ({low_tf:.25f}): {dist_to_min:.25f}%")
+            print(f"Distance from Current Close to Max Price ({high_tf:.25f}): {dist_to_max:.25f}%")
             symmetrical_min_distance = (high_tf - current_price) / (high_tf - low_tf) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
             symmetrical_max_distance = (current_price - low_tf) / (high_tf - low_tf) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
             print(f"Normalized Distance to Min Price (Symmetrical): {symmetrical_max_distance:.25f}%")
@@ -1012,9 +1007,9 @@ while True:
             print("No USDC balance available for trading.")
 
     if not position_open:
-        long_true_count = sum(1 for status in long_conditions.values() if status)
+        long_true_count = sum(int(status) for status in long_conditions.values())
         long_false_count = len(long_conditions) - long_true_count
-        short_true_count = sum(1 for status in short_conditions.values() if status)
+        short_true_count = sum(int(status) for status in short_conditions.values())
         short_false_count = len(short_conditions) - short_true_count
         print(f"\nLong Conditions Summary: {long_true_count} True, {long_false_count} False")
         print(f"Short Conditions Summary: {short_true_count} True, {short_false_count} False")
