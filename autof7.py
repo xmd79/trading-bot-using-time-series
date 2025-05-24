@@ -780,8 +780,8 @@ def main():
                 "dist_to_min_closer_3m": False,
                 "dist_to_min_closer_5m": False,
                 "dist_to_min_closer_15m": False,
-                "close_below_mid_5m": False,
-                "close_below_mid_15m": False
+                "close_below_mid_3m": False,
+                "close_below_mid_5m": False
             }
             conditions_short = {
                 "forecast_price_below_close": False,
@@ -797,8 +797,8 @@ def main():
                 "dist_to_max_closer_3m": False,
                 "dist_to_max_closer_5m": False,
                 "dist_to_max_closer_15m": False,
-                "close_above_mid_5m": False,
-                "close_above_mid_15m": False
+                "close_above_mid_3m": False,
+                "close_above_mid_5m": False
             }
 
             # Backtest and forecast
@@ -870,7 +870,7 @@ def main():
                     print(f"Distance to Max Threshold ({timeframe}): {dist_to_max_price:.25f}%")
 
                     # Middle threshold conditions for 5m and 15m (mutually exclusive)
-                    if timeframe in ["5m", "15m"]:
+                    if timeframe in ["3m", "5m"]:
                         latest_candle = candle_map[timeframe][-1]
                         high_price = Decimal(str(latest_candle["high"]))
                         low_price = Decimal(str(latest_candle["low"]))
@@ -993,8 +993,8 @@ def main():
                 ("dist_to_min_closer_3m", "dist_to_max_closer_3m"),
                 ("dist_to_min_closer_5m", "dist_to_max_closer_5m"),
                 ("dist_to_min_closer_15m", "dist_to_max_closer_15m"),
-                ("close_below_mid_5m", "close_above_mid_5m"),
-                ("close_below_mid_15m", "close_above_mid_15m")
+                ("close_below_mid_3m", "close_above_mid_3m"),
+                ("close_below_mid_5m", "close_above_mid_5m")
             ]
             for long_cond, short_cond in condition_pairs:
                 long_val = conditions_long[long_cond]
