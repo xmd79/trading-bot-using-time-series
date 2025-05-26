@@ -776,10 +776,10 @@ def main():
                 "volume_bullish_3m": False,
                 "volume_bullish_5m": False,
                 "volume_bullish_15m": False,
-                "dist_to_min_1m": False,
-                "dist_to_min_3m": False,
-                "dist_to_min_5m": False,
-                "dist_to_min_15m": False,
+                "dist_to_min_closer_1m": False,
+                "dist_to_min_closer_3m": False,
+                "dist_to_min_closer_5m": False,
+                "dist_to_min_closer_15m": False,
                 "close_below_mid_1m": False,
                 "close_below_mid_3m": False,
                 "close_below_mid_5m": False,
@@ -795,10 +795,10 @@ def main():
                 "volume_bearish_3m": False,
                 "volume_bearish_5m": False,
                 "volume_bearish_15m": False,
-                "dist_to_max_1m": False,
-                "dist_to_max_3m": False,
-                "dist_to_max_5m": False,
-                "dist_to_max_15m": False,
+                "dist_to_max_closer_1m": False,
+                "dist_to_max_closer_3m": False,
+                "dist_to_max_closer_5m": False,
+                "dist_to_max_closer_15m": False,
                 "close_above_mid_1m": False,
                 "close_above_mid_3m": False,
                 "close_above_mid_5m": False,
@@ -861,33 +861,34 @@ def main():
                         conditions_short[f"volume_bearish_{timeframe}"] = True
                     print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}, Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
 
-                    # Distance conditions (new thresholds)
-                    dist_to_min_price = ((current_price - low_tf) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-                    dist_to_max_price = ((high_tf - current_price) / (high_tf - low_tf)) * Decimal('100') if (high_tf - low_tf) != Decimal('0') else Decimal('0')
-                    threshold_map = {
-                        '1m': Decimal('25'),
-                        '3m': Decimal('15'),
-                        '5m': Decimal('15'),
-                        '15m': Decimal('10')
-                    }
-                    dist_threshold = threshold_map[timeframe]
-                    conditions_long[f"dist_to_min_{timeframe}"] = dist_to_min_price < dist_threshold
-                    conditions_short[f"dist_to_max_{timeframe}"] = dist_to_max_price < dist_threshold
-                    print(f"Distance to Min ({timeframe}): {dist_to_min_price:.25f}% (Threshold: {dist_threshold:.25f}%)")
-                    print(f"Distance to Max ({timeframe}): {dist_to_max_price:.25f}% (Threshold: {dist_threshold:.25f}%)")
+                    # Distance conditions (mutually exclusive)
+                    dist_to_min_price = ((current_close - min_threshold_tf) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if (max_threshold_tf - min_threshold_tf) != Decimal('0') else Decimal('0')
+                    dist_to_max_price = ((max_threshold_tf - current_close) / (max_threshold_tf - min_threshold_tf)) * Decimal('100') if (max_threshold_tf - min_threshold_tf) != Decimal('0') else Decimal('0')
+                    if dist_to_min_price < dist_to_max_price:
+                        conditions_long[f"dist_to_min_closer_{timeframe}"] = True
+                        conditions_short[f"dist_to_max_closer_{timeframe}"] = False
+                    else:
+                        conditions_long[f"dist_to_min_closer_{timeframe}"] = False
+                        conditions_short[f"dist_to_max_closer_{timeframe}"] = True
+                    print(f"Distance to Min Threshold ({timeframe}): {dist_to_min_price:.25f}%")
+                    print(f"Distance to Max Threshold ({timeframe}): {dist_to_max_price:.25f}%")
 
                     # Middle threshold conditions for all timeframes (mutually exclusive)
+                    # Modified: Use min_threshold_tf and max_threshold_tf for mid_threshold
                     if min_threshold_tf is not None and max_threshold_tf is not None:
                         mid_threshold = (min_threshold_tf + max_threshold_tf) / Decimal('2')
                         print(f"{timeframe} - Current Price: {current_price:.25f}, Current Close: {current_close:.25f}, Min Threshold: {min_threshold_tf:.25f}, Max Threshold: {max_threshold_tf:.25f}, Middle Threshold: {mid_threshold:.25f}")
+                        # Modified: Compare current_price instead of current_close
                         if current_price > mid_threshold:
                             conditions_short[f"close_above_mid_{timeframe}"] = True
                             conditions_long[f"close_below_mid_{timeframe}"] = False
                         else:
                             conditions_short[f"close_above_mid_{timeframe}"] = False
                             conditions_long[f"close_below_mid_{timeframe}"] = True
+                        # Modified: Log condition status
                         print(f"{timeframe} - Close Above Middle Threshold: {conditions_short[f'close_above_mid_{timeframe}']}")
                         print(f"{timeframe} - Close Below Middle Threshold: {conditions_long[f'close_below_mid_{timeframe}']}")
+                        # Modified: Ensure mutual exclusivity
                         if conditions_short[f"close_above_mid_{timeframe}"] and conditions_long[f"close_below_mid_{timeframe}"]:
                             print(f"Error: Both close_above_mid_{timeframe} and close_below_mid_{timeframe} are True. Resetting to False.")
                             conditions_short[f"close_above_mid_{timeframe}"] = False
@@ -1001,10 +1002,10 @@ def main():
                 ("volume_bullish_3m", "volume_bearish_3m"),
                 ("volume_bullish_5m", "volume_bearish_5m"),
                 ("volume_bullish_15m", "volume_bearish_15m"),
-                ("dist_to_min_1m", "dist_to_max_1m"),
-                ("dist_to_min_3m", "dist_to_max_3m"),
-                ("dist_to_min_5m", "dist_to_max_5m"),
-                ("dist_to_min_15m", "dist_to_max_15m"),
+                ("dist_to_min_closer_1m", "dist_to_max_closer_1m"),
+                ("dist_to_min_closer_3m", "dist_to_max_closer_3m"),
+                ("dist_to_min_closer_5m", "dist_to_max_closer_5m"),
+                ("dist_to_min_closer_15m", "dist_to_max_closer_15m"),
                 ("close_below_mid_1m", "close_above_mid_1m"),
                 ("close_below_mid_3m", "close_above_mid_3m"),
                 ("close_below_mid_5m", "close_above_mid_5m"),
