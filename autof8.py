@@ -779,11 +779,7 @@ def main():
                 "dist_to_min_closer_1m": False,
                 "dist_to_min_closer_3m": False,
                 "dist_to_min_closer_5m": False,
-                "dist_to_min_closer_15m": False,
-                "close_below_mid_1m": False,
-                "close_below_mid_3m": False,
-                "close_below_mid_5m": False,
-                "close_below_mid_15m": False
+                "dist_to_min_closer_15m": False
             }
             conditions_short = {
                 "forecast_price_below_close": False,
@@ -798,11 +794,7 @@ def main():
                 "dist_to_max_closer_1m": False,
                 "dist_to_max_closer_3m": False,
                 "dist_to_max_closer_5m": False,
-                "dist_to_max_closer_15m": False,
-                "close_above_mid_1m": False,
-                "close_above_mid_3m": False,
-                "close_above_mid_5m": False,
-                "close_above_mid_15m": False
+                "dist_to_max_closer_15m": False
             }
 
             # Backtest and forecast
@@ -872,31 +864,6 @@ def main():
                         conditions_short[f"dist_to_max_closer_{timeframe}"] = True
                     print(f"Distance to Min Threshold ({timeframe}): {dist_to_min_price:.25f}%")
                     print(f"Distance to Max Threshold ({timeframe}): {dist_to_max_price:.25f}%")
-
-                    # Middle threshold conditions for all timeframes (mutually exclusive)
-                    # Modified: Use min_threshold_tf and max_threshold_tf for mid_threshold
-                    if min_threshold_tf is not None and max_threshold_tf is not None:
-                        mid_threshold = (min_threshold_tf + max_threshold_tf) / Decimal('2')
-                        print(f"{timeframe} - Current Price: {current_price:.25f}, Current Close: {current_close:.25f}, Min Threshold: {min_threshold_tf:.25f}, Max Threshold: {max_threshold_tf:.25f}, Middle Threshold: {mid_threshold:.25f}")
-                        # Modified: Compare current_price instead of current_close
-                        if current_price > mid_threshold:
-                            conditions_short[f"close_above_mid_{timeframe}"] = True
-                            conditions_long[f"close_below_mid_{timeframe}"] = False
-                        else:
-                            conditions_short[f"close_above_mid_{timeframe}"] = False
-                            conditions_long[f"close_below_mid_{timeframe}"] = True
-                        # Modified: Log condition status
-                        print(f"{timeframe} - Close Above Middle Threshold: {conditions_short[f'close_above_mid_{timeframe}']}")
-                        print(f"{timeframe} - Close Below Middle Threshold: {conditions_long[f'close_below_mid_{timeframe}']}")
-                        # Modified: Ensure mutual exclusivity
-                        if conditions_short[f"close_above_mid_{timeframe}"] and conditions_long[f"close_below_mid_{timeframe}"]:
-                            print(f"Error: Both close_above_mid_{timeframe} and close_below_mid_{timeframe} are True. Resetting to False.")
-                            conditions_short[f"close_above_mid_{timeframe}"] = False
-                            conditions_long[f"close_below_mid_{timeframe}"] = False
-                    else:
-                        print(f"{timeframe} - No valid thresholds for middle threshold calculation.")
-                        conditions_short[f"close_above_mid_{timeframe}"] = False
-                        conditions_long[f"close_below_mid_{timeframe}"] = False
 
                     # Sine wave distances
                     sine_dist_to_min, sine_dist_to_max, _ = scale_to_sine(closes)
@@ -1005,11 +972,7 @@ def main():
                 ("dist_to_min_closer_1m", "dist_to_max_closer_1m"),
                 ("dist_to_min_closer_3m", "dist_to_max_closer_3m"),
                 ("dist_to_min_closer_5m", "dist_to_max_closer_5m"),
-                ("dist_to_min_closer_15m", "dist_to_max_closer_15m"),
-                ("close_below_mid_1m", "close_above_mid_1m"),
-                ("close_below_mid_3m", "close_above_mid_3m"),
-                ("close_below_mid_5m", "close_above_mid_5m"),
-                ("close_below_mid_15m", "close_above_mid_15m")
+                ("dist_to_min_closer_15m", "dist_to_max_closer_15m")
             ]
             for long_cond, short_cond in condition_pairs:
                 long_val = conditions_long[long_cond]
