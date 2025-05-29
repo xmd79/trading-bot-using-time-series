@@ -104,13 +104,29 @@ def get_current_price(retries=5, delay=5):
 def get_balance(asset='USDC'):
     try:
         account = client.futures_account()
+        if 'assets' not in account:
+            print("No 'assets' key in futures account response. Full response:")
+            print(account)
+            return Decimal('0.0')
+
+        print("Futures Account Assets:")
+        for a in account['assets']:
+            print(f"Asset: {a['asset']}, Wallet Balance: {a.get('walletBalance')}")
+
         for asset_info in account['assets']:
-            if asset_info['asset'] == asset:
-                return Decimal(str(asset_info['availableBalance']))
+            if asset_info.get('asset') == asset:
+                wallet = Decimal(str(asset_info.get('walletBalance', '0.0')))
+                print(f"{asset} wallet balance (used for trading): {wallet:.25f}")
+                return wallet
+
+        print(f"{asset} not found in futures account balances.")
         return Decimal('0.0')
+
     except BinanceAPIException as e:
-        print(f"Error fetching balance for {asset}: {e.message}")
-        return Decimal('0.0')
+        print(f"Binance API exception while fetching {asset} balance: {e.message}")
+    except Exception as e:
+        print(f"Unexpected error fetching {asset} balance: {e}")
+    return Decimal('0.0')
 
 def get_position():
     try:
