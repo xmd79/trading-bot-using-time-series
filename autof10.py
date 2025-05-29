@@ -20,8 +20,8 @@ getcontext().prec = 25
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"  # Futures use USDC
 LEVERAGE = 20
-TAKE_PROFIT_ROI = Decimal('2.55')  # % TP based on initial USDC balance
-STOP_LOSS_ROI = Decimal('-2.55')   # % SL based on initial USDC balance
+TAKE_PROFIT_ROI = Decimal('5.00')  # % TP based on initial USDC balance
+STOP_LOSS_ROI = Decimal('-25.00')   # % SL based on initial USDC balance
 MIN_NOTIONAL = Decimal('10.0')  # Minimum notional value for trades
 
 # Load credentials from file
