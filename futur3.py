@@ -636,17 +636,17 @@ def main():
                 "forecast_price_above_close": False,
                 "dip_confirmed_1m": False,
                 "volume_bullish_1m": False,
-                "volume_bullish_3m": True,
-                "volume_bullish_5m": True,
+                "volume_bullish_3m": False,
+                "volume_bullish_5m": False,
                 "dist_to_min_closer_1m": False,
-                "momentum_positive_1m": True
+                "momentum_positive_1m": False
             }
             conditions_short = {
                 "forecast_price_below_close": False,
                 "top_confirmed_1m": False,
                 "volume_bearish_1m": False,
-                "volume_bearish_3m": True,
-                "volume_bearish_5m": True,
+                "volume_bearish_3m": False,
+                "volume_bearish_5m": False,
                 "dist_to_max_closer_1m": False,
                 "momentum_negative_1m": False
             }
@@ -729,12 +729,12 @@ def main():
                 if all(length in smas for length in [56, 360]):
                     sma56 = smas[56]
                     sma360 = smas[360]
-                    if current_close < sma56 and sma56 < sma360:
+                    if current_close > sma56 and sma56 > sma360:
                         sma_bullish_1m = True
-                        print("1m SMA Bullish Signal: close < SMA56 < SMA360")
-                    elif current_close > sma56 and sma56 > sma360:
+                        print("1m SMA Bullish Signal: close > SMA56 > SMA360")
+                    elif current_close < sma56 and sma56 < sma360:
                         sma_bearish_1m = True
-                        print("1m SMA Bearish Signal: close > SMA56 > SMA360")
+                        print("1m SMA Bearish Signal: close < SMA56 < SMA360")
                     else:
                         print("1m SMA: No clear bullish or bearish signal")
 
@@ -980,9 +980,6 @@ def main():
         except Exception as e:
             print(f"Unexpected error in main loop: {e}")
             time.sleep(5)
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()
