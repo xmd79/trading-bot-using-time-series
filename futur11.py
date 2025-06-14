@@ -21,8 +21,7 @@ getcontext().prec = 25
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"
 LEVERAGE = 20
-RISK_PERCENTAGE = Decimal('0.02')  # 2% risk per trade
-STOP_LOSS_PERCENTAGE = Decimal('0.02')  # 2% stop-loss
+STOP_LOSS_PERCENTAGE = Decimal('0.12')  # 12% stop-loss
 TAKE_PROFIT_PERCENTAGE = Decimal('0.04')  # 4% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
 MINIMUM_BALANCE = Decimal('10.0')  # Minimum USDC balance to place trades
@@ -114,12 +113,10 @@ def calculate_fft_forecast(closes, min_threshold, max_threshold, window=FFT_WIND
     positive_ratio = fft_result["positive_ratio"]
     negative_ratio = fft_result["negative_ratio"]
 
-    # Generate frequency array with only the dominant frequency
     freq_array = np.zeros(len(closes_np) // 2)
     freq_array[dominant_index] = dominant_power
     forecast_prices = inverse_fft(freq_array, len(closes_np))
 
-    # Use the last forecast price
     forecast_price = Decimal(str(forecast_prices[-1]))
     cycle_direction = "UP" if positive_ratio >= negative_ratio else "DOWN"
 
@@ -165,7 +162,7 @@ def get_candles(symbol, timeframe, limit=1200, retries=5, delay=5):
                 candles.append(candle)
             return candles
         except BinanceAPIException as e:
-            if e.code == -1003:  # Rate limit error
+            if e.code == -1003:
                 logging.warning(f"Rate limit exceeded for {timeframe}. Waiting 60 seconds.")
                 print(f"Rate limit exceeded for {timeframe}. Waiting 60 seconds.")
                 time.sleep(60)
@@ -198,7 +195,7 @@ def get_current_price(retries=5, delay=5):
             logging.warning(f"Invalid price {price:.25f} on attempt {attempt + 1}/{retries}")
             print(f"Invalid price {price:.25f} on attempt {attempt + 1}/{retries}")
         except BinanceAPIException as e:
-            if e.code == -1003:  # Rate limit error
+            if e.code == -1003:
                 logging.warning(f"Rate limit exceeded fetching price. Waiting 60 seconds.")
                 print(f"Rate limit exceeded fetching price. Waiting 60 seconds.")
                 time.sleep(60)
@@ -246,7 +243,7 @@ def get_position():
         if not positions:
             logging.warning(f"No position data returned for {TRADE_SYMBOL}. Assuming no open position.")
             print(f"No position data returned for {TRADE_SYMBOL}. Assuming no open position.")
-            return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0')}
+            return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0')}
         position = positions[0]
         quantity = Decimal(str(position['positionAmt']))
         entry_price = Decimal(str(position['entryPrice']))
@@ -254,12 +251,13 @@ def get_position():
             "quantity": quantity,
             "entry_price": entry_price,
             "side": "LONG" if quantity > Decimal('0') else "SHORT" if quantity < Decimal('0') else "NONE",
-            "unrealized_pnl": Decimal(str(position['unrealizedProfit']))
+            "unrealized_pnl": Decimal(str(position['unrealizedProfit'])),
+            "initial_balance": Decimal('0.0')  # Will be set when entering trade
         }
     except BinanceAPIException as e:
         logging.error(f"Error fetching position info: {e.message}")
         print(f"Error fetching position info: {e.message}")
-        return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0')}
+        return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0')}
 
 # Trading Functions
 def calculate_quantity(balance, price):
@@ -267,15 +265,18 @@ def calculate_quantity(balance, price):
         logging.warning(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}). Cannot calculate quantity.")
         print(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}). Cannot calculate quantity.")
         return Decimal('0.0')
-    quantity = (balance * RISK_PERCENTAGE * LEVERAGE) / price
+    # Use entire balance for the trade
+    quantity = (balance * LEVERAGE) / price
     return quantity.quantize(QUANTITY_PRECISION, rounding='ROUND_DOWN')
 
-def place_order(signal, quantity, current_price):
+def place_order(signal, quantity, current_price, initial_balance):
     try:
         if quantity <= Decimal('0'):
             logging.warning(f"Invalid quantity {quantity:.25f}. Skipping order.")
             print(f"Invalid quantity {quantity:.25f}. Skipping order.")
-            return
+            return None
+        position = get_position()
+        position["initial_balance"] = initial_balance
         if signal == "LONG":
             order = client.futures_create_order(
                 symbol=TRADE_SYMBOL,
@@ -283,26 +284,41 @@ def place_order(signal, quantity, current_price):
                 type="MARKET",
                 quantity=str(quantity)
             )
+            # Calculate SL and TP based on ROI relative to initial USDC balance
+            # ROI = (Current Balance - Initial Balance) / Initial Balance
+            # Current Balance = (quantity * current_price) for LONG
+            # TP: (quantity * tp_price - initial_balance) / initial_balance = 0.04
+            # SL: (quantity * sl_price - initial_balance) / initial_balance = -0.12
+            tp_roi = Decimal('1') + TAKE_PROFIT_PERCENTAGE
+            sl_roi = Decimal('1') - STOP_LOSS_PERCENTAGE
+            tp_price = (tp_roi * initial_balance / quantity).quantize(Decimal('0.01'))
+            sl_price = (sl_roi * initial_balance / quantity).quantize(Decimal('0.01'))
+            
             logging.info(f"Placed LONG order: {quantity:.25f} BTC at market price ~{current_price:.25f}")
-            print(f"Placed LONG order: {quantity:.25f} BTC at market price ~{current_price:.25f}")
-            stop_loss_price = (current_price * (Decimal('1') - STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
-            take_profit_price = (current_price * (Decimal('1') + TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
+            print(f"\n=== TRADE ENTERED ===")
+            print(f"Side: LONG")
+            print(f"Quantity: {quantity:.25f} BTC")
+            print(f"Entry Price: ~{current_price:.25f} USDC")
+            print(f"Initial USDC Balance: {initial_balance:.25f}")
+            print(f"Stop-Loss Price: {sl_price:.25f} (-12% ROI)")
+            print(f"Take-Profit Price: {tp_price:.25f} (+4% ROI)")
+            print(f"===================\n")
+            
             client.futures_create_order(
                 symbol=TRADE_SYMBOL,
                 side="SELL",
                 type="STOP_MARKET",
                 quantity=str(quantity),
-                stopPrice=str(stop_loss_price)
+                stopPrice=str(sl_price)
             )
             client.futures_create_order(
                 symbol=TRADE_SYMBOL,
                 side="SELL",
                 type="TAKE_PROFIT_MARKET",
                 quantity=str(quantity),
-                stopPrice=str(take_profit_price)
+                stopPrice=str(tp_price)
             )
-            logging.info(f"Placed SL: {stop_loss_price:.25f}, TP: {take_profit_price:.25f}")
-            print(f"Placed SL: {stop_loss_price:.25f}, TP: {take_profit_price:.25f}")
+            logging.info(f"Placed SL: {sl_price:.25f}, TP: {tp_price:.25f}")
         elif signal == "SHORT":
             order = client.futures_create_order(
                 symbol=TRADE_SYMBOL,
@@ -310,29 +326,42 @@ def place_order(signal, quantity, current_price):
                 type="MARKET",
                 quantity=str(quantity)
             )
+            # For SHORT: Current Balance = (quantity * (entry_price - current_price))
+            # TP: (quantity * (current_price - tp_price) - initial_balance) / initial_balance = 0.04
+            # SL: (quantity * (current_price - sl_price) - initial_balance) / initial_balance = -0.12
+            tp_price = (current_price - (tp_roi * initial_balance / quantity)).quantize(Decimal('0.01'))
+            sl_price = (current_price - (sl_roi * initial_balance / quantity)).quantize(Decimal('0.01'))
+            
             logging.info(f"Placed SHORT order: {quantity:.25f} BTC at market price ~{current_price:.25f}")
-            print(f"Placed SHORT order: {quantity:.25f} BTC at market price ~{current_price:.25f}")
-            stop_loss_price = (current_price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
-            take_profit_price = (current_price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
+            print(f"\n=== TRADE ENTERED ===")
+            print(f"Side: SHORT")
+            print(f"Quantity: {quantity:.25f} BTC")
+            print(f"Entry Price: ~{current_price:.25f} USDC")
+            print(f"Initial USDC Balance: {initial_balance:.25f}")
+            print(f"Stop-Loss Price: {sl_price:.25f} (-12% ROI)")
+            print(f"Take-Profit Price: {tp_price:.25f} (+4% ROI)")
+            print(f"===================\n")
+            
             client.futures_create_order(
                 symbol=TRADE_SYMBOL,
                 side="BUY",
                 type="STOP_MARKET",
                 quantity=str(quantity),
-                stopPrice=str(stop_loss_price)
+                stopPrice=str(sl_price)
             )
             client.futures_create_order(
                 symbol=TRADE_SYMBOL,
                 side="BUY",
                 type="TAKE_PROFIT_MARKET",
                 quantity=str(quantity),
-                stopPrice=str(take_profit_price)
+                stopPrice=str(tp_price)
             )
-            logging.info(f"Placed SL: {stop_loss_price:.25f}, TP: {take_profit_price:.25f}")
-            print(f"Placed SL: {stop_loss_price:.25f}, TP: {take_profit_price:.25f}")
+            logging.info(f"Placed SL: {sl_price:.25f}, TP: {tp_price:.25f}")
+        return position
     except BinanceAPIException as e:
         logging.error(f"Error placing order: {e.message}")
         print(f"Error placing order: {e.message}")
+        return None
 
 def close_position(position, current_price):
     if position["side"] == "NONE" or position["quantity"] == Decimal('0'):
@@ -420,19 +449,17 @@ def calculate_thresholds(candles):
 
     current_close = Decimal(str(closes[-1]))
 
-    # Find global min and max across OHLC
     all_prices = np.concatenate([opens, highs, lows, closes])
     min_price = Decimal(str(np.min(all_prices)))
     max_price = Decimal(str(np.max(all_prices)))
 
-    # Ensure min_threshold < current_close < max_threshold
     if min_price >= current_close:
-        min_threshold = current_close * Decimal('0.995')  # 0.5% below current close
+        min_threshold = current_close * Decimal('0.995')
     else:
         min_threshold = min_price
 
     if max_price <= current_close:
-        max_threshold = current_close * Decimal('1.005')  # 0.5% above current close
+        max_threshold = current_close * Decimal('1.005')
     else:
         max_threshold = max_price
 
@@ -470,7 +497,6 @@ def main():
             usdc_balance = get_balance('USDC')
             position = get_position()
 
-            # Initialize conditions
             conditions_long = {
                 "volume_bullish_1m": False,
                 "volume_bullish_3m": False,
@@ -496,11 +522,9 @@ def main():
                 "near_top_5m": False
             }
 
-            # Volume analysis
             buy_volume, sell_volume = calculate_buy_sell_volume(candle_map)
             volume_ratio = calculate_volume_ratio(buy_volume, sell_volume)
 
-            # Reversal and advanced analysis
             for timeframe in timeframes:
                 if not candle_map.get(timeframe):
                     logging.warning(f"No data for {timeframe}. Skipping analysis.")
@@ -510,7 +534,6 @@ def main():
                 closes = [candle["close"] for candle in candles]
                 current_close = Decimal(str(closes[-1])) if closes else Decimal('0')
 
-                # Threshold calculation
                 min_threshold, max_threshold = calculate_thresholds(candles)
 
                 if min_threshold == Decimal('0') or max_threshold == Decimal('0'):
@@ -520,12 +543,10 @@ def main():
                     conditions_short[f"near_top_{timeframe}"] = False
                     continue
 
-                # Calculate distances
                 dist_to_min = abs(current_close - min_threshold)
                 dist_to_max = abs(current_close - max_threshold)
                 reversal_range = max_threshold - min_threshold
 
-                # Calculate normalized distance percentages
                 if reversal_range > Decimal('0'):
                     percent_to_min = (dist_to_min / reversal_range) * Decimal('100')
                     percent_to_max = (dist_to_max / reversal_range) * Decimal('100')
@@ -541,7 +562,6 @@ def main():
                     percent_to_max = Decimal('50')
                     logging.warning(f"No valid reversal range for {timeframe}. Setting percentages to 50%.")
 
-                # Determine proximity
                 if dist_to_min <= dist_to_max:
                     conditions_long[f"near_dip_{timeframe}"] = True
                     conditions_short[f"near_top_{timeframe}"] = False
@@ -556,7 +576,6 @@ def main():
                 logging.info(f"{timeframe} - Near Dip: {conditions_long[f'near_dip_{timeframe}']}, Near Top: {conditions_short[f'near_top_{timeframe}']}")
                 print(f"{timeframe} - Near Dip: {conditions_long[f'near_dip_{timeframe}']}, Near Top: {conditions_short[f'near_top_{timeframe}']}")
 
-                # Volume conditions
                 buy_vol = buy_volume.get(timeframe, [Decimal('0')])[-1]
                 sell_vol = sell_volume.get(timeframe, [Decimal('0')])[-1]
                 price_trend = Decimal(str(closes[-1])) - Decimal(str(closes[-2])) if len(closes) >= 2 else Decimal('0')
@@ -569,7 +588,6 @@ def main():
                 logging.info(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}, Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
                 print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}, Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
 
-                # Forecast price analysis
                 valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
                 if len(valid_closes) >= 10:
                     forecast_price = calculate_fft_forecast(closes, min_threshold, max_threshold)
@@ -585,7 +603,6 @@ def main():
                     conditions_long[f"forecast_above_close_{timeframe}"] = True
                     conditions_short[f"forecast_below_close_{timeframe}"] = False
 
-                # 1m-specific momentum analysis
                 if timeframe == "1m":
                     print("\n--- 1m Timeframe Analysis (Momentum) ---")
                     if len(valid_closes) >= 14:
@@ -606,7 +623,6 @@ def main():
                         conditions_long["momentum_positive_1m"] = True
                         conditions_short["momentum_negative_1m"] = False
 
-            # Log condition pairs
             condition_pairs = [
                 ("volume_bullish_1m", "volume_bearish_1m"),
                 ("volume_bullish_3m", "volume_bearish_3m"),
@@ -625,11 +641,9 @@ def main():
                 logging.info(f"{long_cond}: {conditions_long[long_cond]}, {short_cond}: {conditions_short[short_cond]}")
                 print(f"{long_cond}: {conditions_long[long_cond]}, {short_cond}: {conditions_short[short_cond]}")
 
-            # Evaluate signals
             long_signal = all(conditions_long.values()) and not any(conditions_short.values())
             short_signal = all(conditions_short.values()) and not any(conditions_long.values())
 
-            # Print condition states
             logging.info("Trade Signal Status:")
             print("\nTrade Signal Status:")
             logging.info(f"LONG Signal: {'Active' if long_signal else 'Inactive'}")
@@ -647,7 +661,6 @@ def main():
                 logging.info(f"{condition}: {'True' if status else 'False'}")
                 print(f"{condition}: {'True' if status else 'False'}")
 
-            # Condition summary
             long_true = sum(1 for val in conditions_long.values() if val)
             long_false = len(conditions_long) - long_true
             short_true = sum(1 for val in conditions_short.values() if val)
@@ -657,7 +670,6 @@ def main():
             logging.info(f"Short Conditions Summary: {short_true} True, {short_false} False")
             print(f"Short Conditions Summary: {short_true} True, {short_false} False")
 
-            # Determine final signal
             signal = "NO_SIGNAL"
             if long_signal:
                 signal = "LONG"
@@ -670,19 +682,17 @@ def main():
             logging.info(f"Final Signal: {signal}")
             print(f"Final Signal: {signal}")
 
-            # Execute trades
             if usdc_balance < MINIMUM_BALANCE:
                 logging.warning(f"Insufficient USDC balance ({usdc_balance:.25f}) to place trades. Minimum required: {MINIMUM_BALANCE:.25f}")
                 print(f"Insufficient USDC balance ({usdc_balance:.25f}) to place trades. Minimum required: {MINIMUM_BALANCE:.25f}")
             elif signal in ["LONG", "SHORT"] and position["side"] == "NONE":
                 quantity = calculate_quantity(usdc_balance, current_price)
-                place_order(signal, quantity, current_price)
+                position = place_order(signal, quantity, current_price, usdc_balance)
             elif (signal == "LONG" and position["side"] == "SHORT") or (signal == "SHORT" and position["side"] == "LONG"):
                 close_position(position, current_price)
                 quantity = calculate_quantity(usdc_balance, current_price)
-                place_order(signal, quantity, current_price)
+                position = place_order(signal, quantity, current_price, usdc_balance)
 
-            # Position status
             if position["side"] != "NONE":
                 print("\nCurrent Position Status:")
                 print(f"Position Side: {position['side']}")
@@ -691,6 +701,9 @@ def main():
                 print(f"Current Price: {current_price:.25f} USDC")
                 print(f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC")
                 current_balance = usdc_balance + position['unrealized_pnl']
+                roi = ((current_balance - position['initial_balance']) / position['initial_balance'] * Decimal('100')).quantize(Decimal('0.01')) if position['initial_balance'] > Decimal('0') else Decimal('0')
+                print(f"Current ROI: {roi:.2f}%")
+                print(f"Initial USDC Balance: {position['initial_balance']:.25f}")
                 print(f"Current Total Balance: {current_balance:.25f} USDC")
             else:
                 print(f"\nNo open position. USDC Balance: {usdc_balance:.25f}")
@@ -699,7 +712,6 @@ def main():
             print(f"Current Position: {position['side']}, Quantity: {position['quantity']:.25f} BTC")
             print(f"Current Price: {current_price:.25f}\n")
 
-            # Cleanup
             del candle_map
             gc.collect()
             time.sleep(5)
