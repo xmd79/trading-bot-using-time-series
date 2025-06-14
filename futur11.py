@@ -9,7 +9,6 @@ import gc
 from decimal import Decimal, getcontext
 import requests
 import logging
-from numpy.fft import fft, ifft
 
 # Configure logging
 logging.basicConfig(filename='trading_bot.log', level=logging.INFO, 
@@ -26,7 +25,6 @@ TAKE_PROFIT_PERCENTAGE = Decimal('0.04')  # 4% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
 MINIMUM_BALANCE = Decimal('10.0')  # Minimum USDC balance to place trades
 TIMEFRAMES = ["1m", "3m", "5m"]
-FFT_WINDOW_SIZE = 360  # Window for FFT forecast
 
 # Load credentials
 try:
@@ -56,84 +54,70 @@ except BinanceAPIException as e:
     logging.error(f"Error setting leverage: {e.message}")
     print(f"Error setting leverage: {e.message}")
 
-# FFT Forecast Functions
-def forecast_fft(close_prices):
-    """Perform FFT and return dominant frequencies along with their respective ratios."""
-    n = len(close_prices)
-    freq_components = fft(close_prices)
-    pos_freq = np.abs(freq_components[:n // 2])
+# Reversal Detection Function (Updated to use 1200 candles)
+def detect_recent_reversal(candles, min_threshold, max_threshold, timeframe):
+    """
+    Detect the most recent major reversal (dip or top) within min/max thresholds using up to 1200 candles.
+    Returns 'DIP' if the most recent reversal is a dip, 'TOP' if it's a top, or 'NONE' if no clear reversal.
+    """
+    if len(candles) < 3:
+        logging.warning(f"Insufficient candles ({len(candles)}) for reversal detection in {timeframe}.")
+        print(f"Insufficient candles ({len(candles)}) for reversal detection in {timeframe}.")
+        return "NONE"
 
-    total_power = np.sum(pos_freq)
-    dominant_freq_index = np.argmax(pos_freq)
+    # Use up to the last 1200 candles, but respect available length
+    lookback = min(1200, len(candles))
+    recent_candles = candles[-lookback:]
 
-    positive_ratio = pos_freq[dominant_freq_index] / total_power * 100 if total_power > 0 else 0
-    negative_ratio = (total_power - pos_freq[dominant_freq_index]) / total_power * 100 if total_power > 0 else 0
-
-    return {
-        "dominant_index": dominant_freq_index,
-        "positive_ratio": positive_ratio,
-        "negative_ratio": negative_ratio
-    }, pos_freq[dominant_freq_index]
-
-def inverse_fft(frequencies, n):
-    """Convert frequencies back into price using IFFT."""
-    full_freq = np.zeros(n, dtype=complex)
-    half_n = n // 2
-    if isinstance(frequencies, int):
-        frequencies = np.array([frequencies] * half_n)
-    elif len(frequencies) < half_n:
-        pad_length = half_n - len(frequencies)
-        frequencies = np.pad(frequencies, (0, pad_length), 'constant')
-    elif len(frequencies) > half_n:
-        frequencies = frequencies[:half_n]
+    # Create arrays, filtering out invalid data
+    closes = np.array([float(c['close']) for c in recent_candles if not np.isnan(c['close']) and c['close'] > 0], dtype=np.float64)
+    lows = np.array([float(c['low']) for c in recent_candles if not np.isnan(c['low']) and c['low'] > 0], dtype=np.float64)
+    highs = np.array([float(c['high']) for c in recent_candles if not np.isnan(c['high']) and c['high'] > 0], dtype=np.float64)
     
-    full_freq[:half_n] = frequencies
-    full_freq[-half_n:] = np.conj(frequencies[::-1]) if n % 2 == 0 else np.conj(frequencies[-half_n-1::-1])
-    price_forecast = ifft(full_freq).real
-    return price_forecast
+    # Validate array lengths
+    if len(closes) < 3 or len(lows) < 3 or len(highs) < 3:
+        logging.warning(f"Insufficient valid data (closes: {len(closes)}, lows: {len(lows)}, highs: {len(highs)}) for reversal detection in {timeframe}.")
+        print(f"Insufficient valid data (closes: {len(closes)}, lows: {len(lows)}, highs: {len(highs)}) for reversal detection in {timeframe}.")
+        return "NONE"
 
-def calculate_fft_forecast(closes, min_threshold, max_threshold, window=FFT_WINDOW_SIZE):
-    """Calculate FFT-based forecast price."""
-    closes_np = np.array([float(x) for x in closes[-window:] if not np.isnan(x) and x > 0], dtype=np.float64)
-    if len(closes_np) < 10:
-        logging.warning("Insufficient data for FFT forecast.")
-        print("Insufficient data for FFT forecast.")
-        return Decimal('0')
+    if len(lows) != len(highs) or len(lows) != len(recent_candles):
+        logging.error(f"Array length mismatch in {timeframe}: candles={len(recent_candles)}, lows={len(lows)}, highs={len(highs)}")
+        print(f"Array length mismatch in {timeframe}: candles={len(recent_candles)}, lows={len(lows)}, highs={len(highs)}")
+        return "NONE"
 
-    current_price = Decimal(str(closes_np[-1]))
-    min_threshold = Decimal(str(min_threshold))
-    max_threshold = Decimal(str(max_threshold))
-    threshold_proximity = Decimal('0.005') * (max_threshold - min_threshold)
-
-    is_dip = abs(current_price - min_threshold) <= threshold_proximity and current_price <= min_threshold
-    is_top = abs(current_price - max_threshold) <= threshold_proximity and current_price >= max_threshold
-
-    fft_result, dominant_power = forecast_fft(closes_np)
-    dominant_index = fft_result["dominant_index"]
-    positive_ratio = fft_result["positive_ratio"]
-    negative_ratio = fft_result["negative_ratio"]
-
-    freq_array = np.zeros(len(closes_np) // 2)
-    freq_array[dominant_index] = dominant_power
-    forecast_prices = inverse_fft(freq_array, len(closes_np))
-
-    forecast_price = Decimal(str(forecast_prices[-1]))
-    cycle_direction = "UP" if positive_ratio > negative_ratio else "DOWN"
-
-    if is_dip:
-        forecast_price = max_threshold - Decimal('0.0005') * (max_threshold - min_threshold)
-    elif is_top:
-        forecast_price = min_threshold + Decimal('0.0005') * (max_threshold - min_threshold)
+    min_threshold = float(min_threshold)
+    max_threshold = float(max_threshold)
+    
+    # Calculate proximity threshold (0.5% of range)
+    dip_proximity = 0.005 * (max_threshold - min_threshold)
+    top_proximity = dip_proximity
+    
+    # Identify dips and tops
+    dips = []
+    tops = []
+    for i in range(1, len(lows) - 1):
+        if lows[i] <= min_threshold + dip_proximity and lows[i] < lows[i-1] and lows[i] < lows[i+1]:
+            dips.append((i, lows[i], recent_candles[i]['time']))
+        if highs[i] >= max_threshold - top_proximity and highs[i] > highs[i-1] and highs[i] > highs[i+1]:
+            tops.append((i, highs[i], recent_candles[i]['time']))
+    
+    # Find the most recent reversal
+    latest_dip = max(dips, key=lambda x: x[2], default=(None, None, 0))
+    latest_top = max(tops, key=lambda x: x[2], default=(None, None, 0))
+    
+    if latest_dip[2] == 0 and latest_top[2] == 0:
+        logging.info(f"{timeframe} - No recent dip or top detected within thresholds over {len(recent_candles)} candles.")
+        print(f"{timeframe} - No recent dip or top detected within thresholds over {len(recent_candles)} candles.")
+        return "NONE"
+    
+    if latest_dip[2] > latest_top[2]:
+        logging.info(f"{timeframe} - Most recent reversal: DIP at price {latest_dip[1]:.2f}, time {datetime.datetime.fromtimestamp(latest_dip[2])}")
+        print(f"{timeframe} - Most recent reversal: DIP at price {latest_dip[1]:.2f}, time {datetime.datetime.fromtimestamp(latest_dip[2])}")
+        return "DIP"
     else:
-        if cycle_direction == "UP":
-            forecast_price = min(max_threshold, forecast_price)
-        else:
-            forecast_price = max(min_threshold, forecast_price)
-
-    logging.info(f"FFT Forecast: Price: {forecast_price:.25f}, Min Threshold: {min_threshold:.25f}, Max Threshold: {max_threshold:.25f}, Positive Ratio: {positive_ratio:.2f}%, Negative Ratio: {negative_ratio:.2f}%")
-    print(f"FFT Forecast: Price: {forecast_price:.25f}, Min Threshold: {min_threshold:.25f}, Max Threshold: {max_threshold:.25f}, Positive Ratio: {positive_ratio:.2f}%, Negative Ratio: {negative_ratio:.2f}%")
-
-    return forecast_price
+        logging.info(f"{timeframe} - Most recent reversal: TOP at price {latest_top[1]:.2f}, time {datetime.datetime.fromtimestamp(latest_top[2])}")
+        print(f"{timeframe} - Most recent reversal: TOP at price {latest_top[1]:.2f}, time {datetime.datetime.fromtimestamp(latest_top[2])}")
+        return "TOP"
 
 # Utility Functions
 def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=1200):
@@ -252,7 +236,7 @@ def get_position():
             "entry_price": entry_price,
             "side": "LONG" if quantity > Decimal('0') else "SHORT" if quantity < Decimal('0') else "NONE",
             "unrealized_pnl": Decimal(str(position['unrealizedProfit'])),
-            "initial_balance": Decimal('0.0')  # Will be set when entering trade
+            "initial_balance": Decimal('0.0')
         }
     except BinanceAPIException as e:
         logging.error(f"Error fetching position info: {e.message}")
@@ -265,7 +249,6 @@ def calculate_quantity(balance, price):
         logging.warning(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}). Cannot calculate quantity.")
         print(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}). Cannot calculate quantity.")
         return Decimal('0.0')
-    # Use entire balance for the trade
     quantity = (balance * LEVERAGE) / price
     return quantity.quantize(QUANTITY_PRECISION, rounding='ROUND_DOWN')
 
@@ -284,11 +267,6 @@ def place_order(signal, quantity, current_price, initial_balance):
                 type="MARKET",
                 quantity=str(quantity)
             )
-            # Calculate SL and TP based on ROI relative to initial USDC balance
-            # ROI = (Current Balance - Initial Balance) / Initial Balance
-            # Current Balance = (quantity * current_price) for LONG
-            # TP: (quantity * tp_price - initial_balance) / initial_balance = 0.04
-            # SL: (quantity * sl_price - initial_balance) / initial_balance = -0.12
             tp_roi = Decimal('1') + TAKE_PROFIT_PERCENTAGE
             sl_roi = Decimal('1') - STOP_LOSS_PERCENTAGE
             tp_price = (tp_roi * initial_balance / quantity).quantize(Decimal('0.01'))
@@ -326,9 +304,6 @@ def place_order(signal, quantity, current_price, initial_balance):
                 type="MARKET",
                 quantity=str(quantity)
             )
-            # For SHORT: Current Balance = (quantity * (entry_price - current_price))
-            # TP: (quantity * (current_price - tp_price) - initial_balance) / initial_balance = 0.04
-            # SL: (quantity * (current_price - sl_price) - initial_balance) / initial_balance = -0.12
             tp_price = (current_price - (tp_roi * initial_balance / quantity)).quantize(Decimal('0.01'))
             sl_price = (current_price - (sl_roi * initial_balance / quantity)).quantize(Decimal('0.01'))
             
@@ -502,9 +477,9 @@ def main():
                 "volume_bullish_3m": False,
                 "volume_bullish_5m": False,
                 "momentum_positive_1m": False,
-                "forecast_above_close_1m": False,
-                "forecast_above_close_3m": False,
-                "forecast_above_close_5m": False,
+                "dip_confirmation_1m": False,
+                "dip_confirmation_3m": False,
+                "dip_confirmation_5m": False,
                 "near_dip_1m": False,
                 "near_dip_3m": False,
                 "near_dip_5m": False
@@ -514,9 +489,9 @@ def main():
                 "volume_bearish_3m": False,
                 "volume_bearish_5m": False,
                 "momentum_negative_1m": False,
-                "forecast_below_close_1m": False,
-                "forecast_below_close_3m": False,
-                "forecast_below_close_5m": False,
+                "top_confirmation_1m": False,
+                "top_confirmation_3m": False,
+                "top_confirmation_5m": False,
                 "near_top_1m": False,
                 "near_top_3m": False,
                 "near_top_5m": False
@@ -537,10 +512,12 @@ def main():
                 min_threshold, max_threshold = calculate_thresholds(candles)
 
                 if min_threshold == Decimal('0') or max_threshold == Decimal('0'):
-                    logging.warning(f"No valid thresholds for {timeframe}. Skipping proximity analysis.")
-                    print(f"No valid thresholds for {timeframe}. Skipping proximity analysis.")
+                    logging.warning(f"No valid thresholds for {timeframe}. Skipping proximity and reversal analysis.")
+                    print(f"No valid thresholds for {timeframe}. Skipping proximity and reversal analysis.")
                     conditions_long[f"near_dip_{timeframe}"] = True
                     conditions_short[f"near_top_{timeframe}"] = False
+                    conditions_long[f"dip_confirmation_{timeframe}"] = True
+                    conditions_short[f"top_confirmation_{timeframe}"] = False
                     continue
 
                 dist_to_min = abs(current_close - min_threshold)
@@ -588,23 +565,23 @@ def main():
                 logging.info(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}, Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
                 print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}, Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
 
-                valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
-                if len(valid_closes) >= 10:
-                    forecast_price = calculate_fft_forecast(closes, min_threshold, max_threshold)
-                    logging.info(f"FFT Forecast Price ({timeframe}): {forecast_price:.25f}")
-                    print(f"FFT Forecast Price ({timeframe}): {forecast_price:.25f}")
-                    if forecast_price >= current_close:
-                        conditions_long[f"forecast_above_close_{timeframe}"] = True
-                        conditions_short[f"forecast_below_close_{timeframe}"] = False
-                    else:
-                        conditions_long[f"forecast_above_close_{timeframe}"] = False
-                        conditions_short[f"forecast_below_close_{timeframe}"] = True
+                # Reversal detection over 1200 candles
+                reversal_type = detect_recent_reversal(candles, min_threshold, max_threshold, timeframe)
+                if reversal_type == "DIP":
+                    conditions_long[f"dip_confirmation_{timeframe}"] = True
+                    conditions_short[f"top_confirmation_{timeframe}"] = False
+                elif reversal_type == "TOP":
+                    conditions_long[f"dip_confirmation_{timeframe}"] = False
+                    conditions_short[f"top_confirmation_{timeframe}"] = True
                 else:
-                    conditions_long[f"forecast_above_close_{timeframe}"] = True
-                    conditions_short[f"forecast_below_close_{timeframe}"] = False
+                    conditions_long[f"dip_confirmation_{timeframe}"] = True  # Default to allow LONG if no clear reversal
+                    conditions_short[f"top_confirmation_{timeframe}"] = False
+                logging.info(f"{timeframe} - Dip Confirmation: {conditions_long[f'dip_confirmation_{timeframe}']}, Top Confirmation: {conditions_short[f'top_confirmation_{timeframe}']}")
+                print(f"{timeframe} - Dip Confirmation: {conditions_long[f'dip_confirmation_{timeframe}']}, Top Confirmation: {conditions_short[f'top_confirmation_{timeframe}']}")
 
                 if timeframe == "1m":
                     print("\n--- 1m Timeframe Analysis (Momentum) ---")
+                    valid_closes = np.array([float(c) for c in closes if not np.isnan(c) and c > 0], dtype=np.float64)
                     if len(valid_closes) >= 14:
                         momentum = talib.MOM(valid_closes, timeperiod=14)
                         if len(momentum) > 0 and not np.isnan(momentum[-1]):
@@ -628,9 +605,9 @@ def main():
                 ("volume_bullish_3m", "volume_bearish_3m"),
                 ("volume_bullish_5m", "volume_bearish_5m"),
                 ("momentum_positive_1m", "momentum_negative_1m"),
-                ("forecast_above_close_1m", "forecast_below_close_1m"),
-                ("forecast_above_close_3m", "forecast_below_close_3m"),
-                ("forecast_above_close_5m", "forecast_below_close_5m"),
+                ("dip_confirmation_1m", "top_confirmation_1m"),
+                ("dip_confirmation_3m", "top_confirmation_3m"),
+                ("dip_confirmation_5m", "top_confirmation_5m"),
                 ("near_dip_1m", "near_top_1m"),
                 ("near_dip_3m", "near_top_3m"),
                 ("near_dip_5m", "near_top_5m")
