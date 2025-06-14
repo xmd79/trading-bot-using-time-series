@@ -25,6 +25,7 @@ TAKE_PROFIT_PERCENTAGE = Decimal('0.04')  # 4% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
 MINIMUM_BALANCE = Decimal('10.0')  # Minimum USDC balance to place trades
 TIMEFRAMES = ["1m", "3m", "5m"]
+LOOKBACK_PERIODS = {"1m": 360, "3m": 480, "5m": 576}  # Approx 6 hours per timeframe
 
 # Load credentials
 try:
@@ -54,10 +55,11 @@ except BinanceAPIException as e:
     logging.error(f"Error setting leverage: {e.message}")
     print(f"Error setting leverage: {e.message}")
 
-# Reversal Detection Function (Updated to use 1200 candles)
-def detect_recent_reversal(candles, min_threshold, max_threshold, timeframe):
+# Reversal Detection Function
+def detect_recent_reversal(candles, timeframe):
     """
-    Detect the most recent major reversal (dip or top) within min/max thresholds using up to 1200 candles.
+    Detect the most recent major reversal (dip or top) using np.argmin and np.argmax on closing prices.
+    Uses the default HiLo range between lowest low and highest high to determine proximity.
     Returns 'DIP' if the most recent reversal is a dip, 'TOP' if it's a top, or 'NONE' if no clear reversal.
     """
     if len(candles) < 3:
@@ -65,59 +67,92 @@ def detect_recent_reversal(candles, min_threshold, max_threshold, timeframe):
         print(f"Insufficient candles ({len(candles)}) for reversal detection in {timeframe}.")
         return "NONE"
 
-    # Use up to the last 1200 candles, but respect available length
-    lookback = min(1200, len(candles))
+    # Use dynamic lookback based on timeframe, capped at 1200 candles
+    lookback = min(LOOKBACK_PERIODS[timeframe], len(candles), 1200)
     recent_candles = candles[-lookback:]
 
     # Create arrays, filtering out invalid data
     closes = np.array([float(c['close']) for c in recent_candles if not np.isnan(c['close']) and c['close'] > 0], dtype=np.float64)
-    lows = np.array([float(c['low']) for c in recent_candles if not np.isnan(c['low']) and c['low'] > 0], dtype=np.float64)
     highs = np.array([float(c['high']) for c in recent_candles if not np.isnan(c['high']) and c['high'] > 0], dtype=np.float64)
+    lows = np.array([float(c['low']) for c in recent_candles if not np.isnan(c['low']) and c['low'] > 0], dtype=np.float64)
+    times = np.array([c['time'] for c in recent_candles if not np.isnan(c['close']) and c['close'] > 0], dtype=np.float64)
     
     # Validate array lengths
-    if len(closes) < 3 or len(lows) < 3 or len(highs) < 3:
-        logging.warning(f"Insufficient valid data (closes: {len(closes)}, lows: {len(lows)}, highs: {len(highs)}) for reversal detection in {timeframe}.")
-        print(f"Insufficient valid data (closes: {len(closes)}, lows: {len(lows)}, highs: {len(highs)}) for reversal detection in {timeframe}.")
+    if len(closes) < 3 or len(times) < 3 or len(highs) < 3 or len(lows) < 3:
+        logging.warning(f"Insufficient valid data (closes: {len(closes)}, times: {len(times)}, highs: {len(highs)}, lows: {len(lows)}) for reversal detection in {timeframe}.")
+        print(f"Insufficient valid data (closes: {len(closes)}, times: {len(times)}, highs: {len(highs)}, lows: {len(lows)}) for reversal detection in {timeframe}.")
         return "NONE"
 
-    if len(lows) != len(highs) or len(lows) != len(recent_candles):
-        logging.error(f"Array length mismatch in {timeframe}: candles={len(recent_candles)}, lows={len(lows)}, highs={len(highs)}")
-        print(f"Array length mismatch in {timeframe}: candles={len(recent_candles)}, lows={len(lows)}, highs={len(highs)}")
+    if len(closes) != len(times):
+        logging.error(f"Array length mismatch in {timeframe}: closes={len(closes)}, times={len(times)}")
+        print(f"Array length mismatch in {timeframe}: closes={len(closes)}, times={len(times)}")
         return "NONE"
 
-    min_threshold = float(min_threshold)
-    max_threshold = float(max_threshold)
+    # Find the index of the lowest and highest closing prices
+    dip_index = np.argmin(closes)
+    top_index = np.argmax(closes)
     
-    # Calculate proximity threshold (0.5% of range)
-    dip_proximity = 0.005 * (max_threshold - min_threshold)
-    top_proximity = dip_proximity
+    dip_price = Decimal(str(closes[dip_index]))
+    top_price = Decimal(str(closes[top_index]))
+    dip_time = times[dip_index]
+    top_time = times[top_index]
     
-    # Identify dips and tops
-    dips = []
-    tops = []
-    for i in range(1, len(lows) - 1):
-        if lows[i] <= min_threshold + dip_proximity and lows[i] < lows[i-1] and lows[i] < lows[i+1]:
-            dips.append((i, lows[i], recent_candles[i]['time']))
-        if highs[i] >= max_threshold - top_proximity and highs[i] > highs[i-1] and highs[i] > highs[i+1]:
-            tops.append((i, highs[i], recent_candles[i]['time']))
+    # Use lowest low and highest high for HiLo range
+    lowest_low = Decimal(str(np.min(lows)))
+    highest_high = Decimal(str(np.max(highs)))
+    hilo_range = highest_high - lowest_low
     
-    # Find the most recent reversal
-    latest_dip = max(dips, key=lambda x: x[2], default=(None, None, 0))
-    latest_top = max(tops, key=lambda x: x[2], default=(None, None, 0))
+    # Current close
+    current_close = Decimal(str(closes[-1]))
     
-    if latest_dip[2] == 0 and latest_top[2] == 0:
-        logging.info(f"{timeframe} - No recent dip or top detected within thresholds over {len(recent_candles)} candles.")
-        print(f"{timeframe} - No recent dip or top detected within thresholds over {len(recent_candles)} candles.")
-        return "NONE"
-    
-    if latest_dip[2] > latest_top[2]:
-        logging.info(f"{timeframe} - Most recent reversal: DIP at price {latest_dip[1]:.2f}, time {datetime.datetime.fromtimestamp(latest_dip[2])}")
-        print(f"{timeframe} - Most recent reversal: DIP at price {latest_dip[1]:.2f}, time {datetime.datetime.fromtimestamp(latest_dip[2])}")
-        return "DIP"
+    # Calculate distances to dip and top relative to HiLo range
+    if hilo_range > Decimal('0'):
+        dist_to_dip = abs(current_close - dip_price) / hilo_range
+        dist_to_top = abs(current_close - top_price) / hilo_range
     else:
-        logging.info(f"{timeframe} - Most recent reversal: TOP at price {latest_top[1]:.2f}, time {datetime.datetime.fromtimestamp(latest_top[2])}")
-        print(f"{timeframe} - Most recent reversal: TOP at price {latest_top[1]:.2f}, time {datetime.datetime.fromtimestamp(latest_top[2])}")
+        dist_to_dip = Decimal('0.5')
+        dist_to_top = Decimal('0.5')
+        logging.warning(f"{timeframe} - Zero HiLo range detected. Setting default distances.")
+
+    # Determine proximity: closer to dip or top based on relative distance
+    dip_proximity = dist_to_dip <= dist_to_top
+    top_proximity = dist_to_top < dist_to_dip
+    
+    # Log threshold and proximity information
+    logging.info(f"{timeframe} - Dip Price: {dip_price:.2f} at {datetime.datetime.fromtimestamp(dip_time)}, Top Price: {top_price:.2f} at {datetime.datetime.fromtimestamp(top_time)}")
+    print(f"{timeframe} - Dip Price: {dip_price:.2f} at {datetime.datetime.fromtimestamp(dip_time)}, Top Price: {top_price:.2f} at {datetime.datetime.fromtimestamp(top_time)}")
+    logging.info(f"{timeframe} - HiLo Range: {hilo_range:.2f} (Low: {lowest_low:.2f}, High: {highest_high:.2f})")
+    print(f"{timeframe} - HiLo Range: {hilo_range:.2f} (Low: {lowest_low:.2f}, High: {highest_high:.2f})")
+    logging.info(f"{timeframe} - Current Close: {current_close:.2f}, Dist to Dip: {dist_to_dip:.4f}, Dist to Top: {dist_to_top:.4f}, Near Dip: {dip_proximity}, Near Top: {top_proximity}")
+    print(f"{timeframe} - Current Close: {current_close:.2f}, Dist to Dip: {dist_to_dip:.4f}, Dist to Top: {dist_to_top:.4f}, Near Dip: {dip_proximity}, Near Top: {top_proximity}")
+
+    # Sort reversals by recency
+    reversals = [
+        {"type": "DIP", "price": dip_price, "time": dip_time},
+        {"type": "TOP", "price": top_price, "time": top_time}
+    ]
+    reversals.sort(key=lambda x: x["time"], reverse=True)  # Most recent first
+    
+    # Determine the most recent reversal
+    most_recent = reversals[0]
+    if most_recent["time"] == 0:
+        logging.info(f"{timeframe} - No valid reversal detected over {len(recent_candles)} candles.")
+        print(f"{timeframe} - No valid reversal detected over {len(recent_candles)} candles.")
+        return "NONE"
+    
+    reversal_type = most_recent["type"]
+    logging.info(f"{timeframe} - Most recent reversal: {reversal_type} at price {most_recent['price']:.2f}, time {datetime.datetime.fromtimestamp(most_recent['time'])}")
+    print(f"{timeframe} - Most recent reversal: {reversal_type} at price {most_recent['price']:.2f}, time {datetime.datetime.fromtimestamp(most_recent['time'])}")
+    
+    # Confirm reversal only if current price is near the reversal point based on HiLo range
+    if reversal_type == "DIP" and dip_proximity:
+        return "DIP"
+    elif reversal_type == "TOP" and top_proximity:
         return "TOP"
+    else:
+        logging.info(f"{timeframe} - Current price not near {reversal_type} ({current_close:.2f} vs {most_recent['price']:.2f}). No reversal confirmed.")
+        print(f"{timeframe} - Current price not near {reversal_type} ({current_close:.2f} vs {most_recent['price']:.2f}). No reversal confirmed.")
+        return "NONE"
 
 # Utility Functions
 def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=1200):
@@ -146,10 +181,11 @@ def get_candles(symbol, timeframe, limit=1200, retries=5, delay=5):
                 candles.append(candle)
             return candles
         except BinanceAPIException as e:
+            retry_after = e.response.headers.get('Retry-After', 60) if e.response else 60
             if e.code == -1003:
-                logging.warning(f"Rate limit exceeded for {timeframe}. Waiting 60 seconds.")
-                print(f"Rate limit exceeded for {timeframe}. Waiting 60 seconds.")
-                time.sleep(60)
+                logging.warning(f"Rate limit exceeded for {timeframe}. Waiting {retry_after} seconds.")
+                print(f"Rate limit exceeded for {timeframe}. Waiting {retry_after} seconds.")
+                time.sleep(int(retry_after))
             else:
                 logging.error(f"Binance API Error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e.message}")
                 print(f"Binance API Error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e.message}")
@@ -179,10 +215,11 @@ def get_current_price(retries=5, delay=5):
             logging.warning(f"Invalid price {price:.25f} on attempt {attempt + 1}/{retries}")
             print(f"Invalid price {price:.25f} on attempt {attempt + 1}/{retries}")
         except BinanceAPIException as e:
+            retry_after = e.response.headers.get('Retry-After', 60) if e.response else 60
             if e.code == -1003:
-                logging.warning(f"Rate limit exceeded fetching price. Waiting 60 seconds.")
-                print(f"Rate limit exceeded fetching price. Waiting 60 seconds.")
-                time.sleep(60)
+                logging.warning(f"Rate limit exceeded fetching price. Waiting {retry_after} seconds.")
+                print(f"Rate limit exceeded fetching price. Waiting {retry_after} seconds.")
+                time.sleep(int(retry_after))
             else:
                 logging.error(f"Error fetching {TRADE_SYMBOL} price (attempt {attempt + 1}/{retries}): {e.message}")
                 print(f"Error fetching {TRADE_SYMBOL} price (attempt {attempt + 1}/{retries}): {e.message}")
@@ -227,7 +264,7 @@ def get_position():
         if not positions:
             logging.warning(f"No position data returned for {TRADE_SYMBOL}. Assuming no open position.")
             print(f"No position data returned for {TRADE_SYMBOL}. Assuming no open position.")
-            return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0')}
+            return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0'), "sl_price": Decimal('0.0'), "tp_price": Decimal('0.0')}
         position = positions[0]
         quantity = Decimal(str(position['positionAmt']))
         entry_price = Decimal(str(position['entryPrice']))
@@ -236,12 +273,26 @@ def get_position():
             "entry_price": entry_price,
             "side": "LONG" if quantity > Decimal('0') else "SHORT" if quantity < Decimal('0') else "NONE",
             "unrealized_pnl": Decimal(str(position['unrealizedProfit'])),
-            "initial_balance": Decimal('0.0')
+            "initial_balance": Decimal('0.0'),
+            "sl_price": Decimal('0.0'),
+            "tp_price": Decimal('0.0')
         }
     except BinanceAPIException as e:
         logging.error(f"Error fetching position info: {e.message}")
         print(f"Error fetching position info: {e.message}")
-        return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0')}
+        return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0'), "sl_price": Decimal('0.0'), "tp_price": Decimal('0.0')}
+
+def check_open_orders():
+    try:
+        orders = client.futures_get_open_orders(symbol=TRADE_SYMBOL)
+        for order in orders:
+            logging.info(f"Open order: {order['type']} at {order['stopPrice']}")
+            print(f"Open order: {order['type']} at {order['stopPrice']}")
+        return len(orders)
+    except BinanceAPIException as e:
+        logging.error(f"Error checking open orders: {e.message}")
+        print(f"Error checking open orders: {e.message}")
+        return 0
 
 # Trading Functions
 def calculate_quantity(balance, price):
@@ -267,10 +318,14 @@ def place_order(signal, quantity, current_price, initial_balance):
                 type="MARKET",
                 quantity=str(quantity)
             )
-            tp_roi = Decimal('1') + TAKE_PROFIT_PERCENTAGE
-            sl_roi = Decimal('1') - STOP_LOSS_PERCENTAGE
-            tp_price = (tp_roi * initial_balance / quantity).quantize(Decimal('0.01'))
-            sl_price = (sl_roi * initial_balance / quantity).quantize(Decimal('0.01'))
+            tp_price = (current_price * (Decimal('1') + TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
+            sl_price = (current_price * (Decimal('1') - STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
+            
+            position["sl_price"] = sl_price
+            position["tp_price"] = tp_price
+            position["side"] = "LONG"
+            position["quantity"] = quantity
+            position["entry_price"] = current_price
             
             logging.info(f"Placed LONG order: {quantity:.25f} BTC at market price ~{current_price:.25f}")
             print(f"\n=== TRADE ENTERED ===")
@@ -281,22 +336,6 @@ def place_order(signal, quantity, current_price, initial_balance):
             print(f"Stop-Loss Price: {sl_price:.25f} (-12% ROI)")
             print(f"Take-Profit Price: {tp_price:.25f} (+4% ROI)")
             print(f"===================\n")
-            
-            client.futures_create_order(
-                symbol=TRADE_SYMBOL,
-                side="SELL",
-                type="STOP_MARKET",
-                quantity=str(quantity),
-                stopPrice=str(sl_price)
-            )
-            client.futures_create_order(
-                symbol=TRADE_SYMBOL,
-                side="SELL",
-                type="TAKE_PROFIT_MARKET",
-                quantity=str(quantity),
-                stopPrice=str(tp_price)
-            )
-            logging.info(f"Placed SL: {sl_price:.25f}, TP: {tp_price:.25f}")
         elif signal == "SHORT":
             order = client.futures_create_order(
                 symbol=TRADE_SYMBOL,
@@ -304,8 +343,14 @@ def place_order(signal, quantity, current_price, initial_balance):
                 type="MARKET",
                 quantity=str(quantity)
             )
-            tp_price = (current_price - (tp_roi * initial_balance / quantity)).quantize(Decimal('0.01'))
-            sl_price = (current_price - (sl_roi * initial_balance / quantity)).quantize(Decimal('0.01'))
+            tp_price = (current_price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
+            sl_price = (current_price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
+            
+            position["sl_price"] = sl_price
+            position["tp_price"] = tp_price
+            position["side"] = "SHORT"
+            position["quantity"] = -quantity  # Negative for SHORT
+            position["entry_price"] = current_price
             
             logging.info(f"Placed SHORT order: {quantity:.25f} BTC at market price ~{current_price:.25f}")
             print(f"\n=== TRADE ENTERED ===")
@@ -316,22 +361,13 @@ def place_order(signal, quantity, current_price, initial_balance):
             print(f"Stop-Loss Price: {sl_price:.25f} (-12% ROI)")
             print(f"Take-Profit Price: {tp_price:.25f} (+4% ROI)")
             print(f"===================\n")
+        
+        # Verify no unintended open orders
+        open_orders = check_open_orders()
+        if open_orders > 0:
+            logging.warning(f"Unexpected open orders ({open_orders}) detected after placing {signal} order.")
+            print(f"Warning: Unexpected open orders ({open_orders}) detected after placing {signal} order.")
             
-            client.futures_create_order(
-                symbol=TRADE_SYMBOL,
-                side="BUY",
-                type="STOP_MARKET",
-                quantity=str(quantity),
-                stopPrice=str(sl_price)
-            )
-            client.futures_create_order(
-                symbol=TRADE_SYMBOL,
-                side="BUY",
-                type="TAKE_PROFIT_MARKET",
-                quantity=str(quantity),
-                stopPrice=str(tp_price)
-            )
-            logging.info(f"Placed SL: {sl_price:.25f}, TP: {tp_price:.25f}")
         return position
     except BinanceAPIException as e:
         logging.error(f"Error placing order: {e.message}")
@@ -472,6 +508,31 @@ def main():
             usdc_balance = get_balance('USDC')
             position = get_position()
 
+            # Check if SL or TP is hit for an open position
+            if position["side"] != "NONE" and position["sl_price"] > Decimal('0') and position["tp_price"] > Decimal('0'):
+                if position["side"] == "LONG":
+                    if current_price <= position["sl_price"]:
+                        logging.info(f"Stop-Loss triggered for LONG at {current_price:.25f} (SL: {position['sl_price']:.25f})")
+                        print(f"Stop-Loss triggered for LONG at {current_price:.25f} (SL: {position['sl_price']:.25f})")
+                        close_position(position, current_price)
+                        position = get_position()  # Refresh position
+                    elif current_price >= position["tp_price"]:
+                        logging.info(f"Take-Profit triggered for LONG at {current_price:.25f} (TP: {position['tp_price']:.25f})")
+                        print(f"Take-Profit triggered for LONG at {current_price:.25f} (TP: {position['tp_price']:.25f})")
+                        close_position(position, current_price)
+                        position = get_position()  # Refresh position
+                elif position["side"] == "SHORT":
+                    if current_price >= position["sl_price"]:
+                        logging.info(f"Stop-Loss triggered for SHORT at {current_price:.25f} (SL: {position['sl_price']:.25f})")
+                        print(f"Stop-Loss triggered for SHORT at {current_price:.25f} (SL: {position['sl_price']:.25f})")
+                        close_position(position, current_price)
+                        position = get_position()  # Refresh position
+                    elif current_price <= position["tp_price"]:
+                        logging.info(f"Take-Profit triggered for SHORT at {current_price:.25f} (TP: {position['tp_price']:.25f})")
+                        print(f"Take-Profit triggered for SHORT at {current_price:.25f} (TP: {position['tp_price']:.25f})")
+                        close_position(position, current_price)
+                        position = get_position()  # Refresh position
+
             conditions_long = {
                 "volume_bullish_1m": False,
                 "volume_bullish_3m": False,
@@ -565,8 +626,8 @@ def main():
                 logging.info(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}, Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
                 print(f"Volume Bullish ({timeframe}): {buy_vol:.25f}, Bearish: {sell_vol:.25f}, Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}, Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
 
-                # Reversal detection over 1200 candles
-                reversal_type = detect_recent_reversal(candles, min_threshold, max_threshold, timeframe)
+                # Reversal detection
+                reversal_type = detect_recent_reversal(candles, timeframe)
                 if reversal_type == "DIP":
                     conditions_long[f"dip_confirmation_{timeframe}"] = True
                     conditions_short[f"top_confirmation_{timeframe}"] = False
@@ -677,6 +738,8 @@ def main():
                 print(f"Entry Price: {position['entry_price']:.25f} USDC")
                 print(f"Current Price: {current_price:.25f} USDC")
                 print(f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC")
+                print(f"Stop-Loss Price: {position['sl_price']:.25f} USDC")
+                print(f"Take-Profit Price: {position['tp_price']:.25f} USDC")
                 current_balance = usdc_balance + position['unrealized_pnl']
                 roi = ((current_balance - position['initial_balance']) / position['initial_balance'] * Decimal('100')).quantize(Decimal('0.01')) if position['initial_balance'] > Decimal('0') else Decimal('0')
                 print(f"Current ROI: {roi:.2f}%")
