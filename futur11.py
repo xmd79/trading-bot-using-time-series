@@ -118,7 +118,7 @@ def calculate_fft_forecast(closes, min_threshold, max_threshold, window=FFT_WIND
     forecast_prices = inverse_fft(freq_array, len(closes_np))
 
     forecast_price = Decimal(str(forecast_prices[-1]))
-    cycle_direction = "UP" if positive_ratio >= negative_ratio else "DOWN"
+    cycle_direction = "UP" if positive_ratio > negative_ratio else "DOWN"
 
     if is_dip:
         forecast_price = max_threshold - Decimal('0.0005') * (max_threshold - min_threshold)
