@@ -24,7 +24,7 @@ LEVERAGE = 100
 STOP_LOSS_PERCENTAGE = Decimal('0.10')  # 10% stop-loss
 TAKE_PROFIT_PERCENTAGE = Decimal('0.10')  # 10% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
-MINIMUM_BALANCE = Decimal('10.0')  # Minimum USDC balance to place trades
+MINIMUM_BALANCE = Decimal('1.0000')  # Minimum USDC balance to place trades
 TIMEFRAMES = ["1m", "3m", "5m"]
 LOOKBACK_PERIODS = {"1m": 500, "3m": 500, "5m": 500}  # Use 500 candles for all timeframes
 PRICE_TOLERANCE = Decimal('0.01')  # 1% tolerance (used as a multiplier)
@@ -274,58 +274,6 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy
     logging.info(f"{timeframe} - Confirmed reversal: {confirmed_type} at price {most_recent['price']:.25f}, time {datetime.datetime.fromtimestamp(most_recent['time'])}, distance to current close: {min(dist_to_min, dist_to_max):.25f}")
     print(f"{timeframe} - Confirmed reversal: {confirmed_type} at price {most_recent['price']:.25f}, time {datetime.datetime.fromtimestamp(most_recent['time'])}, distance to current close: {min(dist_to_min, dist_to_max):.25f}")
     return confirmed_type
-
-# Double Bottom/Top Pattern Detection Function
-def detect_double_pattern(candles, timeframe, reversal_type, min_threshold, max_threshold):
-    if len(candles) < 3:
-        logging.warning(f"Insufficient candles ({len(candles)}) for double pattern detection in {timeframe}.")
-        print(f"Insufficient candles ({len(candles)}) for double pattern detection in {timeframe}.")
-        return False, False
-
-    lookback = min(len(candles), LOOKBACK_PERIODS[timeframe])
-    recent_candles = candles[-lookback:]
-    lows = np.array([float(c['low']) for c in recent_candles if not np.isnan(c['low']) and c['low'] > 0], dtype=np.float64)
-    highs = np.array([float(c['high']) for c in recent_candles if not np.isnan(c['high']) and c['high'] > 0], dtype=np.float64)
-    closes = np.array([float(c['close']) for c in recent_candles if not np.isnan(c['close']) and c['close'] > 0], dtype=np.float64)
-
-    if len(lows) < 3 or len(highs) < 3 or len(closes) < 3:
-        logging.warning(f"Insufficient valid data (lows: {len(lows)}, highs: {len(highs)}, closes: {len(closes)}) for double pattern detection in {timeframe}.")
-        print(f"Insufficient valid data (lows: {len(lows)}, highs: {len(highs)}, closes: {len(closes)}) for double pattern detection in {timeframe}.")
-        return False, False
-
-    current_close = Decimal(str(closes[-1]))
-    last_low = Decimal(str(lows[-1]))
-    last_high = Decimal(str(highs[-1]))
-    tolerance = min_threshold * PROXIMITY_THRESHOLD  # Use same proximity threshold as in reversal detection
-
-    double_bottom_confirmed = False
-    double_top_confirmed = False
-
-    if reversal_type == "DIP":
-        # Double Bottom: Check if last low is above the DIP reversal's min threshold
-        if last_low > min_threshold and abs(last_low - min_threshold) <= tolerance:
-            double_bottom_confirmed = True
-            logging.info(f"{timeframe} - Double Bottom Pattern Confirmed: Last low {last_low:.25f} is above DIP min threshold {min_threshold:.25f} within tolerance {tolerance:.25f}")
-            print(f"{timeframe} - Double Bottom Pattern Confirmed: Last low {last_low:.25f} is above DIP min threshold {min_threshold:.25f} within tolerance {tolerance:.25f}")
-        else:
-            logging.info(f"{timeframe} - Double Bottom Pattern Not Confirmed: Last low {last_low:.25f} is not above DIP min threshold {min_threshold:.25f} or outside tolerance {tolerance:.25f}")
-            print(f"{timeframe} - Double Bottom Pattern Not Confirmed: Last low {last_low:.25f} is not above DIP min threshold {min_threshold:.25f} or outside tolerance {tolerance:.25f}")
-
-    elif reversal_type == "TOP":
-        # Double Top: Check if last high is below the TOP reversal's max threshold
-        if last_high < max_threshold and abs(max_threshold - last_high) <= tolerance:
-            double_top_confirmed = True
-            logging.info(f"{timeframe} - Double Top Pattern Confirmed: Last high {last_high:.25f} is below TOP max threshold {max_threshold:.25f} within tolerance {tolerance:.25f}")
-            print(f"{timeframe} - Double Top Pattern Confirmed: Last high {last_high:.25f} is below TOP max threshold {max_threshold:.25f} within tolerance {tolerance:.25f}")
-        else:
-            logging.info(f"{timeframe} - Double Top Pattern Not Confirmed: Last high {last_high:.25f} is not below TOP max threshold {max_threshold:.25f} or outside tolerance {tolerance:.25f}")
-            print(f"{timeframe} - Double Top Pattern Not Confirmed: Last high {last_high:.25f} is not below TOP max threshold {max_threshold:.25f} or outside tolerance {tolerance:.25f}")
-
-    else:
-        logging.info(f"{timeframe} - No major reversal (type: {reversal_type}). Double Bottom/Top patterns not applicable.")
-        print(f"{timeframe} - No major reversal (type: {reversal_type}). Double Bottom/Top patterns not applicable.")
-
-    return double_bottom_confirmed, double_top_confirmed
 
 # Utility Functions
 def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=500):
@@ -736,10 +684,7 @@ def main():
                 "below_middle_5m": False,
                 "fft_bullish_1m": False,
                 "fft_bullish_3m": False,
-                "fft_bullish_5m": False,
-                "double_bottom_1m": False,
-                "double_bottom_3m": False,
-                "double_bottom_5m": False
+                "fft_bullish_5m": False
             }
             conditions_short = {
                 "volume_bearish_1m": False,
@@ -754,10 +699,7 @@ def main():
                 "above_middle_5m": False,
                 "fft_bearish_1m": False,
                 "fft_bearish_3m": False,
-                "fft_bearish_5m": False,
-                "double_top_1m": False,
-                "double_top_3m": False,
-                "double_top_5m": False
+                "fft_bearish_5m": False
             }
 
             buy_volume, sell_volume = calculate_buy_sell_volume_original(candle_map)
@@ -778,8 +720,6 @@ def main():
                     conditions_short[f"volume_bearish_{timeframe}"] = False
                     conditions_long[f"dip_confirmation_{timeframe}"] = True
                     conditions_short[f"top_confirmation_{timeframe}"] = False
-                    conditions_long[f"double_bottom_{timeframe}"] = True
-                    conditions_short[f"double_top_{timeframe}"] = False
                     continue
                 
                 candles = candle_map[timeframe]
@@ -841,8 +781,6 @@ def main():
                     conditions_short[f"volume_bearish_{timeframe}"] = False
                     conditions_long[f"dip_confirmation_{timeframe}"] = True
                     conditions_short[f"top_confirmation_{timeframe}"] = False
-                    conditions_long[f"double_bottom_{timeframe}"] = True
-                    conditions_short[f"double_top_{timeframe}"] = False
                     continue
 
                 conditions_long[f"below_middle_{timeframe}"] = current_close <= middle_threshold
@@ -868,15 +806,6 @@ def main():
                 logging.info(f"{timeframe} - Dip Confirmation: {conditions_long[f'dip_confirmation_{timeframe}']}, Top Confirmation: {conditions_short[f'top_confirmation_{timeframe}']}")
                 print(f"{timeframe} - Dip Confirmation: {conditions_long[f'dip_confirmation_{timeframe}']}")
                 print(f"{timeframe} - Top Confirmation: {conditions_short[f'top_confirmation_{timeframe}']}")
-
-                # Double Bottom/Top Pattern Analysis
-                print(f"\n--- {timeframe} Timeframe Double Pattern Analysis ---")
-                double_bottom, double_top = detect_double_pattern(candles, timeframe, reversal_type, min_threshold, max_threshold)
-                conditions_long[f"double_bottom_{timeframe}"] = double_bottom
-                conditions_short[f"double_top_{timeframe}"] = double_top
-                logging.info(f"{timeframe} - Double Bottom Confirmation: {double_bottom}, Double Top Confirmation: {double_top}")
-                print(f"{timeframe} - Double Bottom Confirmation: {double_bottom}")
-                print(f"{timeframe} - Double Top Confirmation: {double_top}")
 
                 if timeframe == "1m":
                     print(f"\n--- {timeframe} Timeframe Momentum Analysis ---")
@@ -907,10 +836,7 @@ def main():
                 ("below_middle_5m", "above_middle_5m"),
                 ("fft_bullish_1m", "fft_bearish_1m"),
                 ("fft_bullish_3m", "fft_bearish_3m"),
-                ("fft_bullish_5m", "fft_bearish_5m"),
-                ("double_bottom_1m", "double_top_1m"),
-                ("double_bottom_3m", "double_top_3m"),
-                ("double_bottom_5m", "double_top_5m")
+                ("fft_bullish_5m", "fft_bearish_5m")
             ]
             logging.info("Condition Pairs Status:")
             print("\nCondition Pairs Status:")
