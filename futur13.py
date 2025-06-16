@@ -19,9 +19,9 @@ getcontext().prec = 25
 
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"
-LEVERAGE = 20
-STOP_LOSS_PERCENTAGE = Decimal('0.12')  # 12% stop-loss
-TAKE_PROFIT_PERCENTAGE = Decimal('0.04')  # 4% take-profit
+LEVERAGE = 100
+STOP_LOSS_PERCENTAGE = Decimal('0.10')  # 10% stop-loss
+TAKE_PROFIT_PERCENTAGE = Decimal('0.10')  # 10% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
 MINIMUM_BALANCE = Decimal('10.0')  # Minimum USDC balance to place trades
 TIMEFRAMES = ["1m", "3m", "5m"]
