@@ -9,8 +9,7 @@ import gc
 from decimal import Decimal, getcontext
 import requests
 import logging
-import scipy.fft as fftpack
-from collections import deque
+import scipy.fftpack as fftpack
 
 # Configure logging
 logging.basicConfig(filename='trading_bot.log', level=logging.INFO, 
@@ -24,17 +23,16 @@ TRADE_SYMBOL = "BTCUSDC"
 LEVERAGE = 75
 STOP_LOSS_PERCENTAGE = Decimal('0.50')  # 50% stop-loss
 TAKE_PROFIT_PERCENTAGE = Decimal('0.05')  # 5% take-profit
-QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
-MINIMUM_BALANCE = Decimal('1.0000')  # Minimum USDC balance
+QUANTITY_PRECISION = Decimal('0.000001')
+MINIMUM_BALANCE = Decimal('1.0000')
 TIMEFRAMES = ["1m", "3m", "5m"]
 LOOKBACK_PERIODS = {"1m": 500, "3m": 500, "5m": 500}
-PRICE_TOLERANCE = Decimal('0.01')  # 1% tolerance
-VOLUME_CONFIRMATION_RATIO = Decimal('1.5')  # Buy/Sell volume ratio
-PROXIMITY_THRESHOLD = Decimal('0.01')  # 1% proximity
-VOLUME_SPIKE_MULTIPLIER = Decimal('2.5')  # Volume spike threshold
-
-# State for quadrant tracking
-quadrant_history = {tf: deque(maxlen=10) for tf in TIMEFRAMES}
+PRICE_TOLERANCE = Decimal('0.01')
+VOLUME_CONFIRMATION_RATIO = Decimal('1.5')
+PROXIMITY_THRESHOLD = Decimal('0.01')
+SR_CLUSTER_THRESHOLD = Decimal('0.005')
+DOUBLE_PATTERN_LOOKBACK = 50
+INTENSITY_THRESHOLD = Decimal('1.0')
 
 # Load credentials
 try:
@@ -53,7 +51,7 @@ except IndexError:
 
 # Initialize Binance client
 client = BinanceClient(api_key, api_secret, requests_params={"timeout": 30})
-client.API_URL = 'https://fapi.binance.com'  # Futures API
+client.API_URL = 'https://fapi.binance.com'
 
 # Set leverage
 try:
@@ -65,112 +63,102 @@ except BinanceAPIException as e:
     print(f"Error setting leverage: {e.message}")
     exit(1)
 
-# Quadrant Mapping Function
-def map_price_to_quadrant(current_price, min_threshold, max_threshold, reversal_type, timeframe, prev_price=Decimal('0')):
-    if min_threshold >= max_threshold or current_price < min_threshold:
-        logging.warning(f"Invalid quadrant inputs: current={current_price:.25f}, min={min_threshold:.25f}, max={max_threshold:.25f}")
-        return "Q1", "Q1", "Q2", Decimal('0')
-
-    price_range = max_threshold - min_threshold
-    segment_size = price_range / Decimal('4')
-
-    q1_max = min_threshold + segment_size
-    q2_max = min_threshold + 2 * segment_size
-    q3_max = min_threshold + 3 * segment_size
-
-    if current_price <= q1_max:
-        current_quadrant = "Q1"
-    elif current_price <= q2_max:
-        current_quadrant = "Q2"
-    elif current_price <= q3_max:
-        current_quadrant = "Q3"
-    else:
-        current_quadrant = "Q4"
-
-    # Determine cycle (up or down) based on recent price movement
-    is_up_cycle = current_price > prev_price
-    recent_quadrants = list(quadrant_history[timeframe])[-3:] if quadrant_history[timeframe] else []
-    reversed_at_q1 = reversal_type == "DIP" and "Q1" in recent_quadrants
-    reversed_at_q4 = reversal_type == "TOP" and "Q4" in recent_quadrants
-
-    # Update last_quadrant and incoming_quadrant based on cycle and reversal
-    last_quadrant = quadrant_history[timeframe][-1] if quadrant_history[timeframe] else "Q2"
-    if current_quadrant == "Q1" and reversal_type == "DIP":
-        last_quadrant = "Q2"  # Coming from Q2, reversing at Q1
-        incoming_quadrant = "Q2"  # Start of up cycle
-    elif current_quadrant == "Q4" and reversal_type == "TOP":
-        last_quadrant = "Q3"  # Coming from Q3, reversing at Q4
-        incoming_quadrant = "Q3"  # Start of down cycle
-    elif current_quadrant == "Q2":
-        if not is_up_cycle and reversed_at_q4:  # Down cycle
-            last_quadrant = "Q3"
-            incoming_quadrant = "Q1"
-        elif is_up_cycle and reversed_at_q1:  # Up cycle with reversal at Q1
-            last_quadrant = "Q1"
-            incoming_quadrant = "Q1"
-        elif is_up_cycle:  # Up cycle continuing after Q1 reversal
-            last_quadrant = "Q1"
-            incoming_quadrant = "Q3"
-        else:  # Down cycle continuing after Q4 reversal
-            last_quadrant = "Q3"
-            incoming_quadrant = "Q1"
-    else:
-        # Default transition logic
-        if is_up_cycle:
-            incoming_quadrant = {"Q1": "Q2", "Q2": "Q3", "Q3": "Q4", "Q4": "Q3"}.get(current_quadrant, "Q2")
-        else:
-            incoming_quadrant = {"Q4": "Q3", "Q3": "Q2", "Q2": "Q1", "Q1": "Q2"}.get(current_quadrant, "Q3")
-
-    # Update quadrant history
-    quadrant_history[timeframe].append(current_quadrant)
-
-    # Degree mapping
-    normalized_price = (current_price - min_threshold) / price_range if price_range > 0 else Decimal('0')
-    if current_quadrant == "Q1":
-        degrees = normalized_price * Decimal('90')
-    elif current_quadrant == "Q2":
-        degrees = Decimal('90') + (normalized_price - Decimal('0.25')) * Decimal('360')
-    elif current_quadrant == "Q3":
-        degrees = Decimal('180') + (normalized_price - Decimal('0.5')) * Decimal('360')
-    else:
-        degrees = Decimal('270') + (normalized_price - Decimal('0.75')) * Decimal('360')
-    degrees = degrees % Decimal('360')
-
-    logging.info(f"{timeframe} - Quadrant: Current={current_quadrant}, Last={last_quadrant}, Incoming={incoming_quadrant}, Degrees={degrees:.25f}")
-    print(f"{timeframe} - Quadrant: Current={current_quadrant}, Last={last_quadrant}, Incoming={incoming_quadrant}, Degrees={degrees:.25f}")
-    return current_quadrant, last_quadrant, incoming_quadrant, degrees
+# Double Pattern Detection
+def detect_double_pattern(candles, timeframe, min_threshold, max_threshold, buy_volume, sell_volume):
+    if len(candles) < DOUBLE_PATTERN_LOOKBACK:
+        logging.warning(f"Insufficient candles ({len(candles)}) for double pattern in {timeframe}")
+        print(f"Insufficient candles ({len(candles)}) for double pattern in {timeframe}")
+        return "NONE", Decimal('0'), Decimal('0')
+    
+    lookback = min(len(candles), DOUBLE_PATTERN_LOOKBACK)
+    recent_candles = candles[-lookback:]
+    current_close = Decimal(str(recent_candles[-1]['close']))
+    
+    lows = np.array([float(c['low']) for c in recent_candles], dtype=np.float64)
+    highs = np.array([float(c['high']) for c in recent_candles], dtype=np.float64)
+    
+    low_indices = np.where((lows[1:-1] < lows[:-2]) & (lows[1:-1] < lows[2:]))[0] + 1
+    high_indices = np.where((highs[1:-1] > highs[:-2]) & (highs[1:-1] > highs[2:]))[0] + 1
+    
+    if len(low_indices) < 2 or len(high_indices) < 2:
+        logging.warning(f"Insufficient peaks/troughs for double pattern in {timeframe}")
+        print(f"Insufficient peaks/troughs for double pattern in {timeframe}")
+        return "NONE", Decimal('0'), Decimal('0')
+    
+    last_ll_idx, second_ll_idx = low_indices[-1], low_indices[-2]
+    last_hh_idx, second_hh_idx = high_indices[-1], high_indices[-2]
+    
+    last_ll = Decimal(str(lows[last_ll_idx]))
+    second_ll = Decimal(str(lows[second_ll_idx]))
+    last_hh = Decimal(str(highs[last_hh_idx]))
+    second_hh = Decimal(str(highs[second_hh_idx]))
+    
+    last_ll_volume = buy_volume[timeframe][last_ll_idx] if last_ll_idx < len(buy_volume[timeframe]) else Decimal('0')
+    second_ll_volume = buy_volume[timeframe][second_ll_idx] if second_ll_idx < len(buy_volume[timeframe]) else Decimal('0')
+    last_hh_volume = sell_volume[timeframe][last_hh_idx] if last_hh_idx < len(sell_volume[timeframe]) else Decimal('0')
+    second_hh_volume = sell_volume[timeframe][second_hh_idx] if second_hh_idx < len(sell_volume[timeframe]) else Decimal('0')
+    
+    double_bottom_valid = (
+        current_close > last_ll >= second_ll > min_threshold and
+        abs(last_ll - second_ll) <= last_ll * SR_CLUSTER_THRESHOLD and
+        last_ll_volume >= second_ll_volume * VOLUME_CONFIRMATION_RATIO
+    )
+    
+    double_top_valid = (
+        current_close < last_hh <= second_hh < max_threshold and
+        abs(last_hh - second_hh) <= last_hh * SR_CLUSTER_THRESHOLD and
+        last_hh_volume >= second_hh_volume * VOLUME_CONFIRMATION_RATIO
+    )
+    
+    bottom_intensity = Decimal('0')
+    top_intensity = Decimal('0')
+    
+    if double_bottom_valid:
+        bottom_proximity = (current_close - last_ll) / (max_threshold - min_threshold) if max_threshold > min_threshold else Decimal('1')
+        bottom_volume_strength = last_ll_volume / (last_ll_volume + second_ll_volume) if last_ll_volume + second_ll_volume > Decimal('0') else Decimal('1')
+        bottom_intensity = bottom_proximity * bottom_volume_strength * Decimal('2')
+    
+    if double_top_valid:
+        top_proximity = (last_hh - current_close) / (max_threshold - min_threshold) if max_threshold > min_threshold else Decimal('1')
+        top_volume_strength = last_hh_volume / (last_hh_volume + second_hh_volume) if last_hh_volume + second_hh_volume > Decimal('0') else Decimal('1')
+        top_intensity = top_proximity * top_volume_strength * Decimal('2')
+    
+    intensity_ratio = bottom_intensity / top_intensity if top_intensity > Decimal('0') else Decimal('1000') if bottom_intensity > Decimal('0') else Decimal('0')
+    pattern_type = "D. BOTTOM" if intensity_ratio > INTENSITY_THRESHOLD else "D. TOP" if intensity_ratio < Decimal('1') / INTENSITY_THRESHOLD else "NONE"
+    
+    logging.info(f"{timeframe} Double Pattern: {pattern_type}, Bottom Intensity={bottom_intensity:.2f}, Top Intensity={top_intensity:.2f}, Ratio={intensity_ratio:.2f}")
+    print(f"{timeframe} - Double Pattern: {pattern_type}, Bottom Intensity={bottom_intensity:.2f}, Top Intensity={top_intensity:.2f}, Ratio={intensity_ratio:.2f}")
+    return pattern_type, bottom_intensity, top_intensity
 
 # FFT-Based Target Price Function
-def get_target_price(closes, n_components, timeframe, reversal_type="NONE", min_threshold=Decimal('0'), middle_threshold=Decimal('0'), max_threshold=Decimal('0')):
+def get_target(closes, n_components, reversal_type="NONE", min_threshold=Decimal('0'), middle_threshold=Decimal('0'), max_threshold=Decimal('0')):
     if len(closes) < 2 or np.any(np.isnan(closes)) or np.any(closes <= 0):
-        logging.warning(f'Invalid closes data for FFT in {timeframe}.')
-        print(f"Invalid closes data for FFT in {timeframe}.")
+        logging.warning("Invalid closes data for FFT analysis.")
+        print("Invalid closes data for FFT analysis.")
         return datetime.datetime.now(), Decimal('0'), Decimal('0'), Decimal('0'), "Neutral", False, True, 0.0, "Neutral"
     
-    fft = fftpack.fft(closes)
-    frequencies = fftpack.fftfreq(len(closes))
+    fft = fftpack.rfft(closes)
+    frequencies = fftpack.rfftfreq(len(closes))
     amplitudes = np.abs(fft)
     
     idx_max = np.argmax(amplitudes[1:]) + 1
     predominant_freq = frequencies[idx_max]
     predominant_sign = "Positive" if fft[idx_max].real > 0 else "Negative"
-    signed_freq = -predominant_freq if predominant_sign == "Negative" else predominant_freq
     
     current_close = Decimal(str(closes[-1]))
     is_near_min = abs(current_close - min_threshold) <= min_threshold * PROXIMITY_THRESHOLD
     is_near_max = abs(current_close - max_threshold) <= max_threshold * PROXIMITY_THRESHOLD
-    
     if reversal_type == "DIP" and is_near_min and predominant_sign != "Negative":
-        logging.warning(f"DIP reversal near min_threshold ({min_threshold:.25f}), but frequency is {predominant_sign}")
-        print(f"DIP reversal near min_threshold ({min_threshold:.25f}), but frequency is {predominant_sign}")
+        logging.warning(f"DIP reversal near min_threshold ({min_threshold:.2f}), but predominant frequency is {predominant_sign}.")
+        print(f"DIP reversal near min_threshold ({min_threshold:.25f}), but predominant frequency is {predominant_sign}.")
     elif reversal_type == "TOP" and is_near_max and predominant_sign != "Positive":
-        logging.warning(f"TOP reversal near max_threshold ({max_threshold:.25f}), but frequency is {predominant_sign}")
-        print(f"TOP reversal near max_threshold ({max_threshold:.25f}), but frequency is {predominant_sign}")
+        logging.warning(f"TOP reversal near max_threshold ({max_threshold:.2f}), but predominant frequency is {predominant_sign}.")
+        print(f"TOP reversal near max_threshold ({max_threshold:.25f}), but predominant frequency is {predominant_sign}.")
     
     idx = np.argsort(amplitudes)[::-1][:n_components]
     filtered_fft = np.zeros_like(fft)
     filtered_fft[idx] = fft[idx]
-    filtered_signal = fftpack.ifft(filtered_fft).real
+    filtered_signal = fftpack.irfft(filtered_fft)
     
     if reversal_type == "DIP" and max_threshold > middle_threshold > current_close:
         target_price = middle_threshold + Decimal('0.75') * (max_threshold - middle_threshold)
@@ -186,154 +174,29 @@ def get_target_price(closes, n_components, timeframe, reversal_type="NONE", min_
         target_price = Decimal(str(filtered_signal[-1]))
         is_bullish_target = target_price >= middle_threshold
         is_bearish_target = not is_bullish_target
-        logging.warning(f"Invalid reversal or thresholds in {timeframe}. Using FFT target: {target_price:.25f}")
-        print(f"Invalid reversal or thresholds in {timeframe}. Using FFT target: {target_price:.25f}")
+        logging.warning(f"Invalid reversal type {reversal_type} or thresholds. Using default FFT target: {target_price:.2f}")
+        print(f"Invalid reversal type {reversal_type} or thresholds. Using default FFT target: {target_price:.25f}")
     
     market_mood = "Bullish" if is_bullish_target else "Bearish"
-    informational_sl = current_close - Decimal(str(3 * np.std(closes)))
+    stop_loss = current_close - Decimal(str(3 * np.std(closes)))
     fastest_target = target_price + Decimal('0.005') * (target_price - current_close) if is_bullish_target else target_price - Decimal('0.005') * (current_close - target_price)
     
-    logging.info(f"FFT - {timeframe} - Mood: {market_mood}, Close: {current_close:.25f}, Target: {fastest_target:.25f}, Informational SL: {informational_sl:.25f}, Freq: {signed_freq:.6f}")
-    print(f"FFT - {timeframe} - Mood: {market_mood}, Close: {current_close:.25f}, Target: {fastest_target:.25f}, Informational SL: {informational_sl:.25f}, Freq: {signed_freq:.6f}")
-    return datetime.datetime.now(), current_close, informational_sl, fastest_target, market_mood, is_bullish_target, is_bearish_target, signed_freq, predominant_sign
+    logging.info(f"FFT Analysis - Market Mood: {market_mood}, Current Close: {current_close:.2f}, Fastest Target: {fastest_target:.2f}, Stop Loss: {stop_loss:.2f}, Predominant Freq: {predominant_freq:.6f}, Sign: {predominant_sign}")
+    print(f"FFT Analysis - Market Mood: {market_mood}, Current Close: {current_close:.25f}, Fastest Target: {fastest_target:.25f}, Stop Loss: {stop_loss:.25f}, Predominant Freq: {predominant_freq:.6f}, Sign: {predominant_sign}")
+    return datetime.datetime.now(), current_close, stop_loss, fastest_target, market_mood, is_bullish_target, is_bearish_target, predominant_freq, predominant_sign
 
-# Double Pattern Detection
-def detect_double_pattern(candles, timeframe, min_threshold, max_threshold, reversal_type, current_close, predominant_freq, predominant_sign, momentum, buy_volume, sell_volume):
-    if len(candles) < 20:
-        logging.warning(f"Insufficient candles ({len(candles)}) for pattern detection in {timeframe}.")
-        print(f"Insufficient candles ({len(candles)}) for pattern detection in {timeframe}.")
-        return True, False, "D. BOTTOM", Decimal('60'), Decimal('40')
-
-    lookback = min(len(candles), 20)
-    recent_candles = candles[-lookback:]
-    lows = np.array([Decimal(str(c['low'])) for c in recent_candles])
-    highs = np.array([Decimal(str(c['high'])) for c in recent_candles])
-    
-    low_indices = np.argsort(lows)[:2]
-    high_indices = np.argsort(highs)[-2:][::-1]
-    
-    last_ll = lows[low_indices[0]]
-    second_ll = lows[low_indices[1]]
-    last_hh = highs[high_indices[0]]
-    second_hh = highs[high_indices[1]]
-    
-    avg_volume = sum(Decimal(str(c['volume'])) for c in recent_candles[-5:]) / Decimal('5') if recent_candles else Decimal('1')
-    recent_buy_vols = buy_volume.get(timeframe, [Decimal('0')] * 3)[-3:]
-    recent_sell_vols = sell_volume.get(timeframe, [Decimal('0')] * 3)[-3:]
-    
-    buy_vols = np.array([float(v) for v in recent_buy_vols], dtype=np.float64)
-    sell_vols = np.array([float(v) for v in recent_sell_vols], dtype=np.float64)
-    buy_ema = Decimal(str(talib.EMA(buy_vols, timeperiod=3)[-1])) if len(buy_vols) >= 3 else sum(recent_buy_vols) / Decimal(len(recent_buy_vols)) if recent_buy_vols else Decimal('0')
-    sell_ema = Decimal(str(talib.EMA(sell_vols, timeperiod=3)[-1])) if len(sell_vols) >= 3 else sum(recent_sell_vols) / Decimal(len(recent_sell_vols)) if recent_sell_vols else Decimal('0')
-    
-    is_volume_spike_up = buy_ema > avg_volume * VOLUME_SPIKE_MULTIPLIER
-    is_volume_spike_down = sell_ema > avg_volume * VOLUME_SPIKE_MULTIPLIER
-    
-    freq_weight = Decimal('1.5') * Decimal(str(abs(predominant_freq * 100))) if predominant_freq else Decimal('1')
-    if reversal_type == "DIP" and predominant_sign == "Negative":
-        freq_weight *= Decimal('1.2')
-    elif reversal_type == "TOP" and predominant_sign == "Positive":
-        freq_weight *= Decimal('1.2')
-    momentum_weight = Decimal(str(abs(momentum / 1000))) if momentum and momentum != 0 else Decimal('1')
-    
-    volume_weight_db = Decimal('1.5') if is_volume_spike_up and reversal_type == "DIP" else Decimal('1')
-    volume_weight_dt = Decimal('1.5') if is_volume_spike_down and reversal_type == "TOP" else Decimal('1')
-    
-    db_score = Decimal('0')
-    dt_score = Decimal('0')
-    
-    if (current_close > last_ll >= second_ll > min_threshold and 
-        abs(last_ll - min_threshold) <= min_threshold * PROXIMITY_THRESHOLD):
-        db_distance = current_close - last_ll
-        db_volume = buy_ema if is_volume_spike_up else Decimal('1')
-        db_score = db_distance * db_volume * freq_weight * momentum_weight * volume_weight_db
-        if is_volume_spike_up and predominant_sign == "Negative" and momentum >= 0:
-            db_score *= Decimal('1.5')
-    
-    if (current_close < last_hh <= second_hh < max_threshold and 
-        abs(last_hh - max_threshold) <= max_threshold * PROXIMITY_THRESHOLD):
-        dt_distance = last_hh - current_close
-        dt_volume = sell_ema if is_volume_spike_down else Decimal('1')
-        dt_score = dt_distance * dt_volume * freq_weight * momentum_weight * volume_weight_dt
-        if is_volume_spike_down and predominant_sign == "Positive" and momentum < 0:
-            dt_score *= Decimal('1.5')
-    
-    total_score = db_score + dt_score
-    if total_score == Decimal('0'):
-        dist_to_min = abs(current_close - min_threshold)
-        dist_to_max = abs(current_close - max_threshold)
-        vol_ratio = buy_ema / sell_ema if sell_ema > Decimal('0') else Decimal('2') if buy_ema > Decimal('0') else Decimal('1')
-        momentum_bias = momentum >= Decimal('0') if momentum != 0 else True
-        if dist_to_min <= dist_to_max or (vol_ratio > Decimal('1') or momentum_bias):
-            db_score = Decimal('70')
-            dt_score = Decimal('30')
-        else:
-            db_score = Decimal('30')
-            dt_score = Decimal('70')
-        total_score = db_score + dt_score
-    
-    db_ratio = (db_score / total_score) * Decimal('100')
-    dt_ratio = Decimal('100') - db_ratio
-
-    if db_ratio >= Decimal('50'):
-        double_bottom = True
-        double_top = False
-        pattern_type = "D. BOTTOM"
-        if db_ratio < Decimal('60'):
-            db_ratio = Decimal('60')
-            dt_ratio = Decimal('40')
-    else:
-        double_bottom = False
-        double_top = True
-        pattern_type = "D. TOP"
-        if dt_ratio < Decimal('60'):
-            dt_ratio = Decimal('60')
-            db_ratio = Decimal('40')
-
-    logging.info(f"{timeframe} - Pattern: D. BOTTOM={double_bottom}, D. TOP={double_top}, Type={pattern_type}, D. BOTTOM Ratio={db_ratio:.2f}%, D. TOP Ratio={dt_ratio:.2f}%")
-    print(f"{timeframe} - Pattern: D. BOTTOM={double_bottom}, D. TOP={double_top}, Type={pattern_type}, D. BOTTOM Ratio={db_ratio:.2f}%, D. TOP Ratio={dt_ratio:.2f}%")
-    return double_bottom, double_top, pattern_type, db_ratio, dt_ratio
-
-# Volume Analysis
+# Volume Analysis Functions
 def calculate_volume(candles):
     if not candles:
-        logging.warning("No candles for volume.")
-        print("No candles provided.")
+        logging.warning("No candles provided for volume calculation.")
+        print("No candles provided for volume calculation.")
         return Decimal('0')
-    total_volume = sum(Decimal(str(c['volume'])) for c in candles)
-    logging.info(f"Total Volume: {total_volume:.25f}")
-    print(f"Total Volume: {total_volume:.2f}")
+    total_volume = sum(Decimal(str(candle["volume"])) for candle in candles)
+    logging.info(f"Total Volume: {total_volume:.2f}")
+    print(f"Total Volume: {total_volume:.25f}")
     return total_volume
 
 def calculate_buy_sell_volume(candle_map):
-    if not candle_map or not any(candle_map.values()):
-        logging.warning("Invalid candle_map.")
-        print("Invalid candle_map.")
-        return Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), {"1m": "NEUTRAL", "3m": "NEUTRAL", "5m": "NEUTRAL"}
-    
-    try:
-        buy_volume_1m = sum(Decimal(str(c["volume"])) for c in candle_map.get("1m", []) if Decimal(str(c["close"])) > Decimal(str(c["open"])))
-        sell_volume_1m = sum(Decimal(str(c["volume"])) for c in candle_map.get("1m", []) if Decimal(str(c["close"])) < Decimal(str(c["open"])))
-        buy_volume_3m = sum(Decimal(str(c["volume"])) for c in candle_map.get("3m", []) if Decimal(str(c["close"])) > Decimal(str(c["open"])))
-        sell_volume_3m = sum(Decimal(str(c["volume"])) for c in candle_map.get("3m", []) if Decimal(str(c["close"])) < Decimal(str(c["open"])))
-        buy_volume_5m = sum(Decimal(str(c["volume"])) for c in candle_map.get("5m", []) if Decimal(str(c["close"])) > Decimal(str(c["open"])))
-        sell_volume_5m = sum(Decimal(str(c["volume"])) for c in candle_map.get("5m", []) if Decimal(str(c["close"])) < Decimal(str(c["open"])))
-        
-        volume_moods = {}
-        for tf in TIMEFRAMES:
-            buy_vol = locals()[f"buy_volume_{tf}"]
-            sell_vol = locals()[f"sell_volume_{tf}"]
-            volume_moods[tf] = "BULLISH" if buy_vol >= sell_vol else "BEARISH"
-            logging.info(f"{tf} - Buy: {buy_vol:.25f}, Sell: {sell_vol:.25f}, Mood: {volume_moods[tf]}")
-            print(f"{tf} - Buy: {buy_vol:.25f}, Sell: {sell_vol:.25f}, Mood: {volume_moods[tf]}")
-        
-        return buy_volume_1m, sell_volume_1m, buy_volume_3m, sell_volume_3m, buy_volume_5m, sell_volume_5m, volume_moods
-    except Exception as e:
-        logging.error(f"Volume error: {e}")
-        print(f"Volume error: {e}")
-        return Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), {"1m": "NEUTRAL", "3m": "NEUTRAL", "5m": "NEUTRAL"}
-
-def calculate_buy_sell_volume_original(candle_map):
     buy_volume, sell_volume = {}, {}
     for timeframe in candle_map:
         buy_volume[timeframe] = []
@@ -355,22 +218,31 @@ def calculate_buy_sell_volume_original(candle_map):
                 sell_vol = total_volume * bearish_strength
             buy_volume[timeframe].append(buy_vol)
             sell_volume[timeframe].append(sell_vol)
-    return buy_volume, sell_volume
+    
+    volume_moods = {}
+    for tf in TIMEFRAMES:
+        buy_vol = sum(buy_volume.get(tf, [Decimal('0')]))
+        sell_vol = sum(sell_volume.get(tf, [Decimal('0')]))
+        volume_moods[tf] = "BULLISH" if buy_vol >= sell_vol else "BEARISH"
+        logging.info(f"{tf} - Buy Volume: {buy_vol:.2f}, Sell Volume: {sell_vol:.2f}, Mood: {volume_moods[tf]}")
+        print(f"{tf} - Buy Volume: {buy_vol:.25f}, Sell Volume: {sell_vol:.25f}, Mood: {volume_moods[tf]}")
+    
+    return buy_volume, sell_volume, volume_moods
 
 def calculate_volume_ratio(buy_volume, sell_volume):
     volume_ratio = {}
     for timeframe in buy_volume:
         if not buy_volume[timeframe] or not sell_volume[timeframe]:
-            volume_ratio[timeframe] = {"buy_ratio": Decimal('0'), "sell_ratio": Decimal('0'), "status": "No Data"}
-            logging.warning(f"No volume data for {timeframe}")
-            print(f"No volume data for {timeframe}")
+            volume_ratio[timeframe] = {"buy_ratio": Decimal('0'), "sell_ratio": Decimal('0'), "status": "Insufficient Data"}
+            logging.warning(f"Insufficient volume data for {timeframe}")
+            print(f"Insufficient volume data for {timeframe}")
             continue
         recent_buy = buy_volume[timeframe][-3:]
         recent_sell = sell_volume[timeframe][-3:]
         if len(recent_buy) < 3 or len(recent_sell) < 3:
-            volume_ratio[timeframe] = {"buy_ratio": Decimal('0'), "sell_ratio": Decimal('0'), "status": "No Data"}
-            logging.warning(f"Insufficient volume for {timeframe}")
-            print(f"Insufficient volume for {timeframe}")
+            volume_ratio[timeframe] = {"buy_ratio": Decimal('0'), "sell_ratio": Decimal('0'), "status": "Insufficient Data"}
+            logging.warning(f"Insufficient recent volume data for {timeframe} (buy: {len(recent_buy)}, sell: {len(recent_sell)})")
+            print(f"Insufficient recent volume data for {timeframe} (buy: {len(recent_buy)}, sell: {len(recent_sell)})")
             continue
         buy_vols = np.array([float(v) for v in recent_buy], dtype=np.float64)
         sell_vols = np.array([float(v) for v in recent_sell], dtype=np.float64)
@@ -390,17 +262,17 @@ def calculate_volume_ratio(buy_volume, sell_volume):
             sell_ratio = Decimal('0')
             status = "No Activity"
         volume_ratio[timeframe] = {"buy_ratio": buy_ratio, "sell_ratio": sell_ratio, "status": status}
-        logging.info(f"{timeframe} - Buy Ratio: {buy_ratio:.2f}%, Sell Ratio: {sell_ratio:.2f}%, Status: {status}")
-        print(f"{timeframe} - Buy Ratio: {buy_ratio:.2f}%")
-        print(f"{timeframe} - Sell Ratio: {sell_ratio:.2f}%")
+        logging.info(f"{timeframe} - Smoothed Buy Ratio: {buy_ratio:.2f}%, Sell Ratio: {sell_ratio:.2f}%, Status: {status}")
+        print(f"{timeframe} - Smoothed Buy Ratio: {buy_ratio:.25f}%")
+        print(f"{timeframe} - Smoothed Sell Ratio: {sell_ratio:.25f}%")
         print(f"{timeframe} - Volume Status: {status}")
     return volume_ratio
 
-# Reversal Detection
+# Reversal Detection Function
 def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy_volume, sell_volume):
     if len(candles) < 3:
-        logging.warning(f"Insufficient candles ({len(candles)}) for reversal in {timeframe}.")
-        print(f"Insufficient candles ({len(candles)}) for reversal in {timeframe}.")
+        logging.warning(f"Insufficient candles ({len(candles)}) for reversal detection in {timeframe}.")
+        print(f"Insufficient candles ({len(candles)}) for reversal detection in {timeframe}.")
         return "NONE"
 
     lookback = min(len(candles), LOOKBACK_PERIODS[timeframe])
@@ -413,9 +285,14 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy
     highs = np.array([float(c['high']) for c in recent_candles if not np.isnan(c['high']) and c['high'] > 0], dtype=np.float64)
     times = np.array([c['time'] for c in recent_candles if not np.isnan(c['close']) and c['close'] > 0], dtype=np.float64)
 
-    if len(closes) < 3 or len(times) < 3:
-        logging.warning(f"Insufficient data for reversal in {timeframe}")
-        print(f"Insufficient data for reversal in {timeframe}")
+    if len(closes) < 3 or len(times) < 3 or len(lows) < 3 or len(highs) < 3:
+        logging.warning(f"Insufficient valid data (closes: {len(closes)}, times: {len(times)}, highs: {len(highs)}, lows: {len(lows)}) for reversal detection in {timeframe}.")
+        print(f"Insufficient valid data (closes: {len(closes)}, times: {len(times)}, highs: {len(highs)}, lows: {len(lows)}) for reversal detection in {timeframe}.")
+        return "NONE"
+
+    if len(closes) != len(times):
+        logging.error(f"Array length mismatch in {timeframe}: closes={len(closes)}, times={len(times)}")
+        print(f"Array length mismatch in {timeframe}: closes={len(closes)}, times={len(times)}")
         return "NONE"
 
     current_close = Decimal(str(closes[-1]))
@@ -423,8 +300,8 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy
 
     min_time = 0
     max_time = 0
-    closest_min_diff = Decimal('inf')
-    closest_max_diff = Decimal('inf')
+    closest_min_diff = Decimal('infinity')
+    closest_max_diff = Decimal('infinity')
     closest_min_price = min_threshold
     closest_max_price = max_threshold
     min_volume_confirmed = False
@@ -454,18 +331,18 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy
                 max_volume_confirmed = True
 
     if min_time > 0:
-        logging.info(f"{timeframe} - Low: {closest_min_price:.25f} at {datetime.datetime.fromtimestamp(min_time)}")
-        print(f"{timeframe} - Low: {closest_min_price:.25f} at {datetime.datetime.fromtimestamp(min_time)}")
+        logging.info(f"{timeframe} - Found closest low {closest_min_price:.2f} (target: {min_threshold:.2f}, diff: {closest_min_diff:.2f}) at time {datetime.datetime.fromtimestamp(min_time)}")
+        print(f"{timeframe} - Found closest low {closest_min_price:.25f} (target: {min_threshold:.25f}, diff: {closest_min_diff:.25f}) at time {datetime.datetime.fromtimestamp(min_time)}")
     else:
-        logging.warning(f"{timeframe} - No low found within {tolerance:.25f}")
-        print(f"{timeframe} - No low found within {tolerance:.25f}")
+        logging.warning(f"{timeframe} - No low found within {tolerance:.2f} of min threshold {min_threshold:.2f} over {len(recent_candles)} candles.")
+        print(f"{timeframe} - No low found within {tolerance:.25f} of min threshold {min_threshold:.25f} over {len(recent_candles)} candles.")
 
     if max_time > 0:
-        logging.info(f"{timeframe} - High: {closest_max_price:.25f} at {datetime.datetime.fromtimestamp(max_time)}")
-        print(f"{timeframe} - High: {closest_max_price:.25f} at {datetime.datetime.fromtimestamp(max_time)}")
+        logging.info(f"{timeframe} - Found closest high {closest_max_price:.2f} (target: {max_threshold:.2f}, diff: {closest_max_diff:.2f}) at time {datetime.datetime.fromtimestamp(max_time)}")
+        print(f"{timeframe} - Found closest high {closest_max_price:.25f} (target: {max_threshold:.25f}, diff: {closest_max_diff:.25f}) at time {datetime.datetime.fromtimestamp(max_time)}")
     else:
-        logging.warning(f"{timeframe} - No high found within {tolerance:.25f}")
-        print(f"{timeframe} - No high found within {tolerance:.25f}")
+        logging.warning(f"{timeframe} - No high found within {tolerance:.2f} of max threshold {max_threshold:.2f} over {len(recent_candles)} candles.")
+        print(f"{timeframe} - No high found within {tolerance:.25f} of max threshold {max_threshold:.25f} over {len(recent_candles)} candles.")
 
     price_range = max_threshold - min_threshold
     if price_range > Decimal('0'):
@@ -474,10 +351,10 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy
     else:
         min_pct = Decimal('50.00')
         max_pct = Decimal('50.00')
-        logging.warning(f"{timeframe} - Zero price range. Defaulting to 50%.")
-        print(f"{timeframe} - Zero price range. Defaulting to 50%.")
-    logging.info(f"{timeframe} - Distance: {min_pct:.2f}% from min, {max_pct:.2f}% from max")
-    print(f"{timeframe} - Distance: {min_pct:.2f}% from min, {max_pct:.2f}% from max")
+        logging.warning(f"{timeframe} - Zero price range detected. Defaulting normalized distances to 50%.")
+        print(f"{timeframe} - Zero price range detected. Defaulting normalized distances to 50%.")
+    logging.info(f"{timeframe} - Normalized Distance: {min_pct:.2f}% from min threshold, {max_pct:.2f}% from max threshold")
+    print(f"{timeframe} - Normalized Distance: {min_pct:.2f}% from min threshold, {max_pct:.2f}% from max threshold")
 
     reversals = []
     if min_time > 0 and min_volume_confirmed:
@@ -486,8 +363,8 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy
         reversals.append({"type": "TOP", "price": closest_max_price, "time": max_time})
 
     if not reversals:
-        logging.info(f"{timeframe} - No reversals detected.")
-        print(f"{timeframe} - No reversals detected.")
+        logging.info(f"{timeframe} - No valid reversals detected over {len(recent_candles)} candles.")
+        print(f"{timeframe} - No valid reversals detected over {len(recent_candles)} candles.")
         return "NONE"
 
     reversals.sort(key=lambda x: x["time"], reverse=True)
@@ -503,8 +380,8 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy
     else:
         confirmed_type = "DIP" if dist_to_min <= dist_to_max else "TOP"
 
-    logging.info(f"{timeframe} - Confirmed Reversal: {confirmed_type} at {most_recent['price']:.25f}")
-    print(f"{timeframe} - Confirmed Reversal: {confirmed_type} at {most_recent['price']:.25f}")
+    logging.info(f"{timeframe} - Confirmed reversal: {confirmed_type} at price {most_recent['price']:.2f}, time {datetime.datetime.fromtimestamp(most_recent['time'])}, distance to current close: {min(dist_to_min, dist_to_max):.2f}")
+    print(f"{timeframe} - Confirmed reversal: {confirmed_type} at price {most_recent['price']:.25f}, time {datetime.datetime.fromtimestamp(most_recent['time'])}, distance to current close: {min(dist_to_min, dist_to_max):.25f}")
     return confirmed_type
 
 # Utility Functions
@@ -516,7 +393,7 @@ def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=500):
         results = list(executor.map(fetch_candles, timeframes))
     return dict(zip(timeframes, results))
 
-def get_candles(symbol, timeframe, limit=500, retries=3, delay=5):
+def get_candles(symbol, timeframe, limit=500, retries=5, delay=5):
     for attempt in range(retries):
         try:
             klines = client.futures_klines(symbol=symbol, interval=timeframe, limit=limit)
@@ -537,121 +414,156 @@ def get_candles(symbol, timeframe, limit=500, retries=3, delay=5):
             return candles
         except BinanceAPIException as e:
             retry_after = e.response.headers.get('Retry-After', '60') if e.response else '60'
-            retry_after_int = int(retry_after) if retry_after.isdigit() else 60
+            try:
+                retry_after_int = int(retry_after)
+            except (ValueError, TypeError):
+                retry_after_int = 60
             if e.code == -1003:
-                logging.warning(f"Rate limit for {timeframe}. Waiting {retry_after_int}s.")
-                print(f"Rate limit for {timeframe}. Waiting {retry_after_int}s.")
+                logging.warning(f"Rate limit exceeded for {timeframe}. Waiting {retry_after_int} seconds.")
+                print(f"Rate limit exceeded for {timeframe}. Waiting {retry_after_int} seconds.")
                 time.sleep(retry_after_int)
             else:
-                logging.error(f"API error for {timeframe} (attempt {attempt + 1}): {e.message}")
-                print(f"API error for {timeframe}: {e.message}")
-                time.sleep(delay * (attempt + 1))
+                logging.error(f"Binance API Error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e.message}")
+                print(f"Binance API Error fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e.message}")
+                if attempt < retries - 1:
+                    time.sleep(delay * (attempt + 1))
         except requests.exceptions.Timeout as e:
-            logging.error(f"Timeout for {timeframe} (attempt {attempt + 1}): {e}")
-            print(f"Timeout for {timeframe}: {e}")
-            time.sleep(delay * (attempt + 1))
-    logging.error(f"Failed to fetch {timeframe} candles after {retries} attempts.")
-    print(f"Failed to fetch {timeframe} candles.")
+            logging.error(f"Read Timeout fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e}")
+            print(f"Read Timeout fetching candles for {timeframe} (attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+    logging.error(f"Failed to fetch candles for {timeframe} after {retries} attempts. Skipping timeframe.")
+    print(f"Failed to fetch candles for {timeframe} after {retries} attempts. Skipping timeframe.")
     return []
 
-def get_current_price(symbol=TRADE_SYMBOL, retries=3, delay=5):
+def get_current_price(retries=5, delay=5):
     for attempt in range(retries):
         try:
-            ticker = client.futures_symbol_ticker(symbol=symbol)
+            ticker = client.futures_symbol_ticker(symbol=TRADE_SYMBOL)
             price = Decimal(str(ticker['price']))
             if price > Decimal('0'):
-                logging.info(f"Price: {price:.25f}")
-                print(f"Price: {price:.25f}")
+                logging.info(f"Current {TRADE_SYMBOL} price: {price:.2f}")
+                print(f"Current {TRADE_SYMBOL} price: {price:.25f}")
                 return price
-            logging.warning(f"Invalid price {price:.25f}")
-            print(f"Invalid price: {price:.25f}")
+            logging.warning(f"Invalid price {price:.2f} on attempt {attempt + 1}/{retries}")
+            print(f"Invalid price {price:.25f} on attempt {attempt + 1}/{retries}")
         except BinanceAPIException as e:
             retry_after = e.response.headers.get('Retry-After', '60') if e.response else '60'
-            retry_after_int = int(retry_after) if retry_after.isdigit() else 60
-            logging.error(f"Price error (attempt {attempt + 1}): {e.message}")
-            print(f"Price error: {e.message}")
-            time.sleep(retry_after_int if e.code == -1003 else delay * (attempt + 1))
-        except requests.exceptions.Timeout as e:
-            logging.error(f"Price timeout (attempt {attempt + 1}): {e}")
-            print(f"Price timeout: {e}")
-            time.sleep(delay * (attempt + 1))
-    logging.error(f"Failed to fetch price after {retries} attempts.")
-    print(f"Failed to fetch price.")
-    return Decimal('0.0')
+            try:
+                retry_after_int = int(retry_after)
+            except (ValueError, TypeError):
+                retry_after_int = 60
+            if e.code == -1003:
+                logging.warning(f"Rate limit exceeded fetching price. Waiting {retry_after_int} seconds.")
+                print(f"Rate limit exceeded fetching price. Waiting {retry_after_int} seconds.")
+                time.sleep(retry_after_int)
+            else:
+                logging.error(f"Error fetching {TRADE_SYMBOL} price (attempt {attempt + 1}/{retries}): {e.message}")
+                print(f"Error fetching {TRADE_SYMBOL} price (attempt {attempt + 1}/{retries}): {e.message}")
+                if attempt < retries - 1:
+                    time.sleep(delay * (attempt + 1))
+        except requests.exceptions.ReadTimeout as e:
+            logging.error(f"Read Timeout fetching price (attempt {attempt + 1}/{retries}): {e}")
+            print(f"Read Timeout fetching price (attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay * (attempt + 1))
+    logging.error(f"Failed to fetch valid {TRADE_SYMBOL} price after {retries} attempts.")
+    print(f"Failed to fetch valid {TRADE_SYMBOL} price after {retries} attempts.")
+    return Decimal('0')
 
 def get_balance(asset='USDC'):
     try:
         account = client.futures_account()
-        for asset_info in account.get('assets', []):
+        if 'assets' not in account:
+            logging.error("No 'assets' key in futures account response.")
+            print("No 'assets' key in futures account response.")
+            return Decimal('0')
+        for asset_info in account['assets']:
             if asset_info.get('asset') == asset:
-                wallet = Decimal(str(asset_info.get('walletBalance', '0.0')))
-                logging.info(f"{asset} balance: {wallet:.25f}")
-                print(f"{asset} balance: {wallet:.25f}")
+                wallet = Decimal(str(asset_info.get('walletBalance', '0')))
+                logging.info(f"{asset} wallet balance: {wallet:.2f}")
+                print(f"{asset} wallet balance: {wallet:.25f}")
                 return wallet
-        logging.warning(f"{asset} not found.")
-        print(f"{asset} not found.")
-        return Decimal('0.0')
+        logging.warning(f"{asset} not found in futures account balances.")
+        print(f"{asset} not found in futures account balances.")
+        return Decimal('0')
     except BinanceAPIException as e:
-        logging.error(f"Balance error: {e.message}")
-        print(f"Balance error: {e.message}")
+        logging.error(f"Binance API exception while fetching {asset} balance: {e.message}")
+        print(f"Binance API exception while fetching {asset} balance: {e.message}")
+        return Decimal('0')
     except Exception as e:
-        logging.error(f"Balance error: {e}")
-        print(f"Balance error: {e}")
-    return Decimal('0.0')
+        logging.error(f"Unexpected error fetching {asset} balance: {e}")
+        print(f"Unexpected error fetching {asset} balance: {e}")
+        return Decimal('0')
 
-def get_position(symbol=TRADE_SYMBOL):
+def get_position():
     try:
-        positions = client.futures_position_information(symbol=symbol)
+        positions = client.futures_position_information(symbol=TRADE_SYMBOL)
         if not positions:
-            logging.warning(f"No position for {symbol}.")
-            print(f"No position for {symbol}.")
-            return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0'), "sl_price": Decimal('0.0'), "tp_price": Decimal('0.0')}
+            logging.warning(f"No position data returned for {TRADE_SYMBOL}. Assuming no open position.")
+            print(f"No position data returned for {TRADE_SYMBOL}. Assuming no open position.")
+            return {
+                "quantity": Decimal('0'),
+                "entry_price": Decimal('0'),
+                "side": "NONE",
+                "unrealized_pnl": Decimal('0'),
+                "initial_balance": Decimal('0'),
+                "sl_price": Decimal('0'),
+                "tp_price": Decimal('0')
+            }
         position = positions[0]
         quantity = Decimal(str(position['positionAmt']))
-        entry_price = Decimal(str(position['entryPrice']))
         return {
             "quantity": quantity,
-            "entry_price": entry_price,
+            "entry_price": Decimal(str(position['entryPrice'])),
             "side": "LONG" if quantity > Decimal('0') else "SHORT" if quantity < Decimal('0') else "NONE",
             "unrealized_pnl": Decimal(str(position['unrealizedProfit'])),
-            "initial_balance": Decimal('0.0'),
-            "sl_price": Decimal('0.0'),
-            "tp_price": Decimal('0.0')
+            "initial_balance": Decimal('0'),
+            "sl_price": Decimal('0'),
+            "tp_price": Decimal('0')
         }
     except BinanceAPIException as e:
-        logging.error(f"Position error: {e.message}")
-        print(f"Position error: {e.message}")
-        return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0'), "sl_price": Decimal('0.0'), "tp_price": Decimal('0.0')}
+        logging.error(f"Error fetching position info: {e.message}")
+        print(f"Error fetching position info: {e.message}")
+        return {
+            "quantity": Decimal('0'),
+            "entry_price": Decimal('0'),
+            "side": "NONE",
+            "unrealized_pnl": Decimal('0'),
+            "initial_balance": Decimal('0'),
+            "sl_price": Decimal('0'),
+            "tp_price": Decimal('0')
+        }
 
-def check_open_orders(symbol=TRADE_SYMBOL):
+def check_open_orders():
     try:
-        orders = client.futures_get_open_orders(symbol=symbol)
+        orders = client.futures_get_open_orders(symbol=TRADE_SYMBOL)
         for order in orders:
             logging.info(f"Open order: {order['type']} at {order['stopPrice']}")
             print(f"Open order: {order['type']} at {order['stopPrice']}")
         return len(orders)
     except BinanceAPIException as e:
-        logging.error(f"Open orders error: {e.message}")
-        print(f"Open orders error: {e.message}")
+        logging.error(f"Error checking open orders: {e.message}")
+        print(f"Error checking open orders: {e.message}")
         return 0
 
 # Trading Functions
 def calculate_quantity(balance, price):
     if price <= Decimal('0') or balance < MINIMUM_BALANCE:
-        logging.warning(f"Insufficient balance ({balance:.25f}) or price ({price:.25f}).")
-        print(f"Insufficient balance ({balance:.25f}) or price ({price:.25f}).")
-        return Decimal('0.0')
+        logging.warning(f"Insufficient balance ({balance:.2f} USDC) or invalid price ({price:.2f}). Cannot calculate quantity.")
+        print(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}). Cannot calculate quantity.")
+        return Decimal('0')
     quantity = (balance * Decimal(str(LEVERAGE))) / price
     quantity = quantity.quantize(QUANTITY_PRECISION, rounding='ROUND_DOWN')
-    logging.info(f"Quantity: {quantity:.25f} BTC")
-    print(f"Quantity: {quantity:.25f} BTC")
+    logging.info(f"Calculated quantity: {quantity:.6f} BTC for balance {balance:.2f} USDC at price {price:.2f}")
+    print(f"Calculated quantity: {quantity:.25f} BTC for balance {balance:.25f} USDC at price {price:.25f}")
     return quantity
 
 def place_order(signal, quantity, current_price, initial_balance):
     try:
         if quantity <= Decimal('0'):
-            logging.warning(f"Invalid quantity {quantity:.25f}.")
-            print(f"Invalid quantity {quantity:.25f}")
+            logging.warning(f"Invalid quantity {quantity:.6f}. Skipping order.")
+            print(f"Invalid quantity {quantity:.25f}. Skipping order.")
             return None
         position = get_position()
         position["initial_balance"] = initial_balance
@@ -665,29 +577,21 @@ def place_order(signal, quantity, current_price, initial_balance):
             tp_price = (current_price * (Decimal('1') + TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
             sl_price = (current_price * (Decimal('1') - STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
             
-            # Validate stop-loss
-            if sl_price >= current_price:
-                logging.error(f"LONG SL {sl_price:.25f} >= Entry {current_price:.25f}")
-                print(f"Error: LONG SL {sl_price:.25f} >= Entry {current_price:.25f}")
-                sl_price = current_price * Decimal('0.5')  # Fallback to 50% below entry
-                logging.warning(f"Fallback SL: {sl_price:.25f}")
-                print(f"Fallback SL: {sl_price:.25f}")
-            
             position["sl_price"] = sl_price
             position["tp_price"] = tp_price
             position["side"] = "LONG"
             position["quantity"] = quantity
             position["entry_price"] = current_price
             
-            logging.info(f"Placed LONG: {quantity:.25f} BTC at ~{current_price:.25f}")
-            print(f"\n=== TRADE ===")
+            logging.info(f"Placed LONG order: {quantity:.6f} BTC at market price ~{current_price:.2f}")
+            print(f"\n=== TRADE ENTERED ===")
             print(f"Side: LONG")
             print(f"Quantity: {quantity:.25f} BTC")
-            print(f"Entry: {current_price:.25f} USDC")
-            print(f"Balance: {initial_balance:.25f}")
-            print(f"Stop-Loss: {sl_price:.25f} (-50%)")
-            print(f"Take-Profit: {tp_price:.25f} (+5%)")
-            print(f"\n==================")
+            print(f"Entry Price: ~{current_price:.25f} USDC")
+            print(f"Initial USDC Balance: {initial_balance:.25f}")
+            print(f"Stop-Loss Price: {sl_price:.25f} (-50% ROI)")
+            print(f"Take-Profit Price: {tp_price:.25f} (+5% ROI)")
+            print(f"===================\n")
         elif signal == "SHORT":
             order = client.futures_create_order(
                 symbol=TRADE_SYMBOL,
@@ -698,38 +602,30 @@ def place_order(signal, quantity, current_price, initial_balance):
             tp_price = (current_price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
             sl_price = (current_price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
             
-            # Validate stop-loss
-            if sl_price <= current_price:
-                logging.error(f"SHORT SL {sl_price:.25f} <= Entry {current_price:.25f}")
-                print(f"Error: SHORT SL {sl_price:.25f} <= Entry {current_price:.25f}")
-                sl_price = current_price * Decimal('1.5')  # Fallback to 50% above entry
-                logging.warning(f"Fallback SL: {sl_price:.25f}")
-                print(f"Fallback SL: {sl_price:.25f}")
-            
             position["sl_price"] = sl_price
             position["tp_price"] = tp_price
             position["side"] = "SHORT"
             position["quantity"] = -quantity
             position["entry_price"] = current_price
             
-            logging.info(f"Placed SHORT: {quantity:.25f} BTC at ~{current_price:.25f}")
-            print(f"\n=== TRADE ===")
+            logging.info(f"Placed SHORT order: {quantity:.6f} BTC at market price ~{current_price:.2f}")
+            print(f"\n=== TRADE ENTERED ===")
             print(f"Side: SHORT")
             print(f"Quantity: {quantity:.25f} BTC")
-            print(f"Entry Price: {current_price:.25f} USDC")
-            print(f"Balance: {initial_balance:.25f}")
-            print(f"Stop-Loss: {sl_price:.25f} (-50%)")
-            print(f"Take-Profit: {tp_price:.25f} (+5%)")
-            print(f"\n==================")
+            print(f"Entry Price: ~{current_price:.25f} USDC")
+            print(f"Initial USDC Balance: {initial_balance:.25f}")
+            print(f"Stop-Loss Price: {sl_price:.25f} (-50% ROI)")
+            print(f"Take-Profit Price: {tp_price:.25f} (+5% ROI)")
+            print(f"===================\n")
         
         open_orders = check_open_orders()
         if open_orders > 0:
-            logging.warning(f"Unexpected orders after {signal}.")
-            print(f"Warning: {open_orders} orders after {signal}.")
+            logging.warning(f"Unexpected open orders ({open_orders}) detected after placing {signal} order.")
+            print(f"Warning: Unexpected open orders ({open_orders}) detected after placing {signal} order.")
         return position
     except BinanceAPIException as e:
-        logging.error(f"Order error: {e.message}")
-        print(f"Order error: {e.message}")
+        logging.error(f"Error placing order: {e.message}")
+        print(f"Error placing order: {e.message}")
         return None
 
 def close_position(position, current_price):
@@ -738,7 +634,7 @@ def close_position(position, current_price):
         print("No position to close.")
         return
     try:
-        quantity = abs(position['quantity']).quantize(QUANTITY_PRECISION)
+        quantity = abs(position["quantity"]).quantize(QUANTITY_PRECISION)
         side = "SELL" if position["side"] == "LONG" else "BUY"
         order = client.futures_create_order(
             symbol=TRADE_SYMBOL,
@@ -746,17 +642,17 @@ def close_position(position, current_price):
             type="MARKET",
             quantity=str(quantity)
         )
-        logging.info(f"Closed {position['side']}: {quantity:.25f} at {current_price:.25f}")
-        print(f"Closed {position['side']}: {quantity:.25f} at {current_price:.25f}")
-    except Exception as e:
-        logging.error(f"Close error: {e}")
-        print(f"Close error: {e}")
+        logging.info(f"Closed {position['side']} position: {quantity:.6f} BTC at market price ~{current_price:.2f}")
+        print(f"Closed {position['side']} position: {quantity:.25f} BTC at market price ~{current_price:.25f}")
+    except BinanceAPIException as e:
+        logging.error(f"Error closing position: {e.message}")
+        print(f"Error closing position: {e.message}")
 
 # Analysis Functions
 def calculate_thresholds(candles):
     if not candles:
-        logging.warning("No candles for thresholds.")
-        print(f"Returning zero thresholds.")
+        logging.warning("No candles provided for threshold calculation.")
+        print("No candles provided for threshold calculation.")
         return Decimal('0'), Decimal('0'), Decimal('0')
     lookback = min(len(candles), LOOKBACK_PERIODS[candles[0]['timeframe']])
     highs = np.array([float(c['high']) for c in candles[-lookback:] if not np.isnan(c['high']) and c['high'] > 0], dtype=np.float64)
@@ -764,10 +660,10 @@ def calculate_thresholds(candles):
     closes = np.array([float(c['close']) for c in candles[-lookback:] if not np.isnan(c['close']) and c['close'] > 0], dtype=np.float64)
 
     if len(closes) == 0 or len(highs) == 0 or len(lows) == 0:
-        logging.warning(f"No valid data. Candles: {len(candles)}")
-        print(f"No valid data for {len(candles)} candles.")
+        logging.warning(f"No valid OHLC data for threshold calculation. Candles processed: {len(candles)}")
+        print(f"No valid OHLC data for threshold calculation. Candles processed: {len(candles)}")
         return Decimal('0'), Decimal('0'), Decimal('0')
-    
+
     current_close = Decimal(str(closes[-1]))
     min_price = Decimal(str(np.min(lows)))
     max_price = Decimal(str(np.max(highs)))
@@ -776,67 +672,64 @@ def calculate_thresholds(candles):
     middle_threshold = (min_threshold + max_threshold) / Decimal('2')
 
     timeframe = candles[0]['timeframe']
-    logging.info(f"Thresholds for {timeframe}: Min: {min_threshold:.25f}, Mid: {middle_threshold:.25f}, Max: {max_threshold:.25f}")
-    print(f"{timeframe} - Min: {min_threshold:.2f}")
-    print(f"{timeframe} - Mid: {middle_threshold:.2f}")
-    print(f"{timeframe} - Max: {max_threshold:.25f}")
-    print(f"{timeframe} - Close: {current_close:.25f}")
+    logging.info(f"Thresholds calculated over {len(highs)} candles: Minimum: {min_threshold:.2f}, Middle: {middle_threshold:.2f}, Maximum: {max_threshold:.2f}, Current Close: {current_close:.2f}")
+    print(f"{timeframe} - Minimum Threshold: {min_threshold:.25f}")
+    print(f"{timeframe} - Middle Threshold: {middle_threshold:.25f}")
+    print(f"{timeframe} - Maximum Threshold: {max_threshold:.25f}")
+    print(f"{timeframe} - Current Close: {current_close:.25f}")
     return min_threshold, middle_threshold, max_threshold
 
-# Main Loop
+# Main Analysis Loop
 def main():
-    global conditions_long, conditions_short
     timeframes = TIMEFRAMES
-    logging.info("Bot initialized!")
-    print("Bot initialized!")
-
+    logging.info("Futures Analysis Bot Initialized!")
+    print("Futures Analysis Bot Initialized!")
+    
     try:
         while True:
-            current_time = datetime.datetime.now()
-            current_time_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
-            logging.info(f"Time: {current_time_str}")
-            print(f"Time: {current_time_str}")
+            current_local_time = datetime.datetime.now()
+            current_local_time_str = current_local_time.strftime("%Y-%m-%d %H:%M:%S")
+            logging.info(f"Current Time: {current_local_time_str}")
+            print(f"\nCurrent Time: {current_local_time_str}")
 
             candle_map = fetch_candles_in_parallel(timeframes)
             if not candle_map or not any(candle_map.values()):
-                logging.warning("No candles. Retrying in 60s.")
-                print("No candles. Retrying in 60s.")
+                logging.warning("No candle data available. Retrying in 60 seconds.")
+                print("No candle data available. Retrying in 60 seconds.")
                 time.sleep(60)
                 continue
 
             current_price = get_current_price()
             if current_price <= Decimal('0'):
-                logging.warning(f"Price: {current_price:.25f}. API failing.")
-                print(f"Warning: Price: {current_price:.25f}. API failing.")
+                logging.warning(f"Current {TRADE_SYMBOL} price is {current_price:.2f}. API may be failing.")
+                print(f"Warning: Current {TRADE_SYMBOL} price is {current_price:.25f}. API may be failing.")
                 time.sleep(60)
                 continue
-            
+
             usdc_balance = get_balance('USDC')
             position = get_position()
 
             if position["side"] != "NONE" and position["sl_price"] > Decimal('0'):
-                logging.info(f"Checking position: Side={position['side']}, Entry={position['entry_price']:.25f}, SL={position['sl_price']:.25f}, TP={position['tp_price']:.25f}")
-                print(f"Checking position: Side={position['side']}, Entry={position['entry_price']:.25f}, SL={position['sl_price']:.25f}, TP={position['tp_price']:.25f}")
                 if position["side"] == "LONG":
                     if current_price <= position["sl_price"]:
-                        logging.info(f"SL LONG triggered at {current_price:.25f} (SL: {position['sl_price']:.25f})")
-                        print(f"SL LONG triggered at {current_price:.25f} (SL: {position['sl_price']:.25f})")
+                        logging.info(f"Stop-Loss triggered for LONG at {current_price:.2f} (SL: {position['sl_price']:.2f})")
+                        print(f"Stop-Loss triggered for LONG at {current_price:.25f} (SL: {position['sl_price']:.25f})")
                         close_position(position, current_price)
                         position = get_position()
                     elif current_price >= position["tp_price"]:
-                        logging.info(f"TP LONG triggered at {current_price:.25f} (TP: {position['tp_price']:.25f})")
-                        print(f"TP LONG triggered at {current_price:.25f} (TP: {position['tp_price']:.25f})")
+                        logging.info(f"Take-Profit triggered for LONG at {current_price:.2f} (TP: {position['tp_price']:.2f})")
+                        print(f"Take-Profit triggered for LONG at {current_price:.25f} (TP: {position['tp_price']:.25f})")
                         close_position(position, current_price)
                         position = get_position()
                 elif position["side"] == "SHORT":
                     if current_price >= position["sl_price"]:
-                        logging.info(f"SL SHORT triggered at {current_price:.25f} (SL: {position['sl_price']:.25f})")
-                        print(f"SL SHORT triggered at {current_price:.25f} at {current_price:.25f}")
+                        logging.info(f"Stop-Loss triggered for SHORT at {current_price:.2f} (SL: {position['sl_price']:.2f})")
+                        print(f"Stop-Loss triggered for SHORT at {current_price:.25f} (SL: {position['sl_price']:.25f})")
                         close_position(position, current_price)
                         position = get_position()
                     elif current_price <= position["tp_price"]:
-                        logging.info(f"TP SHORT triggered at {current_price:.25f} (TP: {position['tp_price']:.25f})")
-                        print(f"TP SHORT triggered at {current_price:.25f} (TP: {position['tp_price']:.25f})")
+                        logging.info(f"Take-Profit triggered for SHORT at {current_price:.2f} (TP: {position['tp_price']:.2f})")
+                        print(f"Take-Profit triggered for SHORT at {current_price:.25f} (TP: {position['tp_price']:.25f})")
                         close_position(position, current_price)
                         position = get_position()
 
@@ -876,139 +769,109 @@ def main():
                 "double_top_3m": False,
                 "double_top_5m": False
             }
-            
-            buy_volume, sell_volume = calculate_buy_sell_volume_original(candle_map)
+
+            buy_volume, sell_volume, volume_moods = calculate_buy_sell_volume(candle_map)
             volume_ratio = calculate_volume_ratio(buy_volume, sell_volume)
-            buy_vol_1m, sell_vol_1m, buy_vol_3m, sell_vol_3m, buy_vol_5m, sell_vol_5m, volume_moods = calculate_buy_sell_volume(candle_map)
 
             for timeframe in timeframes:
-                print(f"\n--- {timeframe} Analysis ---")
+                print(f"\n--- {timeframe} Timeframe Analysis ---")
                 
                 if not candle_map.get(timeframe):
-                    logging.warning(f"No data for {timeframe}.")
-                    print(f"No data for {timeframe}.")
-                    conditions_long.update({f"{k}_{timeframe}": True for k in ["volume_bullish", "below_middle", "fft_bullish", "dip_confirmation", "double_bottom"]})
-                    conditions_short.update({f"{k}_{timeframe}": False for k in ["volume_bearish", "above_middle", "fft_bearish", "top_confirmation", "double_top"]})
-                    if timeframe == "1m":
-                        conditions_long["momentum_positive_1m"] = True
-                        conditions_short["momentum_negative_1m"] = False
+                    logging.warning(f"No data for {timeframe}. Skipping analysis.")
+                    print(f"No data for {timeframe}. Skipping analysis.")
                     continue
                 
                 candles = candle_map[timeframe]
-                closes = np.array([float(c['close']) for c in candles if not np.isnan(c['close']) and c['close'] > 0], dtype=np.float64)
+                closes = np.array([candle["close"] for candle in candles if not np.isnan(candle["close"]) and candle["close"] > 0], dtype=np.float64)
                 
                 min_threshold, middle_threshold, max_threshold = calculate_thresholds(candles)
                 reversal_type = detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, buy_volume, sell_volume)
                 
-                current_close = Decimal(str(closes[-1])) if len(closes) > 0 else Decimal('0')
-                prev_close = Decimal(str(closes[-2])) if len(closes) >= 2 else current_close
-                current_quadrant, last_quadrant, incoming_quadrant, degrees = map_price_to_quadrant(
-                    current_close, min_threshold, max_threshold, reversal_type, timeframe, prev_close
-                )
-
+                # Double Pattern Detection
+                print(f"\n--- {timeframe} Timeframe Double Pattern Analysis ---")
+                pattern_type, bottom_intensity, top_intensity = detect_double_pattern(candles, timeframe, min_threshold, max_threshold, buy_volume, sell_volume)
+                conditions_long[f"double_bottom_{timeframe}"] = pattern_type == "D. BOTTOM"
+                conditions_short[f"double_top_{timeframe}"] = pattern_type == "D. TOP"
+                logging.info(f"{timeframe} - Double Bottom: {conditions_long[f'double_bottom_{timeframe}']}, Double Top: {conditions_short[f'double_top_{timeframe}']}")
+                print(f"{timeframe} - Double Bottom: {conditions_long[f'double_bottom_{timeframe}']}")
+                print(f"{timeframe} - Double Top: {conditions_short[f'double_top_{timeframe}']}")
+                
                 # FFT Analysis
-                print(f"\n--- {timeframe} FFT ---")
-                predominant_freq = 0.0
-                predominant_sign = "Neutral"
+                print(f"\n--- {timeframe} Timeframe FFT Analysis ---")
                 if len(closes) >= 2:
-                    current_time, entry_price, informational_sl, fastest_target, market_mood, is_bullish_target, is_bearish_target, predominant_freq, predominant_sign = get_target_price(
-                        closes, n_components=5, timeframe=timeframe, reversal_type=reversal_type, min_threshold=min_threshold, middle_threshold=middle_threshold, max_threshold=max_threshold
+                    current_time, entry_price, stop_loss, fastest_target, market_mood, is_bullish_target, is_bearish_target, predominant_freq, predominant_sign = get_target(
+                        closes, n_components=5, reversal_type=reversal_type, min_threshold=min_threshold, middle_threshold=middle_threshold, max_threshold=max_threshold
                     )
-                    print(f"{timeframe} - Time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                    print(f"{timeframe} - Mood: {market_mood}")
-                    print(f"{timeframe} - Close: {entry_price:.25f}")
-                    print(f"{timeframe} - Target: {fastest_target:.25f}")
-                    print(f"{timeframe} - Informational SL: {informational_sl:.25f}")
-                    print(f"{timeframe} - Bullish: {is_bullish_target}")
-                    print(f"{timeframe} - Bearish: {is_bearish_target}")
-                    print(f"{timeframe} - Freq: {predominant_freq:.6f}, Sign: {predominant_sign}")
+                    print(f"{timeframe} - FFT Current Local Time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    print(f"{timeframe} - FFT Market Mood: {market_mood}")
+                    print(f"{timeframe} - FFT Current Close Price: {entry_price:.25f}")
+                    print(f"{timeframe} - FFT Fastest Target: {fastest_target:.25f}")
+                    print(f"{timeframe} - FFT Stop Loss: {stop_loss:.25f}")
+                    print(f"{timeframe} - FFT Bullish Target: {is_bullish_target}")
+                    print(f"{timeframe} - FFT Bearish Target: {is_bearish_target}")
+                    print(f"{timeframe} - Predominant Frequency: {predominant_freq:.6f}, Sign: {predominant_sign}")
                     
                     conditions_long[f"fft_bullish_{timeframe}"] = is_bullish_target
                     conditions_short[f"fft_bearish_{timeframe}"] = is_bearish_target
                 else:
-                    logging.warning(f"{timeframe} - FFT: No data")
-                    print(f"{timeframe} - FFT: No data")
-                    conditions_long[f"fft_bullish_{timeframe}"] = True
+                    logging.warning(f"{timeframe} - FFT Data Status: Insufficient data")
+                    print(f"{timeframe} - FFT Data Status: Insufficient data")
+                    conditions_long[f"fft_bullish_{timeframe}"] = False
                     conditions_short[f"fft_bearish_{timeframe}"] = False
                 
                 # Volume Analysis
-                print(f"\n--- {timeframe} Volume ---")
+                print(f"\n--- {timeframe} Timeframe Volume Analysis ---")
                 total_volume = calculate_volume(candles)
+                print(f"{timeframe} - Volume Mood: {volume_moods.get(timeframe, 'NEUTRAL')}")
                 
-                if timeframe == "1m":
-                    print(f"{timeframe} - Buy: {buy_vol_1m:.25f}")
-                    print(f"{timeframe} - Sell: {sell_vol_1m:.25f}")
-                    print(f"{timeframe} - Mood: {volume_moods['1m']}")
-                elif timeframe == "3m":
-                    print(f"{timeframe} - Buy: {buy_vol_3m:.25f}")
-                    print(f"{timeframe} - Sell: {sell_vol_3m:.25f}")
-                    print(f"{timeframe} - Mood: {volume_moods['3m']}")
-                elif timeframe == "5m":
-                    print(f"{timeframe} - Buy: {buy_vol_5m:.25f}")
-                    print(f"{timeframe} - Sell: {sell_vol_5m:.25f}")
-                    print(f"{timeframe} - Mood: {volume_moods['5m']}")
-
                 # Price Analysis
-                print(f"\n--- {timeframe} Price ---")
+                print(f"\n--- {timeframe} Timeframe Price Analysis ---")
+                current_close = Decimal(str(closes[-1])) if len(closes) > 0 else Decimal('0')
                 
                 if min_threshold == Decimal('0') or max_threshold == Decimal('0'):
-                    logging.warning(f"No thresholds for {timeframe}.")
-                    print(f"No thresholds for {timeframe}.")
-                    conditions_long.update({f"{k}_{timeframe}": True for k in ["below_middle", "volume_bullish", "dip_confirmation", "double_bottom"]})
-                    conditions_short.update({f"{k}_{timeframe}": False for k in ["above_middle", "volume_bearish", "top_confirmation", "double_top"]})
+                    logging.warning(f"No valid thresholds for {timeframe}. Skipping threshold and reversal analysis.")
+                    print(f"No valid thresholds for {timeframe}. Skipping threshold and reversal analysis.")
                     continue
 
                 conditions_long[f"below_middle_{timeframe}"] = current_close <= middle_threshold
                 conditions_short[f"above_middle_{timeframe}"] = not conditions_long[f"below_middle_{timeframe}"]
-                logging.info(f"{timeframe} - Close: {current_close:.25f}, Below: {conditions_long[f'below_middle_{timeframe}']}")
-                print(f"{timeframe} - Close: {current_close:.25f}")
-                print(f"{timeframe} - Below Mid: {conditions_long[f'below_middle_{timeframe}']}")
-                print(f"{timeframe} - Above Mid: {conditions_short[f'above_middle_{timeframe}']}")
+                logging.info(f"{timeframe} - Current Close: {current_close:.2f}, Below Middle: {conditions_long[f'below_middle_{timeframe}']}, Above Middle: {conditions_short[f'above_middle_{timeframe}']}")
+                print(f"{timeframe} - Current Close: {current_close:.25f}")
+                print(f"{timeframe} - Below Middle Threshold: {conditions_long[f'below_middle_{timeframe}']}")
+                print(f"{timeframe} - Above Middle Threshold: {conditions_short[f'above_middle_{timeframe}']}")
 
                 buy_vol = buy_volume.get(timeframe, [Decimal('0')])[-1]
                 sell_vol = sell_volume.get(timeframe, [Decimal('0')])[-1]
                 price_trend = Decimal(str(closes[-1])) - Decimal(str(closes[-2])) if len(closes) >= 2 else Decimal('0')
                 conditions_long[f"volume_bullish_{timeframe}"] = buy_vol > sell_vol or (buy_vol == sell_vol and price_trend >= Decimal('0'))
                 conditions_short[f"volume_bearish_{timeframe}"] = not conditions_long[f"volume_bullish_{timeframe}"]
-                logging.info(f"{timeframe} - Bullish: {buy_vol:.25f}, Bearish: {sell_vol:.25f}")
-                print(f"{timeframe} - Bullish Vol: {buy_vol:.25f}")
-                print(f"{timeframe} - Bearish Vol: {sell_vol:.25f}")
+                logging.info(f"Volume Bullish ({timeframe}): {buy_vol:.2f}, Bearish: {sell_vol:.2f}, Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}, Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
+                print(f"{timeframe} - Volume Bullish: {buy_vol:.25f}")
+                print(f"{timeframe} - Volume Bearish: {sell_vol:.25f}")
+                print(f"{timeframe} - Volume Bullish Condition: {conditions_long[f'volume_bullish_{timeframe}']}")
+                print(f"{timeframe} - Volume Bearish Condition: {conditions_short[f'volume_bearish_{timeframe}']}")
 
                 conditions_long[f"dip_confirmation_{timeframe}"] = reversal_type == "DIP" or reversal_type == "NONE"
                 conditions_short[f"top_confirmation_{timeframe}"] = reversal_type == "TOP"
-                logging.info(f"{timeframe} - Dip: {conditions_long[f'dip_confirmation_{timeframe}']}")
-                print(f"{timeframe} - Dip: {conditions_long[f'dip_confirmation_{timeframe}']}")
-                print(f"{timeframe} - Top: {conditions_short[f'top_confirmation_{timeframe}']}")
+                logging.info(f"{timeframe} - Dip Confirmation: {conditions_long[f'dip_confirmation_{timeframe}']}, Top Confirmation: {conditions_short[f'top_confirmation_{timeframe}']}")
+                print(f"{timeframe} - Dip Confirmation: {conditions_long[f'dip_confirmation_{timeframe}']}")
+                print(f"{timeframe} - Top Confirmation: {conditions_short[f'top_confirmation_{timeframe}']}")
 
-                # Momentum Analysis
-                print(f"\n--- {timeframe} Momentum ---")
-                current_momentum = Decimal('0')
-                if len(closes) >= 14:
-                    momentum = talib.MOM(closes, timeperiod=14)
-                    if len(momentum) > 0 and not np.isnan(momentum[-1]):
-                        current_momentum = Decimal(str(momentum[-1]))
-                        if timeframe == "1m":
-                            conditions_long[f"momentum_positive_1m"] = current_momentum >= Decimal('0')
-                            conditions_short[f"momentum_negative_1m"] = not conditions_long[f"momentum_positive_1m"]
-                            logging.info(f"1m Momentum: {current_momentum:.25f}, Positive: {conditions_long['momentum_positive_1m']}")
-                            print(f"1m Momentum: {current_momentum:.25f}, Positive: {conditions_long['momentum_positive_1m']}")
-                else:
-                    logging.warning(f"{timeframe} Momentum: No data")
-                    print(f"{timeframe} Momentum: No data")
-                    if timeframe == "1m":
-                        conditions_long["momentum_positive_1m"] = True
+                if timeframe == "1m":
+                    print(f"\n--- {timeframe} Timeframe Momentum Analysis ---")
+                    if len(closes) >= 14:
+                        momentum = talib.MOM(closes, timeperiod=14)
+                        if len(momentum) > 0 and not np.isnan(momentum[-1]):
+                            current_momentum = Decimal(str(momentum[-1]))
+                            conditions_long["momentum_positive_1m"] = current_momentum >= Decimal('0')
+                            conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
+                            logging.info(f"1m Momentum: {current_momentum:.2f} - {'Positive' if conditions_long['momentum_positive_1m'] else 'Negative'}")
+                            print(f"1m Momentum: {current_momentum:.25f} - {'Positive' if conditions_long['momentum_positive_1m'] else 'Negative'}")
+                    else:
+                        logging.warning(f"1m Momentum: Insufficient data")
+                        print(f"1m Momentum: Insufficient data")
+                        conditions_long["momentum_positive_1m"] = False
                         conditions_short["momentum_negative_1m"] = False
-                        logging.info(f"1m Momentum: No data, Default Positive: True")
-                        print(f"1m Momentum: No data, Default Positive: True")
-
-                # Double Pattern Analysis
-                print(f"\n--- {timeframe} Pattern ---")
-                double_bottom, double_top, pattern_type, db_ratio, dt_ratio = detect_double_pattern(
-                    candles, timeframe, min_threshold, max_threshold, reversal_type, current_close,
-                    predominant_freq, predominant_sign, current_momentum, buy_volume, sell_volume
-                )
-                conditions_long[f"double_bottom_{timeframe}"] = double_bottom
-                conditions_short[f"double_top_{timeframe}"] = double_top
 
             condition_pairs = [
                 ("volume_bullish_1m", "volume_bearish_1m"),
@@ -1028,8 +891,8 @@ def main():
                 ("double_bottom_3m", "double_top_3m"),
                 ("double_bottom_5m", "double_top_5m")
             ]
-            logging.info("Condition Pairs:")
-            print("\nCondition Pairs:")
+            logging.info("Condition Pairs Status:")
+            print("\nCondition Pairs Status:")
             symmetry_valid = True
             for long_cond, short_cond in condition_pairs:
                 valid = conditions_long[long_cond] != conditions_short[short_cond]
@@ -1037,33 +900,40 @@ def main():
                 print(f"{long_cond}: {conditions_long[long_cond]}, {short_cond}: {conditions_short[short_cond]} {'✓' if valid else '✗'}")
                 if not valid:
                     symmetry_valid = False
-            logging.info(f"Symmetry: {'Valid' if symmetry_valid else 'Invalid'}")
-            print(f"Symmetry: {'Valid' if symmetry_valid else 'Invalid'}")
+                    logging.warning(f"Symmetry violation: {long_cond}={conditions_long[long_cond]}, {short_cond}={conditions_short[short_cond]}")
+            logging.info(f"Symmetry Status: {'Valid' if symmetry_valid else 'Invalid'}")
+            print(f"Symmetry Status: {'Valid' if symmetry_valid else 'Invalid'}")
 
-            long_signal = all(
-                conditions_long[key] for key in conditions_long if not key.startswith("double_bottom")
-            ) and any(conditions_long[f"double_bottom_{tf}"] for tf in timeframes)
-            short_signal = all(
-                conditions_short[key] for key in conditions_short if not key.startswith("double_top")
-            ) and any(conditions_short[f"double_top_{tf}"] for tf in timeframes)
+            long_signal = all(conditions_long.values()) and not any(conditions_short.values())
+            short_signal = all(conditions_short.values()) and not any(conditions_long.values())
 
-            logging.info("Signals:")
-            print("\nSignals:")
-            logging.info(f"LONG: {'Active' if long_signal else 'Inactive'}")
-            print(f"LONG: {'Active' if long_signal else 'Inactive'}")
-            logging.info(f"SHORT: {'Active' if short_signal else 'Inactive'}")
-            print(f"SHORT: {'Active' if short_signal else 'Inactive'}")
+            logging.info("Trade Signal Status:")
+            print("\nTrade Signal Status:")
+            logging.info(f"LONG Signal: {'Active' if long_signal else 'Inactive'}")
+            print(f"LONG Signal: {'Active' if long_signal else 'Inactive'}")
+            if long_signal:
+                double_bottom_active = any(conditions_long[f"double_bottom_{tf}"] for tf in timeframes)
+                if double_bottom_active:
+                    logging.info("LONG Signal triggered with Double Bottom pattern detected")
+                    print("LONG Signal triggered with Double Bottom pattern detected")
+            logging.info(f"SHORT Signal: {'Active' if short_signal else 'Inactive'}")
+            print(f"SHORT Signal: {'Active' if short_signal else 'Inactive'}")
+            if short_signal:
+                double_top_active = any(conditions_short[f"double_top_{tf}"] for tf in timeframes)
+                if double_top_active:
+                    logging.info("SHORT Signal triggered with Double Top pattern detected")
+                    print("SHORT Signal triggered with Double Top pattern detected")
             if long_signal and short_signal:
-                logging.warning("Conflict: Both signals active.")
-                print("Conflict: Both signals active.")
+                logging.warning("Conflict: Both LONG and SHORT signals active. Setting to NO_SIGNAL.")
+                print("Conflict: Both LONG and SHORT signals active. Setting to NO_SIGNAL.")
 
-            logging.info("\nLong Conditions:")
-            print("\nLong Conditions:")
+            logging.info("\nLong Conditions Status:")
+            print("\nLong Conditions Status:")
             for condition, status in conditions_long.items():
                 logging.info(f"{condition}: {'True' if status else 'False'}")
                 print(f"{condition}: {'True' if status else 'False'}")
-            logging.info("\nShort Conditions:")
-            print("\nShort Conditions:")
+            logging.info("\nShort Conditions Status:")
+            print("\nShort Conditions Status:")
             for condition, status in conditions_short.items():
                 logging.info(f"{condition}: {'True' if status else 'False'}")
                 print(f"{condition}: {'True' if status else 'False'}")
@@ -1072,22 +942,24 @@ def main():
             long_false = len(conditions_long) - long_true
             short_true = sum(1 for val in conditions_short.values() if val)
             short_false = len(conditions_short) - short_true
-            logging.info(f"\nLong: {long_true} True, {long_false} False")
-            print(f"\nLong: {long_true} True, {long_false} False")
-            logging.info(f"Short: {short_true} True, {short_false} False")
-            print(f"Short: {short_true} True, {short_false} False")
+            logging.info(f"\nLong Conditions Summary: {long_true} True, {long_false} False")
+            print(f"\nLong Conditions Summary: {long_true} True, {long_false} False")
+            logging.info(f"Short Conditions Summary: {short_true} True, {short_false} False")
+            print(f"Short Conditions Summary: {short_true} True, {short_false} False")
 
             signal = "NO_SIGNAL"
-            if long_signal and not short_signal:
+            if long_signal and symmetry_valid:
                 signal = "LONG"
-            elif short_signal and not long_signal:
+            elif short_signal and symmetry_valid:
                 signal = "SHORT"
-            logging.info(f"Signal: {signal}")
-            print(f"Signal: {signal}")
+            if long_signal and short_signal:
+                signal = "NO_SIGNAL"
+            logging.info(f"Final Signal: {signal}")
+            print(f"Final Signal: {signal}")
 
             if usdc_balance < MINIMUM_BALANCE:
-                logging.warning(f"Low balance: {usdc_balance:.25f}")
-                print(f"Low balance: {usdc_balance:.25f}")
+                logging.warning(f"Insufficient USDC balance ({usdc_balance:.2f}) to place trades. Minimum required: {MINIMUM_BALANCE:.2f}")
+                print(f"Insufficient USDC balance ({usdc_balance:.25f}) to place trades. Minimum required: {MINIMUM_BALANCE:.25f}")
             elif signal in ["LONG", "SHORT"] and position["side"] == "NONE":
                 quantity = calculate_quantity(usdc_balance, current_price)
                 position = place_order(signal, quantity, current_price, usdc_balance)
@@ -1097,47 +969,43 @@ def main():
                 position = place_order(signal, quantity, current_price, usdc_balance)
 
             if position["side"] != "NONE":
-                print("\nPosition:")
-                print(f"Side: {position['side']}")
+                print("\nCurrent Position Status:")
+                print(f"Position Side: {position['side']}")
                 print(f"Quantity: {position['quantity']:.25f} BTC")
-                print(f"Entry: {position['entry_price']:.25f} USDC")
-                print(f"Price: {current_price:.25f} USDC")
-                print(f"PNL: {position['unrealized_pnl']:.25f} USDC")
-                print(f"SL: {position['sl_price']:.25f} USDC")
-                print(f"TP: {position['tp_price']:.25f} USDC")
+                print(f"Entry Price: {position['entry_price']:.25f} USDC")
+                print(f"Current Price: {current_price:.25f} USDC")
+                print(f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC")
+                print(f"Stop-Loss Price: {position['sl_price']:.25f} USDC")
+                print(f"Take-Profit Price: {position['tp_price']:.25f} USDC")
                 current_balance = usdc_balance + position['unrealized_pnl']
                 roi = ((current_balance - position['initial_balance']) / position['initial_balance'] * Decimal('100')).quantize(Decimal('0.01')) if position['initial_balance'] > Decimal('0') else Decimal('0')
-                print(f"ROI: {roi:.2f}%")
-                print(f"Initial: {position['initial_balance']:.25f}")
-                print(f"Balance: {current_balance:.25f} USDC")
+                print(f"Current ROI: {roi:.2f}%")
+                print(f"Initial USDC Balance: {position['initial_balance']:.25f}")
+                print(f"Current Total Balance: {current_balance:.25f} USDC")
             else:
-                print(f"\nNo position. Balance: {usdc_balance:.25f}")
+                print(f"\nNo open position. USDC Balance: {usdc_balance:.25f}")
 
-            print(f"\nBalance: {usdc_balance:.25f}")
-            print(f"Position: {position['side']}, Quantity: {position['quantity']:.25f} BTC")
-            print(f"Price: {current_price:.25f}\n")
+            print(f"\nCurrent USDC Balance: {usdc_balance:.25f}")
+            print(f"Current Position: {position['side']}, Quantity: {position['quantity']:.25f} BTC")
+            print(f"Current Price: {current_price:.25f}\n")
 
             del candle_map
             gc.collect()
             time.sleep(5)
 
-    except Exception as e:
-        logging.error(f"Main error: {e}")
-        print(f"Main error: {e}")
-        position = get_position()
-        if position["side"] != "NONE":
-            close_position(position, get_current_price())
-        time.sleep(5)
-
     except KeyboardInterrupt:
-        logging.info("Shutting down...")
-        print("Shutting down...")
+        logging.info("Shutting down bot...")
+        print("Shutting down bot...")
         position = get_position()
         if position["side"] != "NONE":
             close_position(position, get_current_price())
-        logging.info("Shutdown complete.")
-        print("Shutdown complete.")
+        logging.info("Bot shutdown complete.")
+        print("Bot shutdown complete.")
         exit(0)
+    except Exception as e:
+        logging.error(f"Unexpected error in main loop: {e}")
+        print(f"Unexpected error in main loop: {e}")
+        time.sleep(60)
 
 if __name__ == "__main__":
     main()
