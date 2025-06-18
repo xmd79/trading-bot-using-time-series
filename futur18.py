@@ -87,19 +87,42 @@ def map_price_to_quadrant(current_price, min_threshold, max_threshold, reversal_
     else:
         current_quadrant = "Q4"
 
-    # Update quadrant history before determining last quadrant
-    last_quadrant = quadrant_history[timeframe][-1] if quadrant_history[timeframe] else "Q2"
-    quadrant_history[timeframe].append(current_quadrant)
+    # Determine cycle (up or down) based on recent price movement
+    is_up_cycle = current_price > prev_price
+    recent_quadrants = list(quadrant_history[timeframe])[-3:] if quadrant_history[timeframe] else []
+    reversed_at_q1 = reversal_type == "DIP" and "Q1" in recent_quadrants
+    reversed_at_q4 = reversal_type == "TOP" and "Q4" in recent_quadrants
 
-    # Transition logic
-    if reversal_type == "DIP" and current_quadrant == "Q1":
-        incoming_quadrant = "Q2"
-    elif reversal_type == "TOP" and current_quadrant == "Q4":
-        incoming_quadrant = "Q3"
-    elif current_price > prev_price:
-        incoming_quadrant = {"Q1": "Q2", "Q2": "Q3", "Q3": "Q4", "Q4": "Q3"}.get(current_quadrant, "Q2")
+    # Update last_quadrant and incoming_quadrant based on cycle and reversal
+    last_quadrant = quadrant_history[timeframe][-1] if quadrant_history[timeframe] else "Q2"
+    if current_quadrant == "Q1" and reversal_type == "DIP":
+        last_quadrant = "Q2"  # Coming from Q2, reversing at Q1
+        incoming_quadrant = "Q2"  # Start of up cycle
+    elif current_quadrant == "Q4" and reversal_type == "TOP":
+        last_quadrant = "Q3"  # Coming from Q3, reversing at Q4
+        incoming_quadrant = "Q3"  # Start of down cycle
+    elif current_quadrant == "Q2":
+        if not is_up_cycle and reversed_at_q4:  # Down cycle
+            last_quadrant = "Q3"
+            incoming_quadrant = "Q1"
+        elif is_up_cycle and reversed_at_q1:  # Up cycle with reversal at Q1
+            last_quadrant = "Q1"
+            incoming_quadrant = "Q1"
+        elif is_up_cycle:  # Up cycle continuing after Q1 reversal
+            last_quadrant = "Q1"
+            incoming_quadrant = "Q3"
+        else:  # Down cycle continuing after Q4 reversal
+            last_quadrant = "Q3"
+            incoming_quadrant = "Q1"
     else:
-        incoming_quadrant = {"Q4": "Q3", "Q3": "Q2", "Q2": "Q1", "Q1": "Q2"}.get(current_quadrant, "Q3")
+        # Default transition logic
+        if is_up_cycle:
+            incoming_quadrant = {"Q1": "Q2", "Q2": "Q3", "Q3": "Q4", "Q4": "Q3"}.get(current_quadrant, "Q2")
+        else:
+            incoming_quadrant = {"Q4": "Q3", "Q3": "Q2", "Q2": "Q1", "Q1": "Q2"}.get(current_quadrant, "Q3")
+
+    # Update quadrant history
+    quadrant_history[timeframe].append(current_quadrant)
 
     # Degree mapping
     normalized_price = (current_price - min_threshold) / price_range if price_range > 0 else Decimal('0')
@@ -131,7 +154,6 @@ def get_target_price(closes, n_components, timeframe, reversal_type="NONE", min_
     idx_max = np.argmax(amplitudes[1:]) + 1
     predominant_freq = frequencies[idx_max]
     predominant_sign = "Positive" if fft[idx_max].real > 0 else "Negative"
-    # Apply sign to frequency value
     signed_freq = -predominant_freq if predominant_sign == "Negative" else predominant_freq
     
     current_close = Decimal(str(closes[-1]))
@@ -168,12 +190,12 @@ def get_target_price(closes, n_components, timeframe, reversal_type="NONE", min_
         print(f"Invalid reversal or thresholds in {timeframe}. Using FFT target: {target_price:.25f}")
     
     market_mood = "Bullish" if is_bullish_target else "Bearish"
-    stop_loss = current_close - Decimal(str(3 * np.std(closes)))
+    informational_sl = current_close - Decimal(str(3 * np.std(closes)))
     fastest_target = target_price + Decimal('0.005') * (target_price - current_close) if is_bullish_target else target_price - Decimal('0.005') * (current_close - target_price)
     
-    logging.info(f"FFT - {timeframe} - Mood: {market_mood}, Close: {current_close:.25f}, Target: {fastest_target:.25f}, SL: {stop_loss:.25f}, Freq: {signed_freq:.6f}")
-    print(f"FFT - {timeframe} - Mood: {market_mood}, Close: {current_close:.25f}, Target: {fastest_target:.25f}, SL: {stop_loss:.25f}, Freq: {signed_freq:.6f}")
-    return datetime.datetime.now(), current_close, stop_loss, fastest_target, market_mood, is_bullish_target, is_bearish_target, signed_freq, predominant_sign
+    logging.info(f"FFT - {timeframe} - Mood: {market_mood}, Close: {current_close:.25f}, Target: {fastest_target:.25f}, Informational SL: {informational_sl:.25f}, Freq: {signed_freq:.6f}")
+    print(f"FFT - {timeframe} - Mood: {market_mood}, Close: {current_close:.25f}, Target: {fastest_target:.25f}, Informational SL: {informational_sl:.25f}, Freq: {signed_freq:.6f}")
+    return datetime.datetime.now(), current_close, informational_sl, fastest_target, market_mood, is_bullish_target, is_bearish_target, signed_freq, predominant_sign
 
 # Double Pattern Detection
 def detect_double_pattern(candles, timeframe, min_threshold, max_threshold, reversal_type, current_close, predominant_freq, predominant_sign, momentum, buy_volume, sell_volume):
@@ -199,7 +221,6 @@ def detect_double_pattern(candles, timeframe, min_threshold, max_threshold, reve
     recent_buy_vols = buy_volume.get(timeframe, [Decimal('0')] * 3)[-3:]
     recent_sell_vols = sell_volume.get(timeframe, [Decimal('0')] * 3)[-3:]
     
-    # Smoothed volume using EMA
     buy_vols = np.array([float(v) for v in recent_buy_vols], dtype=np.float64)
     sell_vols = np.array([float(v) for v in recent_sell_vols], dtype=np.float64)
     buy_ema = Decimal(str(talib.EMA(buy_vols, timeperiod=3)[-1])) if len(buy_vols) >= 3 else sum(recent_buy_vols) / Decimal(len(recent_buy_vols)) if recent_buy_vols else Decimal('0')
@@ -208,7 +229,6 @@ def detect_double_pattern(candles, timeframe, min_threshold, max_threshold, reve
     is_volume_spike_up = buy_ema > avg_volume * VOLUME_SPIKE_MULTIPLIER
     is_volume_spike_down = sell_ema > avg_volume * VOLUME_SPIKE_MULTIPLIER
     
-    # Frequency and momentum weights
     freq_weight = Decimal('1.5') * Decimal(str(abs(predominant_freq * 100))) if predominant_freq else Decimal('1')
     if reversal_type == "DIP" and predominant_sign == "Negative":
         freq_weight *= Decimal('1.2')
@@ -216,15 +236,12 @@ def detect_double_pattern(candles, timeframe, min_threshold, max_threshold, reve
         freq_weight *= Decimal('1.2')
     momentum_weight = Decimal(str(abs(momentum / 1000))) if momentum and momentum != 0 else Decimal('1')
     
-    # Volume weights
     volume_weight_db = Decimal('1.5') if is_volume_spike_up and reversal_type == "DIP" else Decimal('1')
     volume_weight_dt = Decimal('1.5') if is_volume_spike_down and reversal_type == "TOP" else Decimal('1')
     
-    # Calculate formation intensity scores
     db_score = Decimal('0')
     dt_score = Decimal('0')
     
-    # Check D. BOTTOM conditions: current_close > last_ll >= second_ll > min_threshold
     if (current_close > last_ll >= second_ll > min_threshold and 
         abs(last_ll - min_threshold) <= min_threshold * PROXIMITY_THRESHOLD):
         db_distance = current_close - last_ll
@@ -233,7 +250,6 @@ def detect_double_pattern(candles, timeframe, min_threshold, max_threshold, reve
         if is_volume_spike_up and predominant_sign == "Negative" and momentum >= 0:
             db_score *= Decimal('1.5')
     
-    # Check D. TOP conditions: current_close < last_hh <= second_hh < max_threshold
     if (current_close < last_hh <= second_hh < max_threshold and 
         abs(last_hh - max_threshold) <= max_threshold * PROXIMITY_THRESHOLD):
         dt_distance = last_hh - current_close
@@ -242,26 +258,23 @@ def detect_double_pattern(candles, timeframe, min_threshold, max_threshold, reve
         if is_volume_spike_down and predominant_sign == "Positive" and momentum < 0:
             dt_score *= Decimal('1.5')
     
-    # Calculate formation intensity ratio
     total_score = db_score + dt_score
     if total_score == Decimal('0'):
-        # Fallback logic when no clear pattern
         dist_to_min = abs(current_close - min_threshold)
         dist_to_max = abs(current_close - max_threshold)
         vol_ratio = buy_ema / sell_ema if sell_ema > Decimal('0') else Decimal('2') if buy_ema > Decimal('0') else Decimal('1')
         momentum_bias = momentum >= Decimal('0') if momentum != 0 else True
         if dist_to_min <= dist_to_max or (vol_ratio > Decimal('1') or momentum_bias):
-            db_score = Decimal('70')  # Favor D. BOTTOM
+            db_score = Decimal('70')
             dt_score = Decimal('30')
         else:
             db_score = Decimal('30')
-            dt_score = Decimal('70')  # Favor D. TOP
+            dt_score = Decimal('70')
         total_score = db_score + dt_score
     
     db_ratio = (db_score / total_score) * Decimal('100')
     dt_ratio = Decimal('100') - db_ratio
 
-    # Ensure one pattern is predominant (>50%)
     if db_ratio >= Decimal('50'):
         double_bottom = True
         double_top = False
@@ -503,7 +516,7 @@ def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=500):
         results = list(executor.map(fetch_candles, timeframes))
     return dict(zip(timeframes, results))
 
-def get_candles(symbol, timeframe, limit=500, retries=5, delay=5):
+def get_candles(symbol, timeframe, limit=500, retries=3, delay=5):
     for attempt in range(retries):
         try:
             klines = client.futures_klines(symbol=symbol, interval=timeframe, limit=limit)
@@ -541,7 +554,7 @@ def get_candles(symbol, timeframe, limit=500, retries=5, delay=5):
     print(f"Failed to fetch {timeframe} candles.")
     return []
 
-def get_current_price(symbol=TRADE_SYMBOL, retries=5, delay=5):
+def get_current_price(symbol=TRADE_SYMBOL, retries=3, delay=5):
     for attempt in range(retries):
         try:
             ticker = client.futures_symbol_ticker(symbol=symbol)
@@ -652,6 +665,14 @@ def place_order(signal, quantity, current_price, initial_balance):
             tp_price = (current_price * (Decimal('1') + TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
             sl_price = (current_price * (Decimal('1') - STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
             
+            # Validate stop-loss
+            if sl_price >= current_price:
+                logging.error(f"LONG SL {sl_price:.25f} >= Entry {current_price:.25f}")
+                print(f"Error: LONG SL {sl_price:.25f} >= Entry {current_price:.25f}")
+                sl_price = current_price * Decimal('0.5')  # Fallback to 50% below entry
+                logging.warning(f"Fallback SL: {sl_price:.25f}")
+                print(f"Fallback SL: {sl_price:.25f}")
+            
             position["sl_price"] = sl_price
             position["tp_price"] = tp_price
             position["side"] = "LONG"
@@ -676,6 +697,14 @@ def place_order(signal, quantity, current_price, initial_balance):
             )
             tp_price = (current_price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
             sl_price = (current_price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
+            
+            # Validate stop-loss
+            if sl_price <= current_price:
+                logging.error(f"SHORT SL {sl_price:.25f} <= Entry {current_price:.25f}")
+                print(f"Error: SHORT SL {sl_price:.25f} <= Entry {current_price:.25f}")
+                sl_price = current_price * Decimal('1.5')  # Fallback to 50% above entry
+                logging.warning(f"Fallback SL: {sl_price:.25f}")
+                print(f"Fallback SL: {sl_price:.25f}")
             
             position["sl_price"] = sl_price
             position["tp_price"] = tp_price
@@ -727,7 +756,7 @@ def close_position(position, current_price):
 def calculate_thresholds(candles):
     if not candles:
         logging.warning("No candles for thresholds.")
-        print("No candles provided.")
+        print(f"Returning zero thresholds.")
         return Decimal('0'), Decimal('0'), Decimal('0')
     lookback = min(len(candles), LOOKBACK_PERIODS[candles[0]['timeframe']])
     highs = np.array([float(c['high']) for c in candles[-lookback:] if not np.isnan(c['high']) and c['high'] > 0], dtype=np.float64)
@@ -786,26 +815,28 @@ def main():
             position = get_position()
 
             if position["side"] != "NONE" and position["sl_price"] > Decimal('0'):
+                logging.info(f"Checking position: Side={position['side']}, Entry={position['entry_price']:.25f}, SL={position['sl_price']:.25f}, TP={position['tp_price']:.25f}")
+                print(f"Checking position: Side={position['side']}, Entry={position['entry_price']:.25f}, SL={position['sl_price']:.25f}, TP={position['tp_price']:.25f}")
                 if position["side"] == "LONG":
                     if current_price <= position["sl_price"]:
-                        logging.info(f"SL LONG at {current_price:.25f}")
-                        print(f"SL LONG at {current_price:.25f}")
+                        logging.info(f"SL LONG triggered at {current_price:.25f} (SL: {position['sl_price']:.25f})")
+                        print(f"SL LONG triggered at {current_price:.25f} (SL: {position['sl_price']:.25f})")
                         close_position(position, current_price)
                         position = get_position()
                     elif current_price >= position["tp_price"]:
-                        logging.info(f"TP LONG at {current_price:.25f}")
-                        print(f"TP LONG at {current_price:.25f}")
+                        logging.info(f"TP LONG triggered at {current_price:.25f} (TP: {position['tp_price']:.25f})")
+                        print(f"TP LONG triggered at {current_price:.25f} (TP: {position['tp_price']:.25f})")
                         close_position(position, current_price)
                         position = get_position()
                 elif position["side"] == "SHORT":
                     if current_price >= position["sl_price"]:
-                        logging.info(f"SL SHORT at {current_price:.25f}")
-                        print(f"SL SHORT at {current_price:.25f}")
+                        logging.info(f"SL SHORT triggered at {current_price:.25f} (SL: {position['sl_price']:.25f})")
+                        print(f"SL SHORT triggered at {current_price:.25f} at {current_price:.25f}")
                         close_position(position, current_price)
                         position = get_position()
                     elif current_price <= position["tp_price"]:
-                        logging.info(f"TP SHORT at {current_price:.25f}")
-                        print(f"TP SHORT at {current_price:.25f}")
+                        logging.info(f"TP SHORT triggered at {current_price:.25f} (TP: {position['tp_price']:.25f})")
+                        print(f"TP SHORT triggered at {current_price:.25f} (TP: {position['tp_price']:.25f})")
                         close_position(position, current_price)
                         position = get_position()
 
@@ -825,7 +856,7 @@ def main():
                 "fft_bullish_5m": False,
                 "double_bottom_1m": False,
                 "double_bottom_3m": False,
-                "double_bottom_5m": False,
+                "double_bottom_5m": False
             }
             conditions_short = {
                 "volume_bearish_1m": False,
@@ -843,7 +874,7 @@ def main():
                 "fft_bearish_5m": False,
                 "double_top_1m": False,
                 "double_top_3m": False,
-                "double_top_5m": False,
+                "double_top_5m": False
             }
             
             buy_volume, sell_volume = calculate_buy_sell_volume_original(candle_map)
@@ -880,14 +911,14 @@ def main():
                 predominant_freq = 0.0
                 predominant_sign = "Neutral"
                 if len(closes) >= 2:
-                    current_time, entry_price, stop_loss, fastest_target, market_mood, is_bullish_target, is_bearish_target, predominant_freq, predominant_sign = get_target_price(
+                    current_time, entry_price, informational_sl, fastest_target, market_mood, is_bullish_target, is_bearish_target, predominant_freq, predominant_sign = get_target_price(
                         closes, n_components=5, timeframe=timeframe, reversal_type=reversal_type, min_threshold=min_threshold, middle_threshold=middle_threshold, max_threshold=max_threshold
                     )
                     print(f"{timeframe} - Time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
                     print(f"{timeframe} - Mood: {market_mood}")
                     print(f"{timeframe} - Close: {entry_price:.25f}")
                     print(f"{timeframe} - Target: {fastest_target:.25f}")
-                    print(f"{timeframe} - SL: {stop_loss:.25f}")
+                    print(f"{timeframe} - Informational SL: {informational_sl:.25f}")
                     print(f"{timeframe} - Bullish: {is_bullish_target}")
                     print(f"{timeframe} - Bearish: {is_bearish_target}")
                     print(f"{timeframe} - Freq: {predominant_freq:.6f}, Sign: {predominant_sign}")
