@@ -137,21 +137,18 @@ def get_target(closes, n_components, reversal_type="NONE", min_threshold=Decimal
     
     # Inverted logic: anticipate reversal by setting bearish target after DIP and bullish target after TOP
     if reversal_type == "DIP" and max_threshold > middle_threshold > current_close:
-        # After a DIP, expect a bearish reversal (price going down)
         target_price = middle_threshold - Decimal('0.75') * (middle_threshold - min_threshold)
         target_price = max(target_price, min_threshold * (Decimal('1') + PROXIMITY_THRESHOLD))
         is_bullish_target = False
         is_bearish_target = True
     elif reversal_type == "TOP" and min_threshold < middle_threshold < current_close:
-        # After a TOP, expect a bullish reversal (price going up)
         target_price = middle_threshold + Decimal('0.75') * (max_threshold - middle_threshold)
         target_price = min(target_price, max_threshold * (Decimal('1') - PROXIMITY_THRESHOLD))
         is_bullish_target = True
         is_bearish_target = False
     else:
-        # Default to FFT signal direction, inverted for consistency
         target_price = Decimal(str(filtered_signal[-1]))
-        is_bearish_target = target_price <= middle_threshold  # Inverted: bearish if below middle
+        is_bearish_target = target_price <= middle_threshold
         is_bullish_target = not is_bearish_target
         logging.warning(f"Invalid reversal type {reversal_type} or thresholds. Using default FFT target: {target_price:.25f}")
         print(f"Invalid reversal type {reversal_type} or thresholds. Using default FFT target: {target_price:.25f}")
@@ -159,18 +156,15 @@ def get_target(closes, n_components, reversal_type="NONE", min_threshold=Decimal
     market_mood = "Bearish" if is_bearish_target else "Bullish"
     stop_loss = current_close + Decimal(str(3 * np.std(closes))) if is_bearish_target else current_close - Decimal(str(3 * np.std(closes)))
     
-    # Adjust fastest_target for 1m timeframe based on inverted market mood
     if timeframe == "1m":
         if is_bearish_target:
-            # Bearish: target near min_threshold, below current_close
             fastest_target = min_threshold * (Decimal('1') + PROXIMITY_THRESHOLD)
             if fastest_target >= current_close:
-                fastest_target = current_close * Decimal('0.995')  # Ensure below current_close
-        else:  # Bullish
-            # Bullish: target near max_threshold, above current_close
+                fastest_target = current_close * Decimal('0.995')
+        else:
             fastest_target = max_threshold * (Decimal('1') - PROXIMITY_THRESHOLD)
             if fastest_target <= current_close:
-                fastest_target = current_close * Decimal('1.005')  # Ensure above current_close
+                fastest_target = current_close * Decimal('1.005')
     else:
         fastest_target = target_price - Decimal('0.005') * (current_close - target_price) if is_bearish_target else target_price + Decimal('0.005') * (target_price - current_close)
     
@@ -204,8 +198,8 @@ def calculate_buy_sell_volume(candle_map):
         
         volume_moods = {}
         for tf in ["1m", "3m", "5m"]:
-            buy_vol = eval(f"buy_volume_{tf}")
-            sell_vol = eval(f"sell_volume_{tf}")
+            buy_vol = locals()[f"buy_volume_{tf}"]
+            sell_vol = locals()[f"sell_volume_{tf}"]
             volume_moods[tf] = "BULLISH" if buy_vol >= sell_vol else "BEARISH"
             logging.info(f"{tf} - Buy Volume: {buy_vol:.25f}, Sell Volume: {sell_vol:.25f}, Mood: {volume_moods[tf]}")
             print(f"{tf} - Buy Volume: {buy_vol:.25f}, Sell Volume: {sell_vol:.25f}, Mood: {volume_moods[tf]}")
@@ -531,7 +525,7 @@ def calculate_quantity(balance, price):
     print(f"Calculated quantity: {quantity:.25f} BTC for balance {balance:.25f} USDC at price {price:.25f}")
     return quantity
 
-def place_order(signal, quantity, current_price, initial_balance):
+def place_order(signal, quantity, price, initial_balance):
     try:
         if quantity <= Decimal('0'):
             logging.warning(f"Invalid quantity {quantity:.25f}. Skipping order.")
@@ -546,32 +540,32 @@ def place_order(signal, quantity, current_price, initial_balance):
                 type="MARKET",
                 quantity=str(quantity)
             )
-            tp_price = (current_price * (Decimal('1') + TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
-            sl_price = (current_price * (Decimal('1') - STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
+            tp_price = (price * (Decimal('1') + TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
+            sl_price = (price * (Decimal('1') - STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
             
             position["sl_price"] = sl_price
             position["tp_price"] = tp_price
             position["side"] = "LONG"
             position["quantity"] = quantity
-            position["entry_price"] = current_price
+            position["entry_price"] = price
             
             message = (
                 f"*Trade Signal: LONG*\n"
                 f"Symbol: {TRADE_SYMBOL}\n"
                 f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"Quantity: {quantity:.6f} BTC\n"
-                f"Entry Price: ~{current_price:.2f} USDC\n"
+                f"Entry Price: ~{price:.2f} USDC\n"
                 f"Initial Balance: {initial_balance:.2f} USDC\n"
                 f"Stop-Loss: {sl_price:.2f} (-50%)\n"
                 f"Take-Profit: {tp_price:.2f} (+5%)\n"
             )
             telegram_loop.run_until_complete(send_telegram_message(message))
             
-            logging.info(f"Placed LONG order: {quantity:.25f} BTC at market price ~{current_price:.25f}")
+            logging.info(f"Placed LONG order: {quantity:.25f} BTC at market price ~{price:.25f}")
             print(f"\n=== TRADE ENTERED ===")
             print(f"Side: LONG")
             print(f"Quantity: {quantity:.25f} BTC")
-            print(f"Entry Price: ~{current_price:.25f} USDC")
+            print(f"Entry Price: ~{price:.25f} USDC")
             print(f"Initial USDC Balance: {initial_balance:.25f}")
             print(f"Stop-Loss Price: {sl_price:.25f} (-50% ROI)")
             print(f"Take-Profit Price: {tp_price:.25f} (+5% ROI)")
@@ -583,32 +577,32 @@ def place_order(signal, quantity, current_price, initial_balance):
                 type="MARKET",
                 quantity=str(quantity)
             )
-            tp_price = (current_price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
-            sl_price = (current_price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
+            tp_price = (price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
+            sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
             
             position["sl_price"] = sl_price
             position["tp_price"] = tp_price
             position["side"] = "SHORT"
             position["quantity"] = -quantity
-            position["entry_price"] = current_price
+            position["entry_price"] = price
             
             message = (
                 f"*Trade Signal: SHORT*\n"
                 f"Symbol: {TRADE_SYMBOL}\n"
                 f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"Quantity: {quantity:.6f} BTC\n"
-                f"Entry Price: ~{current_price:.2f} USDC\n"
+                f"Entry Price: ~{price:.2f} USDC\n"
                 f"Initial Balance: {initial_balance:.2f} USDC\n"
                 f"Stop-Loss: {sl_price:.2f} (-50%)\n"
                 f"Take-Profit: {tp_price:.2f} (+5%)\n"
             )
             telegram_loop.run_until_complete(send_telegram_message(message))
             
-            logging.info(f"Placed SHORT order: {quantity:.25f} BTC at market price ~{current_price:.25f}")
+            logging.info(f"Placed SHORT order: {quantity:.25f} BTC at market price ~{price:.25f}")
             print(f"\n=== TRADE ENTERED ===")
             print(f"Side: SHORT")
             print(f"Quantity: {quantity:.25f} BTC")
-            print(f"Entry Price: ~{current_price:.25f} USDC")
+            print(f"Entry Price: ~{price:.25f} USDC")
             print(f"Initial USDC Balance: {initial_balance:.25f}")
             print(f"Stop-Loss Price: {sl_price:.25f} (-50% ROI)")
             print(f"Take-Profit Price: {tp_price:.25f} (+5% ROI)")
@@ -624,7 +618,7 @@ def place_order(signal, quantity, current_price, initial_balance):
         print(f"Error placing order: {e.message}")
         return None
 
-def close_position(position, current_price):
+def close_position(position, price):
     if position["side"] == "NONE" or position["quantity"] == Decimal('0'):
         logging.info("No position to close.")
         print("No position to close.")
@@ -644,13 +638,13 @@ def close_position(position, current_price):
             f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"Side: {position['side']}\n"
             f"Quantity: {quantity:.6f} BTC\n"
-            f"Exit Price: ~{current_price:.2f} USDC\n"
+            f"Exit Price: ~{price:.2f} USDC\n"
             f"Unrealized PNL: {position['unrealized_pnl']:.2f} USDC\n"
         )
         telegram_loop.run_until_complete(send_telegram_message(message))
         
-        logging.info(f"Closed {position['side']} position: {quantity:.25f} BTC at market price ~{current_price:.25f}")
-        print(f"Closed {position['side']} position: {quantity:.25f} BTC at market price ~{current_price:.25f}")
+        logging.info(f"Closed {position['side']} position: {quantity:.25f} BTC at market price ~{price:.25f}")
+        print(f"Closed {position['side']} position: {quantity:.25f} BTC at market price ~{price:.25f}")
     except BinanceAPIException as e:
         logging.error(f"Error closing position: {e.message}")
         print(f"Error closing position: {e.message}")
@@ -714,7 +708,7 @@ def calculate_thresholds(candles):
     min_price = Decimal(str(np.min(lows)))
     max_price = Decimal(str(np.max(highs)))
     min_threshold = min_price if min_price < current_close else current_close * Decimal('0.995')
-    max_threshold = max_price if max_price > current_close else current_price * Decimal('1.005')
+    max_threshold = max_price if max_price > current_close else current_close * Decimal('1.005')
     middle_threshold = (min_threshold + max_threshold) / Decimal('2')
 
     timeframe = candles[0]['timeframe']
@@ -738,6 +732,14 @@ def main():
             logging.info(f"Current Time: {current_local_time_str}")
             print(f"\nCurrent Time: {current_local_time_str}")
 
+            # Fetch current price first to ensure it's defined
+            current_price = get_current_price()
+            if current_price <= Decimal('0'):
+                logging.warning(f"Failed to fetch valid {TRADE_SYMBOL} price. Retrying in 60 seconds.")
+                print(f"Warning: Failed to fetch valid {TRADE_SYMBOL} price. Retrying in 60 seconds.")
+                time.sleep(60)
+                continue
+
             candle_map = fetch_candles_in_parallel(timeframes)
             if not candle_map or not any(candle_map.values()):
                 logging.warning("No candle data available. Retrying in 60 seconds.")
@@ -745,16 +747,10 @@ def main():
                 time.sleep(60)
                 continue
 
-            current_price = get_current_price()
-            if current_price <= Decimal('0'):
-                logging.warning(f"Current {TRADE_SYMBOL} price is {current_price:.25f}. API may be failing.")
-                print(f"Warning: Current {TRADE_SYMBOL} price is {current_price:.25f}. API may be failing.")
-                time.sleep(60)
-                continue
-
             usdc_balance = get_balance('USDC')
             position = get_position()
 
+            # Check for stop-loss or take-profit triggers
             if position["side"] != "NONE" and position["sl_price"] > Decimal('0'):
                 if position["side"] == "LONG":
                     if current_price <= position["sl_price"]:
@@ -1110,7 +1106,12 @@ def main():
         print("Shutting down bot...")
         position = get_position()
         if position["side"] != "NONE":
-            close_position(position, get_current_price())
+            current_price = get_current_price()
+            if current_price > Decimal('0'):
+                close_position(position, current_price)
+            else:
+                logging.error("Failed to fetch price during shutdown. Position not closed.")
+                print("Failed to fetch price during shutdown. Position not closed.")
         logging.info("Bot shutdown complete.")
         print("Bot shutdown complete.")
         telegram_loop.close()
@@ -1118,6 +1119,14 @@ def main():
     except Exception as e:
         logging.error(f"Unexpected error in main loop: {e}")
         print(f"Unexpected error in main loop: {e}")
+        position = get_position()
+        if position["side"] != "NONE":
+            current_price = get_current_price()
+            if current_price > Decimal('0'):
+                close_position(position, current_price)
+            else:
+                logging.error("Failed to fetch price during error handling. Position not closed.")
+                print("Failed to fetch price during error handling. Position not closed.")
         time.sleep(60)
     finally:
         telegram_loop.close()
