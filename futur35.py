@@ -116,46 +116,65 @@ def get_target(closes, n_components, reversal_type="NONE", min_threshold=Decimal
     frequencies = fftpack.rfftfreq(len(closes))
     amplitudes = np.abs(fft)
     
-    idx_max = np.argmax(amplitudes[1:]) + 1
+    # Identify the most significant positive and negative frequency components
+    idx = np.argsort(amplitudes)[::-1][1:n_components+1]  # Skip DC component
+    positive_freqs = [(i, fft[i].real) for i in idx if fft[i].real > 0]
+    negative_freqs = [(i, fft[i].real) for i in idx if fft[i].real < 0]
+    
+    # Select the predominant frequency based on amplitude
+    idx_max = idx[0] if idx.size > 0 else 1
     predominant_freq = frequencies[idx_max]
     predominant_sign = "Positive" if fft[idx_max].real > 0 else "Negative"
     
     current_close = Decimal(str(closes[-1]))
     is_near_min = abs(current_close - min_threshold) <= min_threshold * PROXIMITY_THRESHOLD
     is_near_max = abs(current_close - max_threshold) <= max_threshold * PROXIMITY_THRESHOLD
-    if reversal_type == "DIP" and is_near_min and predominant_sign == "Negative":
-        logging.warning(f"DIP reversal near min_threshold ({min_threshold:.25f}), but predominant frequency is {predominant_sign}.")
-        print(f"DIP reversal near min_threshold ({min_threshold:.25f}), but predominant frequency is {predominant_sign}.")
-    elif reversal_type == "TOP" and is_near_max and predominant_sign == "Positive":
-        logging.warning(f"TOP reversal near max_threshold ({max_threshold:.25f}), but predominant frequency is {predominant_sign}.")
-        print(f"TOP reversal near max_threshold ({max_threshold:.25f}), but predominant frequency is {predominant_sign}.")
     
-    idx = np.argsort(amplitudes)[::-1][:n_components]
+    # Initialize FFT target calculation
     filtered_fft = np.zeros_like(fft)
-    filtered_fft[idx] = fft[idx]
-    filtered_signal = fftpack.irfft(filtered_fft)
-    
-    # Inverted logic: anticipate reversal by setting bearish target after DIP and bullish target after TOP
-    if reversal_type == "DIP" and max_threshold > middle_threshold > current_close:
-        target_price = middle_threshold - Decimal('0.75') * (middle_threshold - min_threshold)
-        target_price = max(target_price, min_threshold * (Decimal('1') + PROXIMITY_THRESHOLD))
-        is_bullish_target = False
-        is_bearish_target = True
-    elif reversal_type == "TOP" and min_threshold < middle_threshold < current_close:
-        target_price = middle_threshold + Decimal('0.75') * (max_threshold - middle_threshold)
-        target_price = min(target_price, max_threshold * (Decimal('1') - PROXIMITY_THRESHOLD))
+    if positive_freqs and (reversal_type == "DIP" or not negative_freqs):
+        # Bullish target: use positive frequency components
+        for i, _ in positive_freqs[:n_components]:
+            filtered_fft[i] = fft[i]
         is_bullish_target = True
         is_bearish_target = False
+    elif negative_freqs and (reversal_type == "TOP" or not positive_freqs):
+        # Bearish target: use negative frequency components
+        for i, _ in negative_freqs[:n_components]:
+            filtered_fft[i] = fft[i]
+        is_bullish_target = False
+        is_bearish_target = True
     else:
-        target_price = Decimal(str(filtered_signal[-1]))
-        is_bearish_target = target_price <= middle_threshold
-        is_bullish_target = not is_bearish_target
-        logging.warning(f"Invalid reversal type {reversal_type} or thresholds. Using default FFT target: {target_price:.25f}")
-        print(f"Invalid reversal type {reversal_type} or thresholds. Using default FFT target: {target_price:.25f}")
+        # Default: use top n_components regardless of sign
+        filtered_fft[idx[:n_components]] = fft[idx[:n_components]]
+        is_bullish_target = fft[idx_max].real > 0
+        is_bearish_target = not is_bullish_target
     
-    market_mood = "Bearish" if is_bearish_target else "Bullish"
+    filtered_signal = fftpack.irfft(filtered_fft)
+    projected_price = Decimal(str(filtered_signal[-1]))
+    
+    # Adjust target price to ensure bullish targets are above current close and bearish below
+    if is_bullish_target:
+        if reversal_type == "DIP" and max_threshold > middle_threshold > current_close:
+            target_price = middle_threshold + Decimal('0.75') * (max_threshold - middle_threshold)
+            target_price = min(target_price, max_threshold * (Decimal('1') - PROXIMITY_THRESHOLD))
+        else:
+            # Ensure bullish target is above current close
+            target_price = max(projected_price, current_close * Decimal('1.005'))
+            target_price = min(target_price, max_threshold * (Decimal('1') - PROXIMITY_THRESHOLD))
+    else:
+        if reversal_type == "TOP" and min_threshold < middle_threshold < current_close:
+            target_price = middle_threshold - Decimal('0.75') * (middle_threshold - min_threshold)
+            target_price = max(target_price, min_threshold * (Decimal('1') + PROXIMITY_THRESHOLD))
+        else:
+            # Ensure bearish target is below current close
+            target_price = min(projected_price, current_close * Decimal('0.995'))
+            target_price = max(target_price, min_threshold * (Decimal('1') + PROXIMITY_THRESHOLD))
+    
+    market_mood = "Bullish" if is_bullish_target else "Bearish"
     stop_loss = current_close + Decimal(str(3 * np.std(closes))) if is_bearish_target else current_close - Decimal(str(3 * np.std(closes)))
     
+    # Adjust fastest_target for timeframe
     if timeframe == "1m":
         if is_bearish_target:
             fastest_target = min_threshold * (Decimal('1') + PROXIMITY_THRESHOLD)
@@ -166,7 +185,7 @@ def get_target(closes, n_components, reversal_type="NONE", min_threshold=Decimal
             if fastest_target <= current_close:
                 fastest_target = current_close * Decimal('1.005')
     else:
-        fastest_target = target_price - Decimal('0.005') * (current_close - target_price) if is_bearish_target else target_price + Decimal('0.005') * (target_price - current_close)
+        fastest_target = target_price
     
     logging.info(f"FFT Analysis - Timeframe: {timeframe}, Market Mood: {market_mood}, Current Close: {current_close:.25f}, Fastest Target: {fastest_target:.25f}, Stop Loss: {stop_loss:.25f}, Predominant Freq: {predominant_freq:.6f}, Sign: {predominant_sign}")
     return datetime.datetime.now(), current_close, stop_loss, fastest_target, market_mood, is_bullish_target, is_bearish_target, predominant_freq, predominant_sign
@@ -933,7 +952,6 @@ def main():
                     conditions_short[f"momentum_negative_{timeframe}"] = False
                     continue
 
-                # Corrected volume condition checks to align with volume_moods
                 conditions_long[f"volume_bullish_{timeframe}"] = volume_moods[timeframe] == "BULLISH"
                 conditions_short[f"volume_bearish_{timeframe}"] = volume_moods[timeframe] == "BEARISH"
                 logging.info(f"Volume Bullish ({timeframe}): {conditions_long[f'volume_bullish_{timeframe}']}, Bearish: {conditions_short[f'volume_bearish_{timeframe}']}")
