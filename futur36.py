@@ -128,7 +128,7 @@ def calculate_mtf_trend(candles, timeframe):
             print(f"Invalid EMA data for {timeframe}.")
             return "NEUTRAL"
         
-        trend = "UP" if ema_fast[-1] > ema_slow[-1] else "DOWN"
+        trend = "UP" if ema_fast[-1] < ema_slow[-1] else "DOWN"
         logging.info(f"{timeframe} - MTF Trend: {trend}, EMA Fast: {ema_fast[-1]:.25f}, EMA Slow: {ema_slow[-1]:.25f}")
         print(f"{timeframe} - MTF Trend: {trend}, EMA Fast: {ema_fast[-1]:.25f}, EMA Slow: {ema_slow[-1]:.25f}")
         return trend
