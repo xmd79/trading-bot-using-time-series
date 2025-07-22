@@ -34,7 +34,7 @@ LOOKBACK_PERIODS = {"1m": 500, "3m": 500, "5m": 500}
 PRICE_TOLERANCE = Decimal('0.01')  # 1% tolerance for reversal detection
 VOLUME_CONFIRMATION_RATIO = Decimal('1.5')  # Buy/Sell volume ratio for reversal confirmation
 SUPPORT_RESISTANCE_TOLERANCE = Decimal('0.005')  # 0.5% tolerance for support/resistance levels
-API_TIMEOUT = 60  # Increased timeout for Binance API requests
+API_TIMEOUT = 60  # Timeout for Binance API requests
 
 # Global event loop for Telegram
 telegram_loop = asyncio.new_event_loop()
@@ -177,51 +177,75 @@ def get_target(closes, n_components, timeframe, min_threshold, max_threshold, bu
         return (datetime.datetime.now(), Decimal('0'), Decimal('0'), Decimal('0'), 
                 Decimal('0'), Decimal('0'), "Bearish", False, True, 0.0, "PEAK")
     
+    # Apply Hamming window
     window = np.hamming(len(closes))
     fft_result = fft.rfft(closes * window)
     frequencies = fft.rfftfreq(len(closes), d=1.0)
     amplitudes = np.abs(fft_result)
     phases = np.angle(fft_result)
     
+    # Select top N components (excluding DC)
     idx = np.argsort(amplitudes)[::-1][1:n_components+1]
     dominant_freq = frequencies[idx[0]] if idx.size > 0 else 0.0
-    dominant_phase = phases[idx[0]] if idx.size > 0 else 0.0
     
-    current_close = Decimal(str(closes[-1]))
-    midpoint = (min_threshold + max_threshold) / Decimal('2')
-    is_bullish_target = current_close >= midpoint or dominant_phase < 0
+    # Forecast future prices
+    forecast_steps = 5  # Number of future steps to forecast
+    extended_n = len(closes) + forecast_steps
+    extended_t = np.arange(extended_n)
+    
+    # Initialize forecast arrays
+    fastest_forecast = np.zeros(extended_n)
+    average_forecast = np.zeros(extended_n)
+    reversal_forecast = np.zeros(extended_n)
+    
+    # Reconstruct signal for fastest target (top 3 components)
+    filtered_fft = np.zeros_like(fft_result, dtype=complex)
+    filtered_fft[idx[:3]] = fft_result[idx[:3]]
+    fastest_signal = fft.irfft(filtered_fft, n=extended_n)
+    fastest_forecast = fastest_signal
+    
+    # Reconstruct signal for average target (top 2 components)
+    filtered_fft = np.zeros_like(fft_result, dtype=complex)
+    filtered_fft[idx[:2]] = fft_result[idx[:2]]
+    average_signal = fft.irfft(filtered_fft, n=extended_n)
+    average_forecast = average_signal
+    
+    # Reconstruct signal for reversal target (top 1 component)
+    filtered_fft = np.zeros_like(fft_result, dtype=complex)
+    filtered_fft[idx[0]] = fft_result[idx[0]]
+    reversal_signal = fft.irfft(filtered_fft, n=extended_n)
+    reversal_forecast = reversal_signal
+    
+    # Calculate trend direction based on forecast slope
+    forecast_prices = fastest_forecast[-forecast_steps:]
+    slope = np.polyfit(np.arange(forecast_steps), forecast_prices, 1)[0]
+    is_bullish_target = slope > 0
     is_bearish_target = not is_bullish_target
     phase_status = "DIP" if is_bullish_target else "PEAK"
     market_mood = "Bullish" if is_bullish_target else "Bearish"
     
+    # Calculate target prices
+    current_close = Decimal(str(closes[-1]))
     volume_ratio = buy_vol / sell_vol if sell_vol > Decimal('0') else Decimal('1.0')
     volume_exhausted = (volume_ratio < Decimal('0.5') if is_bullish_target else 
                         volume_ratio > Decimal('2.0') if sell_vol > Decimal('0') else False)
     
-    filtered_fft = np.zeros_like(fft_result, dtype=complex)
-    filtered_fft[idx[:3]] = fft_result[idx[:3]]
-    filtered_signal = fft.irfft(filtered_fft, n=len(closes))
-    fastest_target = Decimal(str(filtered_signal[-1])) if len(filtered_signal) > 0 else current_close
+    fastest_target = Decimal(str(fastest_forecast[-1])) if len(fastest_forecast) > 0 else current_close
     fastest_volume_factor = (Decimal('1.0') + (volume_ratio - Decimal('1.0')) * Decimal('0.1') if is_bullish_target 
                            else Decimal('1.0') / (volume_ratio + Decimal('0.1')) if volume_ratio > Decimal('0') else Decimal('1.0'))
     fastest_target *= fastest_volume_factor
     
-    filtered_fft = np.zeros_like(fft_result, dtype=complex)
-    filtered_fft[idx[:2]] = fft_result[idx[:2]]
-    filtered_signal = fft.irfft(filtered_fft, n=len(closes))
-    average_target = Decimal(str(filtered_signal[-1])) if len(filtered_signal) > 0 else current_close
+    average_target = Decimal(str(average_forecast[-1])) if len(average_forecast) > 0 else current_close
     average_volume_factor = (Decimal('1.0') + (volume_ratio - Decimal('1.0')) * Decimal('0.2') if is_bullish_target 
                            else Decimal('1.0') / (volume_ratio + Decimal('0.2')) if volume_ratio > Decimal('0') else Decimal('1.0'))
     average_target *= average_volume_factor
     
-    single_freq_fft = np.zeros_like(fft_result, dtype=complex)
-    single_freq_fft[idx[0]] = fft_result[idx[0]]
-    filtered_signal = fft.irfft(single_freq_fft, n=len(closes))
-    reversal_target = Decimal(str(filtered_signal[-1])) if len(filtered_signal) > 0 else current_close
+    reversal_target = Decimal(str(reversal_forecast[-1])) if len(reversal_forecast) > 0 else current_close
     reversal_volume_factor = (Decimal('1.0') + (volume_ratio - Decimal('1.0')) * Decimal('0.3') if is_bullish_target and not volume_exhausted 
                             else Decimal('1.0') / (volume_ratio + Decimal('0.3')) if volume_ratio > Decimal('0') and not volume_exhausted else Decimal('1.0'))
     reversal_target *= reversal_volume_factor
     
+    # Ensure targets are within bounds
     if is_bullish_target:
         fastest_target = max(fastest_target, current_close * Decimal('1.005'), max_threshold * Decimal('0.995'))
         average_target = max(average_target, fastest_target * Decimal('1.01'), max_threshold * Decimal('0.99'))
@@ -237,9 +261,10 @@ def get_target(closes, n_components, timeframe, min_threshold, max_threshold, bu
                  f"Current Close: {current_close:.2f}, Fastest Target: {fastest_target:.2f}, "
                  f"Average Target: {average_target:.2f}, Reversal Target: {reversal_target:.2f}, "
                  f"Stop Loss: {stop_loss:.2f}, Dominant Freq: {dominant_freq:.6f}, "
-                 f"Volume Ratio: {volume_ratio:.2f}, Volume Exhausted: {volume_exhausted}")
+                 f"Forecast Slope: {slope:.6f}, Volume Ratio: {volume_ratio:.2f}, Volume Exhausted: {volume_exhausted}")
     print(f"{timeframe} - FFT Phase: {phase_status}")
     print(f"{timeframe} - Dominant Frequency: {dominant_freq:.6f}")
+    print(f"{timeframe} - Forecast Slope: {slope:.6f}")
     print(f"{timeframe} - Fastest Target: {fastest_target:.2f}")
     print(f"{timeframe} - Average Target: {average_target:.2f}")
     print(f"{timeframe} - Reversal Target: {reversal_target:.2f}")
@@ -816,7 +841,7 @@ def main():
                     continue
                 
                 candles_tf = candle_map[timeframe]
-                closes = np.array([c["close"] for c in candles_tf if not np.isnan(c["close"]) and c["close"] > 0], dtype=np.float64)
+                closes = np.array([c["close"] for c in candles_tf if c["close"] > 0], dtype=np.float64)
                 
                 min_threshold, middle_threshold, max_threshold = calculate_thresholds(candles_tf)
                 reversal_type, min_time, min_price, peak_type, max_time, max_price = detect_recent_reversal(candles_tf, timeframe, min_threshold, max_threshold)
