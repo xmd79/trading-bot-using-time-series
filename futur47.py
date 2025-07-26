@@ -22,8 +22,8 @@ getcontext().prec = 25
 
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"
-LEVERAGE = 75
-STOP_LOSS_PERCENTAGE = Decimal('0.50')  # 50% stop-loss
+LEVERAGE = 25
+STOP_LOSS_PERCENTAGE = Decimal('0.05')  # 5% stop-loss
 TAKE_PROFIT_PERCENTAGE = Decimal('0.05')  # 5% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
 MINIMUM_BALANCE = Decimal('1.0000')  # Minimum USDC balance to place trades
@@ -972,6 +972,8 @@ def main():
             logging.info(f"Most Recent Extreme: {most_recent_type} in {most_recent_extreme['timeframe']} at {most_recent_price:.2f} "
                          f"(Time: {datetime.datetime.fromtimestamp(most_recent_time)})")
             
+
+
             condition_pairs = [
                 ("momentum_positive_1m", "momentum_negative_1m"),
                 ("momentum_positive_3m", "momentum_negative_3m"),
