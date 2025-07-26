@@ -105,7 +105,7 @@ async def send_telegram_message(message, retries=3, base_delay=5):
     print(f"Failed to send Telegram message after {retries} attempts.")
     return False
 
-# Enhanced MTF Trend Analysis with Binary Classification and Improved Dominant Frequency
+# Enhanced MTF Trend Analysis with Binary Classification
 def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vol, sell_vol, lookback=50):
     if len(candles) < lookback:
         logging.warning(f"Insufficient candles ({len(candles)}) for MTF trend analysis in {timeframe}.")
@@ -124,7 +124,7 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     # FFT for sinusoidal model with Hamming window
     window = np.hamming(len(closes))
     fft_result = fft.rfft(closes * window)
-    frequencies = fft.rfftfreq(len(closes), d=1.0)  # Frequency in cycles per candle
+    frequencies = fft.rfftfreq(len(closes), d=1.0)
     amplitudes = np.abs(fft_result)
     phases = np.angle(fft_result)
     
@@ -133,25 +133,13 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     dominant_freq = frequencies[idx[0]] if idx.size > 0 else 0.0
     dominant_phase = phases[idx[0]] if idx.size > 0 else 0.0
     
-    # Convert frequency to cycles per second based on timeframe duration
-    timeframe_seconds = {"1m": 60, "3m": 180, "5m": 300}
-    if timeframe in timeframe_seconds:
-        dominant_freq = dominant_freq / timeframe_seconds[timeframe]
-    
-    # Ensure non-zero frequency for stability
-    if abs(dominant_freq) < 1e-6:
-        dominant_freq = 0.001  # Default small frequency to avoid division issues
-    
-    # Determine trend and cycle status
+    # Force binary cycle classification (UP or DOWN)
     current_close = Decimal(str(closes[-1]))
     midpoint = (min_threshold + max_threshold) / Decimal('2')
     trend_bullish = current_close < midpoint and dominant_phase < 0
     trend_bearish = not trend_bullish
     cycle_status = "Up" if trend_bullish else "Down"
     trend = "BULLISH" if trend_bullish else "BEARISH"
-    
-    # Apply sign to dominant frequency based on trend
-    dominant_freq_signed = -dominant_freq if trend_bullish else dominant_freq
     
     # Volume confirmation
     volume_ratio = buy_vol / sell_vol if sell_vol > Decimal('0') else Decimal('1.0')
@@ -168,17 +156,17 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     else:
         cycle_target = min(cycle_target, current_close * Decimal('0.995'), min_threshold * Decimal('1.01'))
     
-    logging.info(f"{timeframe} - MTF Trend: {trend}, Cycle: {cycle_status}, Dominant Freq: {dominant_freq_signed:.6f}, "
+    logging.info(f"{timeframe} - MTF Trend: {trend}, Cycle: {cycle_status}, Dominant Freq: {dominant_freq:.6f}, "
                  f"Current Close: {current_close:.2f}, Cycle Target: {cycle_target:.2f}, "
                  f"Volume Ratio: {volume_ratio:.2f}, Volume Confirmed: {volume_confirmed}")
     print(f"{timeframe} - MTF Trend: {trend}")
     print(f"{timeframe} - Cycle Status: {cycle_status}")
-    print(f"{timeframe} - Dominant Frequency: {dominant_freq_signed:.6f}")
+    print(f"{timeframe} - Dominant Frequency: {dominant_freq:.6f}")
     print(f"{timeframe} - Cycle Target: {cycle_target:.2f}")
     print(f"{timeframe} - Volume Ratio: {volume_ratio:.2f}")
     print(f"{timeframe} - Volume Confirmed: {volume_confirmed}")
     
-    return trend, min_threshold, max_threshold, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq_signed, cycle_target
+    return trend, min_threshold, max_threshold, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target
 
 # FFT-Based Target Price Function
 def get_target(closes, n_components, timeframe, min_threshold, max_threshold, buy_vol, sell_vol):
@@ -203,12 +191,11 @@ def get_target(closes, n_components, timeframe, min_threshold, max_threshold, bu
     def reconstruct(components):
         filt_fft = np.zeros_like(fft_result, dtype=complex)
         filt_fft[components] = fft_result[components]
-        signal = fft.irfft(filt_fft, n=extended_n)
-        return Decimal(str(signal[-1])) if len(signal) > 0 else current_close
+        return fft.irfft(filt_fft, n=extended_n)[-1]
 
-    fastest_target = reconstruct(idx[:3])
-    average_target = reconstruct(idx[:2])
-    reversal_target = reconstruct([idx[0]])
+    fastest_target_val = reconstruct(idx[:3])
+    average_target_val = reconstruct(idx[:2])
+    reversal_target_val = reconstruct([idx[0]])
 
     # Determine market phase by slope
     last_vals = []
@@ -226,15 +213,15 @@ def get_target(closes, n_components, timeframe, min_threshold, max_threshold, bu
     phase_status = "DIP" if is_bullish else "TOP"
 
     # Enforce target ordering
-    values = sorted([fastest_target, average_target, reversal_target])
+    values = sorted([fastest_target_val, average_target_val, reversal_target_val])
     if is_bullish:
         # ascending order above close
-        targets = values
+        targets = [Decimal(str(v)) for v in values]
         if current_close >= targets[0]:
             targets = [current_close * Decimal('1.005'), current_close * Decimal('1.01'), current_close * Decimal('1.015')]
     else:
         # descending order below close
-        targets = list(reversed(values))
+        targets = [Decimal(str(v)) for v in reversed(values)]
         if current_close <= targets[0]:
             targets = [current_close * Decimal('0.995'), current_close * Decimal('0.99'), current_close * Decimal('0.985')]
 
@@ -950,11 +937,8 @@ def main():
                         "fft_phase": fft_data[10],
                         "dominant_freq": fft_data[9]
                     }
-                    print(f"{timeframe} - FFT Fastest Target: {fft_data[3]:.25f} USDC")
-                    print(f"{timeframe} - FFT Average Target: {fft_data[4]:.25f} USDC")
-                    print(f"{timeframe} - FFT Reversal Target: {fft_data[5]:.25f} USDC")
-                    print(f"{timeframe} - FFT Market Mood: {fft_data[6]}")
-                    print(f"{timeframe} - FFT Phase: {fft_data[10]}")
+                    conditions_long[f"fft_bullish_{timeframe}"] = fft_data[7]
+                    conditions_short[f"fft_bearish_{timeframe}"] = fft_data[8]
                 
                 if len(closes) >= 14:
                     momentum = talib.MOM(closes, timeperiod=14)
@@ -988,6 +972,8 @@ def main():
             logging.info(f"Most Recent Extreme: {most_recent_type} in {most_recent_extreme['timeframe']} at {most_recent_price:.2f} "
                          f"(Time: {datetime.datetime.fromtimestamp(most_recent_time)})")
             
+
+
             condition_pairs = [
                 ("momentum_positive_1m", "momentum_negative_1m"),
                 ("momentum_positive_3m", "momentum_negative_3m"),
@@ -1061,13 +1047,14 @@ def main():
                         f"Reversal: {details.get('reversal_type', 'N/A')} at price {details.get('reversal_price', Decimal('0')):.2f}, "
                         f"time {details.get('reversal_time', 'N/A')}\n"
                         f"Support Level: {details.get('support_levels', [{}])[0].get('price', Decimal('0')):.2f} USDC, "
-                        f"Touches: {details.get('support_levels', [{}])[0].get('touches', '0')}\n"
+                        f"Touches: {details.get('support_levels', [{}])[0].get('touches', 0)}\n"
                         f"Resistance Level: {details.get('resistance_levels', [{}])[0].get('price', Decimal('0')):.2f} USDC, "
-                        f"Touches: {details.get('resistance_levels', [{}])[0].get('touches', '0')}\n"
+                        f"Touches: {details.get('resistance_levels', [{}])[0].get('touches', 0)}\n"
                         f"Buy Volume: {details.get('buy_volume', Decimal('0')):.2f}\n"
                         f"Sell Volume: {details.get('sell_volume', Decimal('0')):.2f}\n"
                         f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
                         f"FFT Phase: {fft_data.get('fft_phase', 'N/A')}\n"
+                        f"FFT Dominant Frequency: {fft_data.get('dominant_freq', 0.0):.6f}\n"
                         f"FFT Fastest Target: {fft_data.get('fastest_target', Decimal('0')):.2f} USDC\n"
                         f"FFT Average Target: {fft_data.get('average_target', Decimal('0')):.2f} USDC\n"
                         f"FFT Reversal Target: {fft_data.get('reversal_target', Decimal('0')):.2f} USDC\n"
