@@ -148,15 +148,29 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     volume_confirmed = (volume_ratio >= VOLUME_CONFIRMATION_RATIO if trend == "BULLISH" else 
                        Decimal('1.0') / volume_ratio >= VOLUME_CONFIRMATION_RATIO if volume_ratio > Decimal('0') else False)
     
-    filtered_fft = np.zeros_like(fft_result, dtype=complex)
-    filtered_fft[idx[:2]] = fft_result[idx[:2]]
-    filtered_signal = fft.irfft(filtered_fft, n=len(closes))
-    cycle_target = Decimal(str(filtered_signal[-1])) if len(filtered_signal) > 0 else current_close
-    cycle_target = max(cycle_target, Decimal('0.0000000000000000000000001'))  # Ensure positive
+    # Improved cycle_target calculation
+    projection_steps = 5  # Project forward 5 time steps
+    t_future = len(closes) + projection_steps
+    cycle_target = current_close  # Fallback to current close
+    try:
+        # Reconstruct signal using top 2 dominant frequencies
+        signal_future = sum(
+            2 * amplitudes[j] * np.cos(2 * np.pi * frequencies[j] * t_future + phases[j]) / len(closes)
+            for j in idx[:2]
+        )
+        cycle_target = Decimal(str(signal_future + np.mean(closes)))  # Add mean to center the signal
+        cycle_target = max(cycle_target, Decimal('0.0000000000000000000000001'))  # Ensure positive
+    except Exception as e:
+        logging.warning(f"Error projecting cycle target in {timeframe}: {e}")
+        print(f"Error projecting cycle target in {timeframe}: {e}")
+    
+    # Constrain cycle_target based on trend and thresholds
     if trend == "BULLISH":
         cycle_target = max(cycle_target, current_close * Decimal('1.005'), max_threshold * Decimal('0.99'))
+        cycle_target = min(cycle_target, current_close * Decimal('1.05'), max_threshold * Decimal('1.01'))
     else:
         cycle_target = min(cycle_target, current_close * Decimal('0.995'), min_threshold * Decimal('1.01'))
+        cycle_target = max(cycle_target, current_close * Decimal('0.95'), min_threshold * Decimal('0.99'))
     
     logging.info(f"{timeframe} - MTF Trend: {trend}, Cycle: {cycle_status}, Dominant Freq: {dominant_freq:.25f}, "
                  f"Current Close: {current_close:.25f}, Cycle Target: {cycle_target:.25f}, "
@@ -550,8 +564,8 @@ def check_open_orders(retries=5, base_delay=5):
             if attempt < retries - 1:
                 time.sleep(retry_after if e.code == -1003 else base_delay * (2 ** attempt))
         except Exception as e:
-            logging.error(f"Unexpected error checking open orders (attempt {attempt + 1}/{retries}): {e}")
-            print(f"Unexpected error checking open orders (attempt {attempt + 1}/{retries}): {e}")
+            logging.error(f"Unexpected error checking open orders (attempt {attempt}): {e}")
+            print(f"Unexpected error checking open orders after {retries} attempts.")
             if attempt < retries - 1:
                 time.sleep(base_delay * (2 ** attempt))
     logging.error(f"Failed to check open orders after {retries} attempts.")
@@ -561,7 +575,7 @@ def check_open_orders(retries=5, base_delay=5):
 def calculate_quantity(balance, price):
     if price <= Decimal('0') or balance < MINIMUM_BALANCE:
         logging.warning(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}).")
-        print(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}).")
+        print(f"Warning: Insufficient balance {balance:.25f} USDC or invalid price {price:.25f}")
         return Decimal('0.0')
     quantity = (balance * Decimal(str(LEVERAGE))) / price
     quantity = quantity.quantize(QUANTITY_PRECISION, rounding='ROUND_DOWN')
@@ -573,8 +587,8 @@ def place_order(signal, quantity, price, initial_balance, retries=5, base_delay=
     for attempt in range(retries):
         try:
             if quantity <= Decimal('0'):
-                logging.warning(f"Invalid quantity {quantity:.25f}. Skipping order.")
-                print(f"Invalid quantity {quantity:.25f}. Skipping order.")
+                logging.warning(f"Invalid order quantity {quantity:.25f}. Skipping order.")
+                print(f"Invalid order quantity {quantity:.25f}. Skipping order placement.")
                 return None
             position = get_position()
             position["initial_balance"] = initial_balance
@@ -940,11 +954,12 @@ def main():
                 })
             
             print(f"\n--- Multi-Timeframe Min/Max Comparison ---")
-            closest_min_tf = min(min_max_distances, key=lambda x: x["min_distance"])
-            closest_max_tf = min(min_max_distances, key=lambda x: x["max_distance"])
+            closest_min_tf = min(min_max_distances, key=lambda x: x['min_distance'])
+            closest_max_tf = {'timeframe': closest_min_tf, 'distance': closest_min_tf['min_distance'], 'min': closest_min_tf['min_threshold']}
+            logging.info(f"Closest to Min Threshold: {closest_min_tf['timeframe']} at distance {closest_min_tf['min_distance']:.25f}, Min: {closest_min_tf['min_threshold']:.25f}")
             print(f"Closest to Min Threshold: {closest_min_tf['timeframe']} (Distance: {closest_min_tf['min_distance']:.25f}, Min: {closest_min_tf['min_threshold']:.25f})")
+            closest_max_tf = min(min_max_distances, key=lambda x: x['max_distance'])
             print(f"Closest to Max Threshold: {closest_max_tf['timeframe']} (Distance: {closest_max_tf['max_distance']:.25f}, Max: {closest_max_tf['max_threshold']:.25f})")
-            logging.info(f"Closest to Min Threshold: {closest_min_tf['timeframe']} (Distance: {closest_min_tf['min_distance']:.25f})")
             logging.info(f"Closest to Max Threshold: {closest_max_tf['timeframe']} (Distance: {closest_max_tf['max_distance']:.25f})")
             
             most_recent_extreme = max(recent_extremes, key=lambda x: max(x["lowest_low_time"], x["highest_high_time"]))
