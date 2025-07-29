@@ -3,7 +3,6 @@ import datetime
 import time
 import concurrent.futures
 import talib
-import gc
 import numpy as np
 from decimal import Decimal, getcontext
 import logging
@@ -11,7 +10,6 @@ from scipy import fft
 from telegram.ext import Application
 from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException
-import uuid
 
 # Configure logging
 logging.basicConfig(
@@ -134,7 +132,7 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     amplitudes = np.abs(fft_result)
     phases = np.angle(fft_result)
     
-    idx = np.argsort(amplitudes)[::-1][1:3]
+    idx = np.argsort(amplitudes)[::-1][1:6]  # Top 5 frequencies
     dominant_freq = frequencies[idx[0]] if idx.size > 0 else 0.0
     dominant_phase = phases[idx[0]] if idx.size > 0 else 0.0
     
@@ -149,27 +147,35 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     volume_confirmed = (volume_ratio >= VOLUME_CONFIRMATION_RATIO if trend == "BULLISH" else 
                        Decimal('1.0') / volume_ratio >= VOLUME_CONFIRMATION_RATIO if volume_ratio > Decimal('0') else False)
     
-    projection_steps = 5
-    t_future = len(closes) + projection_steps
-    cycle_target = current_close
+    # Cycle target: 5 frequencies, 10 steps ahead, weighted
+    projection_steps = 10
     try:
+        weights = np.array([1 / (i + 1) for i in range(len(idx))])
+        weights /= np.sum(weights)
         signal_future = sum(
-            2 * amplitudes[j] * np.cos(2 * np.pi * frequencies[j] * t_future + phases[j]) / len(closes)
-            for j in idx[:2]
+            weights[i] * 2 * amplitudes[j] * np.cos(2 * np.pi * frequencies[j] * (len(closes) + projection_steps) + phases[j]) / len(closes)
+            for i, j in enumerate(idx[:5])
         )
         cycle_target = Decimal(str(signal_future + np.mean(closes)))
         cycle_target = max(cycle_target, Decimal('0.0000000000000000000000001'))
     except Exception as e:
         logging.warning(f"Error projecting cycle target in {timeframe}: {e}")
         print(f"Error projecting cycle target in {timeframe}: {e}")
+        cycle_target = current_close
 
-    # Constrain cycle_target to align with trend and thresholds
+    # Constrain cycle target
+    price_range = max_threshold - min_threshold
+    tolerance = price_range * SUPPORT_RESISTANCE_TOLERANCE
     if trend == "BULLISH":
-        cycle_target = max(cycle_target, current_close * Decimal('1.005'), min_threshold * Decimal('1.01'))
-        cycle_target = min(cycle_target, current_close * Decimal('1.05'), max_threshold * Decimal('1.01'))
+        cycle_target = max(cycle_target, current_close * Decimal('1.01'), min_threshold * Decimal('1.02'))
+        cycle_target = min(cycle_target, current_close * Decimal('1.10'), max_threshold * Decimal('0.98'))
+        if abs(cycle_target - max_threshold) <= tolerance:
+            cycle_status = "Approaching Resistance"
     else:
-        cycle_target = min(cycle_target, current_close * Decimal('0.995'), max_threshold * Decimal('0.99'))
-        cycle_target = max(cycle_target, current_close * Decimal('0.95'), min_threshold * Decimal('0.99'))
+        cycle_target = min(cycle_target, current_close * Decimal('0.99'), max_threshold * Decimal('0.98'))
+        cycle_target = max(cycle_target, current_close * Decimal('0.90'), min_threshold * Decimal('1.02'))
+        if abs(cycle_target - min_threshold) <= tolerance:
+            cycle_status = "Approaching Support"
 
     logging.info(f"{timeframe} - MTF Trend: {trend}, Cycle: {cycle_status}, Dominant Freq: {dominant_freq:.25f}, "
                  f"Current Close: {current_close:.25f}, Cycle Target: {cycle_target:.25f}, "
@@ -186,6 +192,7 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
 def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vol, n_components=5):
     if len(closes) < 2 or np.any(np.isnan(closes)) or np.any(closes <= 0):
         logging.warning(f"Invalid closes data for FFT analysis in {timeframe}.")
+        print(f"Invalid closes data for FFT analysis in {timeframe}.")
         return (datetime.datetime.now(), Decimal('0'), Decimal('0'), Decimal('0'), 
                 Decimal('0'), Decimal('0'), "Bearish", False, True, 0.0, "TOP")
 
@@ -198,76 +205,57 @@ def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vo
 
     idx = np.argsort(amplitudes)[::-1][1:n_components+1]
     dominant_freq = frequencies[idx[0]] if idx.size > 0 else 0.0
+    dominant_phase = phases[idx[0]] if idx.size > 0 else 0.0
 
-    extended_n = len(closes) + 10
     current_close = Decimal(str(closes[-1]))
-
-    def reconstruct(components):
-        filt_fft = np.zeros_like(fft_result, dtype=complex)
-        filt_fft[components] = fft_result[components]
-        signal = fft.irfft(filt_fft, n=extended_n)
-        return max(Decimal(str(signal[-1] if len(signal) > 0 else current_close)), Decimal('0.0000000000000000000000001'))
-
-    fastest_target_val = reconstruct(idx[:3])
-    average_target_val = reconstruct(idx[:2])
-    reversal_target_val = reconstruct([idx[0]])
-
-    last_vals = []
-    for i in range(5):
-        t = len(closes) + i
-        val = sum(
-            2 * amplitudes[j] * np.cos(2 * np.pi * frequencies[j] * t + phases[j])
-            for j in idx[:3]
-        )
-        last_vals.append(val)
-    slope = np.polyfit(range(len(last_vals)), last_vals, 1)[0]
-    is_bullish = slope > 0
+    midpoint = (min_threshold + max_threshold) / Decimal('2')
+    is_bullish = dominant_phase < 0 and current_close < midpoint
     is_bearish = not is_bullish
     market_mood = "Bullish" if is_bullish else "Bearish"
     phase_status = "DIP" if is_bullish else "TOP"
 
-    # Align FFT targets with trend and timeframe thresholds
-    values = sorted([fastest_target_val, average_target_val, reversal_target_val])
+    def reconstruct(components, steps, weight_factor=1.0):
+        try:
+            weights = np.array([1 / (i + 1) for i in range(len(components))])
+            weights /= np.sum(weights)
+            signal_future = sum(
+                weights[i] * 2 * amplitudes[j] * np.cos(2 * np.pi * frequencies[j] * (len(closes) + steps) + phases[j]) / len(closes)
+                for i, j in enumerate(components)
+            )
+            target = Decimal(str((signal_future + np.mean(closes)) * weight_factor))
+            return max(target, Decimal('0.0000000000000000000000001'))
+        except Exception as e:
+            logging.warning(f"Error reconstructing FFT signal in {timeframe}: {e}")
+            return current_close
+
+    # Calculate FFT targets
+    fastest_target = reconstruct(idx[:3], 3, 1.005 if is_bullish else 0.995)
+    average_target = reconstruct(idx[:4], 5, 1.01 if is_bullish else 0.99)
+    reversal_target = reconstruct(idx[:5], 8, 1.015 if is_bullish else 0.985)
+
+    # Enforce order and constraints
+    targets = [fastest_target, average_target, reversal_target]
+    price_range = max_threshold - min_threshold
+    tolerance = price_range * SUPPORT_RESISTANCE_TOLERANCE
     if is_bullish:
-        targets = [Decimal(str(v)) for v in values]
-        targets = [
-            max(t, current_close * Decimal('1.005'), min_threshold * Decimal('1.01'))
-            for t in targets
-        ]
-        targets = [
-            min(t, current_close * Decimal('1.05'), max_threshold * Decimal('1.01'))
-            for t in targets
-        ]
-        if current_close >= targets[0]:
-            targets = [
-                current_close * Decimal('1.005'),
-                current_close * Decimal('1.01'),
-                current_close * Decimal('1.015')
-            ]
+        targets = [max(t, current_close * Decimal('1.005'), min_threshold * Decimal('1.01')) for t in targets]
+        targets = [min(t, current_close * Decimal('1.10'), max_threshold * Decimal('0.98')) for t in targets]
+        targets[1] = max(targets[1], targets[0] * Decimal('1.005'))
+        targets[2] = max(targets[2], targets[1] * Decimal('1.005'))
+        targets = [t if abs(t - max_threshold) > tolerance else max_threshold * Decimal('0.95') for t in targets]
     else:
-        targets = [Decimal(str(v)) for v in reversed(values)]
-        targets = [
-            min(t, current_close * Decimal('0.995'), max_threshold * Decimal('0.99'))
-            for t in targets
-        ]
-        targets = [
-            max(t, current_close * Decimal('0.95'), min_threshold * Decimal('0.99'))
-            for t in targets
-        ]
-        if current_close <= targets[0]:
-            targets = [
-                current_close * Decimal('0.995'),
-                current_close * Decimal('0.99'),
-                current_close * Decimal('0.985')
-            ]
+        targets = [min(t, current_close * Decimal('0.995'), max_threshold * Decimal('0.98')) for t in targets]
+        targets = [max(t, current_close * Decimal('0.90'), min_threshold * Decimal('1.02')) for t in targets]
+        targets[1] = min(targets[1], targets[0] * Decimal('0.995'))
+        targets[2] = min(targets[2], targets[1] * Decimal('0.995'))
+        targets = [t if abs(t - min_threshold) > tolerance else min_threshold * Decimal('1.05') for t in targets]
 
     fastest_target, average_target, reversal_target = targets
-
     stop_loss = current_close * (Decimal('1') - STOP_LOSS_PERCENTAGE if is_bullish else Decimal('1') + STOP_LOSS_PERCENTAGE)
 
     logging.info(f"FFT {timeframe}: Mood: {market_mood}, Phase: {phase_status}, "
                  f"Close: {current_close:.25f}, Fastest: {fastest_target:.25f}, "
-                 f"Average: {average_target:.25f}, Reversal: {reversal_target:.25f}, Slope: {slope:.25f}")
+                 f"Average: {average_target:.25f}, Reversal: {reversal_target:.25f}")
     print(f"FFT {timeframe} - Market Mood: {market_mood}")
     print(f"FFT {timeframe} - Phase: {phase_status}")
     print(f"FFT {timeframe} - Close: {current_close:.25f}")
@@ -278,16 +266,6 @@ def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vo
     return (datetime.datetime.now(), current_close, stop_loss, fastest_target, 
             average_target, reversal_target, market_mood, is_bullish, is_bearish, 
             dominant_freq, phase_status)
-
-def calculate_volume(candles):
-    if not candles:
-        logging.warning("No candles provided for volume calculation.")
-        print("No candles provided for volume calculation.")
-        return Decimal('0')
-    total_volume = sum(Decimal(str(candle["volume"])) for candle in candles)
-    logging.info(f"Total Volume: {total_volume:.25f}")
-    print(f"Total Volume: {total_volume:.25f}")
-    return total_volume
 
 def calculate_buy_sell_volume(candles, timeframe):
     if not candles:
@@ -839,8 +817,6 @@ def main():
                     volume_data[tf]["buy_volume"], volume_data[tf]["sell_volume"], volume_data[tf]["volume_mood"] = calculate_buy_sell_volume(candle_map[tf], tf)
             
             fft_results = {}
-            min_max_distances = []
-            recent_extremes = []
             analysis_details = {tf: {} for tf in TIMEFRAMES}
             timeframe_ranges = {}
             
@@ -930,18 +906,6 @@ def main():
                     "price_range": price_range
                 }
                 
-                lookback = min(len(candles_tf), LOOKBACK_PERIODS[timeframe])
-                recent_candles = candles_tf[-lookback:]
-                min_candle = min(recent_candles, key=lambda x: x['low'])
-                max_candle = max(recent_candles, key=lambda x: x['high'])
-                recent_extremes.append({
-                    "timeframe": timeframe,
-                    "lowest_low": Decimal(str(min_candle['low'])),
-                    "lowest_low_time": min_candle['time'],
-                    "highest_high": Decimal(str(max_candle['high'])),
-                    "highest_high_time": max_candle['time']
-                })
-                
                 if len(closes) >= 2:
                     fft_data = get_target(
                         closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
@@ -968,33 +932,6 @@ def main():
                         conditions_long[f"momentum_positive_{timeframe}"] = Decimal(str(momentum[-1])) >= Decimal('0')
                         conditions_short[f"momentum_negative_{timeframe}"] = not conditions_long[f"momentum_positive_{timeframe}"]
                 
-                min_max_distances.append({
-                    "timeframe": timeframe,
-                    "min_distance": abs(current_close - min_threshold),
-                    "max_distance": abs(current_close - max_threshold),
-                    "min_threshold": min_threshold,
-                    "max_threshold": max_threshold
-                })
-            
-            print(f"\n--- Multi-Timeframe Min/Max Comparison ---")
-            closest_min_tf = min(min_max_distances, key=lambda x: x['min_distance'])
-            closest_max_tf = {'timeframe': closest_min_tf, 'distance': closest_min_tf['min_distance'], 'min': closest_min_tf['min_threshold']}
-            logging.info(f"Closest to Min Threshold: {closest_min_tf['timeframe']} at distance {closest_min_tf['min_distance']:.25f}, Min: {closest_min_tf['min_threshold']:.25f}")
-            print(f"Closest to Min Threshold: {closest_min_tf['timeframe']} (Distance: {closest_min_tf['min_distance']:.25f}, Min: {closest_min_tf['min_threshold']:.25f})")
-            closest_max_tf = min(min_max_distances, key=lambda x: x['max_distance'])
-            print(f"Closest to Max Threshold: {closest_max_tf['timeframe']} (Distance: {closest_max_tf['max_distance']:.25f}, Max: {closest_max_tf['max_threshold']:.25f})")
-            logging.info(f"Closest to Max Threshold: {closest_max_tf['timeframe']} (Distance: {closest_max_tf['max_distance']:.25f})")
-            
-            most_recent_extreme = max(recent_extremes, key=lambda x: max(x["lowest_low_time"], x["highest_high_time"]))
-            most_recent_time = max(most_recent_extreme["lowest_low_time"], most_recent_extreme["highest_high_time"])
-            most_recent_type = "LOW" if most_recent_extreme["lowest_low_time"] >= most_recent_extreme["highest_high_time"] else "HIGH"
-            most_recent_price = most_recent_extreme["lowest_low"] if most_recent_type == "LOW" else most_recent_extreme["highest_high"]
-            print(f"\n--- Most Recent Low vs High ---")
-            print(f"Most Recent Extreme: {most_recent_type} in {most_recent_extreme['timeframe']} at {most_recent_price:.25f} "
-                  f"(Time: {datetime.datetime.fromtimestamp(most_recent_time)})")
-            logging.info(f"Most Recent Extreme: {most_recent_type} in {most_recent_extreme['timeframe']} at {most_recent_price:.25f} "
-                         f"(Time: {datetime.datetime.fromtimestamp(most_recent_time)})")
-            
             condition_pairs = [
                 ("momentum_positive_1m", "momentum_negative_1m"),
                 ("momentum_positive_3m", "momentum_negative_3m"),
@@ -1119,7 +1056,6 @@ def main():
                         if new_position:
                             position = new_position
             
-            gc.collect()
             time.sleep(5)
     except KeyboardInterrupt:
         logging.info("Bot stopped by user.")
