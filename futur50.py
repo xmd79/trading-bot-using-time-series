@@ -11,6 +11,7 @@ from scipy import fft
 from telegram.ext import Application
 from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException
+import uuid
 
 # Configure logging
 logging.basicConfig(
@@ -117,7 +118,7 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
         logging.warning(f"Insufficient candles ({len(candles)}) for MTF trend analysis in {timeframe}.")
         print(f"Insufficient candles ({len(candles)}) for MTF trend analysis in {timeframe}.")
         return "BEARISH", min_threshold, max_threshold, "TOP", False, True, Decimal('1.0'), False, 0.0, max_threshold
-    
+
     recent_candles = candles[-lookback:]
     closes = np.array([float(c['close']) for c in recent_candles], dtype=np.float64)
     
@@ -125,11 +126,11 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
         logging.warning(f"Invalid or non-positive close prices in {timeframe}.")
         print(f"Invalid or non-positive close prices in {timeframe}.")
         return "BEARISH", min_threshold, max_threshold, "TOP", False, True, Decimal('1.0'), False, 0.0, max_threshold
-    
+
     window = np.hamming(len(closes))
     fft_result = fft.rfft(closes * window)
     timeframe_interval = TIMEFRAME_INTERVALS[timeframe]
-    frequencies = fft.rfftfreq(len(closes), d=timeframe_interval / 60.0)  # Normalize by timeframe in minutes
+    frequencies = fft.rfftfreq(len(closes), d=timeframe_interval / 60.0)
     amplitudes = np.abs(fft_result)
     phases = np.angle(fft_result)
     
@@ -148,30 +149,28 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     volume_confirmed = (volume_ratio >= VOLUME_CONFIRMATION_RATIO if trend == "BULLISH" else 
                        Decimal('1.0') / volume_ratio >= VOLUME_CONFIRMATION_RATIO if volume_ratio > Decimal('0') else False)
     
-    # Improved cycle_target calculation
-    projection_steps = 5  # Project forward 5 time steps
+    projection_steps = 5
     t_future = len(closes) + projection_steps
-    cycle_target = current_close  # Fallback to current close
+    cycle_target = current_close
     try:
-        # Reconstruct signal using top 2 dominant frequencies
         signal_future = sum(
             2 * amplitudes[j] * np.cos(2 * np.pi * frequencies[j] * t_future + phases[j]) / len(closes)
             for j in idx[:2]
         )
-        cycle_target = Decimal(str(signal_future + np.mean(closes)))  # Add mean to center the signal
-        cycle_target = max(cycle_target, Decimal('0.0000000000000000000000001'))  # Ensure positive
+        cycle_target = Decimal(str(signal_future + np.mean(closes)))
+        cycle_target = max(cycle_target, Decimal('0.0000000000000000000000001'))
     except Exception as e:
         logging.warning(f"Error projecting cycle target in {timeframe}: {e}")
         print(f"Error projecting cycle target in {timeframe}: {e}")
-    
-    # Constrain cycle_target based on trend and thresholds
+
+    # Constrain cycle_target to align with trend and thresholds
     if trend == "BULLISH":
-        cycle_target = max(cycle_target, current_close * Decimal('1.005'), max_threshold * Decimal('0.99'))
+        cycle_target = max(cycle_target, current_close * Decimal('1.005'), min_threshold * Decimal('1.01'))
         cycle_target = min(cycle_target, current_close * Decimal('1.05'), max_threshold * Decimal('1.01'))
     else:
-        cycle_target = min(cycle_target, current_close * Decimal('0.995'), min_threshold * Decimal('1.01'))
+        cycle_target = min(cycle_target, current_close * Decimal('0.995'), max_threshold * Decimal('0.99'))
         cycle_target = max(cycle_target, current_close * Decimal('0.95'), min_threshold * Decimal('0.99'))
-    
+
     logging.info(f"{timeframe} - MTF Trend: {trend}, Cycle: {cycle_status}, Dominant Freq: {dominant_freq:.25f}, "
                  f"Current Close: {current_close:.25f}, Cycle Target: {cycle_target:.25f}, "
                  f"Volume Ratio: {volume_ratio:.25f}, Volume Confirmed: {volume_confirmed}")
@@ -184,16 +183,16 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     
     return trend, min_threshold, max_threshold, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target
 
-def get_target(closes, n_components, timeframe, min_threshold, max_threshold, buy_vol, sell_vol):
+def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vol, n_components=5):
     if len(closes) < 2 or np.any(np.isnan(closes)) or np.any(closes <= 0):
         logging.warning(f"Invalid closes data for FFT analysis in {timeframe}.")
         return (datetime.datetime.now(), Decimal('0'), Decimal('0'), Decimal('0'), 
                 Decimal('0'), Decimal('0'), "Bearish", False, True, 0.0, "TOP")
-    
+
     window = np.hamming(len(closes))
     fft_result = fft.rfft(closes * window)
     timeframe_interval = TIMEFRAME_INTERVALS[timeframe]
-    frequencies = fft.rfftfreq(len(closes), d=timeframe_interval / 60.0)  # Normalize by timeframe in minutes
+    frequencies = fft.rfftfreq(len(closes), d=timeframe_interval / 60.0)
     amplitudes = np.abs(fft_result)
     phases = np.angle(fft_result)
 
@@ -227,15 +226,40 @@ def get_target(closes, n_components, timeframe, min_threshold, max_threshold, bu
     market_mood = "Bullish" if is_bullish else "Bearish"
     phase_status = "DIP" if is_bullish else "TOP"
 
+    # Align FFT targets with trend and timeframe thresholds
     values = sorted([fastest_target_val, average_target_val, reversal_target_val])
     if is_bullish:
         targets = [Decimal(str(v)) for v in values]
+        targets = [
+            max(t, current_close * Decimal('1.005'), min_threshold * Decimal('1.01'))
+            for t in targets
+        ]
+        targets = [
+            min(t, current_close * Decimal('1.05'), max_threshold * Decimal('1.01'))
+            for t in targets
+        ]
         if current_close >= targets[0]:
-            targets = [current_close * Decimal('1.005'), current_close * Decimal('1.01'), current_close * Decimal('1.015')]
+            targets = [
+                current_close * Decimal('1.005'),
+                current_close * Decimal('1.01'),
+                current_close * Decimal('1.015')
+            ]
     else:
         targets = [Decimal(str(v)) for v in reversed(values)]
+        targets = [
+            min(t, current_close * Decimal('0.995'), max_threshold * Decimal('0.99'))
+            for t in targets
+        ]
+        targets = [
+            max(t, current_close * Decimal('0.95'), min_threshold * Decimal('0.99'))
+            for t in targets
+        ]
         if current_close <= targets[0]:
-            targets = [current_close * Decimal('0.995'), current_close * Decimal('0.99'), current_close * Decimal('0.985')]
+            targets = [
+                current_close * Decimal('0.995'),
+                current_close * Decimal('0.99'),
+                current_close * Decimal('0.985')
+            ]
 
     fastest_target, average_target, reversal_target = targets
 
@@ -316,7 +340,7 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, hig
     recent_candles = candles[-lookback:]
     
     price_range = max_threshold - min_threshold
-    tolerance = price_range * TOLERANCE_FACTORS[timeframe]  # Dynamic tolerance based on timeframe
+    tolerance = price_range * TOLERANCE_FACTORS[timeframe]
     if timeframe == "1m":
         tolerance *= Decimal('1.5')
     
@@ -920,8 +944,7 @@ def main():
                 
                 if len(closes) >= 2:
                     fft_data = get_target(
-                        closes, n_components=5, timeframe=timeframe, min_threshold=min_threshold, max_threshold=max_threshold,
-                        buy_vol=buy_vol, sell_vol=sell_vol
+                        closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
                     )
                     fft_results[timeframe] = {
                         "time": fft_data[0].strftime('%Y-%m-%d %H:%M:%S'),
