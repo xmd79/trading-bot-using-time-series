@@ -595,7 +595,7 @@ def calculate_quantity(balance, price):
     print(f"Calculated quantity: {quantity:.25f} BTC for balance {balance:.25f} USDC at price {price:.25f}")
     return quantity
 
-def place_order(signal, quantity, price, initial_balance, analysis_details, fft_results, hurst_results, retries=5, base_delay=5):
+def place_order(signal, quantity, price, initial_balance, conditions, analysis_details, fft_results, hurst_results, retries=5, base_delay=5):
     if check_open_orders() > 0:
         logging.warning(f"Cannot place {signal} order: existing open orders detected.")
         print(f"Cannot place {signal} order: existing open orders detected.")
@@ -605,10 +605,6 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, fft_
         print(f"Insufficient balance or invalid quantity {quantity:.25f} BTC. Continuing signal generation.")
         logging.info(f"Insufficient balance or invalid quantity {quantity:.25f} BTC. Continuing signal generation.")
         return None
-    
-    # Send initial signal notification
-    initial_message = f"*{signal} Signal Triggered*\nSymbol: {TRADE_SYMBOL}\nTime: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    telegram_loop.run_until_complete(send_telegram_message(initial_message))
     
     for attempt in range(retries):
         try:
@@ -628,13 +624,24 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, fft_
                     f"*Trade Signal: LONG*\n"
                     f"Symbol: {TRADE_SYMBOL}\n"
                     f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    f"Signal Type: LONG\n"
                     f"Quantity: {quantity:.25f} BTC\n"
                     f"Entry Price: ~{price:.25f} USDC\n"
                     f"Initial Balance: {initial_balance:.25f} USDC\n"
                     f"Stop-Loss: {sl_price:.25f} (-5%)\n"
                     f"Take-Profit: {tp_price:.25f} (+5%)\n"
-                    f"\n*Analysis Details*\n"
+                    f"\n*Trigger Conditions*\n"
                 )
+                for tf in TIMEFRAMES:
+                    message += (
+                        f"\n*{tf} Timeframe*\n"
+                        f"Momentum Positive: {conditions.get(f'momentum_positive_{tf}', False)}\n"
+                        f"FFT Bullish: {conditions.get(f'fft_bullish_{tf}', False)}\n"
+                        f"Dip Confirmed: {conditions.get(f'dip_confirmed_{tf}', False)}\n"
+                        f"Below Middle Threshold: {conditions.get(f'below_middle_{tf}', False)}\n"
+                        f"Hurst Uptrend: {conditions.get(f'hurst_up_{tf}', False)}\n"
+                    )
+                message += f"\n*Analysis Details*\n"
                 for tf in TIMEFRAMES:
                     details = analysis_details.get(tf, {})
                     fft_data = fft_results.get(tf, {})
@@ -682,13 +689,24 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, fft_
                     f"*Trade Signal: SHORT*\n"
                     f"Symbol: {TRADE_SYMBOL}\n"
                     f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    f"Signal Type: SHORT\n"
                     f"Quantity: {quantity:.25f} BTC\n"
                     f"Entry Price: ~{price:.25f} USDC\n"
                     f"Initial Balance: {initial_balance:.25f} USDC\n"
                     f"Stop-Loss: {sl_price:.25f} (-5%)\n"
                     f"Take-Profit: {tp_price:.25f} (+5%)\n"
-                    f"\n*Analysis Details*\n"
+                    f"\n*Trigger Conditions*\n"
                 )
+                for tf in TIMEFRAMES:
+                    message += (
+                        f"\n*{tf} Timeframe*\n"
+                        f"Momentum Negative: {conditions.get(f'momentum_negative_{tf}', False)}\n"
+                        f"FFT Bearish: {conditions.get(f'fft_bearish_{tf}', False)}\n"
+                        f"Top Confirmed: {conditions.get(f'top_confirmed_{tf}', False)}\n"
+                        f"Above Middle Threshold: {conditions.get(f'above_middle_{tf}', False)}\n"
+                        f"Hurst Downtrend: {conditions.get(f'hurst_down_{tf}', False)}\n"
+                    )
+                message += f"\n*Analysis Details*\n"
                 for tf in TIMEFRAMES:
                     details = analysis_details.get(tf, {})
                     fft_data = fft_results.get(tf, {})
@@ -875,17 +893,6 @@ def main():
             fft_results = {}
             hurst_results = {}
             
-            # Prepare iteration message for Telegram
-            iteration_message = (
-                f"*Iteration Analysis*\n"
-                f"Symbol: {TRADE_SYMBOL}\n"
-                f"Time: {current_local_time_str}\n"
-                f"Current Price: {current_price:.25f} USDC\n"
-                f"USDC Balance: {usdc_balance:.25f}\n"
-                f"Position: {position['side']}\n"
-                f"\n*Analysis Details*\n"
-            )
-            
             for timeframe in TIMEFRAMES:
                 print(f"\n--- {timeframe} Timeframe Analysis ---")
                 if not candle_map.get(timeframe):
@@ -905,7 +912,6 @@ def main():
                         "dominant_freq": 0.0
                     }
                     hurst_results[timeframe] = {"trend": "Down", "forecast_price": Decimal('0')}
-                    iteration_message += f"\n*{timeframe} Timeframe*\nNo data available\n"
                     continue
                 
                 candles_tf = candle_map[timeframe]
@@ -977,34 +983,6 @@ def main():
                     "hurst_trend": hurst_trend,
                     "hurst_forecast_price": hurst_forecast_price
                 }
-                
-                # Add timeframe analysis to iteration message
-                iteration_message += (
-                    f"\n*{timeframe} Timeframe*\n"
-                    f"MTF Trend: {trend}\n"
-                    f"Cycle Status: {cycle_status}\n"
-                    f"Dominant Frequency: {dominant_freq:.25f}\n"
-                    f"Cycle Target: {cycle_target:.25f} USDC\n"
-                    f"Volume Ratio: {volume_ratio:.25f}\n"
-                    f"Volume Confirmed: {volume_confirmed}\n"
-                    f"Minimum Threshold: {min_threshold:.25f} USDC\n"
-                    f"Middle Threshold: {middle_threshold:.25f} USDC\n"
-                    f"Maximum Threshold: {max_threshold:.25f} USDC\n"
-                    f"High-Low Range: {price_range:.25f} USDC\n"
-                    f"Most Recent Reversal: {reversal_type} at price {closest_min_price if reversal_type == 'DIP' else closest_max_price:.25f}\n"
-                    f"Support Level: {support_levels[0]['price']:.25f} USDC\n"
-                    f"Resistance Level: {resistance_levels[0]['price']:.25f} USDC\n"
-                    f"Buy Volume: {buy_vol:.25f}\n"
-                    f"Sell Volume: {sell_vol:.25f}\n"
-                    f"Volume Mood: {volume_mood}\n"
-                    f"FFT Phase: {fft_data[10]}\n"
-                    f"FFT Dominant Frequency: {fft_data[9]:.25f}\n"
-                    f"FFT Fastest Target: {fft_data[3]:.25f} USDC\n"
-                    f"FFT Average Target: {fft_data[4]:.25f} USDC\n"
-                    f"FFT Reversal Target: {fft_data[5]:.25f} USDC\n"
-                    f"Hurst Trend: {hurst_trend}\n"
-                    f"Hurst Forecast Price: {hurst_forecast_price:.25f} USDC\n"
-                )
             
             # Print condition status
             print("\nCondition Pairs Status:")
@@ -1059,13 +1037,10 @@ def main():
             print(f"\nTrade Signal Status: {signal}")
             logging.info(f"Trade Signal Status: {signal}")
             
-            # Send iteration analysis to Telegram if a signal is active
-            if signal in ["LONG", "SHORT"]:
-                telegram_loop.run_until_complete(send_telegram_message(iteration_message))
-            
             if signal in ["LONG", "SHORT"] and position["side"] == "NONE":
                 quantity = calculate_quantity(usdc_balance, current_price)
-                new_position = place_order(signal, quantity, current_price, usdc_balance, analysis_details, fft_results, hurst_results)
+                conditions_to_send = conditions_long if signal == "LONG" else conditions_short
+                new_position = place_order(signal, quantity, current_price, usdc_balance, conditions_to_send, analysis_details, fft_results, hurst_results)
                 if new_position:
                     position = new_position
             
