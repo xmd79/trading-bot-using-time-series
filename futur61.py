@@ -604,6 +604,69 @@ def place_order(signal, quantity, price, initial_balance, conditions, analysis_d
     if quantity <= Decimal('0'):
         print(f"Insufficient balance or invalid quantity {quantity:.25f} BTC. Continuing signal generation.")
         logging.info(f"Insufficient balance or invalid quantity {quantity:.25f} BTC. Continuing signal generation.")
+        message = (
+            f"*Trade Signal: {signal} (Not Executed)*\n"
+            f"Symbol: {TRADE_SYMBOL}\n"
+            f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Signal Type: {signal}\n"
+            f"Quantity: {quantity:.25f} BTC\n"
+            f"Entry Price: ~{price:.25f} USDC\n"
+            f"Initial Balance: {initial_balance:.25f} USDC\n"
+            f"Reason: Insufficient balance or invalid quantity\n"
+            f"\n*Trigger Conditions*\n"
+        )
+        if signal == "LONG":
+            for tf in TIMEFRAMES:
+                message += (
+                    f"\n*{tf} Timeframe*\n"
+                    f"Momentum Positive: {conditions.get(f'momentum_positive_{tf}', False)}\n"
+                    f"FFT Bullish: {conditions.get(f'fft_bullish_{tf}', False)}\n"
+                    f"Dip Confirmed: {conditions.get(f'dip_confirmed_{tf}', False)}\n"
+                    f"Below Middle Threshold: {conditions.get(f'below_middle_{tf}', False)}\n"
+                    f"Hurst Uptrend: {conditions.get(f'hurst_up_{tf}', False)}\n"
+                )
+        elif signal == "SHORT":
+            for tf in TIMEFRAMES:
+                message += (
+                    f"\n*{tf} Timeframe*\n"
+                    f"Momentum Negative: {conditions.get(f'momentum_negative_{tf}', False)}\n"
+                    f"FFT Bearish: {conditions.get(f'fft_bearish_{tf}', False)}\n"
+                    f"Top Confirmed: {conditions.get(f'top_confirmed_{tf}', False)}\n"
+                    f"Above Middle Threshold: {conditions.get(f'above_middle_{tf}', False)}\n"
+                    f"Hurst Downtrend: {conditions.get(f'hurst_down_{tf}', False)}\n"
+                )
+        message += f"\n*Analysis Details*\n"
+        for tf in TIMEFRAMES:
+            details = analysis_details.get(tf, {})
+            fft_data = fft_results.get(tf, {})
+            hurst_data = hurst_results.get(tf, {})
+            message += (
+                f"\n*{tf} Timeframe*\n"
+                f"MTF Trend: {details.get('trend', 'N/A')}\n"
+                f"Cycle Status: {details.get('cycle_status', 'N/A')}\n"
+                f"Dominant Frequency: {details.get('dominant_freq', 0.0):.25f}\n"
+                f"Cycle Target: {details.get('cycle_target', Decimal('0')):.25f} USDC\n"
+                f"Volume Ratio: {details.get('volume_ratio', Decimal('0')):.25f}\n"
+                f"Volume Confirmed: {details.get('volume_confirmed', False)}\n"
+                f"Minimum Threshold: {details.get('min_threshold', Decimal('0')):.25f} USDC\n"
+                f"Middle Threshold: {details.get('middle_threshold', Decimal('0')):.25f} USDC\n"
+                f"Maximum Threshold: {details.get('max_threshold', Decimal('0')):.25f} USDC\n"
+                f"High-Low Range: {details.get('price_range', Decimal('0')):.25f} USDC\n"
+                f"Most Recent Reversal: {details.get('reversal_type', 'N/A')} at price {details.get('reversal_price', Decimal('0')):.25f}\n"
+                f"Support Level: {details.get('support_levels', [{}])[0].get('price', Decimal('0')):.25f} USDC\n"
+                f"Resistance Level: {details.get('resistance_levels', [{}])[0].get('price', Decimal('0')):.25f} USDC\n"
+                f"Buy Volume: {details.get('buy_volume', Decimal('0')):.25f}\n"
+                f"Sell Volume: {details.get('sell_volume', Decimal('0')):.25f}\n"
+                f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
+                f"FFT Phase: {fft_data.get('fft_phase', 'N/A')}\n"
+                f"FFT Dominant Frequency: {fft_data.get('dominant_freq', 0.0):.25f}\n"
+                f"FFT Fastest Target: {fft_data.get('fastest_target', Decimal('0')):.25f} USDC\n"
+                f"FFT Average Target: {fft_data.get('average_target', Decimal('0')):.25f} USDC\n"
+                f"FFT Reversal Target: {fft_data.get('reversal_target', Decimal('0')):.25f} USDC\n"
+                f"Hurst Trend: {hurst_data.get('trend', 'N/A')}\n"
+                f"Hurst Forecast Price: {hurst_data.get('forecast_price', Decimal('0')):.25f} USDC\n"
+            )
+        telegram_loop.run_until_complete(send_telegram_message(message))
         return None
     
     for attempt in range(retries):
