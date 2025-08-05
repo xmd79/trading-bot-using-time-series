@@ -37,7 +37,7 @@ STOP_LOSS_PERCENTAGE = Decimal('0.05')  # 5% stop-loss
 TAKE_PROFIT_PERCENTAGE = Decimal('0.05')  # 5% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
 MINIMUM_BALANCE = Decimal('1.0000')  # Minimum USDC balance to place trades
-TIMEFRAMES = ["1m", "3m"]  # Updated to use only 1m and 3m timeframes
+TIMEFRAMES = ["1m", "3m"]  # Use only 1m and 3m timeframes
 LOOKBACK_PERIODS = {"1m": 1500, "3m": 1500}
 VOLUME_CONFIRMATION_RATIO = Decimal('1.5')  # Buy/Sell volume ratio for reversal confirmation
 SUPPORT_RESISTANCE_TOLERANCE = Decimal('0.005')  # 0.5% tolerance for support/resistance levels
@@ -191,17 +191,18 @@ def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, p
         return [], [], [], "Down", Decimal('0')
     
     trend = "Up" if max(troughs) > max(peaks) else "Down"
-    forecast_price = Decimal(str(series[max(troughs)])) * Decimal('1.01') if trend == "Up" else Decimal(str(series[max(peaks)])) * Decimal('0.99')
+    current_close = Decimal(str(series[-1]))
+    forecast_price = current_close * Decimal('1.01') if trend == "Up" else current_close * Decimal('0.99')
     
     logging.info(f"{timeframe} - Hurst Trend: {trend}, Forecast Price: {forecast_price:.25f}")
     print(f"{timeframe} - Hurst Trend: {trend}, Forecast Price: {forecast_price:.25f}")
     return cycles, peaks, troughs, trend, forecast_price
 
 def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vol, sell_vol, lookback=50):
-    if len(candles) < lookback or fft is None:
-        logging.warning(f"{timeframe} - MTF trend analysis skipped: {'Insufficient data' if len(candles) < lookback else 'Missing scipy.fft'}")
-        print(f"{timeframe} - MTF trend analysis skipped: {'Insufficient data' if len(candles) < lookback else 'Missing scipy.fft'}")
-        return "BEARISH", min_threshold, max_threshold, "TOP", False, True, Decimal('1.0'), False, 0.0, max_threshold
+    if len(candles) < lookback:
+        logging.warning(f"{timeframe} - MTF trend analysis skipped: Insufficient data")
+        print(f"{timeframe} - MTF trend analysis skipped: Insufficient data")
+        return "BEARISH", min_threshold, max_threshold, "Down", False, True, Decimal('1.0'), False, 0.0, max_threshold
     
     recent_candles = candles[-lookback:]
     closes = np.array([float(c['close']) for c in recent_candles], dtype=np.float64)
@@ -209,56 +210,37 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     if len(closes) == 0 or np.any(np.isnan(closes)) or np.any(closes <= 0):
         logging.warning(f"Invalid close prices in {timeframe}.")
         print(f"Invalid close prices in {timeframe}.")
-        return "BEARISH", min_threshold, max_threshold, "TOP", False, True, Decimal('1.0'), False, 0.0, max_threshold
+        return "BEARISH", min_threshold, max_threshold, "Down", False, True, Decimal('1.0'), False, 0.0, max_threshold
 
-    window = np.hamming(len(closes))
-    fft_result = fft.rfft(closes * window)
-    timeframe_interval = TIMEFRAME_INTERVALS[timeframe]
-    frequencies = fft.rfftfreq(len(closes), d=timeframe_interval / 60.0)
-    amplitudes = np.abs(fft_result)
-    phases = np.angle(fft_result)
-    
-    idx = np.argsort(amplitudes)[::-1][1:6]
-    dominant_freq = frequencies[idx[0]] if idx.size > 0 else 0.0
-    dominant_phase = phases[idx[0]] if idx.size > 0 else 0.0
-    
     current_close = Decimal(str(closes[-1]))
     midpoint = (min_threshold + max_threshold) / Decimal('2')
-    trend_bullish = current_close < midpoint and dominant_phase < 0
-    cycle_status = "Up" if trend_bullish else "Down"
+    trend_bullish = current_close < midpoint
     trend = "BULLISH" if trend_bullish else "BEARISH"
+    cycle_status = "Up" if trend_bullish else "Down"
     
     volume_ratio = buy_vol / sell_vol if sell_vol > Decimal('0') else Decimal('1.0')
     volume_confirmed = volume_ratio >= VOLUME_CONFIRMATION_RATIO if trend == "BULLISH" else Decimal('1.0') / volume_ratio >= VOLUME_CONFIRMATION_RATIO
     
-    try:
-        weights = np.array([1 / (i + 1) for i in range(len(idx))])
-        weights /= np.sum(weights)
-        signal_future = sum(
-            weights[i] * 2 * amplitudes[j] * np.cos(2 * np.pi * frequencies[j] * (len(closes) + 10) + phases[j]) / len(closes)
-            for i, j in enumerate(idx[:5])
-        )
-        cycle_target = Decimal(str(signal_future + np.mean(closes)))
-        cycle_target = max(cycle_target, Decimal('0.0000000000000000000000001'))
-    except Exception:
-        cycle_target = current_close
-
+    # Ensure cycle target aligns with cycle direction
     price_range = max_threshold - min_threshold
     tolerance = price_range * SUPPORT_RESISTANCE_TOLERANCE
-    if trend == "BULLISH":
-        cycle_target = max(cycle_target, current_close * Decimal('1.01'), min_threshold * Decimal('1.02'))
-        cycle_target = min(cycle_target, current_close * Decimal('1.10'), max_threshold * Decimal('0.98'))
-        if abs(cycle_target - max_threshold) <= tolerance:
-            cycle_status = "Approaching Resistance"
-    else:
-        cycle_target = min(cycle_target, current_close * Decimal('0.99'), max_threshold * Decimal('0.98'))
-        cycle_target = max(cycle_target, current_close * Decimal('0.90'), min_threshold * Decimal('1.02'))
-        if abs(cycle_target - min_threshold) <= tolerance:
-            cycle_status = "Approaching Support"
+    
+    if cycle_status == "Up":
+        cycle_target = current_close * Decimal('1.01')  # Base target 1% above current close
+        cycle_target = max(cycle_target, min_threshold * Decimal('1.02'))  # Ensure above min threshold
+        cycle_target = min(cycle_target, max_threshold - tolerance)  # Cap below max threshold
+        if cycle_target <= current_close:
+            cycle_target = current_close + (max_threshold - current_close) * Decimal('0.5')  # Fallback to midpoint
+    else:  # cycle_status == "Down"
+        cycle_target = current_close * Decimal('0.99')  # Base target 1% below current close
+        cycle_target = min(cycle_target, max_threshold * Decimal('0.98'))  # Cap below max threshold
+        cycle_target = max(cycle_target, min_threshold + tolerance)  # Ensure above min threshold
+        if cycle_target >= current_close:
+            cycle_target = current_close - (current_close - min_threshold) * Decimal('0.5')  # Fallback to midpoint
 
-    logging.info(f"{timeframe} - MTF Trend: {trend}, Cycle: {cycle_status}, Cycle Target: {cycle_target:.25f}")
+    logging.info(f"{timeframe} - MTF Trend: {trend}, Cycle Status: {cycle_status}, Cycle Target: {cycle_target:.25f}")
     print(f"{timeframe} - MTF Trend: {trend}, Cycle Status: {cycle_status}, Cycle Target: {cycle_target:.25f}")
-    return trend, min_threshold, max_threshold, cycle_status, trend_bullish, not trend_bullish, volume_ratio, volume_confirmed, dominant_freq, cycle_target
+    return trend, min_threshold, max_threshold, cycle_status, trend_bullish, not trend_bullish, volume_ratio, volume_confirmed, 0.0, cycle_target
 
 def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vol, n_components=5):
     if len(closes) < 2 or fft is None:
@@ -284,7 +266,7 @@ def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vo
 
     current_close = Decimal(str(closes[-1]))
     midpoint = (min_threshold + max_threshold) / Decimal('2')
-    is_bullish = dominant_phase < 0 and current_close < midpoint
+    is_bullish = current_close < midpoint
     market_mood = "Bullish" if is_bullish else "Bearish"
     phase_status = "DIP" if is_bullish else "TOP"
 
@@ -296,7 +278,8 @@ def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vo
                 weights[i] * 2 * amplitudes[j] * np.cos(2 * np.pi * frequencies[j] * (len(closes) + steps) + phases[j]) / len(closes)
                 for i, j in enumerate(components)
             )
-            return max(Decimal(str((signal_future + np.mean(closes)) * weight_factor)), Decimal('0.0000000000000000000000001'))
+            base_target = (signal_future + np.mean(closes)) * weight_factor
+            return max(Decimal(str(base_target)), Decimal('0.0000000000000000000000001'))
         except Exception:
             return current_close
 
@@ -307,15 +290,16 @@ def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vo
     targets = [fastest_target, average_target, reversal_target]
     price_range = max_threshold - min_threshold
     tolerance = price_range * SUPPORT_RESISTANCE_TOLERANCE
+    
     if is_bullish:
         targets = [max(t, current_close * Decimal('1.005'), min_threshold * Decimal('1.01')) for t in targets]
-        targets = [min(t, current_close * Decimal('1.10'), max_threshold * Decimal('0.98')) for t in targets]
+        targets = [min(t, current_close * Decimal('1.10'), max_threshold - tolerance) for t in targets]
         targets[1] = max(targets[1], targets[0] * Decimal('1.005'))
         targets[2] = max(targets[2], targets[1] * Decimal('1.005'))
         targets = [t if abs(t - max_threshold) > tolerance else max_threshold * Decimal('0.95') for t in targets]
     else:
         targets = [min(t, current_close * Decimal('0.995'), max_threshold * Decimal('0.98')) for t in targets]
-        targets = [max(t, current_close * Decimal('0.90'), min_threshold * Decimal('1.02')) for t in targets]
+        targets = [max(t, current_close * Decimal('0.90'), min_threshold + tolerance) for t in targets]
         targets[1] = min(targets[1], targets[0] * Decimal('0.995'))
         targets[2] = min(targets[2], targets[1] * Decimal('0.995'))
         targets = [t if abs(t - min_threshold) > tolerance else min_threshold * Decimal('1.05') for t in targets]
@@ -820,8 +804,8 @@ def main():
                     close_position(position, current_price)
                 position = get_position()
             
-            conditions_long = {f"{k}_{tf}": False for tf in TIMEFRAMES for k in ["momentum_positive", "fft_bullish", "volume_bullish", "dip_confirmed", "below_middle", "hurst_up"]}
-            conditions_short = {f"{k}_{tf}": False for tf in TIMEFRAMES for k in ["momentum_negative", "fft_bearish", "volume_bearish", "top_confirmed", "above_middle", "hurst_down"]}
+            conditions_long = {f"{k}_{tf}": False for tf in TIMEFRAMES for k in ["momentum_positive", "cycle_up", "volume_bullish", "dip_confirmed", "below_middle", "hurst_up"]}
+            conditions_short = {f"{k}_{tf}": False for tf in TIMEFRAMES for k in ["momentum_negative", "cycle_down", "volume_bearish", "top_confirmed", "above_middle", "hurst_down"]}
             
             volume_data = {tf: calculate_buy_sell_volume(candle_map.get(tf, []), tf) for tf in TIMEFRAMES}
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -867,6 +851,9 @@ def main():
                 
                 trend, min_th, max_th, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target = calculate_mtf_trend(candles_tf, timeframe, min_threshold, max_threshold, buy_vol, sell_vol)
                 
+                conditions_long[f"cycle_up_{timeframe}"] = cycle_status == "Up"
+                conditions_short[f"cycle_down_{timeframe}"] = cycle_status == "Down"
+                
                 cycles, peaks, troughs, hurst_trend, hurst_forecast_price = hurst_cycle_analysis(closes, timeframe, HURST_WINDOW_SIZE[timeframe], HURST_SAMPLING_RATE)
                 conditions_long[f"hurst_up_{timeframe}"] = hurst_trend == "Up"
                 conditions_short[f"hurst_down_{timeframe}"] = hurst_trend == "Down"
@@ -879,8 +866,6 @@ def main():
                 
                 fft_data = get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vol)
                 fft_results[timeframe] = {"time": fft_data[0].strftime('%Y-%m-%d %H:%M:%S'), "current_price": fft_data[1], "fastest_target": fft_data[3], "average_target": fft_data[4], "reversal_target": fft_data[5], "market_mood": fft_data[6], "min_threshold": min_threshold, "middle_threshold": middle_threshold, "max_threshold": max_threshold, "fft_phase": fft_data[10], "dominant_freq": fft_data[9]}
-                conditions_long[f"fft_bullish_{timeframe}"] = fft_data[7]
-                conditions_short[f"fft_bearish_{timeframe}"] = fft_data[8]
                 
                 analysis_details[timeframe] = {
                     "trend": trend, "cycle_status": cycle_status, "dominant_freq": dominant_freq, "cycle_target": cycle_target,
@@ -898,7 +883,7 @@ def main():
             for tf in TIMEFRAMES:
                 for cond_pair in [
                     ("momentum_positive", "momentum_negative"),
-                    ("fft_bullish", "fft_bearish"),
+                    ("cycle_up", "cycle_down"),
                     ("volume_bullish", "volume_bearish"),
                     ("dip_confirmed", "top_confirmed"),
                     ("below_middle", "above_middle"),
@@ -907,20 +892,20 @@ def main():
                     cond1, cond2 = cond_pair
                     status1 = conditions_long.get(f"{cond1}_{tf}", False)
                     status2 = conditions_short.get(f"{cond2}_{tf}", False)
-                    print(f"{cond1}_{tf}: {status1}, {cond2}_{tf}: {status2} ✓")
+                    print(f"{cond1}_{tf}: {status1}, {cond2}_{tf}: {status2} {'✓' if status1 != status2 else '✗'}")
             
             long_true_count = sum(1 for v in conditions_long.values() if v)
             short_true_count = sum(1 for v in conditions_short.values() if v)
             total_conditions = len(conditions_long)
             
-            # Print long and short conditions status in the requested order
+            # Print long and short conditions status
             print("\nLong Conditions Status:")
-            for cond in ["momentum_positive", "fft_bullish", "volume_bullish", "dip_confirmed", "below_middle", "hurst_up"]:
+            for cond in ["momentum_positive", "cycle_up", "volume_bullish", "dip_confirmed", "below_middle", "hurst_up"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_long.get(f'{cond}_{tf}', False)}")
             
             print("\nShort Conditions Status:")
-            for cond in ["momentum_negative", "fft_bearish", "volume_bearish", "top_confirmed", "above_middle", "hurst_down"]:
+            for cond in ["momentum_negative", "cycle_down", "volume_bearish", "top_confirmed", "above_middle", "hurst_down"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_short.get(f'{cond}_{tf}', False)}")
             
