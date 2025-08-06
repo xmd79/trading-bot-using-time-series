@@ -6,19 +6,11 @@ import talib
 import numpy as np
 from decimal import Decimal, getcontext
 import logging
-try:
-    from scipy import fft
-except ImportError as e:
-    logging.error(f"Failed to import scipy.fft: {e}. Using fallback.")
-    fft = None
+from scipy import fft
 from telegram.ext import Application
 from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException
-try:
-    from hurst import compute_Hc
-except ImportError as e:
-    logging.error(f"Failed to import hurst: {e}. Hurst analysis will be skipped.")
-    compute_Hc = None
+from hurst import compute_Hc
 
 # Configure logging
 logging.basicConfig(
@@ -37,7 +29,7 @@ STOP_LOSS_PERCENTAGE = Decimal('0.05')  # 5% stop-loss
 TAKE_PROFIT_PERCENTAGE = Decimal('0.05')  # 5% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
 MINIMUM_BALANCE = Decimal('1.0000')  # Minimum USDC balance to place trades
-TIMEFRAMES = ["1m", "3m"]  # Use only 1m and 3m timeframes
+TIMEFRAMES = ["1m", "3m"]
 LOOKBACK_PERIODS = {"1m": 1500, "3m": 1500}
 SUPPORT_RESISTANCE_TOLERANCE = Decimal('0.005')  # 0.5% tolerance for support/resistance levels
 API_TIMEOUT = 60  # Timeout for Binance API requests
@@ -55,15 +47,10 @@ try:
     with open("credentials.txt", "r") as f:
         lines = [line.strip() for line in f.readlines() if line.strip()]
     if len(lines) != 4:
-        logging.error(f"credentials.txt must contain exactly 4 non-empty lines, found {len(lines)}.")
-        print(f"Error: credentials.txt must contain exactly 4 non-empty lines, found {len(lines)}.")
-        print("Expected format:\nBinance API key\nBinance API secret\nTelegram bot token\nTelegram chat ID")
-        exit(1)
+        raise ValueError(f"credentials.txt must contain exactly 4 non-empty lines, found {len(lines)}.")
     api_key, api_secret, telegram_token, telegram_chat_id = lines
     if not all([api_key, api_secret, telegram_token, telegram_chat_id]):
-        logging.error("One or more credentials in credentials.txt are empty.")
-        print("Error: One or more credentials in credentials.txt are empty.")
-        exit(1)
+        raise ValueError("One or more credentials in credentials.txt are empty.")
 except FileNotFoundError:
     logging.error("credentials.txt not found.")
     print("Error: credentials.txt not found.")
@@ -90,17 +77,12 @@ async def validate_telegram_chat_id(app, chat_id):
             logging.info(f"Valid Telegram chat ID: {chat_id} (Type: {chat.type})")
             print(f"Valid Telegram chat ID: {chat_id} (Type: {chat.type})")
             return True
-        else:
-            logging.error(f"Invalid Telegram chat ID: {chat_id}. Chat type '{chat.type}' is not supported.")
-            print(f"Error: Invalid Telegram chat ID: {chat_id}. Chat type '{chat.type}' is not supported.")
-            return False
+        logging.error(f"Invalid Telegram chat ID: {chat_id}. Chat type '{chat.type}' is not supported.")
+        print(f"Error: Invalid Telegram chat ID: {chat_id}. Chat type '{chat.type}' is not supported.")
+        return False
     except Exception as e:
-        if "Forbidden" in str(e):
-            logging.error(f"Telegram chat ID validation failed: {chat_id}. Cannot send messages to bots or invalid chat IDs.")
-            print(f"Error: Telegram chat ID {chat_id} is invalid or belongs to a bot.")
-        else:
-            logging.error(f"Failed to validate Telegram chat ID {chat_id}: {e}")
-            print(f"Error validating Telegram chat ID {chat_id}: {e}")
+        logging.error(f"Failed to validate Telegram chat ID {chat_id}: {e}")
+        print(f"Error validating Telegram chat ID {chat_id}: {e}")
         return False
 
 try:
@@ -134,10 +116,6 @@ async def send_telegram_message(message, retries=3, base_delay=5):
             print(f"Telegram message sent: {message[:100]}...")
             return True
         except Exception as e:
-            if "Forbidden" in str(e):
-                logging.error(f"Cannot send Telegram message: Invalid chat ID: {telegram_chat_id}")
-                print(f"Error: Cannot send Telegram message. Invalid chat ID: {telegram_chat_id}")
-                return False
             delay = base_delay * (2 ** attempt)
             logging.error(f"Failed to send Telegram message (attempt {attempt + 1}/{retries}): {e}")
             print(f"Failed to send Telegram message (attempt {attempt + 1}/{retries}): {e}")
@@ -147,10 +125,10 @@ async def send_telegram_message(message, retries=3, base_delay=5):
     print(f"Failed to send Telegram message after {retries} attempts.")
     return False
 
-def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, preferred_kind='random_walk'):
-    if len(series) < window_size or compute_Hc is None:
-        logging.warning(f"{timeframe} - Hurst analysis skipped: {'Insufficient data' if len(series) < window_size else 'Missing hurst module'}")
-        print(f"{timeframe} - Hurst analysis skipped: {'Insufficient data' if len(series) < window_size else 'Missing hurst module'}")
+def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20):
+    if len(series) < window_size:
+        logging.warning(f"{timeframe} - Hurst analysis skipped: Insufficient data")
+        print(f"{timeframe} - Hurst analysis skipped: Insufficient data")
         return [], [], [], "Down", Decimal('0')
     
     cycles = []
@@ -158,43 +136,34 @@ def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, p
     troughs = []
     length = len(series)
     
-    kinds = [preferred_kind] + [k for k in ['price', 'random_walk', 'change'] if k != preferred_kind]
-    
     for start in range(0, length - window_size + 1, sampling_rate):
         window = series[start:start + window_size]
-        
         if len(window) < window_size or np.std(window) < 1e-10 or np.any(np.isnan(window)) or np.any(np.isinf(window)):
             print(f"{timeframe} - Skipping window at index {start}: invalid data")
             continue
-        
-        hurst_computed = False
-        for kind in kinds:
-            try:
-                adjusted_window = window if kind != 'price' else window - np.min(window) + 1e-10
-                H, c, data = compute_Hc(adjusted_window, kind=kind, simplified=True)
-                cycles.append(H)
-                hurst_computed = True
-                break
-            except Exception as e:
-                print(f"{timeframe} - Error computing Hurst at index {start} with kind='{kind}': {e}")
-        
-        if not hurst_computed:
+        try:
+            H, c, data = compute_Hc(window, kind='price', simplified=True)
+            cycles.append(H)
+            max_idx = np.argmax(window)
+            min_idx = np.argmin(window)
+            peaks.append(start + max_idx)
+            troughs.append(start + min_idx)
+        except Exception as e:
+            print(f"{timeframe} - Error computing Hurst at index {start}: {e}")
             continue
-        
-        max_idx = np.argmax(window)
-        min_idx = np.argmin(window)
-        peaks.append(start + max_idx)
-        troughs.append(start + min_idx)
     
     if not cycles:
         return [], [], [], "Down", Decimal('0')
     
-    trend = "Up" if max(troughs) > max(peaks) else "Down"
+    avg_hurst = np.mean(cycles)
+    trend = "Up" if avg_hurst > 0.5 else "Down"
     current_close = Decimal(str(series[-1]))
-    forecast_price = current_close * Decimal('1.01') if trend == "Up" else current_close * Decimal('0.99')
+    # Forecast price based on Hurst exponent and trend
+    forecast_price = current_close * (Decimal('1.01') if trend == "Up" else Decimal('0.99'))
+    forecast_price = forecast_price.quantize(Decimal('0.01'))
     
-    logging.info(f"{timeframe} - Hurst Trend: {trend}, Forecast Price: {forecast_price:.25f}")
-    print(f"{timeframe} - Hurst Trend: {trend}, Forecast Price: {forecast_price:.25f}")
+    logging.info(f"{timeframe} - Hurst Exponent: {avg_hurst:.3f}, Trend: {trend}, Forecast Price: {forecast_price:.25f}")
+    print(f"{timeframe} - Hurst Exponent: {avg_hurst:.3f}, Trend: {trend}, Forecast Price: {forecast_price:.25f}")
     return cycles, peaks, troughs, trend, forecast_price
 
 def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vol, sell_vol, lookback=50):
@@ -218,39 +187,23 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     cycle_status = "Up" if trend_bullish else "Down"
     
     volume_ratio = buy_vol / sell_vol if sell_vol > Decimal('0') else Decimal('1.0')
-    volume_confirmed = False  # Volume confirmation not used for triggers
     
     price_range = max_threshold - min_threshold
     tolerance = price_range * SUPPORT_RESISTANCE_TOLERANCE
     
-    if cycle_status == "Up":
-        cycle_target = current_close * Decimal('1.01')
-        cycle_target = max(cycle_target, min_threshold * Decimal('1.02'))
-        cycle_target = min(cycle_target, max_threshold - tolerance)
-        if cycle_target <= current_close:
-            cycle_target = current_close + (max_threshold - current_close) * Decimal('0.5')
-    else:
-        cycle_target = current_close * Decimal('0.99')
-        cycle_target = min(cycle_target, max_threshold * Decimal('0.98'))
-        cycle_target = max(cycle_target, min_threshold + tolerance)
-        if cycle_target >= current_close:
-            cycle_target = current_close - (current_close - min_threshold) * Decimal('0.5')
-
+    cycle_target = current_close * (Decimal('1.01') if cycle_status == "Up" else Decimal('0.99'))
+    cycle_target = cycle_target.quantize(Decimal('0.01'))
+    
     logging.info(f"{timeframe} - MTF Trend: {trend}, Cycle Status: {cycle_status}, Cycle Target: {cycle_target:.25f}")
     print(f"{timeframe} - MTF Trend: {trend}, Cycle Status: {cycle_status}, Cycle Target: {cycle_target:.25f}")
-    return trend, min_threshold, max_threshold, cycle_status, trend_bullish, not trend_bullish, volume_ratio, volume_confirmed, 0.0, cycle_target
+    return trend, min_threshold, max_threshold, cycle_status, trend_bullish, not trend_bullish, volume_ratio, False, 0.0, cycle_target
 
 def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vol, n_components=5):
-    if len(closes) < 2 or fft is None:
-        logging.warning(f"{timeframe} - FFT target analysis skipped: {'Insufficient data' if len(closes) < 2 else 'Missing scipy.fft'}")
-        print(f"{timeframe} - FFT target analysis skipped: {'Insufficient data' if len(closes) < 2 else 'Missing scipy.fft'}")
+    if len(closes) < 2:
+        logging.warning(f"{timeframe} - FFT target analysis skipped: Insufficient data")
+        print(f"{timeframe} - FFT target analysis skipped: Insufficient data")
         return (datetime.datetime.now(), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), "Bearish", False, True, 0.0, "TOP")
     
-    if np.any(np.isnan(closes)) or np.any(closes <= 0):
-        logging.warning(f"Invalid closes data for FFT analysis in {timeframe}.")
-        print(f"Invalid closes data for FFT analysis in {timeframe}.")
-        return (datetime.datetime.now(), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), "Bearish", False, True, 0.0, "TOP")
-
     window = np.hamming(len(closes))
     fft_result = fft.rfft(closes * window)
     timeframe_interval = TIMEFRAME_INTERVALS[timeframe]
@@ -292,15 +245,9 @@ def get_target(closes, timeframe, min_threshold, max_threshold, buy_vol, sell_vo
     if is_bullish:
         targets = [max(t, current_close * Decimal('1.005'), min_threshold * Decimal('1.01')) for t in targets]
         targets = [min(t, current_close * Decimal('1.10'), max_threshold - tolerance) for t in targets]
-        targets[1] = max(targets[1], targets[0] * Decimal('1.005'))
-        targets[2] = max(targets[2], targets[1] * Decimal('1.005'))
-        targets = [t if abs(t - max_threshold) > tolerance else max_threshold * Decimal('0.95') for t in targets]
     else:
         targets = [min(t, current_close * Decimal('0.995'), max_threshold * Decimal('0.98')) for t in targets]
         targets = [max(t, current_close * Decimal('0.90'), min_threshold + tolerance) for t in targets]
-        targets[1] = min(targets[1], targets[0] * Decimal('0.995'))
-        targets[2] = min(targets[2], targets[1] * Decimal('0.995'))
-        targets = [t if abs(t - min_threshold) > tolerance else min_threshold * Decimal('1.05') for t in targets]
 
     fastest_target, average_target, reversal_target = targets
     stop_loss = current_close * (Decimal('1') - STOP_LOSS_PERCENTAGE if is_bullish else Decimal('1') + STOP_LOSS_PERCENTAGE)
@@ -560,6 +507,10 @@ def calculate_quantity(balance, price):
         return Decimal('0.0')
     quantity = (balance * Decimal(str(LEVERAGE))) / price
     quantity = quantity.quantize(QUANTITY_PRECISION, rounding='ROUND_DOWN')
+    if quantity < QUANTITY_PRECISION:
+        logging.warning(f"Calculated quantity {quantity:.25f} below minimum precision {QUANTITY_PRECISION:.25f}.")
+        print(f"Warning: Calculated quantity {quantity:.25f} below minimum precision {QUANTITY_PRECISION:.25f}.")
+        return Decimal('0.0')
     logging.info(f"Calculated quantity: {quantity:.25f} BTC for balance {balance:.25f} USDC at price {price:.25f}")
     print(f"Calculated quantity: {quantity:.25f} BTC for balance {balance:.25f} USDC at price {price:.25f}")
     return quantity
@@ -581,11 +532,6 @@ def calculate_fft_vol_price_indicator(candles, timeframe, min_threshold, max_thr
     
     price_changes = np.diff(closes) / closes[:-1]
     volume_changes = np.diff(volumes) / volumes[:-1]
-    if len(price_changes) == 0 or len(volume_changes) == 0:
-        logging.warning(f"{timeframe} - Insufficient data for volume-price correlation")
-        print(f"{timeframe} - Insufficient data for volume-price correlation")
-        return False, True, "Down Distribution"
-    
     vol_price_corr = np.corrcoef(price_changes, volume_changes)[0, 1] if len(price_changes) > 1 else 0.0
     
     current_close = Decimal(str(closes[-1]))
@@ -648,8 +594,8 @@ def calculate_fft_vol_price_indicator(candles, timeframe, min_threshold, max_thr
     )
     fft_vol_price_bearish = not fft_vol_price_bullish
     
-    logging.info(f"{timeframe} - FFT Vol-Price: Bullish={fft_vol_price_bullish}, Bearish={fft_vol_price_bearish}, Stage={stage}, Oscillator={oscillator_value:.3f}, Vol-Price Corr={vol_price_corr:.3f}, Normalized Price={normalized_price:.3f}")
-    print(f"{timeframe} - FFT Vol-Price: Bullish={fft_vol_price_bullish}, Bearish={fft_vol_price_bearish}, Stage={stage}, Oscillator={oscillator_value:.3f}, Vol-Price Corr={vol_price_corr:.3f}, Normalized Price={normalized_price:.3f}")
+    logging.info(f"{timeframe} - FFT Vol-Price: Bullish={fft_vol_price_bullish}, Bearish={fft_vol_price_bearish}, Stage={stage}")
+    print(f"{timeframe} - FFT Vol-Price: Bullish={fft_vol_price_bullish}, Bearish={fft_vol_price_bearish}, Stage={stage}")
     return fft_vol_price_bullish, fft_vol_price_bearish, stage
 
 def send_signal_message(signal, quantity, price, initial_balance, analysis_details, fft_results, hurst_results, error=None):
