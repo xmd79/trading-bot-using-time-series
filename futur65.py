@@ -158,7 +158,6 @@ def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20):
     avg_hurst = np.mean(cycles)
     trend = "Up" if avg_hurst > 0.5 else "Down"
     current_close = Decimal(str(series[-1]))
-    # Forecast price based on Hurst exponent and trend
     forecast_price = current_close * (Decimal('1.01') if trend == "Up" else Decimal('0.99'))
     forecast_price = forecast_price.quantize(Decimal('0.01'))
     
@@ -547,7 +546,7 @@ def calculate_fft_vol_price_indicator(candles, timeframe, min_threshold, max_thr
     elif reversal_type == "TOP":
         phase = (phase - np.pi / 2) % (2 * np.pi)
     
-    is_bullish_cycle = cycle_status == "Up" and hurst_trend == "Up"
+    is_bullish_cycle = cycle_status == "Up"
     oscillator_value = np.sin(phase) if is_bullish_cycle else np.cos(phase)
     
     phase_normalized = phase / (2 * np.pi)
@@ -837,8 +836,8 @@ def main():
                     close_position(position, current_price)
                 position = get_position()
             
-            conditions_long = {f"{k}_{tf}": False for tf in TIMEFRAMES for k in ["momentum_positive", "cycle_up", "fft_vol_price_bullish", "dip_confirmed", "below_middle", "hurst_up"]}
-            conditions_short = {f"{k}_{tf}": False for tf in TIMEFRAMES for k in ["momentum_negative", "cycle_down", "fft_vol_price_bearish", "top_confirmed", "above_middle", "hurst_down"]}
+            conditions_long = {f"{k}_{tf}": False for tf in TIMEFRAMES for k in ["momentum_positive", "cycle_up", "fft_vol_price_bullish", "dip_confirmed", "below_middle"]}
+            conditions_short = {f"{k}_{tf}": False for tf in TIMEFRAMES for k in ["momentum_negative", "cycle_down", "fft_vol_price_bearish", "top_confirmed", "above_middle"]}
             
             volume_data = {tf: calculate_buy_sell_volume(candle_map.get(tf, []), tf) for tf in TIMEFRAMES}
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -896,8 +895,6 @@ def main():
                 conditions_short[f"cycle_down_{timeframe}"] = cycle_status == "Down"
                 
                 cycles, peaks, troughs, hurst_trend, hurst_forecast_price = hurst_cycle_analysis(closes, timeframe, HURST_WINDOW_SIZE[timeframe], HURST_SAMPLING_RATE)
-                conditions_long[f"hurst_up_{timeframe}"] = hurst_trend == "Up"
-                conditions_short[f"hurst_down_{timeframe}"] = hurst_trend == "Down"
                 
                 if len(closes) >= 14:
                     momentum = talib.MOM(closes, timeperiod=14)
@@ -961,8 +958,7 @@ def main():
                     ("cycle_up", "cycle_down"),
                     ("fft_vol_price_bullish", "fft_vol_price_bearish"),
                     ("dip_confirmed", "top_confirmed"),
-                    ("below_middle", "above_middle"),
-                    ("hurst_up", "hurst_down")
+                    ("below_middle", "above_middle")
                 ]:
                     cond1, cond2 = cond_pair
                     status1 = conditions_long.get(f"{cond1}_{tf}", False)
@@ -970,12 +966,12 @@ def main():
                     print(f"{cond1}_{tf}: {status1}, {cond2}_{tf}: {status2} {'✓' if status1 != status2 else '✗'}")
             
             print("\nLong Conditions Status:")
-            for cond in ["momentum_positive", "cycle_up", "fft_vol_price_bullish", "dip_confirmed", "below_middle", "hurst_up"]:
+            for cond in ["momentum_positive", "cycle_up", "fft_vol_price_bullish", "dip_confirmed", "below_middle"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_long.get(f'{cond}_{tf}', False)}")
             
             print("\nShort Conditions Status:")
-            for cond in ["momentum_negative", "cycle_down", "fft_vol_price_bearish", "top_confirmed", "above_middle", "hurst_down"]:
+            for cond in ["momentum_negative", "cycle_down", "fft_vol_price_bearish", "top_confirmed", "above_middle"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_short.get(f'{cond}_{tf}', False)}")
             
