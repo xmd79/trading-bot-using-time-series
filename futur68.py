@@ -197,10 +197,10 @@ def calculate_buy_sell_volume(candles, timeframe, reversal_type, trend_bullish, 
     
     # Initialize volume flags
     volume_increasing = False
-    volume_exhausted = False
+    volume_decreasing = False
     
-    # Volume analysis based on reversal type and trend
-    if reversal_type == "DIP" and trend_bullish:
+    # Volume analysis based on reversal type
+    if reversal_type == "DIP":
         # LONG: Check volume at dip (argmin) for increasing volume (accumulation)
         start_idx = max(0, min_idx - VOLUME_LOOKBACK // 2)
         end_idx = min(len(candles), start_idx + VOLUME_LOOKBACK)
@@ -208,32 +208,37 @@ def calculate_buy_sell_volume(candles, timeframe, reversal_type, trend_bullish, 
         avg_reversal_volume = np.mean(reversal_volumes) if len(reversal_volumes) > 0 else 0.0
         if avg_reversal_volume > 0 and avg_full_volume > 0:
             volume_increasing = (avg_reversal_volume / avg_full_volume) >= float(VOLUME_CONFIRMATION_RATIO)
-            volume_exhausted = not volume_increasing  # Mutually exclusive
-    elif reversal_type == "TOP" and not trend_bullish:
+            volume_decreasing = not volume_increasing  # Mutually exclusive
+    elif reversal_type == "TOP":
         # SHORT: Check volume at top (argmax) for decreasing volume (distribution)
         start_idx = max(0, max_idx - VOLUME_LOOKBACK // 2)
         end_idx = min(len(candles), start_idx + VOLUME_LOOKBACK)
         reversal_volumes = np.array([float(c["volume"]) for c in candles[start_idx:end_idx]], dtype=np.float64)
         avg_reversal_volume = np.mean(reversal_volumes) if len(reversal_volumes) > 0 else 0.0
         if avg_reversal_volume > 0 and avg_full_volume > 0:
-            volume_exhausted = (avg_reversal_volume / avg_full_volume) <= float(VOLUME_EXHAUSTION_RATIO)
-            volume_increasing = not volume_exhausted  # Mutually exclusive
+            volume_decreasing = (avg_reversal_volume / avg_full_volume) <= float(VOLUME_EXHAUSTION_RATIO)
+            volume_increasing = not volume_decreasing  # Mutually exclusive
     else:
-        # Default case: set both to False if conditions don't match
-        volume_increasing = False
-        volume_exhausted = False
+        # Fallback: If no clear reversal, assume distribution (SHORT bias) unless volume is high
+        start_idx = max(0, min_idx - VOLUME_LOOKBACK // 2)
+        end_idx = min(len(candles), start_idx + VOLUME_LOOKBACK)
+        reversal_volumes = np.array([float(c["volume"]) for c in candles[start_idx:end_idx]], dtype=np.float64)
+        avg_reversal_volume = np.mean(reversal_volumes) if len(reversal_volumes) > 0 else 0.0
+        if avg_reversal_volume > 0 and avg_full_volume > 0:
+            volume_increasing = (avg_reversal_volume / avg_full_volume) >= float(VOLUME_CONFIRMATION_RATIO)
+            volume_decreasing = not volume_increasing  # Mutually exclusive
     
     logging.info(
         f"{timeframe} - Buy Volume: {buy_volume:.25f}, Sell Volume: {sell_volume:.25f}, "
         f"Volume Mood: {volume_mood}, Avg Full Volume: {avg_full_volume:.2f}, "
-        f"Volume Increasing: {volume_increasing}, Volume Exhausted: {volume_exhausted}"
+        f"Volume Increasing: {volume_increasing}, Volume Decreasing: {volume_decreasing}"
     )
     print(
         f"{timeframe} - Buy Volume: {buy_volume:.25f}, Sell Volume: {sell_volume:.25f}, "
         f"Volume Mood: {volume_mood}, Avg Full Volume: {avg_full_volume:.2f}, "
-        f"Volume Increasing: {volume_increasing}, Volume Exhausted: {volume_exhausted}"
+        f"Volume Increasing: {volume_increasing}, Volume Decreasing: {volume_decreasing}"
     )
-    return buy_volume, sell_volume, volume_mood, volume_increasing, volume_exhausted
+    return buy_volume, sell_volume, volume_mood, volume_increasing, volume_decreasing
 
 def calculate_support_resistance(candles, timeframe):
     if len(candles) < 10:
@@ -253,45 +258,38 @@ def calculate_support_resistance(candles, timeframe):
     print(f"{timeframe} - Support: {support_levels[0]['price']:.25f}, Resistance: {resistance_levels[0]['price']:.25f}")
     return support_levels, resistance_levels
 
-def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, higher_tf_tops=None):
+def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, current_close, higher_tf_tops=None):
     if len(candles) < 3:
         logging.warning(f"Insufficient candles ({len(candles)}) for reversal detection in {timeframe}.")
         print(f"Insufficient candles ({len(candles)}) for reversal detection in {timeframe}.")
         return "TOP", 0, Decimal('0'), "TOP", 0, Decimal('0'), 0, 0
     
-    lookback = min(len(candles), RECENT_LOOKBACK[timeframe])
+    lookback = min(len(candles), LOOKBACK_PERIODS[timeframe])
     recent_candles = candles[-lookback:]
     
     price_range = max_threshold - min_threshold
     tolerance = price_range * TOLERANCE_FACTORS[timeframe]
     
-    lows = np.array([float(c['low']) for c in recent_candles])
-    min_idx = np.argmin(lows)
-    min_candle = recent_candles[min_idx]
+    # Find indices and timestamps for min_threshold and max_threshold
+    min_candle = min(recent_candles, key=lambda x: x['low'])
+    max_candle = max(recent_candles, key=lambda x: x['high'])
+    min_idx = next(i for i, c in enumerate(recent_candles) if c['low'] == float(min_threshold))
+    max_idx = next(i for i, c in enumerate(recent_candles) if c['high'] == float(max_threshold))
     min_time = min_candle['time']
-    closest_min_price = Decimal(str(min_candle['low']))
-    
-    highs = np.array([float(c['high']) for c in recent_candles])
-    max_idx = np.argmax(highs)
-    max_candle = recent_candles[max_idx]
     max_time = max_candle['time']
-    closest_max_price = Decimal(str(max_candle['high']))
     
-    current_close = Decimal(str(recent_candles[-1]['close']))
-    
-    # Determine reversal based on price proximity to current close
-    diff_to_high = abs(current_close - closest_max_price)
-    diff_to_low = abs(current_close - closest_min_price)
-    
+    # Determine reversal based on proximity of current close to min_threshold or max_threshold
+    diff_to_high = abs(current_close - max_threshold)
+    diff_to_low = abs(current_close - min_threshold)
     most_recent_reversal = "TOP" if diff_to_high < diff_to_low else "DIP"
     most_recent_time = max_time if most_recent_reversal == "TOP" else min_time
-    most_recent_price = closest_max_price if most_recent_reversal == "TOP" else closest_min_price
+    most_recent_price = max_threshold if most_recent_reversal == "TOP" else min_threshold
     
     # Override for 1m if higher timeframe signals a top
     if timeframe == "1m" and higher_tf_tops and any(higher_tf_tops.values()):
         most_recent_reversal = "TOP"
         most_recent_time = max_time
-        most_recent_price = closest_max_price
+        most_recent_price = max_threshold
     
     logging.info(
         f"{timeframe} - Reversal: {most_recent_reversal} at {most_recent_price:.25f}, "
@@ -301,7 +299,7 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, hig
         f"{timeframe} - Reversal: {most_recent_reversal} at {most_recent_price:.25f}, "
         f"Diff to High: {diff_to_high:.25f}, Diff to Low: {diff_to_low:.25f}"
     )
-    return most_recent_reversal, min_time, closest_min_price, "TOP", max_time, closest_max_price, min_idx, max_idx
+    return most_recent_reversal, min_time, min_threshold, "TOP", max_time, max_threshold, min_idx, max_idx
 
 def calculate_thresholds(candles, timeframe_ranges=None):
     if not candles:
@@ -535,7 +533,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                         f"Sell Volume: {details.get('sell_volume', Decimal('0')):.2f}\n"
                         f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
                         f"Volume Increasing: {details.get('volume_increasing', False)}\n"
-                        f"Volume Exhausted: {details.get('volume_exhausted', False)}\n"
+                        f"Volume Decreasing: {details.get('volume_decreasing', False)}\n"
                     )
                 telegram_loop.run_until_complete(send_telegram_message(message))
                 logging.info(f"Placed LONG order: {quantity:.25f} BTC at market price ~{price:.25f}")
@@ -582,7 +580,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                         f"Sell Volume: {details.get('sell_volume', Decimal('0')):.2f}\n"
                         f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
                         f"Volume Increasing: {details.get('volume_increasing', False)}\n"
-                        f"Volume Exhausted: {details.get('volume_exhausted', False)}\n"
+                        f"Volume Decreasing: {details.get('volume_decreasing', False)}\n"
                     )
                 telegram_loop.run_until_complete(send_telegram_message(message))
                 logging.info(f"Placed SHORT order: {quantity:.25f} BTC at market price ~{price:.25f}")
@@ -623,9 +621,9 @@ def close_position(position, price, retries=5, base_delay=5):
                 f"Symbol: {TRADE_SYMBOL}\n"
                 f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"Side: {position['side']}\n"
-                f"Quantity: {quantity:.25f} BTC\n"
-                f"Exit Price: ~{price:.25f} USDC\n"
-                f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC\n"
+                f"Quantity: {quantity:.2f} BTC\n"
+                f"Exit Price: ~{price:.2f} USDC\n"
+                f"Unrealized PNL: {position['unrealized_pnl']:.2f} USDC\n"
             )
             telegram_loop.run_until_complete(send_telegram_message(message))
             logging.info(f"Closed {position['side']} position: {quantity:.25f} BTC at market price ~{price:.25f}")
@@ -744,7 +742,7 @@ def main():
                 f"above_middle_{tf}": False for tf in TIMEFRAMES
             })
             conditions_short.update({
-                f"volume_exhausted_{tf}": False for tf in TIMEFRAMES
+                f"volume_decreasing_{tf}": False for tf in TIMEFRAMES
             })
             
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -753,7 +751,9 @@ def main():
             for tf in ["3m"]:
                 if candle_map.get(tf):
                     min_th, _, max_th, _ = calculate_thresholds(candle_map[tf], timeframe_ranges)
-                    reversal_type, _, _, _, _, _, _, _ = detect_recent_reversal(candle_map[tf], tf, min_th, max_th)
+                    closes = np.array([c["close"] for c in candle_map[tf] if c["close"] > 0], dtype=np.float64)
+                    current_close = Decimal(str(closes[-1])) if len(closes) > 0 else current_price
+                    reversal_type, _, _, _, _, _, _, _ = detect_recent_reversal(candle_map[tf], tf, min_th, max_th, current_close)
                     higher_tf_tops[tf] = (reversal_type == "TOP")
             
             analysis_details = {}
@@ -770,20 +770,20 @@ def main():
                 
                 min_threshold, middle_threshold, max_threshold, price_range = calculate_thresholds(candles_tf, timeframe_ranges)
                 
-                reversal_type, min_time, closest_min_price, _, max_time, closest_max_price, min_idx, max_idx = detect_recent_reversal(candles_tf, timeframe, min_threshold, max_threshold, higher_tf_tops if timeframe == "1m" else None)
+                current_close = Decimal(str(closes[-1])) if len(closes) > 0 else current_price
+                reversal_type, min_time, closest_min_price, _, max_time, closest_max_price, min_idx, max_idx = detect_recent_reversal(candles_tf, timeframe, min_threshold, max_threshold, current_close, higher_tf_tops if timeframe == "1m" else None)
                 
                 support_levels, resistance_levels = calculate_support_resistance(candles_tf, timeframe)
                 
-                buy_vol, sell_vol, volume_mood, volume_increasing, volume_exhausted = calculate_buy_sell_volume(
+                buy_vol, sell_vol, volume_mood, volume_increasing, volume_decreasing = calculate_buy_sell_volume(
                     candles_tf, timeframe, reversal_type, (closes[-1] < (min_threshold + max_threshold) / 2), min_idx, max_idx
                 )
                 
                 conditions_long[f"dip_confirmed_{timeframe}"] = reversal_type == "DIP"
                 conditions_short[f"top_confirmed_{timeframe}"] = reversal_type == "TOP"
                 conditions_long[f"volume_increasing_{timeframe}"] = volume_increasing
-                conditions_short[f"volume_exhausted_{timeframe}"] = volume_exhausted
+                conditions_short[f"volume_decreasing_{timeframe}"] = volume_decreasing
                 
-                current_close = Decimal(str(closes[-1])) if len(closes) > 0 else current_price
                 conditions_long[f"below_middle_{timeframe}"] = current_close < middle_threshold
                 conditions_short[f"above_middle_{timeframe}"] = current_close > middle_threshold
                 
@@ -817,7 +817,7 @@ def main():
                     "volume_mood": volume_mood,
                     "price_range": price_range,
                     "volume_increasing": volume_increasing,
-                    "volume_exhausted": volume_exhausted
+                    "volume_decreasing": volume_decreasing
                 }
             
             # Print condition pairs status
@@ -826,7 +826,7 @@ def main():
                 for cond_pair in [
                     ("dip_confirmed", "top_confirmed"),
                     ("below_middle", "above_middle"),
-                    ("volume_increasing", "volume_exhausted")
+                    ("volume_increasing", "volume_decreasing")
                 ]:
                     cond1, cond2 = cond_pair
                     status1 = conditions_long.get(f"{cond1}_{tf}", False)
@@ -844,7 +844,7 @@ def main():
             
             print("\nShort Conditions Status:")
             print(f"momentum_negative_1m: {conditions_short.get('momentum_negative_1m', False)}")
-            for cond in ["top_confirmed", "above_middle", "volume_exhausted"]:
+            for cond in ["top_confirmed", "above_middle", "volume_decreasing"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_short.get(f'{cond}_{tf}', False)}")
             
