@@ -781,26 +781,32 @@ def main():
             # Define conditions for LONG and SHORT signals
             conditions_long = {
                 "momentum_positive_1m": False,
-                "dist_to_max_less_than_dist_to_min": False,
+                "dist_to_min_less_than_dist_to_middle": False,
                 "ml_forecast_above_price": False,
             }
             conditions_long.update({
-                f"top_confirmed_{tf}": False for tf in TIMEFRAMES
+                f"dip_confirmed_{tf}": False for tf in TIMEFRAMES
             })
             conditions_long.update({
-                f"above_middle_{tf}": False for tf in TIMEFRAMES
+                f"below_middle_{tf}": False for tf in TIMEFRAMES
+            })
+            conditions_long.update({
+                f"volume_bullish_{tf}": False for tf in TIMEFRAMES
             })
             
             conditions_short = {
                 "momentum_negative_1m": False,
-                "dist_to_min_less_than_dist_to_max": False,
+                "dist_to_max_less_than_dist_to_middle": False,
                 "ml_forecast_below_price": False,
             }
             conditions_short.update({
-                f"dip_confirmed_{tf}": False for tf in TIMEFRAMES
+                f"top_confirmed_{tf}": False for tf in TIMEFRAMES
             })
             conditions_short.update({
-                f"below_middle_{tf}": False for tf in TIMEFRAMES
+                f"above_middle_{tf}": False for tf in TIMEFRAMES
+            })
+            conditions_short.update({
+                f"volume_bearish_{tf}": False for tf in TIMEFRAMES
             })
             
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -839,11 +845,14 @@ def main():
                     candles_tf, timeframe, reversal_type, (closes[-1] < (min_threshold + max_threshold) / 2), min_idx, max_idx
                 )
                 
-                conditions_long[f"top_confirmed_{timeframe}"] = reversal_type == "TOP"
-                conditions_short[f"dip_confirmed_{timeframe}"] = reversal_type == "DIP"
+                conditions_long[f"dip_confirmed_{timeframe}"] = reversal_type == "DIP"
+                conditions_short[f"top_confirmed_{timeframe}"] = reversal_type == "TOP"
                 
-                conditions_long[f"above_middle_{timeframe}"] = current_close > middle_threshold
-                conditions_short[f"below_middle_{timeframe}"] = current_close < middle_threshold
+                conditions_long[f"below_middle_{timeframe}"] = current_close < middle_threshold
+                conditions_short[f"above_middle_{timeframe}"] = current_close > middle_threshold
+                
+                conditions_long[f"volume_bullish_{timeframe}"] = volume_mood == "BULLISH"
+                conditions_short[f"volume_bearish_{timeframe}"] = volume_mood == "BEARISH"
                 
                 trend, min_th, max_th, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target = calculate_mtf_trend(
                     candles_tf, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
@@ -856,11 +865,12 @@ def main():
                 perc_distance = calculate_percentage_distance(current_close, min_threshold, max_threshold)
                 dist_to_min = current_close - min_threshold
                 dist_to_max = max_threshold - current_close
+                dist_to_middle = abs(current_close - middle_threshold)
                 
                 # Update distance conditions
                 if timeframe == "1m":
-                    conditions_long["dist_to_max_less_than_dist_to_min"] = dist_to_max < dist_to_min
-                    conditions_short["dist_to_min_less_than_dist_to_max"] = dist_to_min < dist_to_max
+                    conditions_long["dist_to_min_less_than_dist_to_middle"] = dist_to_min < dist_to_middle
+                    conditions_short["dist_to_max_less_than_dist_to_middle"] = dist_to_max < dist_to_middle
                     conditions_long["ml_forecast_above_price"] = ml_forecast > current_close
                     conditions_short["ml_forecast_below_price"] = ml_forecast < current_close
                 
@@ -919,8 +929,9 @@ def main():
             print("\nCondition Pairs Status:")
             for tf in TIMEFRAMES:
                 for cond_pair in [
-                    ("top_confirmed", "dip_confirmed"),
-                    ("above_middle", "below_middle")
+                    ("dip_confirmed", "top_confirmed"),
+                    ("below_middle", "above_middle"),
+                    ("volume_bullish", "volume_bearish")
                 ]:
                     cond1, cond2 = cond_pair
                     status1 = conditions_long.get(f"{cond1}_{tf}", False)
@@ -928,24 +939,24 @@ def main():
                     print(f"{cond1}_{tf}: {status1}, {cond2}_{tf}: {status2}")
                 if tf == "1m":
                     print(f"momentum_positive_1m: {conditions_long.get('momentum_positive_1m', False)}, momentum_negative_1m: {conditions_short.get('momentum_negative_1m', False)}")
-                    print(f"dist_to_max_less_than_dist_to_min: {conditions_long.get('dist_to_max_less_than_dist_to_min', False)}")
-                    print(f"dist_to_min_less_than_dist_to_max: {conditions_short.get('dist_to_min_less_than_dist_to_max', False)}")
+                    print(f"dist_to_min_less_than_dist_to_middle: {conditions_long.get('dist_to_min_less_than_dist_to_middle', False)}")
+                    print(f"dist_to_max_less_than_dist_to_middle: {conditions_short.get('dist_to_max_less_than_dist_to_middle', False)}")
                     print(f"ml_forecast_above_price: {conditions_long.get('ml_forecast_above_price', False)}")
                     print(f"ml_forecast_below_price: {conditions_short.get('ml_forecast_below_price', False)}")
             
             print("\nLong Conditions Status:")
             print(f"momentum_positive_1m: {conditions_long.get('momentum_positive_1m', False)}")
-            print(f"dist_to_max_less_than_dist_to_min: {conditions_long.get('dist_to_max_less_than_dist_to_min', False)}")
+            print(f"dist_to_min_less_than_dist_to_middle: {conditions_long.get('dist_to_min_less_than_dist_to_middle', False)}")
             print(f"ml_forecast_above_price: {conditions_long.get('ml_forecast_above_price', False)}")
-            for cond in ["top_confirmed", "above_middle"]:
+            for cond in ["dip_confirmed", "below_middle", "volume_bullish"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_long.get(f'{cond}_{tf}', False)}")
             
             print("\nShort Conditions Status:")
             print(f"momentum_negative_1m: {conditions_short.get('momentum_negative_1m', False)}")
-            print(f"dist_to_min_less_than_dist_to_max: {conditions_short.get('dist_to_min_less_than_dist_to_max', False)}")
+            print(f"dist_to_max_less_than_dist_to_middle: {conditions_short.get('dist_to_max_less_than_dist_to_middle', False)}")
             print(f"ml_forecast_below_price: {conditions_short.get('ml_forecast_below_price', False)}")
-            for cond in ["dip_confirmed", "below_middle"]:
+            for cond in ["top_confirmed", "above_middle", "volume_bearish"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_short.get(f'{cond}_{tf}', False)}")
             
