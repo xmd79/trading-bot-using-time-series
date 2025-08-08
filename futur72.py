@@ -1,3 +1,7 @@
+# Trading bot for Binance futures (BTCUSDC) with technical analysis, ML forecasting, and Telegram notifications
+# Dependencies: numpy, talib, scikit-learn, python-telegram-bot, python-binance, scipy
+# Requires credentials.txt with 4 lines: Binance API key, Binance API secret, Telegram bot token, Telegram chat ID
+
 import asyncio
 import datetime
 import time
@@ -37,7 +41,6 @@ VOLUME_CONFIRMATION_RATIO = Decimal('1.5')  # Volume increase ratio for LONG
 VOLUME_EXHAUSTION_RATIO = Decimal('0.5')  # Volume decrease ratio for SHORT
 SUPPORT_RESISTANCE_TOLERANCE = Decimal('0.005')  # 0.5% tolerance for support/resistance
 API_TIMEOUT = 60  # Timeout for Binance API requests
-RECENT_LOOKBACK = {"1m": 100, "3m": 50}  # Recent candles for reversal check
 TIMEFRAME_INTERVALS = {"1m": 60, "3m": 180}  # Timeframe intervals in seconds
 TOLERANCE_FACTORS = {"1m": Decimal('0.10'), "3m": Decimal('0.08')}  # Dynamic tolerance factors
 VOLUME_LOOKBACK = 5  # Lookback for volume trend analysis at reversal
@@ -165,6 +168,9 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     cycle_status = "Up" if trend_bullish else "Down"
     trend = "BULLISH" if trend_bullish else "BEARISH"
     
+    # Validate buy_vol and sell_vol
+    buy_vol = max(buy_vol, Decimal('0'))
+    sell_vol = max(sell_vol, Decimal('0'))
     volume_ratio = buy_vol / sell_vol if sell_vol > Decimal('0') else Decimal('1.0')
     volume_confirmed = volume_ratio >= VOLUME_CONFIRMATION_RATIO if trend == "BULLISH" else Decimal('1.0') / volume_ratio >= VOLUME_CONFIRMATION_RATIO
     
@@ -277,14 +283,22 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, cur
     min_candle = min(recent_candles, key=lambda x: x['low'])
     max_candle = max(recent_candles, key=lambda x: x['high'])
 
-    # Indexes of min and max threshold candles
-    min_idx = next(i for i, c in enumerate(recent_candles) if c['low'] == float(min_threshold))
-    max_idx = next(i for i, c in enumerate(recent_candles) if c['high'] == float(max_threshold))
+    # Find indexes of min and max threshold candles safely
+    min_idx = 0
+    max_idx = 0
+    for i, c in enumerate(recent_candles):
+        if c['low'] == float(min_threshold):
+            min_idx = i
+            break
+    for i, c in enumerate(recent_candles):
+        if c['high'] == float(max_threshold):
+            max_idx = i
+            break
 
     min_time = min_candle['time']
     max_time = max_candle['time']
 
-    # Compare which threshold is closer to current price (no higher timeframe influence)
+    # Compare which threshold is closer to current price
     diff_to_high = abs(current_close - max_threshold)
     diff_to_low = abs(current_close - min_threshold)
 
@@ -341,11 +355,6 @@ def calculate_percentage_distance(current_price, min_threshold, max_threshold):
         return Decimal('0.0')
     return ((current_price - min_threshold) / (max_threshold - min_threshold)) * Decimal('100')
 
-def calculate_percentage_diff_to_threshold(price, threshold):
-    if threshold == Decimal('0'):
-        return Decimal('0.0')
-    return ((price - threshold) / threshold) * Decimal('100')
-
 def generate_ml_forecast(candles, timeframe, forecast_periods=5):
     if len(candles) < ML_LOOKBACK:
         logging.warning(f"Insufficient data ({len(candles)}) for ML forecast in {timeframe}")
@@ -389,9 +398,19 @@ def fetch_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=1500):
     def fetch_candles(timeframe):
         return get_candles(symbol, timeframe, limit)
     
+    candle_map = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = list(executor.map(fetch_candles, timeframes))
-    return dict(zip(timeframes, results))
+        future_to_tf = {executor.submit(fetch_candles, tf): tf for tf in timeframes}
+        for future in concurrent.futures.as_completed(future_to_tf):
+            tf = future_to_tf[future]
+            try:
+                candles = future.result()
+                if candles:
+                    candle_map[tf] = candles
+            except Exception as e:
+                logging.error(f"Error fetching candles for {tf}: {e}")
+                print(f"Error fetching candles for {tf}: {e}")
+    return candle_map
 
 def get_candles(symbol, timeframe, limit=1500, retries=5, base_delay=5):
     for attempt in range(retries):
@@ -547,6 +566,14 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 return None
             position = get_position()
             position["initial_balance"] = initial_balance
+            message = (
+                f"*Trade Signal: {signal}*\n"
+                f"Symbol: {TRADE_SYMBOL}\n"
+                f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Quantity: {quantity:.2f} BTC\n"
+                f"Entry Price: ~{price:.2f} USDC\n"
+                f"Initial Balance: {initial_balance:.2f} USDC\n"
+            )
             if signal == "LONG":
                 order = client.futures_create_order(
                     symbol=TRADE_SYMBOL,
@@ -557,50 +584,11 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 tp_price = (price * (Decimal('1') + TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
                 sl_price = (price * (Decimal('1') - STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "LONG", "quantity": quantity, "entry_price": price})
-                message = (
-                    f"*Trade Signal: LONG*\n"
-                    f"Symbol: {TRADE_SYMBOL}\n"
-                    f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                    f"Quantity: {quantity:.2f} BTC\n"
-                    f"Entry Price: ~{price:.2f} USDC\n"
-                    f"Initial Balance: {initial_balance:.2f} USDC\n"
+                message += (
                     f"Stop-Loss: {sl_price:.2f} (-5%)\n"
                     f"Take-Profit: {tp_price:.2f} (+5%)\n"
                     f"\n*Analysis Details*\n"
                 )
-                for tf in TIMEFRAMES:
-                    details = analysis_details.get(tf, {})
-                    perc_dist = calculate_percentage_distance(price, details.get('min_threshold', Decimal('0')), details.get('max_threshold', Decimal('0')))
-                    dist_to_min = price - details.get('min_threshold', Decimal('0'))
-                    dist_to_max = details.get('max_threshold', Decimal('0')) - price
-                    message += (
-                        f"\n*{tf} Timeframe*\n"
-                        f"MTF Trend: {details.get('trend', 'N/A')}\n"
-                        f"Cycle Status: {details.get('cycle_status', 'N/A')}\n"
-                        f"Dominant Frequency: {details.get('dominant_freq', 0.0):.2f}\n"
-                        f"Cycle Target: {details.get('cycle_target', Decimal('0')):.2f} USDC\n"
-                        f"ML Forecast: {details.get('ml_forecast', Decimal('0')):.2f} USDC\n"
-                        f"Price Position: {perc_dist:.2f}% between min/max\n"
-                        f"Dist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\n"
-                        f"Dist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n"
-                        f"Volume Ratio: {details.get('volume_ratio', Decimal('0')):.2f}\n"
-                        f"Volume Confirmed: {details.get('volume_confirmed', False)}\n"
-                        f"Minimum Threshold: {details.get('min_threshold', Decimal('0')):.2f} USDC\n"
-                        f"Middle Threshold: {details.get('middle_threshold', Decimal('0')):.2f} USDC\n"
-                        f"Maximum Threshold: {details.get('max_threshold', Decimal('0')):.2f} USDC\n"
-                        f"High-Low Range: {details.get('price_range', Decimal('0')):.2f} USDC\n"
-                        f"Most Recent Reversal: {details.get('reversal_type', 'N/A')} at price {details.get('reversal_price', Decimal('0')):.2f}\n"
-                        f"Support Level: {details.get('support_levels', [{}])[0].get('price', Decimal('0')):.2f} USDC\n"
-                        f"Resistance Level: {details.get('resistance_levels', [{}])[0].get('price', Decimal('0')):.2f} USDC\n"
-                        f"Buy Volume: {details.get('buy_volume', Decimal('0')):.2f}\n"
-                        f"Sell Volume: {details.get('sell_volume', Decimal('0')):.2f}\n"
-                        f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
-                        f"Volume Increasing: {details.get('volume_increasing', False)}\n"
-                        f"Volume Decreasing: {details.get('volume_decreasing', False)}\n"
-                    )
-                telegram_loop.run_until_complete(send_telegram_message(message))
-                logging.info(f"Placed LONG order: {quantity:.25f} BTC at market price ~{price:.25f}")
-                print(f"\n=== TRADE ENTERED ===\nSide: LONG\nQuantity: {quantity:.25f} BTC\nEntry Price: ~{price:.25f} USDC\nInitial USDC Balance: {initial_balance:.25f}\nStop-Loss Price: {sl_price:.25f} (-5% ROI)\nTake-Profit Price: {tp_price:.25f} (+5% ROI)\nDist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\nDist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n===================\n")
             elif signal == "SHORT":
                 order = client.futures_create_order(
                     symbol=TRADE_SYMBOL,
@@ -611,50 +599,47 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 tp_price = (price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'))
                 sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'))
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "SHORT", "quantity": -quantity, "entry_price": price})
-                message = (
-                    f"*Trade Signal: SHORT*\n"
-                    f"Symbol: {TRADE_SYMBOL}\n"
-                    f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                    f"Quantity: {quantity:.2f} BTC\n"
-                    f"Entry Price: ~{price:.2f} USDC\n"
-                    f"Initial Balance: {initial_balance:.2f} USDC\n"
+                message += (
                     f"Stop-Loss: {sl_price:.2f} (-5%)\n"
                     f"Take-Profit: {tp_price:.2f} (+5%)\n"
                     f"\n*Analysis Details*\n"
                 )
-                for tf in TIMEFRAMES:
-                    details = analysis_details.get(tf, {})
-                    perc_dist = calculate_percentage_distance(price, details.get('min_threshold', Decimal('0')), details.get('max_threshold', Decimal('0')))
-                    dist_to_min = price - details.get('min_threshold', Decimal('0'))
-                    dist_to_max = details.get('max_threshold', Decimal('0')) - price
-                    message += (
-                        f"\n*{tf} Timeframe*\n"
-                        f"MTF Trend: {details.get('trend', 'N/A')}\n"
-                        f"Cycle Status: {details.get('cycle_status', 'N/A')}\n"
-                        f"Dominant Frequency: {details.get('dominant_freq', 0.0):.2f}\n"
-                        f"Cycle Target: {details.get('cycle_target', Decimal('0')):.2f} USDC\n"
-                        f"ML Forecast: {details.get('ml_forecast', Decimal('0')):.2f} USDC\n"
-                        f"Price Position: {perc_dist:.2f}% between min/max\n"
-                        f"Dist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\n"
-                        f"Dist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n"
-                        f"Volume Ratio: {details.get('volume_ratio', Decimal('0')):.2f}\n"
-                        f"Volume Confirmed: {details.get('volume_confirmed', False)}\n"
-                        f"Minimum Threshold: {details.get('min_threshold', Decimal('0')):.2f} USDC\n"
-                        f"Middle Threshold: {details.get('middle_threshold', Decimal('0')):.2f} USDC\n"
-                        f"Maximum Threshold: {details.get('max_threshold', Decimal('0')):.2f} USDC\n"
-                        f"High-Low Range: {details.get('price_range', Decimal('0')):.2f} USDC\n"
-                        f"Most Recent Reversal: {details.get('reversal_type', 'N/A')} at price {details.get('reversal_price', Decimal('0')):.2f}\n"
-                        f"Support Level: {details.get('support_levels', [{}])[0].get('price', Decimal('0')):.2f} USDC\n"
-                        f"Resistance Level: {details.get('resistance_levels', [{}])[0].get('price', Decimal('0')):.2f} USDC\n"
-                        f"Buy Volume: {details.get('buy_volume', Decimal('0')):.2f}\n"
-                        f"Sell Volume: {details.get('sell_volume', Decimal('0')):.2f}\n"
-                        f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
-                        f"Volume Increasing: {details.get('volume_increasing', False)}\n"
-                        f"Volume Decreasing: {details.get('volume_decreasing', False)}\n"
-                    )
-                telegram_loop.run_until_complete(send_telegram_message(message))
-                logging.info(f"Placed SHORT order: {quantity:.25f} BTC at market price ~{price:.25f}")
-                print(f"\n=== TRADE ENTERED ===\nSide: SHORT\nQuantity: {quantity:.25f} BTC\nEntry Price: ~{price:.25f} USDC\nInitial USDC Balance: {initial_balance:.25f}\nStop-Loss Price: {sl_price:.25f} (-5% ROI)\nTake-Profit Price: {tp_price:.25f} (+5% ROI)\nDist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\nDist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n===================\n")
+            for tf in TIMEFRAMES:
+                details = analysis_details.get(tf, {})
+                perc_dist = calculate_percentage_distance(price, details.get('min_threshold', Decimal('0')), details.get('max_threshold', Decimal('0')))
+                dist_to_min = price - details.get('min_threshold', Decimal('0'))
+                dist_to_max = details.get('max_threshold', Decimal('0')) - price
+                cycle_target = details.get('cycle_target', Decimal('0'))
+                # Validate cycle_target
+                cycle_target = cycle_target if isinstance(cycle_target, Decimal) else Decimal('0')
+                message += (
+                    f"\n*{tf} Timeframe*\n"
+                    f"MTF Trend: {details.get('trend', 'N/A')}\n"
+                    f"Cycle Status: {details.get('cycle_status', 'N/A')}\n"
+                    f"Dominant Frequency: {details.get('dominant_freq', 0.0):.2f}\n"
+                    f"Cycle Target: {cycle_target:.2f} USDC\n"
+                    f"ML Forecast: {details.get('ml_forecast', Decimal('0')):.2f} USDC\n"
+                    f"Price Position: {perc_dist:.2f}% between min/max\n"
+                    f"Dist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\n"
+                    f"Dist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n"
+                    f"Volume Ratio: {details.get('volume_ratio', Decimal('0')):.2f}\n"
+                    f"Volume Confirmed: {details.get('volume_confirmed', False)}\n"
+                    f"Minimum Threshold: {details.get('min_threshold', Decimal('0')):.2f} USDC\n"
+                    f"Middle Threshold: {details.get('middle_threshold', Decimal('0')):.2f} USDC\n"
+                    f"Maximum Threshold: {details.get('max_threshold', Decimal('0')):.2f} USDC\n"
+                    f"High-Low Range: {details.get('price_range', Decimal('0')):.2f} USDC\n"
+                    f"Most Recent Reversal: {details.get('reversal_type', 'N/A')} at price {details.get('reversal_price', Decimal('0')):.2f}\n"
+                    f"Support Level: {details.get('support_levels', [{}])[0].get('price', Decimal('0')):.2f} USDC\n"
+                    f"Resistance Level: {details.get('resistance_levels', [{}])[0].get('price', Decimal('0')):.2f} USDC\n"
+                    f"Buy Volume: {details.get('buy_volume', Decimal('0')):.2f}\n"
+                    f"Sell Volume: {details.get('sell_volume', Decimal('0')):.2f}\n"
+                    f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
+                    f"Volume Increasing: {details.get('volume_increasing', False)}\n"
+                    f"Volume Decreasing: {details.get('volume_decreasing', False)}\n"
+                )
+            telegram_loop.run_until_complete(send_telegram_message(message))
+            logging.info(f"Placed {signal} order: {quantity:.25f} BTC at market price ~{price:.25f}")
+            print(f"\n=== TRADE ENTERED ===\nSide: {signal}\nQuantity: {quantity:.25f} BTC\nEntry Price: ~{price:.25f} USDC\nInitial USDC Balance: {initial_balance:.25f}\nStop-Loss Price: {sl_price:.25f} (-5% ROI)\nTake-Profit Price: {tp_price:.25f} (+5% ROI)\nDist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\nDist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n===================\n")
             return position
         except BinanceAPIException as e:
             retry_after = int(e.response.headers.get('Retry-After', '60')) if e.response else 60
@@ -797,8 +782,7 @@ def main():
             conditions_long = {
                 "momentum_positive_1m": False,
                 "dist_to_max_less_than_dist_to_min": False,
-                "ml_forecast_above_price": False,  # Switched back
-                "cycle_target_above_price": False  # Switched back
+                "ml_forecast_above_price": False,
             }
             conditions_long.update({
                 f"top_confirmed_{tf}": False for tf in TIMEFRAMES
@@ -810,8 +794,7 @@ def main():
             conditions_short = {
                 "momentum_negative_1m": False,
                 "dist_to_min_less_than_dist_to_max": False,
-                "ml_forecast_below_price": False,  # Switched back
-                "cycle_target_below_price": False  # Switched back
+                "ml_forecast_below_price": False,
             }
             conditions_short.update({
                 f"dip_confirmed_{tf}": False for tf in TIMEFRAMES
@@ -878,10 +861,8 @@ def main():
                 if timeframe == "1m":
                     conditions_long["dist_to_max_less_than_dist_to_min"] = dist_to_max < dist_to_min
                     conditions_short["dist_to_min_less_than_dist_to_max"] = dist_to_min < dist_to_max
-                    conditions_long["ml_forecast_above_price"] = ml_forecast > current_close  # Switched back
-                    conditions_short["ml_forecast_below_price"] = ml_forecast < current_close  # Switched back
-                    conditions_long["cycle_target_above_price"] = cycle_target > current_close  # Switched back
-                    conditions_short["cycle_target_below_price"] = cycle_target < current_close  # Switched back
+                    conditions_long["ml_forecast_above_price"] = ml_forecast > current_close
+                    conditions_short["ml_forecast_below_price"] = ml_forecast < current_close
                 
                 if len(closes) >= 14 and timeframe == "1m":
                     momentum = talib.MOM(closes, timeperiod=14)
@@ -916,7 +897,7 @@ def main():
                     "volume_decreasing": volume_decreasing
                 }
                 
-                # Print detailed timeframe analysis to console with range-based percentages only
+                # Print detailed timeframe analysis to console
                 print(f"Trend: {trend}")
                 print(f"Cycle Status: {cycle_status}")
                 print(f"Cycle Target: {cycle_target:.2f}")
@@ -951,14 +932,11 @@ def main():
                     print(f"dist_to_min_less_than_dist_to_max: {conditions_short.get('dist_to_min_less_than_dist_to_max', False)}")
                     print(f"ml_forecast_above_price: {conditions_long.get('ml_forecast_above_price', False)}")
                     print(f"ml_forecast_below_price: {conditions_short.get('ml_forecast_below_price', False)}")
-                    print(f"cycle_target_above_price: {conditions_long.get('cycle_target_above_price', False)}")
-                    print(f"cycle_target_below_price: {conditions_short.get('cycle_target_below_price', False)}")
             
             print("\nLong Conditions Status:")
             print(f"momentum_positive_1m: {conditions_long.get('momentum_positive_1m', False)}")
             print(f"dist_to_max_less_than_dist_to_min: {conditions_long.get('dist_to_max_less_than_dist_to_min', False)}")
             print(f"ml_forecast_above_price: {conditions_long.get('ml_forecast_above_price', False)}")
-            print(f"cycle_target_above_price: {conditions_long.get('cycle_target_above_price', False)}")
             for cond in ["top_confirmed", "above_middle"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_long.get(f'{cond}_{tf}', False)}")
@@ -967,7 +945,6 @@ def main():
             print(f"momentum_negative_1m: {conditions_short.get('momentum_negative_1m', False)}")
             print(f"dist_to_min_less_than_dist_to_max: {conditions_short.get('dist_to_min_less_than_dist_to_max', False)}")
             print(f"ml_forecast_below_price: {conditions_short.get('ml_forecast_below_price', False)}")
-            print(f"cycle_target_below_price: {conditions_short.get('cycle_target_below_price', False)}")
             for cond in ["dip_confirmed", "below_middle"]:
                 for tf in TIMEFRAMES:
                     print(f"{cond}_{tf}: {conditions_short.get(f'{cond}_{tf}', False)}")
@@ -1002,7 +979,7 @@ def main():
             logging.info(f"Trade Signal Status: {signal}")
             
             if signal in ["LONG", "SHORT"] and position["side"] == "NONE":
-                # Send preliminary Telegram notification when a signal is triggered
+                # Send preliminary Telegram notification
                 signal_message = (
                     f"*Trade Signal Triggered: {signal}*\n"
                     f"Symbol: {TRADE_SYMBOL}\n"
@@ -1033,7 +1010,9 @@ def main():
         logging.error(f"Fatal error in main loop: {e}\n{traceback.format_exc()}")
         print(f"Fatal error in main loop: {e}")
         telegram_loop.run_until_complete(send_telegram_message(f"*Fatal Error*\nSymbol: {TRADE_SYMBOL}\nError: {str(e)}"))
-        exit(1)
+    finally:
+        telegram_loop.run_until_complete(telegram_app.stop())
+        telegram_loop.close()
 
 if __name__ == "__main__":
     main()
