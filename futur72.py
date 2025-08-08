@@ -573,8 +573,6 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     perc_dist = calculate_percentage_distance(price, details.get('min_threshold', Decimal('0')), details.get('max_threshold', Decimal('0')))
                     dist_to_min = price - details.get('min_threshold', Decimal('0'))
                     dist_to_max = details.get('max_threshold', Decimal('0')) - price
-                    perc_to_min = calculate_percentage_diff_to_threshold(price, details.get('min_threshold', Decimal('0')))
-                    perc_to_max = calculate_percentage_diff_to_threshold(price, details.get('max_threshold', Decimal('0')))
                     message += (
                         f"\n*{tf} Timeframe*\n"
                         f"MTF Trend: {details.get('trend', 'N/A')}\n"
@@ -583,8 +581,8 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                         f"Cycle Target: {details.get('cycle_target', Decimal('0')):.2f} USDC\n"
                         f"ML Forecast: {details.get('ml_forecast', Decimal('0')):.2f} USDC\n"
                         f"Price Position: {perc_dist:.2f}% between min/max\n"
-                        f"Dist to Min: {dist_to_min:.2f} USDC ({perc_to_min:.2f}%)\n"
-                        f"Dist to Max: {dist_to_max:.2f} USDC ({perc_to_max:.2f}%)\n"
+                        f"Dist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\n"
+                        f"Dist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n"
                         f"Volume Ratio: {details.get('volume_ratio', Decimal('0')):.2f}\n"
                         f"Volume Confirmed: {details.get('volume_confirmed', False)}\n"
                         f"Minimum Threshold: {details.get('min_threshold', Decimal('0')):.2f} USDC\n"
@@ -602,7 +600,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     )
                 telegram_loop.run_until_complete(send_telegram_message(message))
                 logging.info(f"Placed LONG order: {quantity:.25f} BTC at market price ~{price:.25f}")
-                print(f"\n=== TRADE ENTERED ===\nSide: LONG\nQuantity: {quantity:.25f} BTC\nEntry Price: ~{price:.25f} USDC\nInitial USDC Balance: {initial_balance:.25f}\nStop-Loss Price: {sl_price:.25f} (-5% ROI)\nTake-Profit Price: {tp_price:.25f} (+5% ROI)\n===================\n")
+                print(f"\n=== TRADE ENTERED ===\nSide: LONG\nQuantity: {quantity:.25f} BTC\nEntry Price: ~{price:.25f} USDC\nInitial USDC Balance: {initial_balance:.25f}\nStop-Loss Price: {sl_price:.25f} (-5% ROI)\nTake-Profit Price: {tp_price:.25f} (+5% ROI)\nDist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\nDist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n===================\n")
             elif signal == "SHORT":
                 order = client.futures_create_order(
                     symbol=TRADE_SYMBOL,
@@ -629,8 +627,6 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     perc_dist = calculate_percentage_distance(price, details.get('min_threshold', Decimal('0')), details.get('max_threshold', Decimal('0')))
                     dist_to_min = price - details.get('min_threshold', Decimal('0'))
                     dist_to_max = details.get('max_threshold', Decimal('0')) - price
-                    perc_to_min = calculate_percentage_diff_to_threshold(price, details.get('min_threshold', Decimal('0')))
-                    perc_to_max = calculate_percentage_diff_to_threshold(price, details.get('max_threshold', Decimal('0')))
                     message += (
                         f"\n*{tf} Timeframe*\n"
                         f"MTF Trend: {details.get('trend', 'N/A')}\n"
@@ -639,8 +635,8 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                         f"Cycle Target: {details.get('cycle_target', Decimal('0')):.2f} USDC\n"
                         f"ML Forecast: {details.get('ml_forecast', Decimal('0')):.2f} USDC\n"
                         f"Price Position: {perc_dist:.2f}% between min/max\n"
-                        f"Dist to Min: {dist_to_min:.2f} USDC ({perc_to_min:.2f}%)\n"
-                        f"Dist to Max: {dist_to_max:.2f} USDC ({perc_to_max:.2f}%)\n"
+                        f"Dist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\n"
+                        f"Dist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n"
                         f"Volume Ratio: {details.get('volume_ratio', Decimal('0')):.2f}\n"
                         f"Volume Confirmed: {details.get('volume_confirmed', False)}\n"
                         f"Minimum Threshold: {details.get('min_threshold', Decimal('0')):.2f} USDC\n"
@@ -658,7 +654,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     )
                 telegram_loop.run_until_complete(send_telegram_message(message))
                 logging.info(f"Placed SHORT order: {quantity:.25f} BTC at market price ~{price:.25f}")
-                print(f"\n=== TRADE ENTERED ===\nSide: SHORT\nQuantity: {quantity:.25f} BTC\nEntry Price: ~{price:.25f} USDC\nInitial USDC Balance: {initial_balance:.25f}\nStop-Loss Price: {sl_price:.25f} (-5% ROI)\nTake-Profit Price: {tp_price:.25f} (+5% ROI)\n===================\n")
+                print(f"\n=== TRADE ENTERED ===\nSide: SHORT\nQuantity: {quantity:.25f} BTC\nEntry Price: ~{price:.25f} USDC\nInitial USDC Balance: {initial_balance:.25f}\nStop-Loss Price: {sl_price:.25f} (-5% ROI)\nTake-Profit Price: {tp_price:.25f} (+5% ROI)\nDist to Min: {dist_to_min:.2f} USDC ({perc_dist:.2f}% of range)\nDist to Max: {dist_to_max:.2f} USDC ({100 - perc_dist:.2f}% of range)\n===================\n")
             return position
         except BinanceAPIException as e:
             retry_after = int(e.response.headers.get('Retry-After', '60')) if e.response else 60
@@ -877,8 +873,6 @@ def main():
                 perc_distance = calculate_percentage_distance(current_close, min_threshold, max_threshold)
                 dist_to_min = current_close - min_threshold
                 dist_to_max = max_threshold - current_close
-                perc_to_min = calculate_percentage_diff_to_threshold(current_close, min_threshold)
-                perc_to_max = calculate_percentage_diff_to_threshold(current_close, max_threshold)
                 
                 # Update distance conditions
                 if timeframe == "1m":
@@ -922,14 +916,14 @@ def main():
                     "volume_decreasing": volume_decreasing
                 }
                 
-                # Print detailed timeframe analysis to console with percentage differences
+                # Print detailed timeframe analysis to console with range-based percentages only
                 print(f"Trend: {trend}")
                 print(f"Cycle Status: {cycle_status}")
                 print(f"Cycle Target: {cycle_target:.2f}")
                 print(f"ML Forecast: {ml_forecast:.2f}")
                 print(f"Price Position: {perc_distance:.2f}% between min/max")
-                print(f"Dist to Min: {dist_to_min:.2f} ({perc_to_min:.2f}%)")
-                print(f"Dist to Max: {dist_to_max:.2f} ({perc_to_max:.2f}%)")
+                print(f"Dist to Min: {dist_to_min:.2f} USDC ({perc_distance:.2f}% of range)")
+                print(f"Dist to Max: {dist_to_max:.2f} USDC ({100 - perc_distance:.2f}% of range)")
                 print(f"Min Threshold: {min_threshold:.2f}")
                 print(f"Mid Threshold: {middle_threshold:.2f}")
                 print(f"Max Threshold: {max_threshold:.2f}")
