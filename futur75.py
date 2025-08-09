@@ -838,7 +838,7 @@ def main():
                 "ml_forecast_above_price": True,
                 "dip_confirmed_1m": True,
                 "below_middle_1m": True,
-                "volume_bullish_1m": False,
+                "volume_increasing_1m": False,  # Updated condition
                 "hurst_target_above_price_1m": True,
             }
             
@@ -847,7 +847,7 @@ def main():
                 "ml_forecast_below_price": False,
                 "top_confirmed_1m": False,
                 "above_middle_1m": False,
-                "volume_bearish_1m": True,
+                "volume_decreasing_1m": True,   # Updated condition
                 "hurst_target_below_price_1m": False,
             }
             
@@ -909,8 +909,8 @@ def main():
                     conditions_short["top_confirmed_1m"] = reversal_type == "TOP"
                     conditions_long["below_middle_1m"] = current_close < middle_threshold
                     conditions_short["above_middle_1m"] = current_close > middle_threshold
-                    conditions_long["volume_bullish_1m"] = volume_mood == "BULLISH"
-                    conditions_short["volume_bearish_1m"] = volume_mood == "BEARISH"
+                    conditions_long["volume_increasing_1m"] = volume_increasing
+                    conditions_short["volume_decreasing_1m"] = volume_decreasing
                     conditions_long["hurst_target_above_price_1m"] = hurst_target > current_close
                     conditions_short["hurst_target_below_price_1m"] = hurst_target < current_close
                 
@@ -986,7 +986,7 @@ def main():
                 for cond_pair in [
                     ("dip_confirmed", "top_confirmed"),
                     ("below_middle", "above_middle"),
-                    ("volume_bullish", "volume_bearish"),
+                    ("volume_increasing", "volume_decreasing"),  # Updated condition pair
                     ("hurst_target_above_price", "hurst_target_below_price")
                 ]:
                     cond1, cond2 = cond_pair
@@ -1003,7 +1003,7 @@ def main():
             print(f"ml_forecast_above_price: {conditions_long.get('ml_forecast_above_price', False)}")
             print(f"dip_confirmed_1m: {conditions_long.get('dip_confirmed_1m', False)}")
             print(f"below_middle_1m: {conditions_long.get('below_middle_1m', False)}")
-            print(f"volume_bullish_1m: {conditions_long.get('volume_bullish_1m', False)}")
+            print(f"volume_increasing_1m: {conditions_long.get('volume_increasing_1m', False)}")
             print(f"hurst_target_above_price_1m: {conditions_long.get('hurst_target_above_price_1m', False)}")
             
             print("\nShort Conditions Status:")
@@ -1011,7 +1011,7 @@ def main():
             print(f"ml_forecast_below_price: {conditions_short.get('ml_forecast_below_price', False)}")
             print(f"top_confirmed_1m: {conditions_short.get('top_confirmed_1m', False)}")
             print(f"above_middle_1m: {conditions_short.get('above_middle_1m', False)}")
-            print(f"volume_bearish_1m: {conditions_short.get('volume_bearish_1m', False)}")
+            print(f"volume_decreasing_1m: {conditions_short.get('volume_decreasing_1m', False)}")
             print(f"hurst_target_below_price_1m: {conditions_short.get('hurst_target_below_price_1m', False)}")
             
             long_true_count = sum(1 for v in conditions_long.values() if v)
