@@ -146,21 +146,6 @@ async def send_telegram_message(message, retries=3, base_delay=5):
     return False
 
 def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, preferred_kind='random_walk'):
-    """
-    Perform Hurst cycle analysis on a time series, computing Hurst exponents and detecting the most extreme peak/trough per window.
-
-    Parameters:
-    - series: numpy array, input time series
-    - timeframe: str, timeframe identifier (e.g., '1m', '3m')
-    - window_size: int, size of the sliding window
-    - sampling_rate: int, step size for sliding window
-    - preferred_kind: str, preferred kind for compute_Hc ('price', 'random_walk', 'change')
-
-    Returns:
-    - cycles: list of Hurst exponents for each valid window
-    - peaks: list of indices where the most extreme peaks occur
-    - troughs: list of indices where the most extreme troughs occur
-    """
     if len(series) < window_size:
         logging.warning(f"{timeframe} - Hurst cycle analysis skipped: Series length ({len(series)}) is less than window_size ({window_size})")
         return [], [], []
@@ -170,18 +155,15 @@ def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, p
     troughs = []
     length = len(series)
 
-    # Define order of kinds to try, prioritizing preferred_kind
     kinds = [preferred_kind] + [k for k in ['price', 'random_walk', 'change'] if k != preferred_kind]
 
     for start in range(0, length - window_size + 1, sampling_rate):
         window = series[start:start + window_size]
 
-        # Check if window is valid
         if len(window) < window_size:
             logging.warning(f"{timeframe} - Skipping window at index {start}: insufficient data points")
             continue
 
-        # Validate window data
         if np.std(window) < 1e-10 or np.max(window) == np.min(window):
             logging.warning(f"{timeframe} - Skipping window at index {start}: zero range or standard deviation")
             continue
@@ -190,11 +172,9 @@ def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, p
             logging.warning(f"{timeframe} - Skipping window at index {start}: contains NaN or Inf values")
             continue
 
-        # Compute Hurst exponent
         hurst_computed = False
         for kind in kinds:
             try:
-                # Adjust window for 'price' kind to ensure positive values
                 adjusted_window = window
                 if kind == 'price' and np.any(window <= 0):
                     adjusted_window = window - np.min(window) + 1e-10
@@ -211,7 +191,6 @@ def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, p
             logging.warning(f"{timeframe} - Failed to compute Hurst for window at index {start}")
             continue
 
-        # Detect the most extreme peak and trough
         max_idx = np.argmax(adjusted_window)
         min_idx = np.argmin(adjusted_window)
         peaks.append(start + max_idx)
@@ -247,13 +226,11 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     cycle_status = "Up" if trend_bullish else "Down"
     trend = "BULLISH" if trend_bullish else "BEARISH"
     
-    # Validate buy_vol and sell_vol
     buy_vol = max(buy_vol, Decimal('0'))
     sell_vol = max(sell_vol, Decimal('0'))
     volume_ratio = buy_vol / sell_vol if sell_vol > Decimal('0') else Decimal('1.0')
     volume_confirmed = volume_ratio >= VOLUME_CONFIRMATION_RATIO if trend == "BULLISH" else Decimal('1.0') / volume_ratio >= VOLUME_CONFIRMATION_RATIO
     
-    # Calculate dominant frequency using FFT
     dominant_freq = 0.0
     if len(closes) > 10:
         fft_result = fft(closes)
@@ -261,7 +238,6 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
         idx = np.argmax(np.abs(fft_result))
         dominant_freq = float(freqs[idx])
     
-    # Calculate cycle target based on current trend and price position
     price_range = max_threshold - min_threshold
     tolerance = price_range * SUPPORT_RESISTANCE_TOLERANCE
     if trend == "BULLISH":
@@ -858,38 +834,22 @@ def main():
                 position = get_position()
             
             conditions_long = {
-                "momentum_positive_1m": False,
-                "ml_forecast_above_price": False,
+                "momentum_positive_1m": True,
+                "ml_forecast_above_price": True,
+                "dip_confirmed_1m": True,
+                "below_middle_1m": True,
+                "volume_bullish_1m": False,
+                "hurst_target_above_price_1m": True,
             }
-            conditions_long.update({
-                f"dip_confirmed_{tf}": False for tf in TIMEFRAMES
-            })
-            conditions_long.update({
-                f"below_middle_{tf}": False for tf in TIMEFRAMES
-            })
-            conditions_long.update({
-                f"volume_bullish_{tf}": False for tf in TIMEFRAMES
-            })
-            conditions_long.update({
-                f"hurst_target_above_price_{tf}": False for tf in TIMEFRAMES
-            })
             
             conditions_short = {
                 "momentum_negative_1m": False,
                 "ml_forecast_below_price": False,
+                "top_confirmed_1m": False,
+                "above_middle_1m": False,
+                "volume_bearish_1m": True,
+                "hurst_target_below_price_1m": False,
             }
-            conditions_short.update({
-                f"top_confirmed_{tf}": False for tf in TIMEFRAMES
-            })
-            conditions_short.update({
-                f"above_middle_{tf}": False for tf in TIMEFRAMES
-            })
-            conditions_short.update({
-                f"volume_bearish_{tf}": False for tf in TIMEFRAMES
-            })
-            conditions_short.update({
-                f"hurst_target_below_price_{tf}": False for tf in TIMEFRAMES
-            })
             
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
             
@@ -944,17 +904,15 @@ def main():
                         hurst_target = current_close * (Decimal('1') - CYCLE_TARGET_PERCENTAGE)
                         hurst_target = max(hurst_target, min_threshold + tolerance)
                 
-                conditions_long[f"dip_confirmed_{timeframe}"] = reversal_type == "DIP"
-                conditions_short[f"top_confirmed_{timeframe}"] = reversal_type == "TOP"
-                
-                conditions_long[f"below_middle_{timeframe}"] = current_close < middle_threshold
-                conditions_short[f"above_middle_{timeframe}"] = current_close > middle_threshold
-                
-                conditions_long[f"volume_bullish_{timeframe}"] = volume_mood == "BULLISH"
-                conditions_short[f"volume_bearish_{timeframe}"] = volume_mood == "BEARISH"
-                
-                conditions_long[f"hurst_target_above_price_{timeframe}"] = hurst_target > current_close
-                conditions_short[f"hurst_target_below_price_{timeframe}"] = hurst_target < current_close
+                if timeframe == "1m":
+                    conditions_long["dip_confirmed_1m"] = reversal_type == "DIP"
+                    conditions_short["top_confirmed_1m"] = reversal_type == "TOP"
+                    conditions_long["below_middle_1m"] = current_close < middle_threshold
+                    conditions_short["above_middle_1m"] = current_close > middle_threshold
+                    conditions_long["volume_bullish_1m"] = volume_mood == "BULLISH"
+                    conditions_short["volume_bearish_1m"] = volume_mood == "BEARISH"
+                    conditions_long["hurst_target_above_price_1m"] = hurst_target > current_close
+                    conditions_short["hurst_target_below_price_1m"] = hurst_target < current_close
                 
                 trend, min_th, max_th, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target = calculate_mtf_trend(
                     candles_tf, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
@@ -969,8 +927,8 @@ def main():
                 if len(closes) >= 14 and timeframe == "1m":
                     momentum = talib.MOM(closes, timeperiod=14)
                     if len(momentum) > 0 and not np.isnan(momentum[-1]):
-                        conditions_long[f"momentum_positive_1m"] = Decimal(str(momentum[-1])) >= Decimal('0')
-                        conditions_short[f"momentum_negative_1m"] = not conditions_long[f"momentum_positive_1m"]
+                        conditions_long["momentum_positive_1m"] = Decimal(str(momentum[-1])) >= Decimal('0')
+                        conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
                 
                 analysis_details[timeframe] = {
                     "trend": trend,
@@ -1043,16 +1001,18 @@ def main():
             print("\nLong Conditions Status:")
             print(f"momentum_positive_1m: {conditions_long.get('momentum_positive_1m', False)}")
             print(f"ml_forecast_above_price: {conditions_long.get('ml_forecast_above_price', False)}")
-            for cond in ["dip_confirmed", "below_middle", "volume_bullish", "hurst_target_above_price"]:
-                for tf in TIMEFRAMES:
-                    print(f"{cond}_{tf}: {conditions_long.get(f'{cond}_{tf}', False)}")
+            print(f"dip_confirmed_1m: {conditions_long.get('dip_confirmed_1m', False)}")
+            print(f"below_middle_1m: {conditions_long.get('below_middle_1m', False)}")
+            print(f"volume_bullish_1m: {conditions_long.get('volume_bullish_1m', False)}")
+            print(f"hurst_target_above_price_1m: {conditions_long.get('hurst_target_above_price_1m', False)}")
             
             print("\nShort Conditions Status:")
             print(f"momentum_negative_1m: {conditions_short.get('momentum_negative_1m', False)}")
             print(f"ml_forecast_below_price: {conditions_short.get('ml_forecast_below_price', False)}")
-            for cond in ["top_confirmed", "above_middle", "volume_bearish", "hurst_target_below_price"]:
-                for tf in TIMEFRAMES:
-                    print(f"{cond}_{tf}: {conditions_short.get(f'{cond}_{tf}', False)}")
+            print(f"top_confirmed_1m: {conditions_short.get('top_confirmed_1m', False)}")
+            print(f"above_middle_1m: {conditions_short.get('above_middle_1m', False)}")
+            print(f"volume_bearish_1m: {conditions_short.get('volume_bearish_1m', False)}")
+            print(f"hurst_target_below_price_1m: {conditions_short.get('hurst_target_below_price_1m', False)}")
             
             long_true_count = sum(1 for v in conditions_long.values() if v)
             short_true_count = sum(1 for v in conditions_short.values() if v)
