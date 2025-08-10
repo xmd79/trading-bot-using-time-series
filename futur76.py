@@ -834,19 +834,29 @@ def main():
                 position = get_position()
             
             conditions_long = {
-                "momentum_positive_1m": True,
-                "ml_forecast_above_price": True,
-                "dip_confirmed_1m": True,
-                "below_middle_1m": True,
-                "hurst_target_above_price_1m": True,
+                "momentum_positive_1m": False,
+                "ml_forecast_above_price_1m": False,
+                "dip_confirmed_1m": False,
+                "below_middle_1m": False,
+                "hurst_target_above_price_1m": False,
+                "momentum_positive_3m": False,
+                "ml_forecast_above_price_3m": False,
+                "dip_confirmed_3m": False,
+                "below_middle_3m": False,
+                "hurst_target_above_price_3m": False,
             }
             
             conditions_short = {
                 "momentum_negative_1m": False,
-                "ml_forecast_below_price": False,
+                "ml_forecast_below_price_1m": False,
                 "top_confirmed_1m": False,
                 "above_middle_1m": False,
                 "hurst_target_below_price_1m": False,
+                "momentum_negative_3m": False,
+                "ml_forecast_below_price_3m": False,
+                "top_confirmed_3m": False,
+                "above_middle_3m": False,
+                "hurst_target_below_price_3m": False,
             }
             
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -902,13 +912,12 @@ def main():
                         hurst_target = current_close * (Decimal('1') - CYCLE_TARGET_PERCENTAGE)
                         hurst_target = max(hurst_target, min_threshold + tolerance)
                 
-                if timeframe == "1m":
-                    conditions_long["dip_confirmed_1m"] = reversal_type == "DIP"
-                    conditions_short["top_confirmed_1m"] = reversal_type == "TOP"
-                    conditions_long["below_middle_1m"] = current_close < middle_threshold
-                    conditions_short["above_middle_1m"] = current_close > middle_threshold
-                    conditions_long["hurst_target_above_price_1m"] = hurst_target > current_close
-                    conditions_short["hurst_target_below_price_1m"] = hurst_target < current_close
+                conditions_long[f"dip_confirmed_{timeframe}"] = reversal_type == "DIP"
+                conditions_short[f"top_confirmed_{timeframe}"] = reversal_type == "TOP"
+                conditions_long[f"below_middle_{timeframe}"] = current_close < middle_threshold
+                conditions_short[f"above_middle_{timeframe}"] = current_close > middle_threshold
+                conditions_long[f"hurst_target_above_price_{timeframe}"] = hurst_target > current_close
+                conditions_short[f"hurst_target_below_price_{timeframe}"] = hurst_target < current_close
                 
                 trend, min_th, max_th, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target = calculate_mtf_trend(
                     candles_tf, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
@@ -916,15 +925,14 @@ def main():
                 
                 ml_forecast = generate_ml_forecast(candles_tf, timeframe)
                 
-                if timeframe == "1m":
-                    conditions_long["ml_forecast_above_price"] = ml_forecast > current_close
-                    conditions_short["ml_forecast_below_price"] = ml_forecast < current_close
+                conditions_long[f"ml_forecast_above_price_{timeframe}"] = ml_forecast > current_close
+                conditions_short[f"ml_forecast_below_price_{timeframe}"] = ml_forecast < current_close
                 
-                if len(closes) >= 14 and timeframe == "1m":
+                if len(closes) >= 14:
                     momentum = talib.MOM(closes, timeperiod=14)
                     if len(momentum) > 0 and not np.isnan(momentum[-1]):
-                        conditions_long["momentum_positive_1m"] = Decimal(str(momentum[-1])) >= Decimal('0')
-                        conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
+                        conditions_long[f"momentum_positive_{timeframe}"] = Decimal(str(momentum[-1])) >= Decimal('0')
+                        conditions_short[f"momentum_negative_{timeframe}"] = not conditions_long[f"momentum_positive_{timeframe}"]
                 
                 analysis_details[timeframe] = {
                     "trend": trend,
@@ -988,24 +996,27 @@ def main():
                     status1 = conditions_long.get(f"{cond1}_{tf}", False)
                     status2 = conditions_short.get(f"{cond2}_{tf}", False)
                     print(f"{cond1}_{tf}: {status1}, {cond2}_{tf}: {status2}")
-                if tf == "1m":
-                    print(f"momentum_positive_1m: {conditions_long.get('momentum_positive_1m', False)}, momentum_negative_1m: {conditions_short.get('momentum_negative_1m', False)}")
-                    print(f"ml_forecast_above_price: {conditions_long.get('ml_forecast_above_price', False)}")
-                    print(f"ml_forecast_below_price: {conditions_short.get('ml_forecast_below_price', False)}")
+                print(f"momentum_positive_{tf}: {conditions_long.get(f'momentum_positive_{tf}', False)}, momentum_negative_{tf}: {conditions_short.get(f'momentum_negative_{tf}', False)}")
+                print(f"ml_forecast_above_price_{tf}: {conditions_long.get(f'ml_forecast_above_price_{tf}', False)}")
+                print(f"ml_forecast_below_price_{tf}: {conditions_short.get(f'ml_forecast_below_price_{tf}', False)}")
             
             print("\nLong Conditions Status:")
-            print(f"momentum_positive_1m: {conditions_long.get('momentum_positive_1m', False)}")
-            print(f"ml_forecast_above_price: {conditions_long.get('ml_forecast_above_price', False)}")
-            print(f"dip_confirmed_1m: {conditions_long.get('dip_confirmed_1m', False)}")
-            print(f"below_middle_1m: {conditions_long.get('below_middle_1m', False)}")
-            print(f"hurst_target_above_price_1m: {conditions_long.get('hurst_target_above_price_1m', False)}")
+            for tf in TIMEFRAMES:
+                print(f"{tf}:")
+                print(f"  momentum_positive: {conditions_long.get(f'momentum_positive_{tf}', False)}")
+                print(f"  ml_forecast_above_price: {conditions_long.get(f'ml_forecast_above_price_{tf}', False)}")
+                print(f"  dip_confirmed: {conditions_long.get(f'dip_confirmed_{tf}', False)}")
+                print(f"  below_middle: {conditions_long.get(f'below_middle_{tf}', False)}")
+                print(f"  hurst_target_above_price: {conditions_long.get(f'hurst_target_above_price_{tf}', False)}")
             
             print("\nShort Conditions Status:")
-            print(f"momentum_negative_1m: {conditions_short.get('momentum_negative_1m', False)}")
-            print(f"ml_forecast_below_price: {conditions_short.get('ml_forecast_below_price', False)}")
-            print(f"top_confirmed_1m: {conditions_short.get('top_confirmed_1m', False)}")
-            print(f"above_middle_1m: {conditions_short.get('above_middle_1m', False)}")
-            print(f"hurst_target_below_price_1m: {conditions_short.get('hurst_target_below_price_1m', False)}")
+            for tf in TIMEFRAMES:
+                print(f"{tf}:")
+                print(f"  momentum_negative: {conditions_short.get(f'momentum_negative_{tf}', False)}")
+                print(f"  ml_forecast_below_price: {conditions_short.get(f'ml_forecast_below_price_{tf}', False)}")
+                print(f"  top_confirmed: {conditions_short.get(f'top_confirmed_{tf}', False)}")
+                print(f"  above_middle: {conditions_short.get(f'above_middle_{tf}', False)}")
+                print(f"  hurst_target_below_price: {conditions_short.get(f'hurst_target_below_price_{tf}', False)}")
             
             long_true_count = sum(1 for v in conditions_long.values() if v)
             short_true_count = sum(1 for v in conditions_short.values() if v)
