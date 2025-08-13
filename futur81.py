@@ -860,7 +860,7 @@ def main():
                 time.sleep(60)
                 continue
             
-            candle_map = fetch_c_candles_in_parallel(TIMEFRAMES)  # Correct function name
+            candle_map = fetch_c_candles_in_parallel(TIMEFRAMES)
             if not candle_map or not any(candle_map.values()):
                 logging.warning("No candle data available. Retrying in 60 seconds.")
                 print("No candle data available. Retrying in 60 seconds.")
@@ -930,7 +930,7 @@ def main():
                 "below_middle_1m": False,
                 "below_middle_3m": False,
                 "fft_forecast_above_price_1m": False,
-                "volume_increasing_1m": False,
+                "volume_bullish_1m": False,
             }
             
             conditions_short = {
@@ -942,7 +942,7 @@ def main():
                 "above_middle_1m": False,
                 "above_middle_3m": False,
                 "fft_forecast_below_price_1m": False,
-                "volume_decreasing_1m": False,
+                "volume_bearish_1m": False,
             }
             
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -1003,12 +1003,13 @@ def main():
                     conditions_short["top_confirmed_" + timeframe] = reversal_type == "TOP"
                     conditions_long["below_middle_" + timeframe] = current_close < middle_threshold
                     conditions_short["above_middle_" + timeframe] = current_close > middle_threshold
+                    if timeframe == "1m":
+                        conditions_long["volume_bullish_1m"] = volume_mood == "BULLISH"
+                        conditions_short["volume_bearish_1m"] = volume_mood == "BEARISH"
                 
                 if timeframe == "1m":
                     conditions_long["hurst_target_above_price_1m"] = hurst_target > current_close
                     conditions_short["hurst_target_below_price_1m"] = hurst_target < current_close
-                    conditions_long["volume_increasing_1m"] = volume_increasing
-                    conditions_short["volume_decreasing_1m"] = volume_decreasing
                 
                 trend, min_th, max_th, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target = calculate_mtf_trend(
                     candles_tf, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
@@ -1022,8 +1023,8 @@ def main():
                 
                 fft_forecast = generate_fft_forecast(candles_tf, timeframe)
                 if timeframe == "1m":
-                    conditions_long["fft_forecast_above_price_" + timeframe] = fft_forecast > current_close
-                    conditions_short["fft_forecast_below_price_" + timeframe] = fft_forecast < current_close
+                    conditions_long["fft_forecast_above_price_1m"] = fft_forecast > current_close
+                    conditions_short["fft_forecast_below_price_1m"] = fft_forecast < current_close
                 
                 if len(closes) >= 14 and timeframe == "1m":
                     momentum = talib.MOM(closes, timeperiod=14)
@@ -1092,7 +1093,7 @@ def main():
                 ("below_middle_3m", "above_middle_3m"),
                 ("fft_forecast_above_price_1m", "fft_forecast_below_price_1m"),
                 ("hurst_target_above_price_1m", "hurst_target_below_price_1m"),
-                ("volume_increasing_1m", "volume_decreasing_1m")
+                ("volume_bullish_1m", "volume_bearish_1m"),
             ]:
                 cond1, cond2 = cond_pair
                 status1 = conditions_long.get(cond1, False)
