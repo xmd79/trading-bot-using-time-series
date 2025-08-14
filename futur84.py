@@ -359,17 +359,28 @@ def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, 
     weights = weights / np.sum(weights) if np.sum(weights) > 0 else np.ones_like(weights) / len(weights)
     dominant_freq = np.sum(np.array(all_freqs) * weights)
     
-    spectral_power = power[np.argmin(np.abs(freqs - dominant_freq))] if dominant_freq in freqs else 0.0
+    # Find the index of the frequency closest to the dominant_freq
+    idx = np.argmin(np.abs(freqs - dominant_freq))
+    spectral_power = power[idx]
+    
+    # Calculate total power (excluding DC component)
+    total_power = np.sum(power[indices])
     
     # Calculate intensity (normalized power)
-    total_power = np.sum(power)
-    intensity = spectral_power / total_power if total_power > 0 else 0.0
+    if total_power > 0:
+        # Normalized power (0-1 scale)
+        intensity = spectral_power / total_power
+        
+        # Alternative: Logarithmic intensity (dB scale)
+        # intensity_db = 10 * np.log10(spectral_power / total_power) if spectral_power > 0 else -np.inf
+        # intensity = (intensity_db + 60) / 60  # Normalize to 0-1 (assuming -60dB to 0dB range)
+    else:
+        intensity = 0.0
     
     # Calculate frequency range
     freq_range = np.max(freqs[indices]) - np.min(freqs[indices]) if len(indices) > 0 else 0.0
     
     # Calculate degree (phase of the predominant frequency)
-    idx = np.argmin(np.abs(freqs - dominant_freq))
     phase = np.angle(fft_result[idx])
     degree = (phase + np.pi) / (2 * np.pi)  # maps from [-pi, pi] to [0, 1]
     
@@ -1168,7 +1179,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 )
                 
                 tp_price = (price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
-                sl_price = (price * (Decimal('1') + STOP_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
+                sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
                 
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "SHORT", "quantity": -quantity, "entry_price": price})
                 
@@ -1394,8 +1405,8 @@ def main():
                 "volume_mood_bullish_5m": False,
                 "volume_increasing_1m": False,
                 "negative_dominant_freq_1m": False,
-                "ht_sine_cycle_up_1m": False,  # New condition for HT_SINE cycle type
-                "momentum_increasing_1m": False,  # New condition for momentum trend
+                "ht_sine_cycle_up_1m": False,
+                "momentum_increasing_1m": False,
             }
             
             conditions_short = {
@@ -1416,8 +1427,8 @@ def main():
                 "volume_mood_bearish_5m": False,
                 "volume_decreasing_1m": False,
                 "positive_dominant_freq_1m": False,
-                "ht_sine_cycle_down_1m": False,  # New condition for HT_SINE cycle type
-                "momentum_decreasing_1m": False,  # New condition for momentum trend
+                "ht_sine_cycle_down_1m": False,
+                "momentum_decreasing_1m": False,
             }
             
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -1627,8 +1638,8 @@ def main():
                 ("volume_mood_bullish_5m", "volume_mood_bearish_5m"),
                 ("volume_increasing_1m", "volume_decreasing_1m"),
                 ("negative_dominant_freq_1m", "positive_dominant_freq_1m"),
-                ("ht_sine_cycle_up_1m", "ht_sine_cycle_down_1m"),  # New condition pair
-                ("momentum_increasing_1m", "momentum_decreasing_1m")  # New condition pair
+                ("ht_sine_cycle_up_1m", "ht_sine_cycle_down_1m"),
+                ("momentum_increasing_1m", "momentum_decreasing_1m")
             ]:
                 cond1, cond2 = cond_pair
                 status1 = conditions_long.get(cond1, False)
