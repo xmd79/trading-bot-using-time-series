@@ -1365,6 +1365,8 @@ def main():
                 "below_middle_5m": False,
                 "fft_forecast_above_price_1m": False,
                 "negative_dominant_freq_1m": False,
+                "momentum_increasing_1m": False,
+                "volume_1min_bullish": False,  # New condition
             }
             
             conditions_short = {
@@ -1378,6 +1380,8 @@ def main():
                 "above_middle_5m": False,
                 "fft_forecast_below_price_1m": False,
                 "positive_dominant_freq_1m": False,
+                "momentum_decreasing_1m": False,
+                "volume_1min_bearish": False,  # New condition
             }
             
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -1445,6 +1449,11 @@ def main():
                 conditions_long["below_middle_" + timeframe] = current_close < middle_threshold
                 conditions_short["above_middle_" + timeframe] = current_close > middle_threshold
                 
+                # Add new volume conditions for 1m timeframe
+                if timeframe == "1m":
+                    conditions_long["volume_1min_bullish"] = buy_vol > sell_vol
+                    conditions_short["volume_1min_bearish"] = sell_vol > buy_vol
+                
                 trend, min_th, max_th, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target, ht_sine, ht_sine_cycle_type = calculate_mtf_trend(
                     candles_tf, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
                 )
@@ -1458,6 +1467,11 @@ def main():
                 momentum_values, momentum_increasing, momentum_decreasing = calculate_momentum_trend(
                     candles_tf, timeframe, period=MOMENTUM_PERIOD, lookback=MOMENTUM_LOOKBACK
                 )
+                
+                # Add conditions for momentum trend for 1m timeframe
+                if timeframe == "1m":
+                    conditions_long["momentum_increasing_1m"] = momentum_increasing
+                    conditions_short["momentum_decreasing_1m"] = momentum_decreasing
                 
                 ml_forecast = generate_ml_forecast(candles_tf, timeframe)
                 
@@ -1544,6 +1558,14 @@ def main():
                 if timeframe == "1m":
                     print(f"Negative Dominant Frequency (Long Condition): {conditions_long['negative_dominant_freq_1m']}")
                     print(f"Positive Dominant Frequency (Short Condition): {conditions_short['positive_dominant_freq_1m']}")
+                    print(f"Momentum Increasing (Long Condition): {conditions_long['momentum_increasing_1m']}")
+                    print(f"Momentum Decreasing (Short Condition): {conditions_short['momentum_decreasing_1m']}")
+                    print(f"Volume 1min Bullish (Long Condition): {conditions_long['volume_1min_bullish']}")
+                    print(f"Volume 1min Bearish (Short Condition): {conditions_short['volume_1min_bearish']}")
+            
+            # Ensure symmetrical conditions for all pairs
+            # For momentum_increasing/momentum_decreasing
+            conditions_short["momentum_decreasing_1m"] = not conditions_long["momentum_increasing_1m"]
             
             print("\nCondition Pairs Status:")
             for cond_pair in [
@@ -1555,6 +1577,8 @@ def main():
                 ("below_middle_5m", "above_middle_5m"),
                 ("fft_forecast_above_price_1m", "fft_forecast_below_price_1m"),
                 ("negative_dominant_freq_1m", "positive_dominant_freq_1m"),
+                ("momentum_increasing_1m", "momentum_decreasing_1m"),
+                ("volume_1min_bullish", "volume_1min_bearish")  # New condition pair
             ]:
                 cond1, cond2 = cond_pair
                 status1 = conditions_long.get(cond1, False)
