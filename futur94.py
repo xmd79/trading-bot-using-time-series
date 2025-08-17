@@ -16,14 +16,17 @@ from scipy.signal import hilbert
 import talib
 import sys
 import scipy.signal as signal
+
 # Configure logging
 logging.basicConfig(
     filename='trading_bot.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
 # Set Decimal precision
 getcontext().prec = 25
+
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"
 LEVERAGE = 25
@@ -48,8 +51,10 @@ ATR_MULTIPLIER_TP = Decimal('1.5')  # ATR multiplier for take-profit
 ATR_THRESHOLD = Decimal('0.01')  # Minimum ATR percentage for trade signals
 MOMENTUM_PERIOD = 14  # Period for momentum calculation
 MOMENTUM_LOOKBACK = 3  # Number of recent momentum values to check for trend
+
 # Global event loop for Telegram
 telegram_loop = asyncio.new_event_loop()
+
 # Load credentials
 try:
     with open("credentials.txt", "r") as f:
@@ -72,6 +77,7 @@ except Exception as e:
     logging.error(f"Unexpected error reading credentials.txt: {e}")
     print(f"Unexpected error reading credentials.txt: {e}")
     sys.exit(1)
+
 # Initialize Binance client
 try:
     client = BinanceClient(api_key, api_secret, requests_params={"timeout": API_TIMEOUT})
@@ -80,6 +86,7 @@ except Exception as e:
     logging.error(f"Failed to initialize Binance client: {e}")
     print(f"Failed to initialize Binance client: {e}")
     sys.exit(1)
+
 # Initialize and validate Telegram bot
 async def validate_telegram_chat_id(app, chat_id):
     try:
@@ -100,6 +107,7 @@ async def validate_telegram_chat_id(app, chat_id):
             logging.error(f"Failed to validate Telegram chat ID {chat_id}: {e}")
             print(f"Error validating Telegram chat ID {chat_id}: {e}")
         return False
+
 try:
     telegram_app = Application.builder().token(telegram_token).build()
     asyncio.set_event_loop(telegram_loop)
@@ -112,6 +120,7 @@ except Exception as e:
     logging.error(f"Failed to initialize Telegram bot: {e}")
     print(f"Failed to initialize Telegram bot: {e}")
     sys.exit(1)
+
 # Set leverage
 try:
     client.futures_change_leverage(symbol=TRADE_SYMBOL, leverage=LEVERAGE)
@@ -121,6 +130,7 @@ except BinanceAPIException as e:
     logging.error(f"Error setting leverage: {e.message}")
     print(f"Error setting leverage: {e.message}")
     sys.exit(1)
+
 async def send_telegram_message(message, retries=3, base_delay=5):
     escaped_message = (
         message.replace('_', r'\_')
@@ -175,6 +185,7 @@ async def send_telegram_message(message, retries=3, base_delay=5):
     logging.error(f"Failed to send Telegram message after {retries} attempts: {message[:100]}...")
     print(f"Failed to send Telegram message after {retries} attempts: {message[:100]}...")
     return False
+
 def clean_data(data, min_val=1e-10):
     """Replace NaN, Inf, and zero values with a small positive value"""
     if isinstance(data, list):
@@ -187,6 +198,7 @@ def clean_data(data, min_val=1e-10):
     data = np.where(np.abs(data) < min_val, min_val * np.sign(data) if data.any() != 0 else min_val, data)
     
     return data
+
 def compute_Hc(series, kind="random_walk", simplified=True):
     """
     Compute the Hurst exponent H and the constant c using the R/S method.
@@ -245,6 +257,7 @@ def compute_Hc(series, kind="random_walk", simplified=True):
     # and fit a line to log(R/S) vs log(window_size)
     # This is a simplified version that just returns the basic calculation
     return H, 0.0, [(n/2, rs)]
+
 def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, max_threshold, current_close):
     """
     Analyze the frequency spectrum to determine the current stage in the stationary circuit of energy flow.
@@ -357,10 +370,6 @@ def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, 
     if total_power > 0:
         # Normalized power (0-1 scale)
         intensity = spectral_power / total_power
-        
-        # Alternative: Logarithmic intensity (dB scale)
-        # intensity_db = 10 * np.log10(spectral_power / total_power) if spectral_power > 0 else -np.inf
-        # intensity = (intensity_db + 60) / 60  # Normalize to 0-1 (assuming -60dB to 0dB range)
     else:
         intensity = 0.0
     
@@ -422,6 +431,7 @@ def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, 
     top_frequencies = [(freqs[i], power[i]) for i in sorted_indices]
     
     return dominant_freq, spectral_power, intensity, freq_range, degree, stage, cycle_direction, top_frequencies, ht_sine, ht_sine_cycle_type
+
 def calculate_atr(candles, timeframe, period=ATR_PERIOD):
     if len(candles) < period:
         logging.warning(f"Insufficient candles ({len(candles)}) for ATR calculation in {timeframe}.")
@@ -457,6 +467,7 @@ def calculate_atr(candles, timeframe, period=ATR_PERIOD):
         logging.error(f"Error calculating ATR for {timeframe}: {e}")
         print(f"Error calculating ATR for {timeframe}: {e}")
         return Decimal('0')
+
 def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, preferred_kind='random_walk'):
     if len(series) < window_size:
         logging.warning(f"{timeframe} - Hurst cycle analysis skipped: Series length ({len(series)}) < window_size ({window_size})")
@@ -514,6 +525,7 @@ def hurst_cycle_analysis(series, timeframe, window_size=200, sampling_rate=20, p
         return [], [], []
     
     return cycles, peaks, troughs
+
 def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vol, sell_vol, lookback=50):
     if len(candles) < lookback:
         logging.warning(f"{timeframe} - MTF trend analysis skipped: Insufficient data")
@@ -585,6 +597,7 @@ def calculate_mtf_trend(candles, timeframe, min_threshold, max_threshold, buy_vo
     print(f"{timeframe} - MTF Trend: {trend}, Cycle Status: {cycle_status}, Cycle Target: {cycle_target:.25f}, Dominant Freq: {dominant_freq:.25f}, HT_SINE Cycle: {ht_sine_cycle_type}")
     
     return trend, min_threshold, max_threshold, cycle_status, trend_bullish, not trend_bullish, volume_ratio, volume_confirmed, dominant_freq, cycle_target, ht_sine, ht_sine_cycle_type
+
 def calculate_buy_sell_volume(candles, timeframe, reversal_type, trend_bullish, min_idx, max_idx):
     if not candles or len(candles) < VOLUME_LOOKBACK:
         logging.warning(f"No candles or insufficient candles ({len(candles)}) for volume analysis in {timeframe}.")
@@ -649,6 +662,7 @@ def calculate_buy_sell_volume(candles, timeframe, reversal_type, trend_bullish, 
     )
     
     return buy_vol, sell_vol, volume_mood, volume_increasing, volume_decreasing
+
 def calculate_support_resistance(candles, timeframe):
     if len(candles) < 10:
         logging.warning(f"Insufficient candles ({len(candles)}) for support/resistance in {timeframe}.")
@@ -667,6 +681,7 @@ def calculate_support_resistance(candles, timeframe):
     print(f"{timeframe} - Support: {support_levels[0]['price']:.25f}, Resistance: {resistance_levels[0]['price']:.25f}")
     
     return support_levels, resistance_levels
+
 def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, current_close, higher_tf_tops=None):
     if len(candles) < 3:
         logging.warning(f"Insufficient candles ({len(candles)}) for reversal detection in {timeframe}.")
@@ -719,6 +734,7 @@ def detect_recent_reversal(candles, timeframe, min_threshold, max_threshold, cur
     )
     
     return most_recent_reversal, min_time, min_threshold, "TOP", max_time, max_threshold, min_idx, max_idx
+
 def calculate_thresholds(candles, timeframe_ranges=None):
     if not candles:
         logging.warning("No candles provided for threshold calculation.")
@@ -750,10 +766,12 @@ def calculate_thresholds(candles, timeframe_ranges=None):
     print(f"{timeframe} - Min: {min_threshold:.25f}, Mid: {middle_threshold:.25f}, Max: {max_threshold:.25f}")
     
     return min_threshold, middle_threshold, max_threshold, price_range
+
 def calculate_percentage_distance(current_price, min_threshold, max_threshold):
     if max_threshold == min_threshold:
         return Decimal('0.0')
     return ((current_price - min_threshold) / (max_threshold - min_threshold)) * Decimal('100')
+
 def generate_ml_forecast(candles, timeframe, forecast_periods=5):
     if len(candles) < ML_LOOKBACK:
         logging.warning(f"Insufficient data ({len(candles)}) for ML forecast in {timeframe}")
@@ -794,6 +812,7 @@ def generate_ml_forecast(candles, timeframe, forecast_periods=5):
         logging.error(f"Error generating ML forecast for {timeframe}: {e}")
         print(f"Error generating ML forecast for {timeframe}: {e}")
         return Decimal('0.0')
+
 def generate_fft_forecast(candles, timeframe, forecast_periods=5):
     if len(candles) < 10:
         logging.warning(f"Insufficient data ({len(candles)}) for FFT forecast in {timeframe}")
@@ -888,6 +907,7 @@ def generate_fft_forecast(candles, timeframe, forecast_periods=5):
         logging.error(f"Error generating FFT forecast for {timeframe}: {e}")
         print(f"Error generating FFT forecast for {timeframe}: {e}")
         return Decimal('0.0')
+
 def calculate_momentum_trend(candles, timeframe, period=MOMENTUM_PERIOD, lookback=MOMENTUM_LOOKBACK):
     """
     Calculate momentum and determine if it's increasing or decreasing over the last few values.
@@ -934,6 +954,7 @@ def calculate_momentum_trend(candles, timeframe, period=MOMENTUM_PERIOD, lookbac
         logging.warning(f"Insufficient momentum values ({len(momentum)}) for trend analysis in {timeframe}")
         print(f"Insufficient momentum values ({len(momentum)}) for trend analysis in {timeframe}")
         return np.zeros(lookback), False, False
+
 def fetch_c_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=1500):
     def fetch_candles(timeframe):
         return get_candles(symbol, timeframe, limit)
@@ -952,6 +973,7 @@ def fetch_c_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=1500):
                 print(f"Error fetching candles for {tf}: {e}")
     
     return candle_map
+
 def get_candles(symbol, timeframe, limit=1500, retries=5, base_delay=5):
     for attempt in range(retries):
         try:
@@ -989,6 +1011,7 @@ def get_candles(symbol, timeframe, limit=1500, retries=5, base_delay=5):
     logging.error(f"Failed to fetch candles for {timeframe} after {retries} attempts.")
     print(f"Failed to fetch candles for {timeframe} after {retries} attempts.")
     return []
+
 def get_current_price(retries=5, base_delay=5):
     for attempt in range(retries):
         try:
@@ -1012,6 +1035,7 @@ def get_current_price(retries=5, base_delay=5):
     logging.error(f"Failed to fetch valid {TRADE_SYMBOL} price after {retries} attempts.")
     print(f"Failed to fetch valid {TRADE_SYMBOL} price after {retries} attempts.")
     return Decimal('0.0')
+
 def get_balance(asset='USDC', retries=5, base_delay=5):
     for attempt in range(retries):
         try:
@@ -1037,6 +1061,7 @@ def get_balance(asset='USDC', retries=5, base_delay=5):
     logging.error(f"Failed to fetch {asset} balance after {retries} attempts.")
     print(f"Failed to fetch {asset} balance after {retries} attempts.")
     return Decimal('0.0')
+
 def get_position(retries=5, base_delay=5):
     for attempt in range(retries):
         try:
@@ -1065,6 +1090,7 @@ def get_position(retries=5, base_delay=5):
     logging.error(f"Failed to fetch position info after {retries} attempts.")
     print(f"Failed to fetch position info after {retries} attempts.")
     return {"quantity": Decimal('0.0'), "entry_price": Decimal('0.0'), "side": "NONE", "unrealized_pnl": Decimal('0.0'), "initial_balance": Decimal('0.0'), "sl_price": Decimal('0.0'), "tp_price": Decimal('0.0')}
+
 def check_open_orders(retries=5, base_delay=5):
     for attempt in range(retries):
         try:
@@ -1083,6 +1109,7 @@ def check_open_orders(retries=5, base_delay=5):
     logging.error(f"Failed to check open orders after {retries} attempts.")
     print(f"Failed to check open orders after {retries} attempts.")
     return 0
+
 def calculate_quantity(balance, price):
     if price <= Decimal('0') or balance < MINIMUM_BALANCE:
         logging.warning(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}).")
@@ -1096,6 +1123,7 @@ def calculate_quantity(balance, price):
     print(f"Calculated quantity: {quantity:.25f} BTC for balance {balance:.25f} USDC at price {price:.25f}")
     
     return quantity
+
 def place_order(signal, quantity, price, initial_balance, analysis_details, retries=5, base_delay=5):
     if check_open_orders() > 0:
         logging.warning(f"Cannot place {signal} order: existing open orders detected.")
@@ -1220,6 +1248,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
     logging.error(f"Failed to place order after {retries} attempts.")
     print(f"Failed to place order after {retries} attempts.")
     return None
+
 def close_position(position, price, retries=5, base_delay=5):
     if position["side"] == "NONE" or position["quantity"] == Decimal('0'):
         logging.info("No position to close.")
@@ -1268,6 +1297,7 @@ def close_position(position, price, retries=5, base_delay=5):
     
     logging.error(f"Failed to close position after {retries} attempts.")
     print(f"Failed to close position after {retries} attempts.")
+
 def main():
     try:
         logging.info("Futures Analysis Bot Initialized!")
@@ -1473,10 +1503,10 @@ def main():
                 
                 ml_forecast = generate_ml_forecast(candles_tf, timeframe)
                 
+                # Set ML forecast conditions independently for 1m timeframe
                 if timeframe == "1m":
-                    # Ensure ml_forecast conditions are exact opposites
                     conditions_long["ml_forecast_above_price_1m"] = ml_forecast > current_close
-                    conditions_short["ml_forecast_below_price_1m"] = not conditions_long["ml_forecast_above_price_1m"]
+                    conditions_short["ml_forecast_below_price_1m"] = ml_forecast < current_close
                 
                 fft_forecast = generate_fft_forecast(candles_tf, timeframe)
                 
@@ -1491,11 +1521,13 @@ def main():
                     conditions_long["fft_above_current_5m"] = fft_forecast > current_close
                     conditions_short["fft_below_current_5m"] = fft_forecast < current_close
                 
+                # Set momentum conditions independently for 1m timeframe
                 if len(closes) >= MOMENTUM_PERIOD and timeframe == "1m":
                     momentum = talib.MOM(closes, timeperiod=MOMENTUM_PERIOD)
                     if len(momentum) > 0 and not np.isnan(momentum[-1]):
-                        conditions_long["momentum_positive_1m"] = Decimal(str(momentum[-1])) >= Decimal('0')
-                        conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
+                        momentum_value = Decimal(str(momentum[-1]))
+                        conditions_long["momentum_positive_1m"] = momentum_value > Decimal('0')
+                        conditions_short["momentum_negative_1m"] = momentum_value < Decimal('0')
                 
                 analysis_details[timeframe] = {
                     "trend": trend,
@@ -1564,10 +1596,6 @@ def main():
                 # Print FFT conditions for each timeframe
                 print(f"FFT Above Current ({timeframe}): {conditions_long.get(f'fft_above_current_{timeframe}', False)}")
                 print(f"FFT Below Current ({timeframe}): {conditions_short.get(f'fft_below_current_{timeframe}', False)}")
-            
-            # Ensure symmetrical conditions for all pairs
-            # For momentum_increasing/momentum_decreasing
-            conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
             
             print("\nCondition Pairs Status:")
             for cond_pair in [
@@ -1679,5 +1707,6 @@ def main():
         except Exception as e:
             logging.error(f"Error during Telegram cleanup: {e}")
             print(f"Error during Telegram cleanup: {e}")
+
 if __name__ == "__main__":
     main()
