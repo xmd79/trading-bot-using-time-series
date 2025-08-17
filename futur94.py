@@ -955,6 +955,20 @@ def calculate_momentum_trend(candles, timeframe, period=MOMENTUM_PERIOD, lookbac
         print(f"Insufficient momentum values ({len(momentum)}) for trend analysis in {timeframe}")
         return np.zeros(lookback), False, False
 
+def calculate_fft_target(cycle_direction, current_close, min_threshold, max_threshold):
+    """Calculate FFT target based on cycle direction and thresholds"""
+    price_range = max_threshold - min_threshold
+    tolerance = price_range * SUPPORT_RESISTANCE_TOLERANCE
+    
+    if cycle_direction == "Up":
+        fft_target = current_close * (Decimal('1') + CYCLE_TARGET_PERCENTAGE)
+        fft_target = min(fft_target, max_threshold - tolerance)
+    else:
+        fft_target = current_close * (Decimal('1') - CYCLE_TARGET_PERCENTAGE)
+        fft_target = max(fft_target, min_threshold + tolerance)
+    
+    return fft_target
+
 def fetch_c_candles_in_parallel(timeframes, symbol=TRADE_SYMBOL, limit=1500):
     def fetch_candles(timeframe):
         return get_candles(symbol, timeframe, limit)
@@ -1193,8 +1207,10 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 dist_to_max = details.get('max_threshold', Decimal('0')) - price
                 cycle_target = details.get('cycle_target', Decimal('0'))
                 hurst_target = details.get('hurst_target', Decimal('0'))
+                fft_target = details.get('fft_target', Decimal('0'))
                 cycle_target = cycle_target if isinstance(cycle_target, Decimal) else Decimal('0')
                 hurst_target = hurst_target if isinstance(hurst_target, Decimal) else Decimal('0')
+                fft_target = fft_target if isinstance(fft_target, Decimal) else Decimal('0')
                 
                 message += (
                     f"\n{tf} Timeframe\n"
@@ -1205,6 +1221,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     f"Hurst Exponent: {details.get('hurst_exponent', 0.0):.25f}\n"
                     f"Hurst Cycle Type: {details.get('hurst_cycle_type', 'N/A')}\n"
                     f"Hurst Target Price: {hurst_target:.25f} USDC\n"
+                    f"FFT Target: {fft_target:.25f} USDC\n"
                     f"ML Forecast: {details.get('ml_forecast', Decimal('0')):.25f} USDC\n"
                     f"FFT Forecast: {details.get('fft_forecast', Decimal('0')):.25f} USDC\n"
                     f"HT_SINE Cycle Type: {details.get('ht_sine_cycle_type', 'N/A')}\n"
@@ -1387,9 +1404,7 @@ def main():
                 "ml_forecast_above_price_1m": False,
                 "negative_dominant_freq_1m": False,
                 "volume_bullish_1m": False,
-                "fft_above_current_1m": False,
-                "fft_above_current_3m": False,
-                "fft_above_current_5m": False,
+                "hurst_target_above_current": False,
             }
             
             conditions_short = {
@@ -1397,9 +1412,7 @@ def main():
                 "ml_forecast_below_price_1m": False,
                 "positive_dominant_freq_1m": False,
                 "volume_bearish_1m": False,
-                "fft_below_current_1m": False,
-                "fft_below_current_3m": False,
-                "fft_below_current_5m": False,
+                "hurst_target_below_current": False,
             }
             
             # Define required conditions (must all be true for signal)
@@ -1408,9 +1421,7 @@ def main():
                 "ml_forecast_above_price_1m",
                 "negative_dominant_freq_1m",
                 "volume_bullish_1m",
-                "fft_above_current_1m",
-                "fft_above_current_3m",
-                "fft_above_current_5m",
+                "hurst_target_above_current"
             ]
             
             required_short_conditions = [
@@ -1418,9 +1429,7 @@ def main():
                 "ml_forecast_below_price_1m",
                 "positive_dominant_freq_1m",
                 "volume_bearish_1m",
-                "fft_below_current_1m",
-                "fft_below_current_3m",
-                "fft_below_current_5m",
+                "hurst_target_below_current"
             ]
             
             timeframe_ranges = {tf: calculate_thresholds(candle_map.get(tf, []))[3] if candle_map.get(tf) else Decimal('0') for tf in TIMEFRAMES}
@@ -1491,6 +1500,9 @@ def main():
                     candles_tf, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
                 )
                 
+                # Calculate FFT target based on spectral analysis
+                fft_target = calculate_fft_target(cycle_status, current_close, min_threshold, max_threshold)
+                
                 # Add new conditions for 1m timeframe based on predominant frequency
                 if timeframe == "1m":
                     conditions_long["negative_dominant_freq_1m"] = dominant_freq < 0
@@ -1503,31 +1515,23 @@ def main():
                 
                 ml_forecast = generate_ml_forecast(candles_tf, timeframe)
                 
-                # Set ML forecast conditions independently for 1m timeframe
                 if timeframe == "1m":
+                    # Ensure ml_forecast conditions are exact opposites
                     conditions_long["ml_forecast_above_price_1m"] = ml_forecast > current_close
-                    conditions_short["ml_forecast_below_price_1m"] = ml_forecast < current_close
+                    conditions_short["ml_forecast_below_price_1m"] = not conditions_long["ml_forecast_above_price_1m"]
                 
                 fft_forecast = generate_fft_forecast(candles_tf, timeframe)
                 
-                # Set FFT conditions for each timeframe
+                # For 1m timeframe, use Hurst target instead of advanced FFT
                 if timeframe == "1m":
-                    conditions_long["fft_above_current_1m"] = fft_forecast > current_close
-                    conditions_short["fft_below_current_1m"] = fft_forecast < current_close
-                elif timeframe == "3m":
-                    conditions_long["fft_above_current_3m"] = fft_forecast > current_close
-                    conditions_short["fft_below_current_3m"] = fft_forecast < current_close
-                elif timeframe == "5m":
-                    conditions_long["fft_above_current_5m"] = fft_forecast > current_close
-                    conditions_short["fft_below_current_5m"] = fft_forecast < current_close
+                    conditions_long["hurst_target_above_current"] = hurst_target > current_close
+                    conditions_short["hurst_target_below_current"] = hurst_target < current_close
                 
-                # Set momentum conditions independently for 1m timeframe
                 if len(closes) >= MOMENTUM_PERIOD and timeframe == "1m":
                     momentum = talib.MOM(closes, timeperiod=MOMENTUM_PERIOD)
                     if len(momentum) > 0 and not np.isnan(momentum[-1]):
-                        momentum_value = Decimal(str(momentum[-1]))
-                        conditions_long["momentum_positive_1m"] = momentum_value > Decimal('0')
-                        conditions_short["momentum_negative_1m"] = momentum_value < Decimal('0')
+                        conditions_long["momentum_positive_1m"] = Decimal(str(momentum[-1])) >= Decimal('0')
+                        conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
                 
                 analysis_details[timeframe] = {
                     "trend": trend,
@@ -1539,6 +1543,7 @@ def main():
                     "hurst_target": hurst_target,
                     "ml_forecast": ml_forecast,
                     "fft_forecast": fft_forecast,
+                    "fft_target": fft_target,
                     "ht_sine": ht_sine,
                     "ht_sine_cycle_type": ht_sine_cycle_type,
                     "momentum_values": momentum_values,
@@ -1575,6 +1580,7 @@ def main():
                 print(f"Hurst Target Price: {hurst_target:.25f}")
                 print(f"ML Forecast: {ml_forecast:.25f}")
                 print(f"FFT Forecast: {fft_forecast:.25f}")
+                print(f"FFT Target: {fft_target:.25f}")
                 print(f"HT_SINE Cycle Type: {ht_sine_cycle_type}")
                 print(f"Price Position: {analysis_details[timeframe]['perc_distance']:.25f}% between min/max")
                 print(f"Dist to Min: {analysis_details[timeframe]['dist_to_min']:.25f} USDC ({analysis_details[timeframe]['perc_distance']:.25f}% of range)")
@@ -1592,18 +1598,18 @@ def main():
                 if timeframe == "1m":
                     print(f"Volume Bullish (1m): {conditions_long['volume_bullish_1m']}")
                     print(f"Volume Bearish (1m): {conditions_short['volume_bearish_1m']}")
-                
-                # Print FFT conditions for each timeframe
-                print(f"FFT Above Current ({timeframe}): {conditions_long.get(f'fft_above_current_{timeframe}', False)}")
-                print(f"FFT Below Current ({timeframe}): {conditions_short.get(f'fft_below_current_{timeframe}', False)}")
+                    print(f"Hurst Target Above Current: {conditions_long['hurst_target_above_current']}")
+                    print(f"Hurst Target Below Current: {conditions_short['hurst_target_below_current']}")
+            
+            # Ensure symmetrical conditions for all pairs
+            # For momentum_increasing/momentum_decreasing
+            conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
             
             print("\nCondition Pairs Status:")
             for cond_pair in [
                 ("negative_dominant_freq_1m", "positive_dominant_freq_1m"),
                 ("volume_bullish_1m", "volume_bearish_1m"),
-                ("fft_above_current_1m", "fft_below_current_1m"),
-                ("fft_above_current_3m", "fft_below_current_3m"),
-                ("fft_above_current_5m", "fft_below_current_5m"),
+                ("hurst_target_above_current", "hurst_target_below_current")
             ]:
                 cond1, cond2 = cond_pair
                 status1 = conditions_long.get(cond1, False)
