@@ -132,29 +132,6 @@ except BinanceAPIException as e:
     sys.exit(1)
 
 async def send_telegram_message(message, retries=3, base_delay=5):
-    # Function to split long messages into chunks
-    def split_message(msg, max_length=4000):
-        if len(msg) <= max_length:
-            return [msg]
-        
-        chunks = []
-        current_chunk = ""
-        
-        # Split by lines to avoid breaking in the middle of a line
-        lines = msg.split('\n')
-        for line in lines:
-            if len(current_chunk) + len(line) + 1 <= max_length:
-                current_chunk += line + '\n'
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk)
-                current_chunk = line + '\n'
-        
-        if current_chunk:
-            chunks.append(current_chunk)
-        
-        return chunks
-    
     escaped_message = (
         message.replace('_', r'\_')
                .replace('*', r'\*')
@@ -176,43 +153,38 @@ async def send_telegram_message(message, retries=3, base_delay=5):
                .replace('!', r'\!')
     )
     
-    # Split the message into chunks if it's too long
-    message_chunks = split_message(escaped_message)
-    
-    for chunk in message_chunks:
-        for attempt in range(retries):
-            try:
-                await telegram_app.bot.send_message(chat_id=telegram_chat_id, text=chunk, parse_mode='MarkdownV2')
-                logging.info(f"Telegram message sent successfully: {chunk[:100]}...")
-                print(f"Telegram message sent successfully: {chunk[:100]}...")
-                break
-            except Exception as e:
-                if "Can't parse entities" in str(e):
-                    try:
-                        await telegram_app.bot.send_message(chat_id=telegram_chat_id, text=chunk, parse_mode=None)
-                        logging.info(f"Telegram message sent successfully (plain text fallback): {chunk[:100]}...")
-                        print(f"Telegram message sent successfully (plain text fallback): {chunk[:100]}...")
-                        break
-                    except Exception as fallback_e:
-                        error_msg = f"Failed to send Telegram message (plain text fallback, attempt {attempt + 1}/{retries}): {str(fallback_e)}\n{traceback.format_exc()}"
-                        logging.error(error_msg)
-                        print(error_msg)
-                else:
-                    error_msg = f"Failed to send Telegram message (attempt {attempt + 1}/{retries}): {str(e)}\n{traceback.format_exc()}"
+    for attempt in range(retries):
+        try:
+            await telegram_app.bot.send_message(chat_id=telegram_chat_id, text=escaped_message, parse_mode='MarkdownV2')
+            logging.info(f"Telegram message sent successfully: {message[:100]}...")
+            print(f"Telegram message sent successfully: {message[:100]}...")
+            return True
+        except Exception as e:
+            if "Can't parse entities" in str(e):
+                try:
+                    await telegram_app.bot.send_message(chat_id=telegram_chat_id, text=message, parse_mode=None)
+                    logging.info(f"Telegram message sent successfully (plain text fallback): {message[:100]}...")
+                    print(f"Telegram message sent successfully (plain text fallback): {message[:100]}...")
+                    return True
+                except Exception as fallback_e:
+                    error_msg = f"Failed to send Telegram message (plain text fallback, attempt {attempt + 1}/{retries}): {str(fallback_e)}\n{traceback.format_exc()}"
                     logging.error(error_msg)
                     print(error_msg)
-                if "Forbidden" in str(e):
-                    logging.error(f"Cannot send Telegram message: Invalid chat ID: {telegram_chat_id}")
-                    print(f"Error: Cannot send Telegram message. Invalid chat ID: {telegram_chat_id}")
-                    return False
-                delay = base_delay * (2 ** attempt)
-                if attempt < retries - 1:
-                    await asyncio.sleep(delay)
-        else:
-            logging.error(f"Failed to send Telegram message after {retries} attempts: {chunk[:100]}...")
-            print(f"Failed to send Telegram message after {retries} attempts: {chunk[:100]}...")
+            else:
+                error_msg = f"Failed to send Telegram message (attempt {attempt + 1}/{retries}): {str(e)}\n{traceback.format_exc()}"
+                logging.error(error_msg)
+                print(error_msg)
+            if "Forbidden" in str(e):
+                logging.error(f"Cannot send Telegram message: Invalid chat ID: {telegram_chat_id}")
+                print(f"Error: Cannot send Telegram message. Invalid chat ID: {telegram_chat_id}")
+                return False
+            delay = base_delay * (2 ** attempt)
+            if attempt < retries - 1:
+                await asyncio.sleep(delay)
     
-    return True
+    logging.error(f"Failed to send Telegram message after {retries} attempts: {message[:100]}...")
+    print(f"Failed to send Telegram message after {retries} attempts: {message[:100]}...")
+    return False
 
 def clean_data(data, min_val=1e-10):
     """Replace NaN, Inf, and zero values with a small positive value"""
@@ -1370,7 +1342,6 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     f"\nAnalysis Details\n"
                 )
             
-            # Add detailed analysis for all timeframes
             for tf in TIMEFRAMES:
                 details = analysis_details.get(tf, {})
                 perc_dist = calculate_percentage_distance(price, details.get('min_threshold', Decimal('0')), details.get('max_threshold', Decimal('0')))
@@ -1382,10 +1353,10 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 hurst_target = hurst_target if isinstance(hurst_target, Decimal) else Decimal('0')
                 
                 message += (
-                    f"\n{tf} Timeframe Analysis\n"
-                    f"------------------------\n"
+                    f"\n{tf} Timeframe\n"
                     f"MTF Trend: {details.get('trend', 'N/A')}\n"
                     f"Cycle Status: {details.get('cycle_status', 'N/A')}\n"
+                    f"Dominant Frequency: {details.get('dominant_freq', 0.0):.25f}\n"
                     f"Cycle Target: {cycle_target:.25f} USDC\n"
                     f"Hurst Exponent: {details.get('hurst_exponent', 0.0):.25f}\n"
                     f"Hurst Cycle Type: {details.get('hurst_cycle_type', 'N/A')}\n"
@@ -1411,12 +1382,6 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
                     f"Volume Bullish (1m): {details.get('volume_bullish', False)}\n"
                     f"Volume Bearish (1m): {details.get('volume_bearish', False)}\n"
-                    f"Momentum Trend: Increasing={details.get('momentum_increasing', False)}, Decreasing={details.get('momentum_decreasing', False)}\n"
-                    f"FFT Cycle Stage: {details.get('fft_cycle_stage', 'N/A')}\n"
-                    f"FFT Cycle Direction: {details.get('fft_cycle_direction', 'N/A')}\n"
-                    f"FFT Dominant Freq: {details.get('fft_dominant_freq', 0.0):.25f}\n"
-                    f"FFT Phase Angle: {details.get('fft_phase_angle', 0.0):.2f}°\n"
-                    f"FFT Harmonic Strength: {details.get('fft_harmonic_strength', 0.0):.25f}\n"
                 )
             
             telegram_loop.run_until_complete(send_telegram_message(message))
