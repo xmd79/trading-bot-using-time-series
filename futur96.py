@@ -9,13 +9,15 @@ import traceback
 from telegram.ext import Application
 from binance.client import Client as BinanceClient
 from binance.exceptions import BinanceAPIException
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import MinMaxScaler, PolynomialFeatures
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.metrics import mean_squared_error
 from scipy.fft import fft, fftfreq
 from scipy.signal import hilbert
 import talib
 import sys
 import scipy.signal as signal
+import pandas as pd
 
 # Configure logging
 logging.basicConfig(
@@ -43,7 +45,7 @@ API_TIMEOUT = 60  # Timeout for Binance API requests
 TIMEFRAME_INTERVALS = {"1m": 60, "3m": 180, "5m": 300}  # Timeframe intervals in seconds
 TOLERANCE_FACTORS = {"1m": Decimal('0.10'), "3m": Decimal('0.08'), "5m": Decimal('0.06')}  # Dynamic tolerance factors
 VOLUME_LOOKBACK = 5  # Lookback for volume trend analysis at reversal
-ML_LOOKBACK = 100  # Lookback period for ML forecasting
+ML_LOOKBACK = 200  # Lookback period for ML forecasting
 CYCLE_TARGET_PERCENTAGE = Decimal('0.02')  # 2% target for cycle completion
 ATR_PERIOD = 14  # Period for ATR calculation
 ATR_MULTIPLIER_SL = Decimal('1.5')  # ATR multiplier for stop-loss
@@ -773,39 +775,167 @@ def calculate_percentage_distance(current_price, min_threshold, max_threshold):
     return ((current_price - min_threshold) / (max_threshold - min_threshold)) * Decimal('100')
 
 def generate_ml_forecast(candles, timeframe, forecast_periods=5):
+    """
+    Advanced ML forecast using Random Forest and Random Walk concepts for cycle prediction.
+    
+    Parameters:
+    - candles: List of candle data
+    - timeframe: Timeframe string (e.g., "1m", "5m")
+    - forecast_periods: Number of periods to forecast (default: 5)
+    
+    Returns:
+    - forecast_price: Predicted price after forecast_periods
+    """
     if len(candles) < ML_LOOKBACK:
         logging.warning(f"Insufficient data ({len(candles)}) for ML forecast in {timeframe}")
         print(f"Insufficient data ({len(candles)}) for ML forecast in {timeframe}")
         return Decimal('0.0')
     
     try:
+        # Extract data
         closes = np.array([float(c['close']) for c in candles[-ML_LOOKBACK:]], dtype=np.float64)
-        if len(closes) < 10 or np.any(np.isnan(closes)) or np.any(closes <= 0):
-            logging.warning(f"Invalid closes ({len(closes)}) for ML forecast in {timeframe}")
-            print(f"Invalid closes ({len(closes)}) for ML forecast in {timeframe}")
-            return Decimal('0.0')
+        highs = np.array([float(c['high']) for c in candles[-ML_LOOKBACK:]], dtype=np.float64)
+        lows = np.array([float(c['low']) for c in candles[-ML_LOOKBACK:]], dtype=np.float64)
+        volumes = np.array([float(c['volume']) for c in candles[-ML_LOOKBACK:]], dtype=np.float64)
         
         # Clean the data
         closes = clean_data(closes)
+        highs = clean_data(highs)
+        lows = clean_data(lows)
+        volumes = clean_data(volumes)
         
-        scaler = MinMaxScaler()
-        closes_scaled = scaler.fit_transform(closes.reshape(-1, 1))
+        # Create DataFrame for easier feature engineering
+        df = pd.DataFrame({
+            'close': closes,
+            'high': highs,
+            'low': lows,
+            'volume': volumes
+        })
         
-        poly = PolynomialFeatures(degree=2)
-        X = poly.fit_transform(np.arange(len(closes_scaled)).reshape(-1, 1))
-        y = closes_scaled.ravel()
+        # Calculate returns
+        df['returns'] = df['close'].pct_change()
         
-        model = LinearRegression()
-        model.fit(X, y)
+        # Calculate log returns
+        df['log_returns'] = np.log(df['close'] / df['close'].shift(1))
         
-        future_X = poly.transform(np.arange(len(closes_scaled), len(closes_scaled) + forecast_periods).reshape(-1, 1))
-        future_y = model.predict(future_X)
+        # Calculate lagged returns
+        for lag in range(1, 6):
+            df[f'lagged_return_{lag}'] = df['returns'].shift(lag)
         
-        forecast_prices = scaler.inverse_transform(future_y.reshape(-1, 1))
-        forecast_price = Decimal(str(forecast_prices[-1][0]))
+        # Calculate rolling statistics
+        for window in [5, 10, 20]:
+            df[f'rolling_mean_{window}'] = df['close'].rolling(window=window).mean()
+            df[f'rolling_std_{window}'] = df['close'].rolling(window=window).std()
+            df[f'rolling_min_{window}'] = df['close'].rolling(window=window).min()
+            df[f'rolling_max_{window}'] = df['close'].rolling(window=window).max()
         
-        logging.info(f"{timeframe} - ML Forecast (Polynomial Regression): {forecast_price:.25f}")
-        print(f"{timeframe} - ML Forecast (Polynomial Regression): {forecast_price:.25f}")
+        # Calculate technical indicators
+        df['rsi'] = talib.RSI(df['close'], timeperiod=14)
+        df['macd'], df['macdsignal'], df['macdhist'] = talib.MACD(df['close'], fastperiod=12, slowperiod=26, signalperiod=9)
+        df['adx'] = talib.ADX(df['high'], df['low'], df['close'], timeperiod=14)
+        df['cci'] = talib.CCI(df['high'], df['low'], df['close'], timeperiod=14)
+        df['willr'] = talib.WILLR(df['high'], df['low'], df['close'], timeperiod=14)
+        df['stoch_k'], df['stoch_d'] = talib.STOCH(df['high'], df['low'], df['close'], fastk_period=14, slowk_period=3, slowd_period=3)
+        
+        # Calculate Bollinger Bands
+        df['bb_upper'], df['bb_middle'], df['bb_lower'] = talib.BBANDS(df['close'], timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+        
+        # Calculate ATR
+        df['atr'] = talib.ATR(df['high'], df['low'], df['close'], timeperiod=14)
+        
+        # Calculate OBV
+        df['obv'] = talib.OBV(df['close'], df['volume'])
+        
+        # Calculate Hurst exponent
+        df['hurst'] = 0.5  # Default value
+        for i in range(20, len(df)):
+            window_data = df['close'].iloc[i-20:i].values
+            if len(window_data) > 10:
+                try:
+                    H, _, _ = compute_Hc(window_data, kind='price', simplified=True)
+                    df.at[df.index[i], 'hurst'] = H
+                except:
+                    pass
+        
+        # Calculate FFT components
+        df['fft_real'] = 0.0
+        df['fft_imag'] = 0.0
+        df['fft_power'] = 0.0
+        
+        for i in range(20, len(df)):
+            window_data = df['close'].iloc[i-20:i].values
+            if len(window_data) > 10:
+                try:
+                    fft_result = fft(window_data - np.mean(window_data))
+                    freqs = np.fft.fftfreq(len(window_data))
+                    
+                    # Get the dominant frequency (excluding DC component)
+                    power = np.abs(fft_result[1:]) ** 2
+                    if len(power) > 0:
+                        dominant_idx = np.argmax(power) + 1
+                        df.at[df.index[i], 'fft_real'] = np.real(fft_result[dominant_idx])
+                        df.at[df.index[i], 'fft_imag'] = np.imag(fft_result[dominant_idx])
+                        df.at[df.index[i], 'fft_power'] = power[dominant_idx - 1]
+                except:
+                    pass
+        
+        # Create target variable (future returns)
+        df['target'] = df['close'].shift(-forecast_periods) / df['close'] - 1
+        
+        # Drop rows with NaN values
+        df = df.dropna()
+        
+        if len(df) < 50:
+            logging.warning(f"Insufficient data after feature engineering in {timeframe}")
+            print(f"Insufficient data after feature engineering in {timeframe}")
+            return Decimal('0.0')
+        
+        # Define features and target
+        feature_columns = [col for col in df.columns if col not in ['close', 'high', 'low', 'volume', 'target']]
+        X = df[feature_columns].values
+        y = df['target'].values
+        
+        # Scale features
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        
+        # Train Random Forest model
+        model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42, n_jobs=-1)
+        model.fit(X_scaled, y)
+        
+        # Get the most recent data point for prediction
+        last_data = df.iloc[-1:][feature_columns].values
+        last_data_scaled = scaler.transform(last_data)
+        
+        # Predict future return
+        predicted_return = model.predict(last_data_scaled)[0]
+        
+        # Calculate forecast price
+        current_close = Decimal(str(df['close'].iloc[-1]))
+        forecast_price = current_close * (Decimal('1') + Decimal(str(predicted_return)))
+        
+        # Adjust forecast based on cycle direction
+        # Get current cycle direction from the last few price movements
+        recent_returns = df['returns'].iloc[-5:].values
+        if len(recent_returns) >= 3:
+            # Simple trend detection
+            if np.mean(recent_returns) > 0:
+                # Uptrend - ensure forecast is above current price
+                forecast_price = max(forecast_price, current_close * Decimal('1.001'))
+            else:
+                # Downtrend - ensure forecast is below current price
+                forecast_price = min(forecast_price, current_close * Decimal('0.999'))
+        
+        # Apply bounds based on recent price range
+        recent_min = Decimal(str(df['close'].iloc[-20:].min()))
+        recent_max = Decimal(str(df['close'].iloc[-20:].max()))
+        
+        # Don't let forecast go beyond reasonable bounds
+        forecast_price = max(forecast_price, recent_min * Decimal('0.95'))
+        forecast_price = min(forecast_price, recent_max * Decimal('1.05'))
+        
+        logging.info(f"{timeframe} - ML Forecast (Random Forest): {forecast_price:.25f}")
+        print(f"{timeframe} - ML Forecast (Random Forest): {forecast_price:.25f}")
         
         return forecast_price
     except Exception as e:
@@ -1332,7 +1462,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 )
                 
                 tp_price = (price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
-                sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
+                sl_price = (price * (Decimal('1') + STOP_LOFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
                 
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "SHORT", "quantity": -quantity, "entry_price": price})
                 
@@ -1542,14 +1672,14 @@ def main():
             conditions_long = {
                 "momentum_positive_1m": False,
                 "ml_forecast_above_price_1m": False,
-                "positive_dominant_freq_1m": False,  # Changed from negative
+                "negative_dominant_freq_1m": False,
                 "volume_bullish_1m": False,
             }
             
             conditions_short = {
                 "momentum_negative_1m": False,
                 "ml_forecast_below_price_1m": False,
-                "negative_dominant_freq_1m": False,  # Changed from positive
+                "positive_dominant_freq_1m": False,
                 "volume_bearish_1m": False,
             }
             
@@ -1557,14 +1687,14 @@ def main():
             required_long_conditions = [
                 "momentum_positive_1m",
                 "ml_forecast_above_price_1m",
-                "positive_dominant_freq_1m",  # Changed from negative
+                "negative_dominant_freq_1m",
                 "volume_bullish_1m",
             ]
             
             required_short_conditions = [
                 "momentum_negative_1m",
                 "ml_forecast_below_price_1m",
-                "negative_dominant_freq_1m",  # Changed from positive
+                "positive_dominant_freq_1m",
                 "volume_bearish_1m",
             ]
             
@@ -1638,8 +1768,8 @@ def main():
                 
                 # Add new conditions for 1m timeframe based on predominant frequency
                 if timeframe == "1m":
-                    conditions_long["positive_dominant_freq_1m"] = dominant_freq > 0  # Changed from negative
-                    conditions_short["negative_dominant_freq_1m"] = dominant_freq < 0  # Changed from positive
+                    conditions_long["negative_dominant_freq_1m"] = dominant_freq < 0
+                    conditions_short["positive_dominant_freq_1m"] = dominant_freq > 0
                 
                 # Calculate momentum trend for all timeframes
                 momentum_values, momentum_increasing, momentum_decreasing = calculate_momentum_trend(
@@ -1743,7 +1873,7 @@ def main():
             
             print("\nCondition Pairs Status:")
             for cond_pair in [
-                ("positive_dominant_freq_1m", "negative_dominant_freq_1m"),  # Changed order
+                ("negative_dominant_freq_1m", "positive_dominant_freq_1m"),
                 ("volume_bullish_1m", "volume_bearish_1m")
             ]:
                 cond1, cond2 = cond_pair
