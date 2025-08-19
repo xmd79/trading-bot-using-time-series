@@ -1328,6 +1328,9 @@ def wavelet_analysis(candles, timeframe, forecast_periods=1):
         closes = clean_data(closes)
         n = len(closes)
         
+        # Calculate mean for later conversion back to price scale
+        mean_close = np.mean(closes)
+        
         # Choose wavelet and determine decomposition levels
         wavelet = 'db4'  # Daubechies 4 wavelet
         max_level = pywt.dwt_max_level(n, pywt.Wavelet(wavelet).dec_len)
@@ -1337,8 +1340,9 @@ def wavelet_analysis(candles, timeframe, forecast_periods=1):
             logging.warning(f"Insufficient data for wavelet decomposition in {timeframe}.")
             return 0, "N/A", Decimal('0.0'), [], np.zeros(n)
         
-        # Perform wavelet decomposition
-        coeffs = pywt.wavedec(closes, wavelet, level=levels)
+        # Perform wavelet decomposition on centered data
+        centered_closes = closes - mean_close
+        coeffs = pywt.wavedec(centered_closes, wavelet, level=levels)
         
         # Calculate energy for each level
         energies = []
@@ -1382,7 +1386,14 @@ def wavelet_analysis(candles, timeframe, forecast_periods=1):
             y = reconstruction[-3:]
             coeffs_fit = np.polyfit(x, y, 1)
             next_value = np.polyval(coeffs_fit, len(reconstruction))
-            forecast_price = Decimal(str(next_value))
+            # Convert back to original price scale by adding the mean
+            forecast_price = Decimal(str(next_value + mean_close))
+            
+            # Apply bounds based on recent price range to prevent unrealistic forecasts
+            recent_min = np.min(closes[-20:])
+            recent_max = np.max(closes[-20:])
+            forecast_price = max(forecast_price, Decimal(str(recent_min * 0.95)))
+            forecast_price = min(forecast_price, Decimal(str(recent_max * 1.05)))
         else:
             forecast_price = Decimal(str(closes[-1]))
         
