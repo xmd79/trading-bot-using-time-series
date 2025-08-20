@@ -1953,19 +1953,9 @@ def main():
                         hurst_target = current_close * (Decimal('1') - CYCLE_TARGET_PERCENTAGE)
                         hurst_target = max(hurst_target, min_threshold + tolerance)
                 
-                # Add new volume conditions for 1m timeframe
-                if timeframe == "1m":
-                    conditions_long["volume_bullish_1m"] = (volume_mood == "BULLISH")
-                    conditions_short["volume_bearish_1m"] = (volume_mood == "BEARISH")
-                
                 trend, min_th, max_th, cycle_status, trend_bullish, trend_bearish, volume_ratio, volume_confirmed, dominant_freq, cycle_target, ht_sine, ht_sine_cycle_type = calculate_mtf_trend(
                     candles_tf, timeframe, min_threshold, max_threshold, buy_vol, sell_vol
                 )
-                
-                # Add new conditions for 1m timeframe based on predominant frequency
-                if timeframe == "1m":
-                    conditions_long["negative_dominant_freq_1m"] = dominant_freq < 0
-                    conditions_short["positive_dominant_freq_1m"] = dominant_freq > 0
                 
                 # Calculate momentum trend for all timeframes
                 momentum_values, momentum_increasing, momentum_decreasing = calculate_momentum_trend(
@@ -1973,11 +1963,6 @@ def main():
                 )
                 
                 ml_forecast = generate_ml_forecast(candles_tf, timeframe)
-                
-                if timeframe == "1m":
-                    # Ensure ml_forecast conditions are exact opposites
-                    conditions_long["ml_forecast_above_price_1m"] = ml_forecast > current_close
-                    conditions_short["ml_forecast_below_price_1m"] = not conditions_long["ml_forecast_above_price_1m"]
                 
                 fft_forecast = generate_fft_forecast(candles_tf, timeframe)
                 
@@ -1991,17 +1976,12 @@ def main():
                     candles_tf, timeframe
                 )
                 
-                # Add wavelet conditions for 1min timeframe
-                if timeframe == "1m":
-                    conditions_long["wavelet_forecast_above_current_1m"] = wavelet_forecast > current_close
-                    conditions_short["wavelet_forecast_below_current_1m"] = wavelet_forecast < current_close
-                
                 # Calculate DMI for 1m timeframe
                 plus_di, minus_di, adx = None, None, None
                 if timeframe == "1m":
                     plus_di, minus_di, adx = calculate_dmi(candles_tf, timeframe, period=DMI_PERIOD)
                     
-                    # Set DMI conditions
+                    # Set DMI conditions with perfect symmetry
                     if plus_di is not None and minus_di is not None and adx is not None:
                         # For LONG: +DI > -DI and ADX > ADX_THRESHOLD (strong uptrend)
                         conditions_long["dmi_bullish_1m"] = (plus_di > minus_di) and (adx > ADX_THRESHOLD)
@@ -2015,11 +1995,30 @@ def main():
                         conditions_short["dmi_bearish_1m"] = False
                         print("DMI indicators not available for 1m timeframe")
                 
-                if len(closes) >= MOMENTUM_PERIOD and timeframe == "1m":
-                    momentum = talib.MOM(closes, timeperiod=MOMENTUM_PERIOD)
-                    if len(momentum) > 0 and not np.isnan(momentum[-1]):
-                        conditions_long["momentum_positive_1m"] = Decimal(str(momentum[-1])) >= Decimal('0')
-                        conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
+                # Set conditions for 1m timeframe with perfect symmetry
+                if timeframe == "1m":
+                    # Momentum conditions
+                    if len(closes) >= MOMENTUM_PERIOD:
+                        momentum = talib.MOM(closes, timeperiod=MOMENTUM_PERIOD)
+                        if len(momentum) > 0 and not np.isnan(momentum[-1]):
+                            conditions_long["momentum_positive_1m"] = Decimal(str(momentum[-1])) >= Decimal('0')
+                            conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
+                    
+                    # ML forecast conditions
+                    conditions_long["ml_forecast_above_price_1m"] = ml_forecast > current_close
+                    conditions_short["ml_forecast_below_price_1m"] = not conditions_long["ml_forecast_above_price_1m"]
+                    
+                    # Volume conditions
+                    conditions_long["volume_bullish_1m"] = (volume_mood == "BULLISH")
+                    conditions_short["volume_bearish_1m"] = not conditions_long["volume_bullish_1m"]
+                    
+                    # Wavelet forecast conditions
+                    conditions_long["wavelet_forecast_above_current_1m"] = wavelet_forecast > current_close
+                    conditions_short["wavelet_forecast_below_current_1m"] = not conditions_long["wavelet_forecast_above_current_1m"]
+                    
+                    # Dominant frequency conditions
+                    conditions_long["negative_dominant_freq_1m"] = dominant_freq < 0
+                    conditions_short["positive_dominant_freq_1m"] = dominant_freq > 0
                 
                 analysis_details[timeframe] = {
                     "trend": trend,
@@ -2061,8 +2060,8 @@ def main():
                     "price_range": price_range,
                     "volume_increasing": volume_increasing,
                     "volume_decreasing": volume_decreasing,
-                    "volume_bullish": (volume_mood == "BULLISH") if timeframe == "1m" else None,
-                    "volume_bearish": (volume_mood == "BEARISH") if timeframe == "1m" else None,
+                    "volume_bullish": conditions_long.get("volume_bullish_1m", None) if timeframe == "1m" else None,
+                    "volume_bearish": conditions_short.get("volume_bearish_1m", None) if timeframe == "1m" else None,
                     "fft_cycle_stage": fft_cycle_stage,
                     "fft_cycle_direction": fft_cycle_direction,
                     "fft_dominant_freq": fft_dominant_freq,
@@ -2116,10 +2115,6 @@ def main():
                     print(f"DMI Bearish: {conditions_short['dmi_bearish_1m']}")
                     print(f"Wavelet Forecast Above Current (1m): {conditions_long['wavelet_forecast_above_current_1m']}")
                     print(f"Wavelet Forecast Below Current (1m): {conditions_short['wavelet_forecast_below_current_1m']}")
-            
-            # Ensure symmetrical conditions for all pairs
-            # For momentum_increasing/momentum_decreasing
-            conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
             
             print("\nCondition Pairs Status:")
             for cond_pair in [
