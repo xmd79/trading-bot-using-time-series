@@ -1786,7 +1786,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 )
                 
                 tp_price = (price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
-                sl_price = (price * (Decimal('1') + STOP_LOFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
+                sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
                 
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "SHORT", "quantity": -quantity, "entry_price": price})
                 
@@ -2027,7 +2027,6 @@ def main():
                 "volume_bullish_1m": False,
                 "dmi_bullish_1m": False,
                 "wavelet_forecast_above_current_1m": False,
-                "octagonal_up_1m": False,
                 "octagonal_trigger_1m": False,
             }
             
@@ -2038,7 +2037,6 @@ def main():
                 "volume_bearish_1m": False,
                 "dmi_bearish_1m": False,
                 "wavelet_forecast_below_current_1m": False,
-                "octagonal_down_1m": False,
                 "octagonal_trigger_1m": False,
             }
             
@@ -2050,7 +2048,6 @@ def main():
                 "volume_bullish_1m",
                 "dmi_bullish_1m",
                 "wavelet_forecast_above_current_1m",
-                "octagonal_up_1m",
                 "octagonal_trigger_1m",
             ]
             
@@ -2061,7 +2058,6 @@ def main():
                 "volume_bearish_1m",
                 "dmi_bearish_1m",
                 "wavelet_forecast_below_current_1m",
-                "octagonal_down_1m",
                 "octagonal_trigger_1m",
             ]
             
@@ -2196,16 +2192,12 @@ def main():
                     conditions_long["negative_dominant_freq_1m"] = dominant_freq < 0
                     conditions_short["positive_dominant_freq_1m"] = dominant_freq > 0
                     
-                    # Octagonal conditions
-                    conditions_long["octagonal_up_1m"] = (octagonal_direction == "Up")
-                    conditions_short["octagonal_down_1m"] = (octagonal_direction == "Down")
-                    
-                    # Octagonal trigger conditions - new conditions based on price target
-                    # For LONG: current price is below the octagonal price target
+                    # Octagonal trigger conditions - simplified to just one condition
+                    # For LONG: octagonal direction is "Up" and current price is below the octagonal price target
                     octagonal_target_distance = octagonal_price_target - current_close
                     conditions_long["octagonal_trigger_1m"] = (octagonal_direction == "Up") and (octagonal_target_distance > Decimal('0'))
                     
-                    # For SHORT: current price is above the octagonal price target
+                    # For SHORT: octagonal direction is "Down" and current price is above the octagonal price target
                     conditions_short["octagonal_trigger_1m"] = (octagonal_direction == "Down") and (octagonal_target_distance < Decimal('0'))
                     
                     print(f"Octagonal Trigger (1m): LONG={conditions_long['octagonal_trigger_1m']}, SHORT={conditions_short['octagonal_trigger_1m']}")
@@ -2323,8 +2315,6 @@ def main():
                     print(f"DMI Bearish: {conditions_short['dmi_bearish_1m']}")
                     print(f"Wavelet Forecast Above Current (1m): {conditions_long['wavelet_forecast_above_current_1m']}")
                     print(f"Wavelet Forecast Below Current (1m): {conditions_short['wavelet_forecast_below_current_1m']}")
-                    print(f"Octagonal Up (1m): {conditions_long['octagonal_up_1m']}")
-                    print(f"Octagonal Down (1m): {conditions_short['octagonal_down_1m']}")
                     print(f"Octagonal Trigger Active (1m): {analysis_details[timeframe]['octagonal_trigger_active']}")
                     print(f"Octagonal Target Distance (1m): {analysis_details[timeframe]['octagonal_target_distance']:.25f}")
             
@@ -2334,7 +2324,6 @@ def main():
                 ("volume_bullish_1m", "volume_bearish_1m"),
                 ("dmi_bullish_1m", "dmi_bearish_1m"),
                 ("wavelet_forecast_above_current_1m", "wavelet_forecast_below_current_1m"),
-                ("octagonal_up_1m", "octagonal_down_1m"),
                 ("octagonal_trigger_1m", "octagonal_trigger_1m")
             ]:
                 cond1, cond2 = cond_pair
