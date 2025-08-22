@@ -1857,50 +1857,46 @@ def main():
             
             # Initialize conditions for 1m timeframe only (except DMI)
             conditions_long = {
-                "momentum_positive_1m": False,
+                "wavelet_forecast_above_current_1m": False,
                 "ml_forecast_above_price_1m": False,
                 "negative_dominant_freq_1m": False,
                 "volume_bullish_1m": False,
+                "momentum_positive_1m": False,
                 "dmi_bullish_1m": False,
-                "wavelet_forecast_above_current_1m": False,
-                # Add DMI conditions for 3m and 5m
                 "dmi_bullish_3m": False,
                 "dmi_bullish_5m": False,
             }
             
             conditions_short = {
-                "momentum_negative_1m": False,
+                "wavelet_forecast_below_current_1m": False,
                 "ml_forecast_below_price_1m": False,
                 "positive_dominant_freq_1m": False,
                 "volume_bearish_1m": False,
+                "momentum_negative_1m": False,
                 "dmi_bearish_1m": False,
-                "wavelet_forecast_below_current_1m": False,
-                # Add DMI conditions for 3m and 5m
                 "dmi_bearish_3m": False,
                 "dmi_bearish_5m": False,
             }
             
             # Define required conditions (must all be true for signal)
             required_long_conditions = [
-                "momentum_positive_1m",
+                "wavelet_forecast_above_current_1m",
                 "ml_forecast_above_price_1m",
                 "negative_dominant_freq_1m",
                 "volume_bullish_1m",
+                "momentum_positive_1m",
                 "dmi_bullish_1m",
-                "wavelet_forecast_above_current_1m",
-                # Add DMI conditions for 3m and 5m
                 "dmi_bullish_3m",
                 "dmi_bullish_5m",
             ]
             
             required_short_conditions = [
-                "momentum_negative_1m",
+                "wavelet_forecast_below_current_1m",
                 "ml_forecast_below_price_1m",
                 "positive_dominant_freq_1m",
                 "volume_bearish_1m",
+                "momentum_negative_1m",
                 "dmi_bearish_1m",
-                "wavelet_forecast_below_current_1m",
-                # Add DMI conditions for 3m and 5m
                 "dmi_bearish_3m",
                 "dmi_bearish_5m",
             ]
