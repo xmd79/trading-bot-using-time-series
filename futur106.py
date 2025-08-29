@@ -2062,15 +2062,15 @@ def main():
                         momentum = talib.MOM(closes, timeperiod=MOMENTUM_PERIOD)
                         if len(momentum) > 0 and not np.isnan(momentum[-1]):
                             conditions_long["momentum_positive_1m"] = Decimal(str(momentum[-1])) >= Decimal('0')
-                            conditions_short["momentum_negative_1m"] = not conditions_long["momentum_positive_1m"]
+                            conditions_short["momentum_negative_1m"] = Decimal(str(momentum[-1])) < Decimal('0')
                     
-                    # ML forecast conditions
+                    # ML forecast conditions - FIXED for perfect symmetry
                     conditions_long["ml_forecast_above_price_1m"] = ml_forecast > current_close_tf
-                    conditions_short["ml_forecast_below_price_1m"] = not conditions_long["ml_forecast_above_price_1m"]
+                    conditions_short["ml_forecast_below_price_1m"] = ml_forecast < current_close_tf
                     
-                    # Wavelet forecast conditions
+                    # Wavelet forecast conditions - FIXED for perfect symmetry
                     conditions_long["wavelet_forecast_above_current_1m"] = wavelet_forecast > current_close_tf
-                    conditions_short["wavelet_forecast_below_current_1m"] = not conditions_long["wavelet_forecast_above_current_1m"]
+                    conditions_short["wavelet_forecast_below_current_1m"] = wavelet_forecast < current_close_tf
                     
                     # Dominant frequency conditions
                     conditions_long["negative_dominant_freq_1m"] = dominant_freq < 0
