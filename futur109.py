@@ -139,6 +139,19 @@ except BinanceAPIException as e:
     sys.exit(1)
 
 async def send_telegram_message(message, retries=3, base_delay=5):
+    # First, try to send without escaping (for debugging)
+    for attempt in range(retries):
+        try:
+            await telegram_app.bot.send_message(chat_id=telegram_chat_id, text=message, parse_mode=None)
+            logging.info(f"Telegram message sent successfully (plain text): {message[:100]}...")
+            print(f"Telegram message sent successfully (plain text): {message[:100]}...")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to send Telegram message (plain text, attempt {attempt + 1}/{retries}): {str(e)}")
+            if attempt < retries - 1:
+                await asyncio.sleep(base_delay * (2 ** attempt))
+    
+    # If plain text fails, try with escaping
     escaped_message = (
         message.replace('_', r'\_')
                .replace('*', r'\*')
@@ -163,22 +176,22 @@ async def send_telegram_message(message, retries=3, base_delay=5):
     for attempt in range(retries):
         try:
             await telegram_app.bot.send_message(chat_id=telegram_chat_id, text=escaped_message, parse_mode='MarkdownV2')
-            logging.info(f"Telegram message sent successfully: {message[:100]}...")
-            print(f"Telegram message sent successfully: {message[:100]}...")
+            logging.info(f"Telegram message sent successfully (Markdown): {message[:100]}...")
+            print(f"Telegram message sent successfully (Markdown): {message[:100]}...")
             return True
         except Exception as e:
             if "Can't parse entities" in str(e):
                 try:
                     await telegram_app.bot.send_message(chat_id=telegram_chat_id, text=message, parse_mode=None)
-                    logging.info(f"Telegram message sent successfully (plain text fallback): {message[:100]}...")
-                    print(f"Telegram message sent successfully (plain text fallback): {message[:100]}...")
+                    logging.info(f"Telegram message sent successfully (fallback): {message[:100]}...")
+                    print(f"Telegram message sent successfully (fallback): {message[:100]}...")
                     return True
                 except Exception as fallback_e:
-                    error_msg = f"Failed to send Telegram message (plain text fallback, attempt {attempt + 1}/{retries}): {str(fallback_e)}\n{traceback.format_exc()}"
+                    error_msg = f"Failed to send Telegram message (fallback, attempt {attempt + 1}/{retries}): {str(fallback_e)}\n{traceback.format_exc()}"
                     logging.error(error_msg)
                     print(error_msg)
             else:
-                error_msg = f"Failed to send Telegram message (attempt {attempt + 1}/{retries}): {str(e)}\n{traceback.format_exc()}"
+                error_msg = f"Failed to send Telegram message (Markdown, attempt {attempt + 1}/{retries}): {str(e)}\n{traceback.format_exc()}"
                 logging.error(error_msg)
                 print(error_msg)
             if "Forbidden" in str(e):
@@ -1648,7 +1661,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 )
                 
                 tp_price = (price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
-                sl_price = (price * (Decimal('1') + STOP_LOFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
+                sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
                 
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "SHORT", "quantity": -quantity, "entry_price": price})
                 
@@ -2280,13 +2293,17 @@ def main():
             should_send_alert = (long_true_count >= 10 or short_true_count >= 10) and \
                                (last_alert_time == 0 or current_time - last_alert_time > alert_cooldown)
             
+            # Debug logging
+            logging.info(f"Alert check: long_true_count={long_true_count}, short_true_count={short_true_count}, should_send_alert={should_send_alert}")
+            logging.info(f"Last alert time: {last_alert_time}, Current time: {current_time}, Time diff: {current_time - last_alert_time}")
+            
             if should_send_alert:
                 # Build the telegram_analysis_message
                 telegram_analysis_message = (
-                    f"Market Analysis Update\n"
+                    f"🚨 MARKET ANALYSIS ALERT 🚨\n\n"
                     f"Time: {current_local_time_str}\n"
-                    f"Current Price: {current_price:.25f} USDC\n"
-                    f"USDC Balance: {usdc_balance:.25f}\n"
+                    f"Current Price: {current_price:.2f} USDC\n"
+                    f"USDC Balance: {usdc_balance:.2f}\n"
                     f"Position: {position['side']} ({position['quantity']:.6f} BTC)\n\n"
                     f"Signal Status: {signal}\n"
                     f"LONG Conditions: {long_true_count}/{total_required_long}\n"
@@ -2300,12 +2317,12 @@ def main():
                         f"--- {tf} Timeframe ---\n"
                         f"Trend: {details.get('trend', 'N/A')}\n"
                         f"Cycle Status: {details.get('cycle_status', 'N/A')}\n"
-                        f"Dominant Frequency: {details.get('dominant_freq', 0.0):.25f}\n"
-                        f"Cycle Target: {details.get('cycle_target', Decimal('0')):.25f} USDC\n"
-                        f"Hurst Exponent: {details.get('hurst_exponent', 0.0):.25f}\n"
-                        f"ML Forecast: {details.get('ml_forecast', Decimal('0')):.25f} USDC\n"
-                        f"FFT Forecast: {details.get('fft_forecast', Decimal('0')):.25f} USDC\n"
-                        f"Wavelet Forecast: {details.get('wavelet_forecast', Decimal('0')):.25f} USDC\n"
+                        f"Dominant Frequency: {details.get('dominant_freq', 0.0):.4f}\n"
+                        f"Cycle Target: {details.get('cycle_target', Decimal('0')):.2f} USDC\n"
+                        f"Hurst Exponent: {details.get('hurst_exponent', 0.0):.4f}\n"
+                        f"ML Forecast: {details.get('ml_forecast', Decimal('0')):.2f} USDC\n"
+                        f"FFT Forecast: {details.get('fft_forecast', Decimal('0')):.2f} USDC\n"
+                        f"Wavelet Forecast: {details.get('wavelet_forecast', Decimal('0')):.2f} USDC\n"
                         f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
                         f"Reversal Type: {details.get('reversal_type', 'N/A')}\n\n"
                     )
@@ -2315,8 +2332,22 @@ def main():
                     telegram_analysis_message = f"🚨 SIGNAL ALERT: {signal} 🚨\n\n{telegram_analysis_message}\n\n🚨 SIGNAL ALERT: {signal} 🚨"
                 
                 # Send the message
-                telegram_loop.run_until_complete(send_telegram_message(telegram_analysis_message))
-                last_alert_time = current_time
+                logging.info(f"Sending Telegram alert: {telegram_analysis_message[:100]}...")
+                print(f"Sending Telegram alert: {telegram_analysis_message[:100]}...")
+                
+                # Try to send the message with detailed error handling
+                try:
+                    result = telegram_loop.run_until_complete(send_telegram_message(telegram_analysis_message))
+                    if result:
+                        last_alert_time = current_time
+                        logging.info("Telegram alert sent successfully")
+                        print("Telegram alert sent successfully")
+                    else:
+                        logging.error("Failed to send Telegram alert")
+                        print("Failed to send Telegram alert")
+                except Exception as e:
+                    logging.error(f"Error sending Telegram alert: {e}")
+                    print(f"Error sending Telegram alert: {e}")
                 
                 # Print signal alert to console at the end if signal is not NO_SIGNAL
                 if signal != "NO_SIGNAL":
