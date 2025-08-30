@@ -57,7 +57,6 @@ MOMENTUM_LOOKBACK = 3  # Number of recent momentum values to check for trend
 DMI_PERIOD = 7  # Period for DMI calculation (optimized for 1min)
 ADX_THRESHOLD = 15  # Minimum ADX for trend strength (optimized for 1min)
 SIGNAL_CONDITION_THRESHOLD = 10  # Number of conditions that must be true to generate a signal
-ALERT_COOLDOWN = 3600  # 1 hour cooldown between alerts (in seconds)
 
 # Global event loop for Telegram
 telegram_loop = asyncio.new_event_loop()
@@ -1813,9 +1812,14 @@ def main():
         # Start the Telegram application
         telegram_loop.run_until_complete(telegram_app.initialize())
         
-        # Initialize alert tracking variables
-        last_alert_time = 0
-        alert_cooldown = ALERT_COOLDOWN  # 1 hour cooldown
+        # Initialize condition tracking variables
+        prev_long_condition_met = False
+        prev_short_condition_met = False
+        
+        # Initialize last alert time tracking
+        last_long_alert_time = 0
+        last_short_alert_time = 0
+        ALERT_COOLDOWN = 300  # 5 minutes cooldown between alerts for the same signal type
         
         while True:
             current_local_time = datetime.datetime.now()
@@ -2288,15 +2292,31 @@ def main():
             if signal != "NO_SIGNAL":
                 print(f"\n🚨 SIGNAL ALERT: {signal} 🚨")
             
-            # Send detailed analysis to Telegram only if 10 or more conditions are true and cooldown has passed
+            # FIXED: Check for condition state changes (for alerting)
+            current_long_condition_met = (long_true_count >= 10)
+            current_short_condition_met = (short_true_count >= 10)
+            
+            # Get current time for cooldown check
             current_time = time.time()
-            should_send_alert = (long_true_count >= 10 or short_true_count >= 10) and \
-                               (last_alert_time == 0 or current_time - last_alert_time > alert_cooldown)
             
-            # Debug logging
-            logging.info(f"Alert check: long_true_count={long_true_count}, short_true_count={short_true_count}, should_send_alert={should_send_alert}")
-            logging.info(f"Last alert time: {last_alert_time}, Current time: {current_time}, Time diff: {current_time - last_alert_time}")
+            # FIXED: Always send an alert if 10 or more conditions are met, with cooldown to prevent spam
+            long_alert_triggered = current_long_condition_met and (current_time - last_long_alert_time >= ALERT_COOLDOWN)
+            short_alert_triggered = current_short_condition_met and (current_time - last_short_alert_time >= ALERT_COOLDOWN)
             
+            # Update previous states
+            prev_long_condition_met = current_long_condition_met
+            prev_short_condition_met = current_short_condition_met
+            
+            # Determine if we should send an alert
+            should_send_alert = long_alert_triggered or short_alert_triggered
+            
+            # Update last alert times if we're sending an alert
+            if long_alert_triggered:
+                last_long_alert_time = current_time
+            if short_alert_triggered:
+                last_short_alert_time = current_time
+            
+            # Send detailed analysis to Telegram if conditions are met
             if should_send_alert:
                 # Build the telegram_analysis_message
                 telegram_analysis_message = (
@@ -2339,7 +2359,6 @@ def main():
                 try:
                     result = telegram_loop.run_until_complete(send_telegram_message(telegram_analysis_message))
                     if result:
-                        last_alert_time = current_time
                         logging.info("Telegram alert sent successfully")
                         print("Telegram alert sent successfully")
                     else:
