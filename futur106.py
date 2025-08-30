@@ -18,6 +18,7 @@ import talib
 import sys
 import scipy.signal as signal
 import pandas as pd
+import pywt  # For wavelet analysis
 
 # Configure logging
 logging.basicConfig(
