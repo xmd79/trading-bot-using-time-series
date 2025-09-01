@@ -1660,7 +1660,7 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                 )
                 
                 tp_price = (price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
-                sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
+                sl_price = (price * (Decimal('1') + STOP_LOFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
                 
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "SHORT", "quantity": -quantity, "entry_price": price})
                 
@@ -1819,7 +1819,9 @@ def main():
         # Initialize last alert time tracking
         last_long_alert_time = 0
         last_short_alert_time = 0
-        ALERT_COOLDOWN = 300  # 5 minutes cooldown between alerts for the same signal type
+        last_any_alert_time = 0
+        ALERT_COOLDOWN = 5  # 5 seconds cooldown between alerts for the same signal type
+        MIN_ANY_ALERT_COOLDOWN = 5  # 5 seconds minimum between any signal alerts
         
         while True:
             current_local_time = datetime.datetime.now()
@@ -1830,16 +1832,16 @@ def main():
             
             current_price = get_current_price()
             if current_price <= Decimal('0'):
-                logging.warning(f"Failed to fetch valid {TRADE_SYMBOL} price. Retrying in 60 seconds.")
-                print(f"Warning: Failed to fetch valid {TRADE_SYMBOL} price. Retrying in 60 seconds.")
-                time.sleep(60)
+                logging.warning(f"Failed to fetch valid {TRADE_SYMBOL} price. Retrying in 5 seconds.")
+                print(f"Warning: Failed to fetch valid {TRADE_SYMBOL} price. Retrying in 5 seconds.")
+                time.sleep(5)
                 continue
             
             candle_map = fetch_c_candles_in_parallel(TIMEFRAMES)
             if not candle_map or not any(candle_map.values()):
-                logging.warning("No candle data available. Retrying in 60 seconds.")
-                print("No candle data available. Retrying in 60 seconds.")
-                time.sleep(60)
+                logging.warning("No candle data available. Retrying in 5 seconds.")
+                print("No candle data available. Retrying in 5 seconds.")
+                time.sleep(5)
                 continue
             
             usdc_balance = get_balance('USDC')
@@ -2299,22 +2301,24 @@ def main():
             # Get current time for cooldown check
             current_time = time.time()
             
-            # FIXED: Always send an alert if 10 or more conditions are met, with cooldown to prevent spam
+            # FIXED: Always send an alert if 10 or more conditions are met, with shorter cooldown
             long_alert_triggered = current_long_condition_met and (current_time - last_long_alert_time >= ALERT_COOLDOWN)
             short_alert_triggered = current_short_condition_met and (current_time - last_short_alert_time >= ALERT_COOLDOWN)
             
-            # Update previous states
-            prev_long_condition_met = current_long_condition_met
-            prev_short_condition_met = current_short_condition_met
+            # Additional check: Send alert if signal is active and it's been at least 5 seconds since any alert
+            signal_active = (signal == "LONG" or signal == "SHORT")
+            signal_alert_triggered = signal_active and (current_time - last_any_alert_time >= MIN_ANY_ALERT_COOLDOWN)
             
             # Determine if we should send an alert
-            should_send_alert = long_alert_triggered or short_alert_triggered
+            should_send_alert = long_alert_triggered or short_alert_triggered or signal_alert_triggered
             
             # Update last alert times if we're sending an alert
-            if long_alert_triggered:
+            if long_alert_triggered or (signal == "LONG" and signal_alert_triggered):
                 last_long_alert_time = current_time
-            if short_alert_triggered:
+            if short_alert_triggered or (signal == "SHORT" and signal_alert_triggered):
                 last_short_alert_time = current_time
+            if should_send_alert:
+                last_any_alert_time = current_time
             
             # Send detailed analysis to Telegram if conditions are met
             if should_send_alert:
@@ -2383,6 +2387,7 @@ def main():
                     true_conditions = [cond for cond in required_short_conditions if conditions_short.get(cond, False)]
                     total_conditions = total_required_short
                     condition_count = short_true_count
+                
                 # Calculate the quantity we can trade
                 quantity = calculate_quantity(usdc_balance, current_price)
                 if quantity > Decimal('0'):
@@ -2393,6 +2398,7 @@ def main():
                         "true_conditions": true_conditions
                     }
                     analysis_details["signal_info"] = signal_info
+                    
                     # Place the order
                     new_position = place_order(signal, quantity, current_price, usdc_balance, analysis_details)
                     if new_position:
@@ -2404,7 +2410,7 @@ def main():
                     # Not enough balance, skip without notification
                     logging.debug(f"Insufficient balance to trade {signal} signal. Required: {MINIMUM_BALANCE} USDC, Available: {usdc_balance:.25f} USDC")
             
-            time.sleep(5)
+            time.sleep(5)  # 5-second iteration cycle
     
     except KeyboardInterrupt:
         logging.info("Bot stopped by user.")
