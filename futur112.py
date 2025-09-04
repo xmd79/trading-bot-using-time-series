@@ -2094,7 +2094,7 @@ def main():
                         print(f"DMI Bullish (1m): {conditions_long['dmi_bullish_1m']}")
                         print(f"DMI Bearish (1m): {conditions_short['dmi_bearish_1m']}")
                     
-                    # Set new conditions for all timeframes
+                    # Set new conditions for all timeframes with proper symmetry
                     conditions_long[f"dip_reversal_{timeframe}"] = (reversal_type == "DIP")
                     conditions_long[f"below_middle_{timeframe}"] = (current_close_tf < middle_threshold)
                     
@@ -2229,6 +2229,57 @@ def main():
                         print(f"Wavelet Forecast Above Current (1m): {conditions_long['wavelet_forecast_above_current_1m']}")
                         print(f"Wavelet Forecast Below Current (1m): {conditions_short['wavelet_forecast_below_current_1m']}")
                 
+                # Ensure perfect symmetry between LONG and SHORT conditions
+                for timeframe in TIMEFRAMES:
+                    # For reversal conditions - ensure mutual exclusivity
+                    if conditions_long.get(f'dip_reversal_{timeframe}', False):
+                        conditions_short[f'top_reversal_{timeframe}'] = False
+                    if conditions_short.get(f'top_reversal_{timeframe}', False):
+                        conditions_long[f'dip_reversal_{timeframe}'] = False
+                        
+                    # For middle threshold conditions - ensure mutual exclusivity
+                    if conditions_long.get(f'below_middle_{timeframe}', False):
+                        conditions_short[f'above_middle_{timeframe}'] = False
+                    if conditions_short.get(f'above_middle_{timeframe}', False):
+                        conditions_long[f'below_middle_{timeframe}'] = False
+
+                # For 1m specific conditions - ensure mutual exclusivity
+                # Momentum conditions
+                if conditions_long.get('momentum_positive_1m', False):
+                    conditions_short['momentum_negative_1m'] = False
+                if conditions_short.get('momentum_negative_1m', False):
+                    conditions_long['momentum_positive_1m'] = False
+
+                # ML forecast conditions
+                if conditions_long.get('ml_forecast_above_price_1m', False):
+                    conditions_short['ml_forecast_below_price_1m'] = False
+                if conditions_short.get('ml_forecast_below_price_1m', False):
+                    conditions_long['ml_forecast_above_price_1m'] = False
+
+                # Wavelet forecast conditions
+                if conditions_long.get('wavelet_forecast_above_current_1m', False):
+                    conditions_short['wavelet_forecast_below_current_1m'] = False
+                if conditions_short.get('wavelet_forecast_below_current_1m', False):
+                    conditions_long['wavelet_forecast_above_current_1m'] = False
+
+                # Dominant frequency conditions
+                if conditions_long.get('negative_dominant_freq_1m', False):
+                    conditions_short['positive_dominant_freq_1m'] = False
+                if conditions_short.get('positive_dominant_freq_1m', False):
+                    conditions_long['negative_dominant_freq_1m'] = False
+
+                # DMI conditions
+                if conditions_long.get('dmi_bullish_1m', False):
+                    conditions_short['dmi_bearish_1m'] = False
+                if conditions_short.get('dmi_bearish_1m', False):
+                    conditions_long['dmi_bullish_1m'] = False
+
+                # Volume conditions
+                if conditions_long.get('volume_bullish_1m', False):
+                    conditions_short['volume_bearish_1m'] = False
+                if conditions_short.get('volume_bearish_1m', False):
+                    conditions_long['volume_bullish_1m'] = False
+                
                 print("\nCondition Pairs Status:")
                 for cond_pair in [
                     ("negative_dominant_freq_1m", "positive_dominant_freq_1m"),
@@ -2287,9 +2338,10 @@ def main():
                 
                 # Determine signal based on which side has more true conditions
                 signal = "NO_SIGNAL"
-                if long_percentage > 0.5 and long_percentage > short_percentage:
+                # Fixed: Use >= 0.5 instead of > 0.5 for better symmetry
+                if long_percentage >= 0.5 and long_percentage > short_percentage:
                     signal = "LONG"
-                elif short_percentage > 0.5 and short_percentage > long_percentage:
+                elif short_percentage >= 0.5 and short_percentage > long_percentage:
                     signal = "SHORT"
                 
                 print(f"\nTrade Signal Status: {signal}")
@@ -2300,8 +2352,8 @@ def main():
                     print(f"\n🚨 SIGNAL ALERT: {signal} 🚨")
                 
                 # Check for condition state changes (for alerting)
-                current_long_condition_met = (long_percentage > 0.5)  # More than half of conditions are true
-                current_short_condition_met = (short_percentage > 0.5)  # More than half of conditions are true
+                current_long_condition_met = (long_percentage >= 0.5)  # At least half of conditions are true
+                current_short_condition_met = (short_percentage >= 0.5)  # At least half of conditions are true
                 
                 # Determine if we should send an alert (no cooldown, just check if conditions are met)
                 should_send_alert = current_long_condition_met or current_short_condition_met
@@ -2320,11 +2372,22 @@ def main():
                         f"SHORT Conditions: {short_true_count}/{total_required_short} ({short_percentage:.1%})\n\n"
                     )
                     
+                    # Add condition details
+                    telegram_analysis_message += "LONG Conditions:\n"
+                    for cond in required_long_conditions:
+                        status = "✅" if conditions_long.get(cond, False) else "❌"
+                        telegram_analysis_message += f"{status} {cond}\n"
+                    
+                    telegram_analysis_message += "\nSHORT Conditions:\n"
+                    for cond in required_short_conditions:
+                        status = "✅" if conditions_short.get(cond, False) else "❌"
+                        telegram_analysis_message += f"{status} {cond}\n"
+                    
                     # Add timeframe analysis details
                     for tf in TIMEFRAMES:
                         details = analysis_details.get(tf, {})
                         telegram_analysis_message += (
-                            f"--- {tf} Timeframe ---\n"
+                            f"\n--- {tf} Timeframe ---\n"
                             f"Trend: {details.get('trend', 'N/A')}\n"
                             f"Cycle Status: {details.get('cycle_status', 'N/A')}\n"
                             f"Dominant Frequency: {details.get('dominant_freq', 0.0):.4f}\n"
@@ -2334,7 +2397,7 @@ def main():
                             f"FFT Forecast: {details.get('fft_forecast', Decimal('0')):.2f} USDC\n"
                             f"Wavelet Forecast: {details.get('wavelet_forecast', Decimal('0')):.2f} USDC\n"
                             f"Volume Mood: {details.get('volume_mood', 'N/A')}\n"
-                            f"Reversal Type: {details.get('reversal_type', 'N/A')}\n\n"
+                            f"Reversal Type: {details.get('reversal_type', 'N/A')}\n"
                         )
                     
                     # Wrap with signal alerts if signal is not NO_SIGNAL
@@ -2410,7 +2473,7 @@ def main():
                     logging.error(f"Failed to send error message to Telegram: {telegram_error}")
                 
                 # Sleep for a bit before retrying
-                time.sleep(30)
+                time.sleep(5)
     
     except KeyboardInterrupt:
         logging.info("Bot stopped by user.")
