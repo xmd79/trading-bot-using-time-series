@@ -534,14 +534,52 @@ def calculate_dmi(candles, timeframe, period=DMI_PERIOD):
         
         # Only determine bullish/bearish if we have valid values
         if latest_plus_di is not None and latest_minus_di is not None and latest_adx is not None:
+            # Log the raw values for debugging
+            logging.info(f"{timeframe} - DMI Raw Values: +DI={latest_plus_di:.4f}, -DI={latest_minus_di:.4f}, ADX={latest_adx:.4f}, Threshold={ADX_THRESHOLD}")
+            
             # Check if ADX is above threshold (indicating a trend)
             if latest_adx > ADX_THRESHOLD:
                 # In a trending market, determine direction based on +DI vs -DI
-                if latest_plus_di > latest_minus_di:
+                # Add a small tolerance to handle floating-point precision issues
+                tolerance = 1e-6
+                if latest_plus_di > latest_minus_di + tolerance:
                     is_bullish = True
-                elif latest_minus_di > latest_plus_di:
+                    is_bearish = False
+                elif latest_minus_di > latest_plus_di + tolerance:
+                    is_bullish = False
                     is_bearish = True
-                # If +DI and -DI are equal, both remain False (no clear trend)
+                else:
+                    # +DI and -DI are approximately equal, check which one is slightly higher
+                    if latest_plus_di > latest_minus_di:
+                        is_bullish = True
+                        is_bearish = False
+                    else:
+                        is_bullish = False
+                        is_bearish = True
+            else:
+                # ADX is below threshold, indicating a weak trend or sideways market
+                # Still determine direction based on +DI vs -DI, but with less confidence
+                tolerance = 1e-6
+                if latest_plus_di > latest_minus_di + tolerance:
+                    is_bullish = True
+                    is_bearish = False
+                elif latest_minus_di > latest_plus_di + tolerance:
+                    is_bullish = False
+                    is_bearish = True
+                else:
+                    # +DI and -DI are approximately equal, default to the current market direction
+                    # Use the price trend as a tiebreaker
+                    if len(closes) >= 2:
+                        if closes[-1] > closes[-2]:
+                            is_bullish = True
+                            is_bearish = False
+                        else:
+                            is_bullish = False
+                            is_bearish = True
+                    else:
+                        # Not enough data, default to bearish as a conservative approach
+                        is_bullish = False
+                        is_bearish = True
         
         logging.info(
             f"{timeframe} - DMI: +DI={latest_plus_di:.4f}, -DI={latest_minus_di:.4f}, ADX={latest_adx:.4f}, "
