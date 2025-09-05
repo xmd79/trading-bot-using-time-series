@@ -528,17 +528,20 @@ def calculate_dmi(candles, timeframe, period=DMI_PERIOD):
         latest_minus_di = minus_di[-1] if not np.isnan(minus_di[-1]) else None
         latest_adx = adx[-1] if not np.isnan(adx[-1]) else None
         
-        # Determine if DMI is bullish or bearish with proper symmetry
+        # Initialize both as False
         is_bullish = False
         is_bearish = False
         
+        # Only determine bullish/bearish if we have valid values
         if latest_plus_di is not None and latest_minus_di is not None and latest_adx is not None:
-            # For bullish: +DI > -DI and ADX > threshold
-            if latest_plus_di > latest_minus_di and latest_adx > ADX_THRESHOLD:
-                is_bullish = True
-            # For bearish: -DI > +DI and ADX > threshold
-            elif latest_minus_di > latest_plus_di and latest_adx > ADX_THRESHOLD:
-                is_bearish = True
+            # Check if ADX is above threshold (indicating a trend)
+            if latest_adx > ADX_THRESHOLD:
+                # In a trending market, determine direction based on +DI vs -DI
+                if latest_plus_di > latest_minus_di:
+                    is_bullish = True
+                elif latest_minus_di > latest_plus_di:
+                    is_bearish = True
+                # If +DI and -DI are equal, both remain False (no clear trend)
         
         logging.info(
             f"{timeframe} - DMI: +DI={latest_plus_di:.4f}, -DI={latest_minus_di:.4f}, ADX={latest_adx:.4f}, "
