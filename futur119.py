@@ -33,7 +33,7 @@ getcontext().prec = 25
 # Exchange constants
 TRADE_SYMBOL = "BTCUSDC"
 LEVERAGE = 25
-STOP_LOSS_PERCENTAGE = Decimal('0.05')  # 5% stop-loss
+STOP_LOSS_PERCENTAGE = Decimal('0.75')  # 75% stop-loss
 TAKE_PROFIT_PERCENTAGE = Decimal('0.05')  # 5% take-profit
 QUANTITY_PRECISION = Decimal('0.000001')  # Binance quantity precision for BTCUSDC
 MINIMUM_BALANCE = Decimal('1.0000')  # Minimum USDC balance to place trades
@@ -1925,13 +1925,17 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     quantity=str(quantity)
                 )
                 
+                # Calculate stop-loss and take-profit based on PNL percentage difference from initial balance
+                # For LONG position:
+                # Stop-loss triggers when PNL is -75% of initial balance
+                # Take-profit triggers when PNL is +5% of initial balance
                 tp_price = (price * (Decimal('1') + TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
                 sl_price = (price * (Decimal('1') - STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
                 
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "LONG", "quantity": quantity, "entry_price": price})
                 
                 message += (
-                    f"Stop-Loss: {sl_price:.2f} (-5%)\n"
+                    f"Stop-Loss: {sl_price:.2f} (-75%)\n"
                     f"Take-Profit: {tp_price:.2f} (+5%)\n"
                     f"\nAnalysis Details\n"
                 )
@@ -1943,13 +1947,17 @@ def place_order(signal, quantity, price, initial_balance, analysis_details, retr
                     quantity=str(quantity)
                 )
                 
+                # Calculate stop-loss and take-profit based on PNL percentage difference from initial balance
+                # For SHORT position:
+                # Stop-loss triggers when PNL is -75% of initial balance
+                # Take-profit triggers when PNL is +5% of initial balance
                 tp_price = (price * (Decimal('1') - TAKE_PROFIT_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
-                sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')  # Fixed typo here
+                sl_price = (price * (Decimal('1') + STOP_LOSS_PERCENTAGE)).quantize(Decimal('0.01'), rounding='ROUND_DOWN')
                 
                 position.update({"sl_price": sl_price, "tp_price": tp_price, "side": "SHORT", "quantity": -quantity, "entry_price": price})
                 
                 message += (
-                    f"Stop-Loss: {sl_price:.2f} (+5%)\n"
+                    f"Stop-Loss: {sl_price:.2f} (+75%)\n"
                     f"Take-Profit: {tp_price:.2f} (-5%)\n"
                     f"\nAnalysis Details\n"
                 )
@@ -2073,6 +2081,13 @@ def close_position(position, price, retries=5, base_delay=5):
                 quantity=str(quantity)
             )
             
+            # Calculate PNL percentage difference from initial balance
+            initial_balance = position.get("initial_balance", Decimal('0'))
+            unrealized_pnl = position.get("unrealized_pnl", Decimal('0'))
+            
+            # Calculate PNL percentage
+            pnl_percentage = (unrealized_pnl / initial_balance * Decimal('100')) if initial_balance > Decimal('0') else Decimal('0')
+            
             message = (
                 f"Position Closed\n"
                 f"Symbol: {TRADE_SYMBOL}\n"
@@ -2080,7 +2095,8 @@ def close_position(position, price, retries=5, base_delay=5):
                 f"Side: {position['side']}\n"
                 f"Quantity: {quantity:.2f} BTC\n"
                 f"Exit Price: ~{price:.2f} USDC\n"
-                f"Unrealized PNL: {position['unrealized_pnl']:.2f} USDC\n"
+                f"Unrealized PNL: {unrealized_pnl:.2f} USDC\n"
+                f"PNL Percentage: {pnl_percentage:.2f}%\n"
             )
             
             telegram_loop.run_until_complete(send_telegram_message(message))
@@ -2141,48 +2157,52 @@ def main():
                 print(f"USDC Balance: {usdc_balance:.25f}")
                 print(f"Current Position: {position['side']} ({position['quantity']:.6f} BTC)")
                 
-                if position["side"] != "NONE" and position["sl_price"] > Decimal('0'):
-                    if position["side"] == "LONG" and current_price <= position["sl_price"]:
+                # Calculate PNL percentage difference from initial balance
+                if position["side"] != "NONE" and position["initial_balance"] > Decimal('0'):
+                    pnl_percentage = (position["unrealized_pnl"] / position["initial_balance"] * Decimal('100'))
+                    
+                    # Check if stop-loss or take-profit is triggered based on PNL percentage
+                    if position["side"] == "LONG" and pnl_percentage <= -STOP_LOSS_PERCENTAGE * Decimal('100'):
                         message = (
                             f"Stop-Loss Triggered: LONG\n"
                             f"Symbol: {TRADE_SYMBOL}\n"
                             f"Time: {current_local_time_str}\n"
                             f"Exit Price: {current_price:.25f} USDC\n"
-                            f"Stop-Loss Price: {position['sl_price']:.25f} USDC\n"
-                            f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC\n"
+                            f"PNL: {position['unrealized_pnl']:.25f} USDC ({pnl_percentage:.2f}%)\n"
+                            f"Stop-Loss Threshold: -{STOP_LOSS_PERCENTAGE * Decimal('100')}%\n"
                         )
                         telegram_loop.run_until_complete(send_telegram_message(message))
                         close_position(position, current_price)
-                    elif position["side"] == "LONG" and current_price >= position["tp_price"]:
+                    elif position["side"] == "LONG" and pnl_percentage >= TAKE_PROFIT_PERCENTAGE * Decimal('100'):
                         message = (
                             f"Take-Profit Triggered: LONG\n"
                             f"Symbol: {TRADE_SYMBOL}\n"
                             f"Time: {current_local_time_str}\n"
                             f"Exit Price: {current_price:.25f} USDC\n"
-                            f"Take-Profit Price: {position['tp_price']:.25f} USDC\n"
-                            f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC\n"
+                            f"PNL: {position['unrealized_pnl']:.25f} USDC ({pnl_percentage:.2f}%)\n"
+                            f"Take-Profit Threshold: +{TAKE_PROFIT_PERCENTAGE * Decimal('100')}%\n"
                         )
                         telegram_loop.run_until_complete(send_telegram_message(message))
                         close_position(position, current_price)
-                    elif position["side"] == "SHORT" and current_price >= position["sl_price"]:
+                    elif position["side"] == "SHORT" and pnl_percentage <= -STOP_LOSS_PERCENTAGE * Decimal('100'):
                         message = (
                             f"Stop-Loss Triggered: SHORT\n"
                             f"Symbol: {TRADE_SYMBOL}\n"
                             f"Time: {current_local_time_str}\n"
                             f"Exit Price: {current_price:.25f} USDC\n"
-                            f"Stop-Loss Price: {position['sl_price']:.25f} USDC\n"
-                            f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC\n"
+                            f"PNL: {position['unrealized_pnl']:.25f} USDC ({pnl_percentage:.2f}%)\n"
+                            f"Stop-Loss Threshold: -{STOP_LOSS_PERCENTAGE * Decimal('100')}%\n"
                         )
                         telegram_loop.run_until_complete(send_telegram_message(message))
                         close_position(position, current_price)
-                    elif position["side"] == "SHORT" and current_price <= position["tp_price"]:
+                    elif position["side"] == "SHORT" and pnl_percentage >= TAKE_PROFIT_PERCENTAGE * Decimal('100'):
                         message = (
                             f"Take-Profit Triggered: SHORT\n"
                             f"Symbol: {TRADE_SYMBOL}\n"
                             f"Time: {current_local_time_str}\n"
                             f"Exit Price: {current_price:.25f} USDC\n"
-                            f"Take-Profit Price: {position['tp_price']:.25f} USDC\n"
-                            f"Unrealized PNL: {position['unrealized_pnl']:.25f} USDC\n"
+                            f"PNL: {position['unrealized_pnl']:.25f} USDC ({pnl_percentage:.2f}%)\n"
+                            f"Take-Profit Threshold: +{TAKE_PROFIT_PERCENTAGE * Decimal('100')}%\n"
                         )
                         telegram_loop.run_until_complete(send_telegram_message(message))
                         close_position(position, current_price)
