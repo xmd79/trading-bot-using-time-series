@@ -2522,6 +2522,19 @@ def main():
                 else:
                     signal = "NO_SIGNAL"
                 
+                # Print all LONG conditions and their status
+                print("\n=== LONG CONDITIONS ===")
+                for condition, status in conditions_long.items():
+                    print(f"{condition}: {'PASS' if status else 'FAIL'}")
+                print("=====================")
+                
+                # Print all SHORT conditions and their status
+                print("\n=== SHORT CONDITIONS ===")
+                for condition, status in conditions_short.items():
+                    print(f"{condition}: {'PASS' if status else 'FAIL'}")
+                print("======================")
+                
+                # Print final signal evaluation
                 print(f"\n=== FINAL SIGNAL EVALUATION ===")
                 print(f"LONG Conditions Met: {sum(conditions_long.values())}/15 - {'PASS' if long_signal else 'FAIL'}")
                 print(f"SHORT Conditions Met: {sum(conditions_short.values())}/15 - {'PASS' if short_signal else 'FAIL'}")
@@ -2566,6 +2579,26 @@ def main():
                     else:
                         # Not enough balance, skip without notification
                         logging.debug(f"Insufficient balance to trade {signal} signal. Required: {MINIMUM_BALANCE} USDC, Available: {usdc_balance:.25f} USDC")
+                
+                # Print final signal evaluation at the end when not in trade
+                if position["side"] == "NONE":
+                    # Print all LONG conditions and their status
+                    print("\n=== LONG CONDITIONS ===")
+                    for condition, status in conditions_long.items():
+                        print(f"{condition}: {'PASS' if status else 'FAIL'}")
+                    print("=====================")
+                    
+                    # Print all SHORT conditions and their status
+                    print("\n=== SHORT CONDITIONS ===")
+                    for condition, status in conditions_short.items():
+                        print(f"{condition}: {'PASS' if status else 'FAIL'}")
+                    print("======================")
+                    
+                    print(f"\n=== FINAL SIGNAL EVALUATION ===")
+                    print(f"LONG Conditions Met: {sum(conditions_long.values())}/15 - {'PASS' if long_signal else 'FAIL'}")
+                    print(f"SHORT Conditions Met: {sum(conditions_short.values())}/15 - {'PASS' if short_signal else 'FAIL'}")
+                    print(f"Final Signal: {signal}")
+                    print("==============================\n")
                 
                 time.sleep(5)
             
