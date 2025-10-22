@@ -2506,9 +2506,12 @@ def main():
                     else:
                         print("LRC: Invalid calculation")
                 
-                # NEW SIMPLIFIED SIGNAL LOGIC - Trigger when ALL 15 conditions are true
-                long_signal = all(conditions_long.values())
-                short_signal = all(conditions_short.values())
+                # FIXED SIGNAL LOGIC - Trigger when at least 12 conditions from 15 are true
+                long_conditions_met = sum(conditions_long.values())
+                short_conditions_met = sum(conditions_short.values())
+                
+                long_signal = long_conditions_met >= 12
+                short_signal = short_conditions_met >= 12
                 
                 # Determine the final signal
                 if long_signal and short_signal:
@@ -2526,26 +2529,28 @@ def main():
                 print("\n=== LONG CONDITIONS ===")
                 for condition, status in conditions_long.items():
                     print(f"{condition}: {'PASS' if status else 'FAIL'}")
+                print(f"Total Met: {long_conditions_met}/15 - {'PASS' if long_signal else 'FAIL'}")
                 print("=====================")
                 
                 # Print all SHORT conditions and their status
                 print("\n=== SHORT CONDITIONS ===")
                 for condition, status in conditions_short.items():
                     print(f"{condition}: {'PASS' if status else 'FAIL'}")
+                print(f"Total Met: {short_conditions_met}/15 - {'PASS' if short_signal else 'FAIL'}")
                 print("======================")
                 
                 # Print final signal evaluation
                 print(f"\n=== FINAL SIGNAL EVALUATION ===")
-                print(f"LONG Conditions Met: {sum(conditions_long.values())}/15 - {'PASS' if long_signal else 'FAIL'}")
-                print(f"SHORT Conditions Met: {sum(conditions_short.values())}/15 - {'PASS' if short_signal else 'FAIL'}")
+                print(f"LONG Conditions Met: {long_conditions_met}/15 - {'PASS' if long_signal else 'FAIL'}")
+                print(f"SHORT Conditions Met: {short_conditions_met}/15 - {'PASS' if short_signal else 'FAIL'}")
                 print(f"Final Signal: {signal}")
                 print("==============================\n")
                 
-                logging.info(f"Final Signal: {signal} (LONG: {sum(conditions_long.values())}/15, SHORT: {sum(conditions_short.values())}/15)")
+                logging.info(f"Final Signal: {signal} (LONG: {long_conditions_met}/15, SHORT: {short_conditions_met}/15)")
                 
                 # Only print signal alert if signal is not NO_SIGNAL
                 if signal != "NO_SIGNAL":
-                    print(f"\n🚨 STRONG SIGNAL ALERT: {signal} (ALL 15 conditions met) 🚨")
+                    print(f"\n🚨 STRONG SIGNAL ALERT: {signal} (at least 12/15 conditions met) 🚨")
                 
                 # If we have a signal and no open position, try to trade
                 if signal in ["LONG", "SHORT"] and position["side"] == "NONE":
@@ -2553,11 +2558,11 @@ def main():
                     if signal == "LONG":
                         true_conditions = [cond for cond in conditions_long.keys() if conditions_long[cond]]
                         total_conditions = len(conditions_long)
-                        condition_count = sum(conditions_long.values())
+                        condition_count = long_conditions_met
                     else:
                         true_conditions = [cond for cond in conditions_short.keys() if conditions_short[cond]]
                         total_conditions = len(conditions_short)
-                        condition_count = sum(conditions_short.values())
+                        condition_count = short_conditions_met
                     
                     # Calculate the quantity we can trade
                     quantity = calculate_quantity(usdc_balance, current_price)
