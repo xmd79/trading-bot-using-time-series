@@ -96,33 +96,36 @@ except BinanceAPIException as e:
     print(f"Error setting leverage: {e.message}")
     sys.exit(1)
 
-# Get symbol precision for quantity
-def get_symbol_precision(symbol=TRADE_SYMBOL):
+# Get symbol info (step size and min notional)
+def get_symbol_info(symbol=TRADE_SYMBOL):
     try:
         info = client.futures_exchange_info()
         for s in info['symbols']:
             if s['symbol'] == symbol:
+                step_size = None
+                min_notional = None
                 for filter in s['filters']:
                     if filter['filterType'] == 'LOT_SIZE':
-                        step_size = filter['stepSize']
-                        # Count the number of decimal places in stepSize
-                        if '.' in step_size:
-                            return len(step_size.split('.')[1])
-                        else:
-                            return 0
-        # Default to 3 if not found (common for BTC)
-        return 3
+                        step_size = Decimal(filter['stepSize'])
+                    elif filter['filterType'] == 'MIN_NOTIONAL':
+                        min_notional = Decimal(filter['notional'])
+                if step_size is None or min_notional is None:
+                    logging.error(f"Could not find LOT_SIZE or MIN_NOTIONAL filter for {symbol}")
+                    # Fallback values
+                    step_size = Decimal('0.001')
+                    min_notional = Decimal('5.0')  # Typical for BTCUSDC
+                return step_size, min_notional
+        # Default if symbol not found
+        return Decimal('0.001'), Decimal('5.0')
     except Exception as e:
-        logging.error(f"Error getting symbol precision: {e}")
-        # Fallback to 3 (common for BTC)
-        return 3
+        logging.error(f"Error getting symbol info: {e}")
+        return Decimal('0.001'), Decimal('5.0')
 
-# Set quantity precision based on symbol
-SYMBOL_QUANTITY_PRECISION = get_symbol_precision(TRADE_SYMBOL)
-QUANTITY_PRECISION = Decimal('0.' + '0' * (SYMBOL_QUANTITY_PRECISION - 1) + '1')  # e.g., Decimal('0.001') for 3 decimals
+# Get symbol info
+SYMBOL_STEP_SIZE, SYMBOL_MIN_NOTIONAL = get_symbol_info(TRADE_SYMBOL)
 
-logging.info(f"Symbol: {TRADE_SYMBOL}, Quantity Precision: {SYMBOL_QUANTITY_PRECISION} decimal places")
-print(f"Symbol: {TRADE_SYMBOL}, Quantity Precision: {SYMBOL_QUANTITY_PRECISION} decimal places")
+logging.info(f"Symbol: {TRADE_SYMBOL}, Step Size: {SYMBOL_STEP_SIZE}, Min Notional: {SYMBOL_MIN_NOTIONAL}")
+print(f"Symbol: {TRADE_SYMBOL}, Step Size: {SYMBOL_STEP_SIZE}, Min Notional: {SYMBOL_MIN_NOTIONAL}")
 
 def clean_data(data, min_val=1e-10):
     """Replace NaN, Inf, and zero values with a small positive value"""
@@ -1813,11 +1816,19 @@ def calculate_quantity(balance, price):
         logging.debug(f"Insufficient balance ({balance:.25f} USDC) or invalid price ({price:.25f}) for trading.")
         return Decimal('0.0')
     
-    quantity = (balance * Decimal(str(LEVERAGE))) / price
-    quantity = quantity.quantize(QUANTITY_PRECISION, rounding='ROUND_DOWN')
+    # Calculate the maximum quantity we can trade with the entire balance
+    raw_quantity = (balance * Decimal(str(LEVERAGE))) / price
+    # Round down to the nearest step
+    quantity = raw_quantity.quantize(SYMBOL_STEP_SIZE, rounding='ROUND_DOWN')
     
-    logging.info(f"Calculated quantity: {quantity:.25f} BTC for balance {balance:.25f} USDC at price {price:.25f}")
-    print(f"Calculated quantity: {quantity:.25f} BTC for balance {balance:.25f} USDC at price {price:.25f}")
+    # Check if the quantity meets the minimum notional requirement
+    notional_value = quantity * price
+    if notional_value < SYMBOL_MIN_NOTIONAL:
+        logging.warning(f"Calculated quantity {quantity} results in notional {notional_value} which is below minimum {SYMBOL_MIN_NOTIONAL}")
+        return Decimal('0.0')
+    
+    logging.info(f"Calculated quantity: {quantity} BTC for balance {balance} USDC at price {price}")
+    print(f"Calculated quantity: {quantity} BTC for balance {balance} USDC at price {price}")
     
     return quantity
 
@@ -1932,7 +1943,7 @@ def close_position(position, price, retries=5, base_delay=5):
     
     for attempt in range(retries):
         try:
-            quantity = abs(position["quantity"]).quantize(QUANTITY_PRECISION)
+            quantity = abs(position["quantity"]).quantize(SYMBOL_STEP_SIZE)
             side = "SELL" if position["side"] == "LONG" else "BUY"
             
             order = client.futures_create_order(
