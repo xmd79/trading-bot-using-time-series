@@ -18,7 +18,9 @@ class BinanceSineAnalyzer:
         # Read API credentials from file
         api_key, api_secret = self.read_api_credentials()
         
-        self.client = Client(api_key, api_secret)
+        # Initialize client with testnet=False to avoid testnet
+        self.client = Client(api_key, api_secret, testnet=False)
+        
         # Timeframes in descending order (from highest to lowest)
         self.timeframes = [
             ('24h', Client.KLINE_INTERVAL_1DAY),
@@ -40,6 +42,13 @@ class BinanceSineAnalyzer:
         self.current_trade_symbol = None
         self.initial_usdc_balance = Decimal('0')
         self.current_asset_balance = Decimal('0')
+        
+        # Rate limiting
+        self.last_request_time = 0
+        self.min_request_interval = 0.2  # Minimum time between requests in seconds
+        self.request_weight = 0
+        self.max_request_weight = 1200  # Binance's default limit per minute
+        self.weight_reset_time = time.time() + 60  # Reset weight every minute
         
     def read_api_credentials(self):
         """Read API key and secret from api.txt file"""
@@ -70,10 +79,61 @@ class BinanceSineAnalyzer:
         
         return value
     
+    def rate_limit(self):
+        """Implement rate limiting to avoid API bans"""
+        current_time = time.time()
+        
+        # Reset request weight if a minute has passed
+        if current_time > self.weight_reset_time:
+            self.request_weight = 0
+            self.weight_reset_time = current_time + 60
+        
+        # Check if we're approaching the weight limit
+        if self.request_weight >= self.max_request_weight * 0.9:  # 90% of limit
+            sleep_time = self.weight_reset_time - current_time
+            if sleep_time > 0:
+                print(f"Approaching rate limit. Sleeping for {sleep_time:.1f} seconds...")
+                time.sleep(sleep_time)
+                self.request_weight = 0
+                self.weight_reset_time = time.time() + 60
+        
+        # Enforce minimum time between requests
+        elapsed = current_time - self.last_request_time
+        if elapsed < self.min_request_interval:
+            time.sleep(self.min_request_interval - elapsed)
+        
+        self.last_request_time = time.time()
+    
+    def make_request(self, func, *args, weight=1, **kwargs):
+        """Make an API request with rate limiting and error handling"""
+        self.rate_limit()
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = func(*args, **kwargs)
+                self.request_weight += weight
+                return result
+            except Exception as e:
+                if hasattr(e, 'code') and e.code == -1003:  # Rate limit error
+                    retry_after = 60  # Default retry time
+                    if hasattr(e, 'response') and e.response:
+                        retry_after = int(e.response.headers.get('Retry-After', 60))
+                    
+                    print(f"Rate limit exceeded. Waiting {retry_after} seconds before retry...")
+                    time.sleep(retry_after)
+                elif attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    print(f"Request failed. Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"Request failed after {max_retries} attempts: {e}")
+                    raise
+    
     def get_all_usdc_pairs(self):
         """Get all trading pairs with USDC"""
         try:
-            exchange_info = self.client.get_exchange_info()
+            exchange_info = self.make_request(self.client.get_exchange_info, weight=10)
             usdc_pairs = [s['symbol'] for s in exchange_info['symbols'] 
                          if s['quoteAsset'] == 'USDC' and s['status'] == 'TRADING']
             return usdc_pairs
@@ -84,10 +144,12 @@ class BinanceSineAnalyzer:
     def get_klines(self, symbol, interval, limit=100):
         """Get kline data for a symbol and interval"""
         try:
-            klines = self.client.get_klines(
+            klines = self.make_request(
+                self.client.get_klines,
                 symbol=symbol,
                 interval=interval,
-                limit=limit
+                limit=limit,
+                weight=1
             )
             return klines
         except Exception as e:
@@ -213,7 +275,7 @@ class BinanceSineAnalyzer:
                 is_dip = False
             
             # Get current price and 24h statistics
-            ticker = self.client.get_ticker(symbol=symbol)
+            ticker = self.make_request(self.client.get_ticker, symbol=symbol, weight=1)
             current_price = float(ticker['lastPrice'])
             quote_volume_24h = float(ticker['quoteVolume'])
             
@@ -253,7 +315,8 @@ class BinanceSineAnalyzer:
         dip_assets = []
         completed_count = 0
         
-        with ThreadPoolExecutor(max_workers=20) as executor:
+        # Reduce number of workers to avoid rate limits
+        with ThreadPoolExecutor(max_workers=5) as executor:
             # Submit all tasks
             future_to_symbol = {executor.submit(self.analyze_pair_on_tf, symbol, tf_name, tf_interval): symbol for symbol in symbols}
             
@@ -269,6 +332,9 @@ class BinanceSineAnalyzer:
                         print(f"✓ {result['symbol']} - DIP found on {tf_name} ({completed_count}/{len(symbols)})")
                 except Exception as e:
                     print(f"Error processing {symbol}: {e}")
+                
+                # Small delay to avoid rate limits
+                time.sleep(0.1)
         
         print(f"\nFound {len(dip_assets)} assets in DIP on {tf_name} timeframe")
         return dip_assets
@@ -338,7 +404,7 @@ class BinanceSineAnalyzer:
     def get_spot_balance(self, asset='USDC'):
         """Get spot balance for a specific asset"""
         try:
-            balance_info = self.client.get_asset_balance(asset=asset)
+            balance_info = self.make_request(self.client.get_asset_balance, asset=asset, weight=2)
             if balance_info:
                 return Decimal(balance_info['free'])
             return Decimal('0')
@@ -350,14 +416,14 @@ class BinanceSineAnalyzer:
         """Place a market buy order for a symbol using USDC"""
         try:
             # Get current price for calculation
-            ticker = self.client.get_symbol_ticker(symbol=symbol)
+            ticker = self.make_request(self.client.get_symbol_ticker, symbol=symbol, weight=1)
             current_price = float(ticker['price'])
             
             # Calculate quantity to buy (accounting for precision)
             quantity = usdc_amount / Decimal(str(current_price))
             
             # Get symbol info to determine precision
-            symbol_info = self.client.get_symbol_info(symbol)
+            symbol_info = self.make_request(self.client.get_symbol_info, symbol=symbol, weight=2)
             filters = symbol_info['filters']
             lot_size_filter = next(filter(lambda f: f['filterType'] == 'LOT_SIZE', filters), None)
             
@@ -368,11 +434,13 @@ class BinanceSineAnalyzer:
             
             # Place the order
             print(f"Placing market buy order for {symbol}: {self.format_decimal(quantity)} at ~{self.format_decimal(current_price)}")
-            order = self.client.create_order(
+            order = self.make_request(
+                self.client.create_order,
                 symbol=symbol,
                 side=Client.SIDE_BUY,
                 type=Client.ORDER_TYPE_MARKET,
-                quantity=str(quantity)
+                quantity=str(quantity),
+                weight=5
             )
             
             print(f"Buy order executed: {order}")
@@ -391,7 +459,7 @@ class BinanceSineAnalyzer:
                 return False
             
             # Get symbol info to determine precision
-            symbol_info = self.client.get_symbol_info(symbol)
+            symbol_info = self.make_request(self.client.get_symbol_info, symbol=symbol, weight=2)
             filters = symbol_info['filters']
             lot_size_filter = next(filter(lambda f: f['filterType'] == 'LOT_SIZE', filters), None)
             
@@ -404,11 +472,13 @@ class BinanceSineAnalyzer:
             
             # Place the order
             print(f"Placing market sell order for {symbol}: {self.format_decimal(quantity)}")
-            order = self.client.create_order(
+            order = self.make_request(
+                self.client.create_order,
                 symbol=symbol,
                 side=Client.SIDE_SELL,
                 type=Client.ORDER_TYPE_MARKET,
-                quantity=str(quantity)
+                quantity=str(quantity),
+                weight=5
             )
             
             print(f"Sell order executed: {order}")
@@ -437,7 +507,7 @@ class BinanceSineAnalyzer:
                 return False
             
             # Get current price
-            ticker = self.client.get_symbol_ticker(symbol=self.current_trade_symbol)
+            ticker = self.make_request(self.client.get_symbol_ticker, symbol=self.current_trade_symbol, weight=1)
             current_price = Decimal(ticker['price'])
             
             # Calculate current value in USDC
@@ -461,7 +531,7 @@ class BinanceSineAnalyzer:
     def run_trading_bot(self):
         """Main trading bot loop"""
         print("Starting trading bot...")
-        print("Bot will scan for MTF dip assets every 5 seconds")
+        print("Bot will scan for MTF dip assets every 30 seconds")
         print("Will enter trades with entire USDC balance and exit at 2% profit")
         
         while True:
@@ -518,8 +588,8 @@ class BinanceSineAnalyzer:
                     else:
                         print("No suitable MTF asset found")
                 
-                # Wait for 5 seconds before next iteration
-                print("\nWaiting 5 seconds for next iteration...")
+                # Wait for 30 seconds before next iteration (increased from 5)
+                print("\nWaiting 30 seconds for next iteration...")
                 time.sleep(5)
                 
                 # Clean up memory
@@ -530,7 +600,7 @@ class BinanceSineAnalyzer:
                 break
             except Exception as e:
                 print(f"Error in trading loop: {e}")
-                time.sleep(5)  # Wait before retrying
+                time.sleep(30)  # Wait before retrying
 
 def main():
     """Main function to run the analyzer"""
