@@ -3,7 +3,7 @@ HFT Auto Trading Bot — KuCoin Futures Edition
 ===================================================
 Strictly 5 Conditions:
   1. Sine Scale (5m TF): Uses argmin/argmax of last 1200 5m values as cycle boundaries
-  2. Extrema Cycle (1m TF): Uses argmin/argmax of last 1200 1m values for precise micro-reversals
+  2. Extrema Cycle (1m TF): argmin/argmax of last 1200 1m closes — LONG when most recent extreme is a LOW and current close > that low (bounce confirmed); SHORT when most recent extreme is a HIGH and current close < that high (rejection confirmed)
   3. Momentum (1m TF): MOM > 0 (LONG) | MOM < 0 (SHORT)
   4. Volume (1m TF): Bullish % > Bearish % (LONG) | Bearish % > Bullish % (SHORT) [Out of 100%]
   5. FFT Dominance (1m TF): Top 12 Negative Freq Power > Top 12 Positive Freq Power (LONG) | Vice versa (SHORT)
@@ -352,11 +352,35 @@ def compute_signals(candle_map):
     cond_sine_short = dist_to_max < dist_to_min
     
     # 2. Extrema Cycle (1m)
-    last_1200_1m = close_arr_1m[-ANALYSIS_WINDOW_1M:]
-    argmin_idx_1m = int(np.argmin(last_1200_1m))
-    argmax_idx_1m = int(np.argmax(last_1200_1m))
-    cond_cycle_long = argmin_idx_1m > argmax_idx_1m
-    cond_cycle_short = argmax_idx_1m > argmin_idx_1m
+    # Index semantics in the 1200-bar window: 0 = OLDEST, (window_len-1) = MOST RECENT.
+    # bars_ago = (window_len - 1) - idx  →  lower bars_ago = more recent.
+    # LONG  = argmin more recent (lower bars_ago) than argmax
+    #         AND current close > cycle_min  (already bounced off the low)
+    # SHORT = argmax more recent (lower bars_ago) than argmin
+    #         AND current close < cycle_max  (already rejected from the high)
+    candles_1m_window = candle_map["1m"][-500:]
+    last_1200_1m      = close_arr_1m[-500:]
+    window_len_1m     = len(last_1200_1m)
+    argmin_idx_1m     = int(np.argmin(last_1200_1m))
+    argmax_idx_1m     = int(np.argmax(last_1200_1m))
+    cycle_min_price   = float(last_1200_1m[argmin_idx_1m])
+    cycle_max_price   = float(last_1200_1m[argmax_idx_1m])
+    current_close_1m  = float(close_arr_1m[-1])
+    bars_ago_min      = (window_len_1m - 1) - argmin_idx_1m
+    bars_ago_max      = (window_len_1m - 1) - argmax_idx_1m
+    try:
+        ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S UTC")
+        ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S UTC")
+    except Exception:
+        ts_min = ts_max = "N/A"
+    if bars_ago_min < bars_ago_max:
+        most_recent_extreme = "ARGMIN (LOW)"
+    elif bars_ago_max < bars_ago_min:
+        most_recent_extreme = "ARGMAX (HIGH)"
+    else:
+        most_recent_extreme = "TIE"
+    cond_cycle_long  = (argmin_idx_1m > argmax_idx_1m) and (current_close_1m > cycle_min_price)
+    cond_cycle_short = (argmax_idx_1m > argmin_idx_1m) and (current_close_1m < cycle_max_price)
     
     # 3. Momentum (1m)
     mom_1m = calculate_momentum(close_arr_1m)
@@ -388,6 +412,12 @@ def compute_signals(candle_map):
         },
         "dist_to_min": dist_to_min, "dist_to_max": dist_to_max,
         "argmin_idx_1m": argmin_idx_1m, "argmax_idx_1m": argmax_idx_1m,
+        "cycle_min_price": cycle_min_price, "cycle_max_price": cycle_max_price,
+        "current_close_1m": current_close_1m,
+        "bars_ago_min": bars_ago_min, "bars_ago_max": bars_ago_max,
+        "ts_min": ts_min, "ts_max": ts_max,
+        "most_recent_extreme": most_recent_extreme,
+        "window_len_1m": window_len_1m,
         "mom_1m": mom_1m, "bullish_perc": bullish_perc, "bearish_perc": bearish_perc,
         "neg_ratio": neg_ratio, "pos_ratio": pos_ratio,
     }
@@ -500,8 +530,13 @@ def print_conditions(sig):
     print(f"     Dist to Min: {sig['dist_to_min']:.2f}% | Dist to Max: {sig['dist_to_max']:.2f}%")
     print(f"     LONG: {str(f['sine_long']):<5} | SHORT: {str(f['sine_short']):<5}")
     
-    print(f"  2. Extrema Cycle (1m)")
-    print(f"     Argmin Idx: {sig['argmin_idx_1m']} | Argmax Idx: {sig['argmax_idx_1m']}")
+    print(f"  2. Extrema Cycle (1m)  [window: {sig['window_len_1m']} bars | 0=oldest, {sig['window_len_1m']-1}=most recent]")
+    print(f"     LOWEST  LOW  → price: {sig['cycle_min_price']:.2f}  | array idx: {sig['argmin_idx_1m']:4d} | bars ago: {sig['bars_ago_min']:4d} | time: {sig['ts_min']}")
+    print(f"     HIGHEST HIGH → price: {sig['cycle_max_price']:.2f}  | array idx: {sig['argmax_idx_1m']:4d} | bars ago: {sig['bars_ago_max']:4d} | time: {sig['ts_max']}")
+    print(f"     Current Close: {sig['current_close_1m']:.2f}")
+    print(f"     Most recent extreme: {sig['most_recent_extreme']}")
+    print(f"     Bounce confirmed (close > cycle_low):  {sig['current_close_1m'] > sig['cycle_min_price']}")
+    print(f"     Reject confirmed (close < cycle_high): {sig['current_close_1m'] < sig['cycle_max_price']}")
     print(f"     LONG: {str(f['cycle_long']):<5} | SHORT: {str(f['cycle_short']):<5}")
     
     print(f"  3. Momentum (1m)")
