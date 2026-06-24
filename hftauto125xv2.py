@@ -455,6 +455,7 @@ def calculate_sl_tp(entry_price, side):
         
     print(f"  [Risk Calc] TP Dist: {tp_dist:.2f} ({TAKE_PROFIT_ROE}% ROE gross / {NET_PROFIT_ROE}% net)")
     print(f"  [Risk Calc] SL Dist: {sl_dist:.2f} ({STOP_LOSS_ROE}% ROE)")
+    print(f"  [Risk Calc] TP Price: {tp_price:.2f} | SL Price: {sl_price:.2f}")
     
     return float(sl_price), float(tp_price)
 
@@ -675,6 +676,9 @@ def main():
                     print(f"  ROE:        {roe:+.2f}%")
                     print(f"  TP Target:  {TAKE_PROFIT_ROE}% ROE")
                     print(f"  SL Target:  {STOP_LOSS_ROE}% ROE")
+                    if saved_state and saved_state.get("tp") and saved_state.get("sl"):
+                        print(f"  TP Price:   {saved_state['tp']:.2f}")
+                        print(f"  SL Price:   {saved_state['sl']:.2f}")
                     print(f"  ─────────────────────────────")
                     
                     if sig:
@@ -749,6 +753,9 @@ def main():
                     print(f"  Elapsed:    {elapsed}")
                     print(f"  TP Target:  {TAKE_PROFIT_ROE}% ROE")
                     print(f"  SL Target:  {STOP_LOSS_ROE}% ROE")
+                    if saved_state and saved_state.get("tp") and saved_state.get("sl"):
+                        print(f"  TP Price:   {saved_state['tp']:.2f}")
+                        print(f"  SL Price:   {saved_state['sl']:.2f}")
                     print(f"  ─────────────────────────────")
                     
                     if sig:
