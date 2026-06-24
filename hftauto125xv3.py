@@ -1,17 +1,17 @@
 """
-HFT Auto Trading Bot v6.0 — KuCoin Futures Edition
+HFT Auto Trading Bot v5.1 — KuCoin Futures Edition
 ===================================================
-Strictly 6 Conditions (1m & 5m TF):
-  1. Sine Scale 1m: Uses argmin/argmax of last 1200 values as cycle boundaries
+Strictly 5 Conditions (1m TF):
+  1. Sine Scale: Uses argmin/argmax of last 500 values as cycle boundaries
+     - Most recent extrema as reversal starting point
+     - argmin more recent → up cycle | argmax more recent → down cycle
      - dist_to_min < dist_to_max (LONG) | dist_to_max < dist_to_min (SHORT)
-  2. Sine Scale 5m: Uses argmin/argmax of last 1200 values as cycle boundaries
-     - dist_to_min < dist_to_max (LONG) | dist_to_max < dist_to_min (SHORT)
-  3. Extrema Cycle: argmin > argmax (LONG) | argmax > argmin (SHORT) [Last 1200 values - 1min TF]
-  4. Momentum: MOM > 0 (LONG) | MOM < 0 (SHORT) [1min TF, period 14]
-  5. Volume: Bullish % > Bearish % of total 1m volume (LONG) | Bearish % > Bullish % (SHORT)
-  6. FFT Frequency Analysis: Predominant frequencies between extremas of 1min TF (raw close, NOT sine)
-     - Most negative predominant freq corresponds to argmin (lowest low) -> LONG
-     - Most positive predominant freq -> SHORT
+  2. Extrema Cycle: argmin > argmax (LONG) | argmax > argmin (SHORT) [Last 500 values]
+  3. Momentum: MOM > 0 (LONG) | MOM < 0 (SHORT)
+  4. Volume: Bullish > Bearish (LONG) | Bearish > Bullish (SHORT) [Total 1m Volume]
+  5. FFT Frequency Analysis: Predominant frequencies between reversal extremas
+     - Mostly negative predominant -> LONG | Mostly positive predominant -> SHORT
+     - (Always strictly evaluates to one or the other)
 
 25x Leverage
 TP: 2.55% NET Profit (5.55% Gross ROE after 3.0% RT fee deduction)
@@ -65,7 +65,7 @@ gc.collect()
 
 clean_trades_file()
 
-print("HFT KuCoin Bot v6.0 (STRICT 6-COND / 25x / 2.55% NET TP) initialising...")
+print("HFT KuCoin Bot v5.1 (STRICT 5-COND / 25x / 2.55% NET TP) initialising...")
 if _cleaned:
     print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
 del _cleaned
@@ -182,11 +182,6 @@ STOP_LOSS_ROE = -25.0                                  # -25% ROE Stop Loss
 TP_PRICE_PCT = TAKE_PROFIT_ROE / LEVERAGE / 100.0  # 5.55 / 25 / 100 = 0.00222 (0.222%)
 SL_PRICE_PCT = abs(STOP_LOSS_ROE) / LEVERAGE / 100.0  # 25.0 / 25 / 100 = 0.01 (1.0%)
 
-# Data parameters
-LOOKBACK_1M = 1200  # Last 1200 values for 1min TF
-LOOKBACK_5M = 1200  # Last 1200 values for 5min TF
-KLINE_LIMIT = 200   # API limit per request
-
 try:
     with open("credentials_kucoin.txt", "r") as _f:
         _lines = _f.readlines()
@@ -225,30 +220,21 @@ def get_price(symbol):
         print(f"  [price] error: {e}")
         return 0.0
 
-def fetch_candles_for_tf(symbol, granularity, lookback):
-    """
-    Fetches candles for a given timeframe.
-    1min: 1200 candles = 1200 minutes = 20 hours (6 requests of 200)
-    5min: 1200 candles = 6000 minutes = 100 hours (6 requests of 200)
-    """
-    candles = []
+def fetch_candle_map(symbol):
+    """Fetches up to 500 1m candles (3 requests of 200 due to API limit)."""
+    candle_map = {"1m": []}
     if not API_CONNECTED:
-        return candles
-    
-    # Calculate time interval per candle in milliseconds
-    interval_ms = granularity * 60 * 1000
-    
+        return candle_map
     now_ms = int(time.time() * 1000)
-    num_requests = (lookback + KLINE_LIMIT - 1) // KLINE_LIMIT  # Ceiling division
-    
-    for i in range(num_requests):
-        end_ms = now_ms - (i * KLINE_LIMIT * interval_ms)
-        start_ms = end_ms - (KLINE_LIMIT * interval_ms)
+    limit = 200
+    for i in range(3):
+        end_ms = now_ms - (i * limit * 60 * 1000)
+        start_ms = end_ms - (limit * 60 * 1000)
         try:
-            raw = client.get_klines(symbol, granularity, start_ms=start_ms, end_ms=end_ms)
+            raw = client.get_klines(symbol, 1, start_ms=start_ms, end_ms=end_ms)
             for k in reversed(raw):  # Append chronologically
                 try:
-                    candles.append({
+                    candle_map["1m"].append({
                         "time": int(k[0]) / 1000,
                         "open": float(k[1]),
                         "high": float(k[2]),
@@ -259,37 +245,13 @@ def fetch_candles_for_tf(symbol, granularity, lookback):
                 except (IndexError, TypeError, ValueError):
                     continue
         except Exception as e:
-            print(f"  kline fetch error [{granularity}m]: {e}")
-    
-    # Trim to exact lookback and deduplicate by time
-    seen_times = set()
-    unique_candles = []
-    for c in candles:
-        if c["time"] not in seen_times:
-            seen_times.add(c["time"])
-            unique_candles.append(c)
-    
-    return unique_candles[-lookback:]
-
-def fetch_candle_map(symbol):
-    """Fetches 1m and 5m candles."""
-    candle_map = {"1m": [], "5m": []}
-    
-    print(f"  [data] Fetching {LOOKBACK_1M} 1m candles...")
-    candle_map["1m"] = fetch_candles_for_tf(symbol, 1, LOOKBACK_1M)
-    print(f"  [data] Got {len(candle_map['1m'])} 1m candles")
-    
-    print(f"  [data] Fetching {LOOKBACK_5M} 5m candles...")
-    candle_map["5m"] = fetch_candles_for_tf(symbol, 5, LOOKBACK_5M)
-    print(f"  [data] Got {len(candle_map['5m'])} 5m candles")
-    
+            print(f"  kline fetch error [1m]: {e}")
+            
+    candle_map["1m"] = candle_map["1m"][-500:]
     return candle_map
 
 def get_buy_sell_volume_1m(candle_map):
-    """
-    Calculates bullish vs bearish volume from 1m candles.
-    Returns volumes and percentages of total.
-    """
+    """Calculates total bullish vs bearish volume from all fetched 1m candles."""
     candles = candle_map.get("1m", [])
     buy_vol = sell_vol = 0.0
     for c in candles:
@@ -297,19 +259,15 @@ def get_buy_sell_volume_1m(candle_map):
             buy_vol += c["volume"]
         else:
             sell_vol += c["volume"]
-    total_vol = buy_vol + sell_vol
-    buy_pct = (buy_vol / total_vol * 100) if total_vol > 0 else 50.0
-    sell_pct = (sell_vol / total_vol * 100) if total_vol > 0 else 50.0
-    return buy_vol, sell_vol, buy_pct, sell_pct
+    return buy_vol, sell_vol
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TECHNICAL ANALYSIS (Strictly the 6 required conditions)
+# TECHNICAL ANALYSIS (Strictly the 5 required conditions)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def scale_to_sine(close_prices, argmin_idx, argmax_idx):
     """
-    Scale to Sine using argmin and argmax as cycle boundaries.
-    Works for any timeframe's close prices.
+    Scale to Sine using argmin and argmax of last 500 values as cycle boundaries.
     """
     if len(close_prices) < 32:
         return 50.0, 50.0, 0.0, "none", np.array([])
@@ -318,19 +276,11 @@ def scale_to_sine(close_prices, argmin_idx, argmax_idx):
     sine_wave = np.nan_to_num(sine_wave)
     sine_wave = -sine_wave  # Invert for standard peak/trough alignment
     
-    # Use indices relative to the array we're working with
-    arr_len = len(close_prices)
-    sine_len = len(sine_wave)
+    sine_500 = sine_wave[-500:] if len(sine_wave) >= 500 else sine_wave
+    sine_at_argmin = sine_500[argmin_idx]
+    sine_at_argmax = sine_500[argmax_idx]
     
-    # Adjust indices if arrays differ in length
-    offset = sine_len - arr_len if sine_len > arr_len else 0
-    adj_argmin = min(argmin_idx + offset, sine_len - 1)
-    adj_argmax = min(argmax_idx + offset, sine_len - 1)
-    
-    sine_at_argmin = sine_wave[adj_argmin]
-    sine_at_argmax = sine_wave[adj_argmax]
-    
-    if adj_argmin > adj_argmax:
+    if argmin_idx > argmax_idx:
         cycle_min = sine_at_argmin
         cycle_max = sine_at_argmax
         cycle_direction = "up"
@@ -351,55 +301,41 @@ def scale_to_sine(close_prices, argmin_idx, argmax_idx):
     return dist_to_min, dist_to_max, current_sine, cycle_direction, sine_wave
 
 
-def analyze_fft_frequencies_raw(close_arr, argmin_idx, argmax_idx):
+def analyze_fft_frequencies(sine_wave, argmin_idx, argmax_idx, cycle_direction):
     """
-    FFT Frequency Analysis using RAW 1min close prices (NOT sine).
-    Analyzes predominant frequencies in a stationary circuit between extremas
-    of the last 1200 values (1min TF).
-    
-    Logic:
-    - If most negative predominant freq corresponds to argmin (lowest low) -> LONG
-    - If mostly positive predominant freq -> SHORT
+    FFT Frequency Analysis: Since total power must equal neg + pos power,
+    it strictly evaluates to LONG (mostly negative) or SHORT (mostly positive).
+    There is NO 'NONE' state.
     """
-    if len(close_arr) < 16:
-        return True, False, 0.0, 0.0, 0.0
+    if len(sine_wave) < 16:
+        return True, False, 0.0, 1.0, 0.0, False 
     
-    last_1200 = close_arr[-LOOKBACK_1M:] if len(close_arr) >= LOOKBACK_1M else close_arr
-    
-    # Get segment between extremas (stationary circuit)
+    sine_500 = sine_wave[-500:] if len(sine_wave) >= 500 else sine_wave
     start_idx = min(argmin_idx, argmax_idx)
     end_idx = max(argmin_idx, argmax_idx)
     
     if end_idx - start_idx < 8:
-        # Fallback to last 64 values if segment too short
-        segment = last_1200[-64:] if len(last_1200) >= 64 else last_1200
+        segment = sine_500[-64:] if len(sine_500) >= 64 else sine_500
     else:
-        segment = last_1200[start_idx:end_idx + 1]
+        segment = sine_500[start_idx:end_idx + 1]
     
     n = len(segment)
     if n < 8:
-        return True, False, 0.0, 0.0, 0.0
+        return True, False, 0.0, 1.0, 0.0, False
     
-    # Detrend the segment for better FFT results (remove linear trend)
-    x = np.arange(n)
-    coeffs = np.polyfit(x, segment, 1)
-    detrended = segment - np.polyval(coeffs, x)
-    
-    # Apply FFT to detrended raw close prices
-    fft_result = fft(detrended)
+    fft_result = fft(segment)
     fft_magnitude = np.abs(fft_result)
     freq_bins = fftfreq(n)
     
-    # Skip DC component (index 0)
     magnitudes = fft_magnitude[1:]
     frequencies = freq_bins[1:]
     
     if len(magnitudes) == 0:
-        return True, False, 0.0, 0.0, 0.0
+        return True, False, 0.0, 1.0, 0.0, False
     
     total_power = np.sum(magnitudes)
     if total_power == 0:
-        return True, False, 0.0, 0.0, 0.0
+        return True, False, 0.0, 1.0, 0.0, False
     
     neg_mask = frequencies < 0
     pos_mask = frequencies > 0
@@ -410,23 +346,18 @@ def analyze_fft_frequencies_raw(close_arr, argmin_idx, argmax_idx):
     neg_power_ratio = neg_power / total_power
     pos_power_ratio = pos_power / total_power
     
-    # Find predominant frequency (most significant)
     predom_idx = np.argmax(magnitudes)
     predom_freq = frequencies[predom_idx]
     
-    # Determine if argmin is more recent (up cycle) or argmax is more recent (down cycle)
-    # argmin_idx and argmax_idx are indices within last_1200
-    argmin_more_recent = argmin_idx > argmax_idx
+    grad_spread_neg = neg_power_ratio > 0.45
     
-    # LONG: Most negative predominant freq AND corresponds to argmin (lowest low)
-    # This means: negative frequencies dominate AND argmin is more recent (up cycle from low)
-    fft_long = (neg_power_ratio >= pos_power_ratio) and argmin_more_recent
+    # STRICT EVALUATION: One MUST be true. No 'NONE'.
+    # If mostly negative predominant -> LONG
+    # If mostly positive predominant -> SHORT
+    fft_long_signal = neg_power_ratio >= pos_power_ratio
+    fft_short_signal = pos_power_ratio > neg_power_ratio
     
-    # SHORT: Mostly positive predominant freq
-    # This means: positive frequencies dominate AND argmax is more recent (down cycle from high)
-    fft_short = (pos_power_ratio > neg_power_ratio) and (not argmin_more_recent)
-    
-    return fft_long, fft_short, predom_freq, neg_power_ratio, pos_power_ratio
+    return fft_long_signal, fft_short_signal, predom_freq, neg_power_ratio, pos_power_ratio, grad_spread_neg
 
 
 def calculate_momentum(close_arr, period=14):
@@ -438,101 +369,73 @@ def calculate_momentum(close_arr, period=14):
 
 def compute_signals(candle_map):
     closes_1m_raw = [c["close"] for c in candle_map.get("1m", [])]
-    closes_5m_raw = [c["close"] for c in candle_map.get("5m", [])]
     live_price = get_price(TRADE_SYMBOL)
     
-    if len(closes_1m_raw) < 50 or len(closes_5m_raw) < 50:
+    if len(closes_1m_raw) < 50:
         return None
         
-    close_arr_1m = np.array(closes_1m_raw, dtype=float)
-    close_arr_5m = np.array(closes_5m_raw, dtype=float)
+    close_arr = np.array(closes_1m_raw, dtype=float)
     
-    # ─── 1min TF Analysis (Rules 1, 3, 4, 5, 6) ───
+    # 2. Extrema Cycle
+    last_500 = close_arr[-500:]
+    argmin_idx = int(np.argmin(last_500))
+    argmax_idx = int(np.argmax(last_500))
+    cond_cycle_long = argmin_idx > argmax_idx
+    cond_cycle_short = argmax_idx > argmin_idx
     
-    # 3. Extrema Cycle - 1min TF, Last 1200 values
-    last_1200_1m = close_arr_1m[-LOOKBACK_1M:] if len(close_arr_1m) >= LOOKBACK_1M else close_arr_1m
-    argmin_idx_1m = int(np.argmin(last_1200_1m))
-    argmax_idx_1m = int(np.argmax(last_1200_1m))
-    cond_cycle_long = argmin_idx_1m > argmax_idx_1m
-    cond_cycle_short = argmax_idx_1m > argmin_idx_1m
-    
-    # 1. Sine Scale - 1min TF, Last 1200 values
-    dist_to_min_1m, dist_to_max_1m, current_sine_1m, cycle_dir_1m, sine_wave_1m = scale_to_sine(
-        close_arr_1m, argmin_idx_1m, argmax_idx_1m
+    # 1. Sine Scale
+    dist_to_min, dist_to_max, current_sine, cycle_direction, sine_wave = scale_to_sine(
+        close_arr, argmin_idx, argmax_idx
     )
-    cond_sine_1m_long = dist_to_min_1m < dist_to_max_1m
-    cond_sine_1m_short = dist_to_max_1m < dist_to_min_1m
+    cond_sine_long = dist_to_min < dist_to_max
+    cond_sine_short = dist_to_max < dist_to_min
     
-    # ─── 5min TF Analysis (Rule 2) ───
-    
-    # 2. Sine Scale - 5min TF, Last 1200 values
-    last_1200_5m = close_arr_5m[-LOOKBACK_5M:] if len(close_arr_5m) >= LOOKBACK_5M else close_arr_5m
-    argmin_idx_5m = int(np.argmin(last_1200_5m))
-    argmax_idx_5m = int(np.argmax(last_1200_5m))
-    
-    dist_to_min_5m, dist_to_max_5m, current_sine_5m, cycle_dir_5m, sine_wave_5m = scale_to_sine(
-        close_arr_5m, argmin_idx_5m, argmax_idx_5m
-    )
-    cond_sine_5m_long = dist_to_min_5m < dist_to_max_5m
-    cond_sine_5m_short = dist_to_max_5m < dist_to_min_5m
-    
-    # ─── Continue 1min TF Analysis ───
-    
-    # 6. FFT Frequency Analysis - 1min TF, RAW close prices (NOT sine)
-    fft_long, fft_short, predom_freq, neg_ratio, pos_ratio = analyze_fft_frequencies_raw(
-        close_arr_1m, argmin_idx_1m, argmax_idx_1m
+    # 5. FFT Frequency Analysis
+    fft_long, fft_short, predom_freq, neg_ratio, pos_ratio, grad_spread = analyze_fft_frequencies(
+        sine_wave, argmin_idx, argmax_idx, cycle_direction
     )
     cond_fft_long = fft_long
     cond_fft_short = fft_short
     
-    # 4. Momentum - 1min TF
-    mom = calculate_momentum(close_arr_1m)
+    # 3. Momentum
+    mom = calculate_momentum(close_arr)
     if np.isnan(mom):
         return None
     cond_mom_long = mom > 0
     cond_mom_short = mom < 0
     
-    # 5. Volume - 1min TF with percentages
-    buy_vol, sell_vol, buy_pct, sell_pct = get_buy_sell_volume_1m(candle_map)
-    cond_vol_long = buy_pct > sell_pct
-    cond_vol_short = sell_pct > buy_pct
+    # 4. Volume
+    buy_vol, sell_vol = get_buy_sell_volume_1m(candle_map)
+    cond_vol_long = buy_vol > sell_vol
+    cond_vol_short = sell_vol > buy_vol
     
-    # ALL 6 CONDITIONS MUST BE TRUE
-    is_long = (cond_sine_1m_long and cond_sine_5m_long and cond_cycle_long and 
-               cond_mom_long and cond_vol_long and cond_fft_long)
-    is_short = (cond_sine_1m_short and cond_sine_5m_short and cond_cycle_short and 
-                cond_mom_short and cond_vol_short and cond_fft_short)
+    # ALL 5 CONDITIONS MUST BE TRUE
+    is_long = cond_sine_long and cond_cycle_long and cond_mom_long and cond_vol_long and cond_fft_long
+    is_short = cond_sine_short and cond_cycle_short and cond_mom_short and cond_vol_short and cond_fft_short
     
     return {
         "price": live_price,
         "is_long": is_long,
         "is_short": is_short,
         "cond_flags": {
-            "sine_1m_long": cond_sine_1m_long, "sine_1m_short": cond_sine_1m_short,
-            "sine_5m_long": cond_sine_5m_long, "sine_5m_short": cond_sine_5m_short,
+            "sine_long": cond_sine_long, "sine_short": cond_sine_short,
             "cycle_long": cond_cycle_long, "cycle_short": cond_cycle_short,
             "mom_long": cond_mom_long, "mom_short": cond_mom_short,
             "vol_long": cond_vol_long, "vol_short": cond_vol_short,
             "fft_long": cond_fft_long, "fft_short": cond_fft_short,
         },
-        "dist_to_min_1m": dist_to_min_1m,
-        "dist_to_max_1m": dist_to_max_1m,
-        "dist_to_min_5m": dist_to_min_5m,
-        "dist_to_max_5m": dist_to_max_5m,
-        "cycle_direction_1m": cycle_dir_1m,
-        "cycle_direction_5m": cycle_dir_5m,
-        "argmin_idx_1m": argmin_idx_1m,
-        "argmax_idx_1m": argmax_idx_1m,
-        "argmin_idx_5m": argmin_idx_5m,
-        "argmax_idx_5m": argmax_idx_5m,
+        "dist_to_min": dist_to_min,
+        "dist_to_max": dist_to_max,
+        "cycle_direction": cycle_direction,
+        "argmin_idx": argmin_idx,
+        "argmax_idx": argmax_idx,
         "momentum": mom,
         "buy_vol": buy_vol,
         "sell_vol": sell_vol,
-        "buy_pct": buy_pct,
-        "sell_pct": sell_pct,
         "predom_freq": predom_freq,
         "neg_freq_ratio": neg_ratio,
         "pos_freq_ratio": pos_ratio,
+        "grad_spread_neg": grad_spread,
     }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -691,37 +594,22 @@ def format_duration(start_dt, end_dt):
     m, s = divmod(remainder, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def print_conditions(flags, is_long, is_short, sig=None):
+def print_conditions(flags, is_long, is_short):
     """Helper to strictly format conditions as True/False for both LONG and SHORT, plus counts."""
-    print(f"  1. Sine Scale 1m       LONG: {str(flags['sine_1m_long']):<5} | SHORT: {str(flags['sine_1m_short']):<5}")
-    print(f"  2. Sine Scale 5m       LONG: {str(flags['sine_5m_long']):<5} | SHORT: {str(flags['sine_5m_short']):<5}")
-    print(f"  3. Extrema Cycle 1m    LONG: {str(flags['cycle_long']):<5} | SHORT: {str(flags['cycle_short']):<5}")
-    print(f"  4. Momentum 1m         LONG: {str(flags['mom_long']):<5} | SHORT: {str(flags['mom_short']):<5}")
-    print(f"  5. Volume 1m           LONG: {str(flags['vol_long']):<5} | SHORT: {str(flags['vol_short']):<5}")
-    print(f"  6. FFT Predom Freq 1m  LONG: {str(flags['fft_long']):<5} | SHORT: {str(flags['fft_short']):<5}")
+    print(f"  1. Sine Scale          LONG: {str(flags['sine_long']):<5} | SHORT: {str(flags['sine_short']):<5}")
+    print(f"  2. Extrema Cycle       LONG: {str(flags['cycle_long']):<5} | SHORT: {str(flags['cycle_short']):<5}")
+    print(f"  3. Momentum            LONG: {str(flags['mom_long']):<5} | SHORT: {str(flags['mom_short']):<5}")
+    print(f"  4. Volume              LONG: {str(flags['vol_long']):<5} | SHORT: {str(flags['vol_short']):<5}")
+    print(f"  5. FFT Predom Freq     LONG: {str(flags['fft_long']):<5} | SHORT: {str(flags['fft_short']):<5}")
     
     # Calculate how many are true for each side
-    long_true_count = sum([
-        flags['sine_1m_long'], flags['sine_5m_long'], flags['cycle_long'],
-        flags['mom_long'], flags['vol_long'], flags['fft_long']
-    ])
-    short_true_count = sum([
-        flags['sine_1m_short'], flags['sine_5m_short'], flags['cycle_short'],
-        flags['mom_short'], flags['vol_short'], flags['fft_short']
-    ])
+    long_true_count = sum([flags['sine_long'], flags['cycle_long'], flags['mom_long'], flags['vol_long'], flags['fft_long']])
+    short_true_count = sum([flags['sine_short'], flags['cycle_short'], flags['mom_short'], flags['vol_short'], flags['fft_short']])
     
     print(f"  ──────────────────────────────────────────────────")
-    print(f"  True Count:         LONG: {long_true_count}/6      | SHORT: {short_true_count}/6")
+    print(f"  True Count:         LONG: {long_true_count}/5      | SHORT: {short_true_count}/5")
     print(f"  Overall LONG:  {is_long}")
     print(f"  Overall SHORT: {is_short}")
-    
-    # Additional details if sig provided
-    if sig:
-        print(f"  ──────────────────────────────────────────────────")
-        print(f"  [1m Sine] dist_to_min: {sig['dist_to_min_1m']:.1f}% | dist_to_max: {sig['dist_to_max_1m']:.1f}%")
-        print(f"  [5m Sine] dist_to_min: {sig['dist_to_min_5m']:.1f}% | dist_to_max: {sig['dist_to_max_5m']:.1f}%")
-        print(f"  [Volume] Buy: {sig['buy_pct']:.1f}% | Sell: {sig['sell_pct']:.1f}%")
-        print(f"  [FFT] Neg: {sig['neg_freq_ratio']:.3f} | Pos: {sig['pos_freq_ratio']:.3f} | Predom: {sig['predom_freq']:.4f}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
@@ -729,7 +617,7 @@ def print_conditions(flags, is_long, is_short, sig=None):
 
 def main():
     print(f"\n{'='*60}")
-    print(f"HFT KuCoin Bot v6.0 Configuration:")
+    print(f"HFT KuCoin Bot v5.1 Configuration:")
     print(f"{'='*60}")
     print(f"Symbol:        {TRADE_SYMBOL}")
     print(f"Leverage:      {LEVERAGE}x")
@@ -739,9 +627,7 @@ def main():
     print(f"TP Price Move: {TP_PRICE_PCT*100:.3f}%")
     print(f"SL Price Move: {SL_PRICE_PCT*100:.3f}%")
     print(f"Min Balance:   {MIN_BALANCE_USDT} USDT")
-    print(f"Lookback 1m:   {LOOKBACK_1M} candles")
-    print(f"Lookback 5m:   {LOOKBACK_5M} candles")
-    print(f"Conditions:    Strictly 6 (Sine 1m, Sine 5m, Extrema, Momentum, Volume, FFT)")
+    print(f"Conditions:    Strictly 5 (Sine Scale, Extrema Cycle, Momentum, Volume, FFT)")
     print(f"Loop:          {LOOP_SLEEP}s")
     print(f"API Connected: {API_CONNECTED}")
     print(f"{'='*60}\n")
@@ -753,21 +639,15 @@ def main():
         print(f"    Entry: {saved_state.get('entry_price', 0):.2f}")
         
     loop_count = 0
-    last_data_fetch = 0
-    cached_candle_map = {"1m": [], "5m": []}
-    DATA_REFRESH_INTERVAL = 60  # Refresh data every 60 seconds to reduce API calls
 
     while True:
         try:
             now = datetime.datetime.now()
             now_str = now.strftime("%Y-%m-%d %H:%M:%S")
             loop_count += 1
-            current_time = time.time()
 
-            # Fetch data periodically (not every loop to reduce API load)
-            if current_time - last_data_fetch >= DATA_REFRESH_INTERVAL or len(cached_candle_map["1m"]) == 0:
-                cached_candle_map = fetch_candle_map(TRADE_SYMBOL)
-                last_data_fetch = current_time
+            # Fetch data
+            candle_map = fetch_candle_map(TRADE_SYMBOL)
             
             # Check for live position on exchange
             pos = get_position_info(TRADE_SYMBOL)
@@ -786,7 +666,7 @@ def main():
                 entry_price = pos["entry_price"]
                 mark_price = pos["mark_price"]
                 
-                sig = compute_signals(cached_candle_map)
+                sig = compute_signals(candle_map)
                 
                 if loop_count % 5 == 0:  # Print status every 15 seconds
                     print(f"\n[{now_str}] ╔══════ LIVE POSITION ══════╗")
@@ -803,7 +683,7 @@ def main():
                     
                     if sig:
                         print(f"  CONDITIONS (monitoring only - no new entry):")
-                        print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"], sig)
+                        print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"])
                     
                     print(f"  ═════════════════════════════")
                 
@@ -859,7 +739,7 @@ def main():
                 sim_entry_time = saved_state["entry_time"]
                 
                 hit, reason, sim_roe = check_sim_tp_sl(sim_entry_price, current_price, sim_side)
-                sig = compute_signals(cached_candle_map)
+                sig = compute_signals(candle_map)
                 
                 if loop_count % 5 == 0:
                     start_dt = datetime.datetime.strptime(sim_entry_time, "%Y-%m-%d %H:%M:%S")
@@ -880,7 +760,7 @@ def main():
                     
                     if sig:
                         print(f"  CONDITIONS (monitoring only):")
-                        print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"], sig)
+                        print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"])
                     
                     print(f"  ═══════════════════════════════")
                 
@@ -930,24 +810,23 @@ def main():
             # SIGNAL SCANNING PHASE (Only if FLAT - no position anywhere)
             # ═══════════════════════════════════════════════════════════════
             if not pos["is_open"] and not saved_state:
-                sig = compute_signals(cached_candle_map)
+                sig = compute_signals(candle_map)
                 if not sig:
                     if loop_count % 20 == 0: 
-                        print(f"[{now_str}] Gathering data...")
+                        print(f"[{now_str}] Gathering 1m data...")
                     time.sleep(LOOP_SLEEP)
                     continue
 
                 # Print condition analysis with TRUE/FALSE formatting and Counts
                 if loop_count % 5 == 0:
                     print(f"\n[{now_str}] Scanning Conditions (FLAT):")
-                    print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"], sig)
+                    print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"])
                     print(f"  ──────────────────────────────────────────────────")
                     print(f"  Balance: {balance:.2f} USDT | Sufficient: {has_sufficient_balance}")
-                    print(f"  Data: 1m={len(cached_candle_map['1m'])} candles | 5m={len(cached_candle_map['5m'])} candles")
 
                 # ENTRY LOGIC - LONG
                 if sig["is_long"]:
-                    print(f"\n  *** ALL 6 CONDITIONS MET FOR LONG ***")
+                    print(f"\n  *** ALL 5 CONDITIONS MET FOR LONG ***")
                     
                     if has_sufficient_balance:
                         print(f"  [LIVE] Executing LONG entry...")
@@ -982,7 +861,7 @@ def main():
 
                 # ENTRY LOGIC - SHORT
                 elif sig["is_short"]:
-                    print(f"\n  *** ALL 6 CONDITIONS MET FOR SHORT ***")
+                    print(f"\n  *** ALL 5 CONDITIONS MET FOR SHORT ***")
                     
                     if has_sufficient_balance:
                         print(f"  [LIVE] Executing SHORT entry...")
