@@ -1,16 +1,12 @@
 """
-HFT Auto Trading Bot v5.3 — KuCoin Futures Edition
+HFT Auto Trading Bot — KuCoin Futures Edition
 ===================================================
 Strictly 5 Conditions:
   1. Sine Scale (5m TF): Uses argmin/argmax of last 1200 5m values as cycle boundaries
-     - dist_to_min < dist_to_max (LONG) | dist_to_max < dist_to_min (SHORT)
   2. Extrema Cycle (1m TF): Uses argmin/argmax of last 1200 1m values for precise micro-reversals
-     - argmin > argmax (LONG) | argmax > argmin (SHORT)
-  3. Momentum (5m TF): MOM > 0 (LONG) | MOM < 0 (SHORT)
-  4. Volume (5m TF): Bullish > Bearish (LONG) | Bearish > Bullish (SHORT)
-  5. FFT Frequency Analysis (5m TF): Strict Dominance between extremas
-     - Negative Power STRICTLY > Positive Power (LONG) | Positive Power STRICTLY > Negative Power (SHORT)
-     - (NO equals. If exactly equal, neither triggers - pure dominance required)
+  3. Momentum (1m TF): MOM > 0 (LONG) | MOM < 0 (SHORT)
+  4. Volume (1m TF): Bullish % > Bearish % (LONG) | Bearish % > Bullish % (SHORT) [Out of 100%]
+  5. FFT Dominance (1m TF): Top 12 Negative Freq Power > Top 12 Positive Freq Power (LONG) | Vice versa (SHORT)
 
 25x Leverage
 TP: 2.55% NET Profit (5.55% Gross ROE after 3.0% RT fee deduction)
@@ -35,7 +31,7 @@ import gc
 from scipy.fft import fft, fftfreq
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# FILE SETUP - Clean trades.txt
+# FILE SETUP
 # ═══════════════════════════════════════════════════════════════════════════════
 
 TRADE_STATE_FILE = "trade_state.json"
@@ -43,7 +39,6 @@ TRADES_LOG_FILE = "trades.txt"
 ANALYTICS_FILE = "analytics.json"
 
 def clean_trades_file():
-    """Create or empty the trades.txt file."""
     try:
         with open(TRADES_LOG_FILE, "w", encoding="utf-8") as f:
             f.write("")
@@ -64,7 +59,7 @@ gc.collect()
 
 clean_trades_file()
 
-print("HFT KuCoin Bot v5.3 (25x / 5m Sine + 1m Extrema / Strict FFT Dominance) initialising...")
+print("HFT KuCoin Bot (25x / 5m Sine + 1m Extrema/Mom/Vol/FFT) initialising...")
 if _cleaned:
     print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
 del _cleaned
@@ -96,11 +91,8 @@ class KuCoinFuturesClient:
         ts = str(int(time.time() * 1000))
         sign = _kucoin_sign(self.api_secret, ts, method, signed_endpoint, body)
         return {
-            "KC-API-KEY": self.api_key,
-            "KC-API-SIGN": sign,
-            "KC-API-TIMESTAMP": ts,
-            "KC-API-PASSPHRASE": self._signed_passphrase,
-            "KC-API-KEY-VERSION": "2",
+            "KC-API-KEY": self.api_key, "KC-API-SIGN": sign, "KC-API-TIMESTAMP": ts,
+            "KC-API-PASSPHRASE": self._signed_passphrase, "KC-API-KEY-VERSION": "2",
             "Content-Type": "application/json",
         }
 
@@ -126,40 +118,22 @@ class KuCoinFuturesClient:
 
     def get_account_overview(self):
         return self.get("/api/v1/account-overview", {"currency": "USDT"})
-
     def get_klines(self, symbol, granularity, start_ms=None, end_ms=None):
         params = {"symbol": symbol, "granularity": granularity}
-        if start_ms:
-            params["from"] = start_ms
-        if end_ms:
-            params["to"] = end_ms
-        data = self.get("/api/v1/kline/query", params)
-        return data.get("data", [])
-
+        if start_ms: params["from"] = start_ms
+        if end_ms: params["to"] = end_ms
+        return self.get("/api/v1/kline/query", params).get("data", [])
     def get_ticker(self, symbol):
         return self.get("/api/v1/ticker", {"symbol": symbol})
-
     def get_position(self, symbol):
         return self.get("/api/v1/position", {"symbol": symbol})
-
     def place_order(self, symbol, side, size, leverage):
-        payload = {
-            "clientOid": hashlib.md5(f"{time.time()}{side}".encode()).hexdigest(),
-            "symbol": symbol,
-            "side": side,
-            "type": "market",
-            "size": size,
-            "leverage": str(leverage),
-        }
+        payload = {"clientOid": hashlib.md5(f"{time.time()}{side}".encode()).hexdigest(),
+                   "symbol": symbol, "side": side, "type": "market", "size": size, "leverage": str(leverage)}
         return self.post("/api/v1/orders", payload)
-
     def close_position(self, symbol):
-        payload = {
-            "clientOid": hashlib.md5(str(time.time()).encode()).hexdigest(),
-            "symbol": symbol,
-            "type": "market",
-            "closeOrder": True,
-        }
+        payload = {"clientOid": hashlib.md5(str(time.time()).encode()).hexdigest(),
+                   "symbol": symbol, "type": "market", "closeOrder": True}
         return self.post("/api/v1/orders", payload)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -171,296 +145,240 @@ LEVERAGE = 25
 LOOP_SLEEP = 3
 MIN_BALANCE_USDT = 5.0
 
-# Analysis windows
-ANALYSIS_WINDOW_5M = 1200  # 1200 * 5m = 100 hours ≈ 4.16 days
-ANALYSIS_WINDOW_1M = 1200  # 1200 * 1m = 20 hours
+ANALYSIS_WINDOW_5M = 1200 
+ANALYSIS_WINDOW_1M = 1200 
 
 KUCOIN_TAKER_FEE = 0.0006
-RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100  # 0.0012 * 25 * 100 = 3.0%
-NET_PROFIT_ROE = 2.55                                  # 2.55% Clean Net Profit Target
-TAKE_PROFIT_ROE = NET_PROFIT_ROE + RT_FEE_ROE_PCT      # 2.55 + 3.0 = 5.55% Gross
-STOP_LOSS_ROE = -25.0                                  # -25% ROE Stop Loss
+RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100  # 3.0%
+NET_PROFIT_ROE = 2.55                                  
+TAKE_PROFIT_ROE = NET_PROFIT_ROE + RT_FEE_ROE_PCT      # 5.55%
+STOP_LOSS_ROE = -25.0                                  
 
-# Price move percentages for TP/SL
-TP_PRICE_PCT = TAKE_PROFIT_ROE / LEVERAGE / 100.0  # 5.55 / 25 / 100 = 0.00222 (0.222%)
-SL_PRICE_PCT = abs(STOP_LOSS_ROE) / LEVERAGE / 100.0  # 25.0 / 25 / 100 = 0.01 (1.0%)
+TP_PRICE_PCT = TAKE_PROFIT_ROE / LEVERAGE / 100.0  # 0.222%
+SL_PRICE_PCT = abs(STOP_LOSS_ROE) / LEVERAGE / 100.0  # 1.0%
 
 try:
     with open("credentials_kucoin.txt", "r") as _f:
         _lines = _f.readlines()
-        _API_KEY = _lines[0].strip()
-        _API_SECRET = _lines[1].strip()
-        _API_PASSPHRASE = _lines[2].strip()
+        _API_KEY, _API_SECRET, _API_PASSPHRASE = _lines[0].strip(), _lines[1].strip(), _lines[2].strip()
     client = KuCoinFuturesClient(_API_KEY, _API_SECRET, _API_PASSPHRASE)
     API_CONNECTED = True
 except Exception as e:
-    print(f"  [WARN] API credentials not found or invalid: {e}")
-    print("  [WARN] Running in SIMULATION-ONLY mode")
-    client = None
-    API_CONNECTED = False
+    print(f"  [WARN] API credentials not found or invalid: {e}\n  [WARN] Running in SIMULATION-ONLY mode")
+    client, API_CONNECTED = None, False
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DATA HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def get_account_balance():
-    if not API_CONNECTED:
-        return 0.0
-    try:
-        data = client.get_account_overview()
-        return float(data["data"]["availableBalance"])
-    except Exception as e:
-        print(f"  [balance] error: {e}")
-        return 0.0
+    if not API_CONNECTED: return 0.0
+    try: return float(client.get_account_overview()["data"]["availableBalance"])
+    except Exception: return 0.0
 
 def get_price(symbol):
-    if not API_CONNECTED:
-        return 0.0
-    try:
-        data = client.get_ticker(symbol)
-        return float(data["data"]["price"])
-    except Exception as e:
-        print(f"  [price] error: {e}")
-        return 0.0
+    if not API_CONNECTED: return 0.0
+    try: return float(client.get_ticker(symbol)["data"]["price"])
+    except Exception: return 0.0
 
 def fetch_candle_map(symbol):
-    """
-    Fetches 1200 5m candles AND 1200 1m candles.
-    5m: 4.16 days of data (For Sine, Momentum, Volume, FFT)
-    1m: 20 hours of data (For Condition 2 Extrema Cycle)
-    """
     candle_map = {"1m": [], "5m": []}
-    if not API_CONNECTED:
-        return candle_map
-    
+    if not API_CONNECTED: return candle_map
     now_ms = int(time.time() * 1000)
-    limit = 200
-    num_requests = 6  # 6 * 200 = 1200 candles
+    limit, num_requests = 200, 6 
     
-    # --- Fetch 5m Candles ---
-    candle_duration_ms_5m = 5 * 60 * 1000
-    for i in range(num_requests):
-        end_ms = now_ms - (i * limit * candle_duration_ms_5m)
-        start_ms = end_ms - (limit * candle_duration_ms_5m)
-        try:
-            raw = client.get_klines(symbol, 5, start_ms=start_ms, end_ms=end_ms)
-            for k in reversed(raw):
-                try:
-                    candle_map["5m"].append({
-                        "time": int(k[0]) / 1000,
-                        "open": float(k[1]),
-                        "high": float(k[2]),
-                        "low": float(k[3]),
-                        "close": float(k[4]),
-                        "volume": float(k[5]),
-                    })
-                except (IndexError, TypeError, ValueError):
-                    continue
-        except Exception as e:
-            print(f"  kline fetch error [5m]: {e}")
-            
-    candle_map["5m"] = candle_map["5m"][-ANALYSIS_WINDOW_5M:]
-
-    # --- Fetch 1m Candles ---
-    candle_duration_ms_1m = 1 * 60 * 1000
-    for i in range(num_requests):
-        end_ms = now_ms - (i * limit * candle_duration_ms_1m)
-        start_ms = end_ms - (limit * candle_duration_ms_1m)
-        try:
-            raw = client.get_klines(symbol, 1, start_ms=start_ms, end_ms=end_ms)
-            for k in reversed(raw):
-                try:
-                    candle_map["1m"].append({
-                        "time": int(k[0]) / 1000,
-                        "open": float(k[1]),
-                        "high": float(k[2]),
-                        "low": float(k[3]),
-                        "close": float(k[4]),
-                        "volume": float(k[5]),
-                    })
-                except (IndexError, TypeError, ValueError):
-                    continue
-        except Exception as e:
-            print(f"  kline fetch error [1m]: {e}")
-            
-    candle_map["1m"] = candle_map["1m"][-ANALYSIS_WINDOW_1M:]
+    for tf, dur_ms in [("5m", 5 * 60 * 1000), ("1m", 1 * 60 * 1000)]:
+        for i in range(num_requests):
+            end_ms = now_ms - (i * limit * dur_ms)
+            start_ms = end_ms - (limit * dur_ms)
+            try:
+                for k in reversed(client.get_klines(symbol, int(tf[0]), start_ms=start_ms, end_ms=end_ms)):
+                    try:
+                        candle_map[tf].append({"time": int(k[0])/1000, "open": float(k[1]), "high": float(k[2]),
+                                               "low": float(k[3]), "close": float(k[4]), "volume": float(k[5])})
+                    except (IndexError, TypeError, ValueError): continue
+            except Exception as e: print(f"  kline fetch error [{tf}]: {e}")
+        candle_map[tf] = candle_map[tf][-1200:]
     return candle_map
 
-def get_buy_sell_volume(candles):
-    """Calculates total bullish vs bearish volume from provided candles."""
+def get_buy_sell_volume_perc(candles):
     buy_vol = sell_vol = 0.0
     for c in candles:
-        if c["close"] >= c["open"]:
-            buy_vol += c["volume"]
-        else:
-            sell_vol += c["volume"]
-    return buy_vol, sell_vol
+        if c["close"] >= c["open"]: buy_vol += c["volume"]
+        else: sell_vol += c["volume"]
+    total_vol = buy_vol + sell_vol
+    if total_vol == 0: return 50.0, 50.0
+    return (buy_vol / total_vol) * 100.0, (sell_vol / total_vol) * 100.0
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TECHNICAL ANALYSIS (Strictly the 5 required conditions)
+# TECHNICAL ANALYSIS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def scale_to_sine(close_prices, argmin_idx, argmax_idx):
-    """Condition 1: Scale to Sine using 5m boundaries."""
-    if len(close_prices) < 32:
-        return 50.0, 50.0, 0.0, "none", np.array([])
-    
-    sine_wave, _ = talib.HT_SINE(close_prices)
-    sine_wave = np.nan_to_num(sine_wave)
-    sine_wave = -sine_wave  # Invert for standard peak/trough alignment
-    
+def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
+    if len(close_prices_5m) < 32: return 50.0, 50.0
+    sine_wave, _ = talib.HT_SINE(close_prices_5m)
+    sine_wave = np.nan_to_num(-sine_wave)
     sine_window = sine_wave[-ANALYSIS_WINDOW_5M:] if len(sine_wave) >= ANALYSIS_WINDOW_5M else sine_wave
-    sine_at_argmin = sine_window[argmin_idx]
-    sine_at_argmax = sine_window[argmax_idx]
-    
-    if argmin_idx > argmax_idx:
-        cycle_min = sine_at_argmin
-        cycle_max = sine_at_argmax
-        cycle_direction = "up"
-    else:
-        cycle_max = sine_at_argmax
-        cycle_min = sine_at_argmin
-        cycle_direction = "down"
-    
-    current_sine = sine_wave[-1]
+    cycle_min, cycle_max = sine_window[argmin_idx], sine_window[argmax_idx]
     rng = cycle_max - cycle_min if cycle_max != cycle_min else 1e-9
-    
-    dist_to_min = ((current_sine - cycle_min) / rng) * 100
-    dist_to_max = ((cycle_max - current_sine) / rng) * 100
-    
-    dist_to_min = max(0, min(100, dist_to_min))
-    dist_to_max = max(0, min(100, dist_to_max))
-    
-    return dist_to_min, dist_to_max, current_sine, cycle_direction, sine_wave
+    current_sine = sine_wave[-1]
+    dist_to_min = max(0, min(100, ((current_sine - cycle_min) / rng) * 100))
+    dist_to_max = max(0, min(100, ((cycle_max - current_sine) / rng) * 100))
+    return dist_to_min, dist_to_max
 
 
-def analyze_fft_frequencies(sine_wave, argmin_idx, argmax_idx, cycle_direction):
-    """Condition 5: Strict FFT Dominance. NO equals allowed."""
-    if len(sine_wave) < 16:
-        return False, False, 0.0, 1.0, 0.0, False 
+def analyze_fft_dominance_1m(close_prices_1m):
+    """
+    FFT Dominance using HT_SINE quadrature components.
     
-    sine_window = sine_wave[-ANALYSIS_WINDOW_5M:] if len(sine_wave) >= ANALYSIS_WINDOW_5M else sine_wave
-    start_idx = min(argmin_idx, argmax_idx)
-    end_idx = max(argmin_idx, argmax_idx)
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║ CRITICAL FIX: Real signals have symmetric FFT magnitudes (always 50/50).  ║
+    ║ Solution: Use BOTH HT_SINE outputs to create a COMPLEX signal that         ║
+    ║ breaks conjugate symmetry. The phase relationship between sine and         ║
+    ║ leadsine varies with market cycle position, producing asymmetric power.    ║
+    ╚══════════════════════════════════════════════════════════════════════════════╝
     
-    if end_idx - start_idx < 8:
-        segment = sine_window[-64:] if len(sine_window) >= 64 else sine_window
-    else:
-        segment = sine_window[start_idx:end_idx + 1]
+    - Negative freq power > Positive freq power → LONG (cycle trough area)
+    - Positive freq power > Negative freq power → SHORT (cycle peak area)
+    """
+    if len(close_prices_1m) < 32: 
+        return False, False, 0.0, 0.0
     
-    n = len(segment)
-    if n < 8:
-        return False, False, 0.0, 1.0, 0.0, False
+    # Get BOTH outputs from HT_SINE - this is the key fix!
+    sine_wave_1m, lead_sine_1m = talib.HT_SINE(close_prices_1m)
+    sine_wave_1m = np.nan_to_num(-sine_wave_1m)
+    lead_sine_1m = np.nan_to_num(-lead_sine_1m)
     
-    fft_result = fft(segment)
-    fft_magnitude = np.abs(fft_result)
+    # Remove NaN values that appear at the start of HT_SINE output
+    valid_mask = ~(np.isnan(sine_wave_1m) | np.isnan(lead_sine_1m))
+    sine_wave_1m = sine_wave_1m[valid_mask]
+    lead_sine_1m = lead_sine_1m[valid_mask]
+    
+    if len(sine_wave_1m) < 32:
+        return False, False, 0.0, 0.0
+    
+    n = len(sine_wave_1m)
+    
+    # ══════════════════════════════════════════════════════════════════════════
+    # THE FIX: Construct complex signal from quadrature components
+    # ══════════════════════════════════════════════════════════════════════════
+    # The HT_SINE leadsine is a predictive signal with varying phase lead.
+    # By combining sine (real) + j*leadsine (imaginary), we create a complex
+    # signal that is NOT conjugate symmetric, allowing different neg/pos power.
+    #
+    # Physics: When leadsine is ~90° ahead → power shifts to positive freqs
+    #          When leadsine is ~90° behind → power shifts to negative freqs
+    #          The actual lead angle varies with cycle position/momentum
+    # ══════════════════════════════════════════════════════════════════════════
+    
+    complex_signal = sine_wave_1m + 1j * lead_sine_1m
+    
+    # Apply Hanning window to reduce spectral leakage
+    window = np.hanning(n)
+    complex_signal = complex_signal * window
+    
+    # Remove DC component (mean)
+    complex_signal = complex_signal - np.mean(complex_signal)
+    
+    # Compute FFT
+    fft_result = fft(complex_signal)
+    fft_power = np.abs(fft_result) ** 2  # Use power (magnitude squared)
     freq_bins = fftfreq(n)
     
-    magnitudes = fft_magnitude[1:]
+    # Skip DC component (index 0)
+    powers = fft_power[1:]
     frequencies = freq_bins[1:]
     
-    if len(magnitudes) == 0:
-        return False, False, 0.0, 1.0, 0.0, False
-    
-    total_power = np.sum(magnitudes)
-    if total_power == 0:
-        return False, False, 0.0, 1.0, 0.0, False
-    
+    # Separate negative and positive frequencies
     neg_mask = frequencies < 0
     pos_mask = frequencies > 0
     
-    neg_power = np.sum(magnitudes[neg_mask])
-    pos_power = np.sum(magnitudes[pos_mask])
+    neg_powers = powers[neg_mask]
+    pos_powers = powers[pos_mask]
     
-    neg_power_ratio = neg_power / total_power
-    pos_power_ratio = pos_power / total_power
+    # Extract Top 12 Predominant Negative Frequencies
+    if len(neg_powers) >= 12:
+        top_12_neg = np.sort(neg_powers)[-12:]
+        neg_power = np.sum(top_12_neg)
+    elif len(neg_powers) > 0:
+        neg_power = np.sum(neg_powers)
+    else:
+        neg_power = 0.0
+        
+    # Extract Top 12 Predominant Positive Frequencies
+    if len(pos_powers) >= 12:
+        top_12_pos = np.sort(pos_powers)[-12:]
+        pos_power = np.sum(top_12_pos)
+    elif len(pos_powers) > 0:
+        pos_power = np.sum(pos_powers)
+    else:
+        pos_power = 0.0
     
-    predom_idx = np.argmax(magnitudes)
-    predom_freq = frequencies[predom_idx]
+    total_power = neg_power + pos_power
+    if total_power == 0: 
+        return False, False, 0.0, 0.0
     
-    grad_spread_neg = neg_power_ratio > 0.45
+    neg_ratio = (neg_power / total_power) * 100
+    pos_ratio = (pos_power / total_power) * 100
     
-    # STRICT DOMINANCE EVALUATION: NO EQUALS.
-    # If neg == pos, NEITHER triggers (no buy/sell power dominance).
-    fft_long_signal = neg_power_ratio > pos_power_ratio
-    fft_short_signal = pos_power_ratio > neg_power_ratio
+    # Strict Dominance: One MUST be strictly greater than the other
+    # Add small threshold to avoid noise-triggered false signals
+    DOMINANCE_THRESHOLD = 0.1  # At least 0.1% difference required
+    fft_long_signal = neg_ratio > (pos_ratio + DOMINANCE_THRESHOLD)
+    fft_short_signal = pos_ratio > (neg_ratio + DOMINANCE_THRESHOLD)
     
-    return fft_long_signal, fft_short_signal, predom_freq, neg_power_ratio, pos_power_ratio, grad_spread_neg
+    return fft_long_signal, fft_short_signal, neg_ratio, pos_ratio
 
 
 def calculate_momentum(close_arr, period=14):
-    if len(close_arr) < period + 1:
-        return np.nan
-    mom = talib.MOM(close_arr, timeperiod=period)
-    return float(mom[-1])
-
+    if len(close_arr) < period + 1: return np.nan
+    return float(talib.MOM(close_arr, timeperiod=period)[-1])
 
 def compute_signals(candle_map):
     closes_5m_raw = [c["close"] for c in candle_map.get("5m", [])]
     closes_1m_raw = [c["close"] for c in candle_map.get("1m", [])]
     live_price = get_price(TRADE_SYMBOL)
     
-    if len(closes_5m_raw) < 50 or len(closes_1m_raw) < 50:
-        return None
-        
+    if len(closes_5m_raw) < 50 or len(closes_1m_raw) < 50: return None
     close_arr_5m = np.array(closes_5m_raw, dtype=float)
     close_arr_1m = np.array(closes_1m_raw, dtype=float)
     
-    # ═══════════════════════════════════════════════════════════════
-    # 2. Extrema Cycle (STRICTLY 1m TF - Last 1200 1m values)
-    # ═══════════════════════════════════════════════════════════════
+    # 1. Sine Scale (5m)
+    last_1200_5m = close_arr_5m[-ANALYSIS_WINDOW_5M:]
+    argmin_idx_5m = int(np.argmin(last_1200_5m))
+    argmax_idx_5m = int(np.argmax(last_1200_5m))
+    dist_to_min, dist_to_max = scale_to_sine(close_arr_5m, argmin_idx_5m, argmax_idx_5m)
+    cond_sine_long = dist_to_min < dist_to_max
+    cond_sine_short = dist_to_max < dist_to_min
+    
+    # 2. Extrema Cycle (1m)
     last_1200_1m = close_arr_1m[-ANALYSIS_WINDOW_1M:]
     argmin_idx_1m = int(np.argmin(last_1200_1m))
     argmax_idx_1m = int(np.argmax(last_1200_1m))
     cond_cycle_long = argmin_idx_1m > argmax_idx_1m
     cond_cycle_short = argmax_idx_1m > argmin_idx_1m
     
-    # ═══════════════════════════════════════════════════════════════
-    # 1. Sine Scale (STRICTLY 5m TF - Last 1200 5m values)
-    # ═══════════════════════════════════════════════════════════════
-    last_1200_5m = close_arr_5m[-ANALYSIS_WINDOW_5M:]
-    argmin_idx_5m = int(np.argmin(last_1200_5m))
-    argmax_idx_5m = int(np.argmax(last_1200_5m))
+    # 3. Momentum (1m)
+    mom_1m = calculate_momentum(close_arr_1m)
+    if np.isnan(mom_1m): return None
+    cond_mom_long = mom_1m > 0
+    cond_mom_short = mom_1m < 0
     
-    dist_to_min, dist_to_max, current_sine, cycle_direction, sine_wave = scale_to_sine(
-        close_arr_5m, argmin_idx_5m, argmax_idx_5m
-    )
-    cond_sine_long = dist_to_min < dist_to_max
-    cond_sine_short = dist_to_max < dist_to_min
+    # 4. Volume (1m Percentages)
+    bullish_perc, bearish_perc = get_buy_sell_volume_perc(candle_map["1m"])
+    cond_vol_long = bullish_perc > bearish_perc
+    cond_vol_short = bearish_perc > bullish_perc
     
-    # ═══════════════════════════════════════════════════════════════
-    # 5. FFT Frequency Analysis (STRICTLY 5m TF)
-    # ═══════════════════════════════════════════════════════════════
-    fft_long, fft_short, predom_freq, neg_ratio, pos_ratio, grad_spread = analyze_fft_frequencies(
-        sine_wave, argmin_idx_5m, argmax_idx_5m, cycle_direction
-    )
+    # 5. FFT Dominance (1m Top 12 Freqs) - FIXED VERSION
+    fft_long, fft_short, neg_ratio, pos_ratio = analyze_fft_dominance_1m(close_arr_1m)
     cond_fft_long = fft_long
     cond_fft_short = fft_short
     
-    # ═══════════════════════════════════════════════════════════════
-    # 3. Momentum (STRICTLY 5m TF)
-    # ═══════════════════════════════════════════════════════════════
-    mom = calculate_momentum(close_arr_5m)
-    if np.isnan(mom):
-        return None
-    cond_mom_long = mom > 0
-    cond_mom_short = mom < 0
-    
-    # ═══════════════════════════════════════════════════════════════
-    # 4. Volume (STRICTLY 5m TF)
-    # ═══════════════════════════════════════════════════════════════
-    buy_vol, sell_vol = get_buy_sell_volume(candle_map["5m"])
-    cond_vol_long = buy_vol > sell_vol
-    cond_vol_short = sell_vol > buy_vol
-    
-    # ALL 5 CONDITIONS MUST BE TRUE
     is_long = cond_sine_long and cond_cycle_long and cond_mom_long and cond_vol_long and cond_fft_long
     is_short = cond_sine_short and cond_cycle_short and cond_mom_short and cond_vol_short and cond_fft_short
     
     return {
-        "price": live_price,
-        "is_long": is_long,
-        "is_short": is_short,
+        "price": live_price, "is_long": is_long, "is_short": is_short,
         "cond_flags": {
             "sine_long": cond_sine_long, "sine_short": cond_sine_short,
             "cycle_long": cond_cycle_long, "cycle_short": cond_cycle_short,
@@ -468,18 +386,10 @@ def compute_signals(candle_map):
             "vol_long": cond_vol_long, "vol_short": cond_vol_short,
             "fft_long": cond_fft_long, "fft_short": cond_fft_short,
         },
-        "dist_to_min": dist_to_min,
-        "dist_to_max": dist_to_max,
-        "cycle_direction": cycle_direction,
-        "argmin_idx_1m": argmin_idx_1m,
-        "argmax_idx_1m": argmax_idx_1m,
-        "momentum": mom,
-        "buy_vol": buy_vol,
-        "sell_vol": sell_vol,
-        "predom_freq": predom_freq,
-        "neg_freq_ratio": neg_ratio,
-        "pos_freq_ratio": pos_ratio,
-        "grad_spread_neg": grad_spread,
+        "dist_to_min": dist_to_min, "dist_to_max": dist_to_max,
+        "argmin_idx_1m": argmin_idx_1m, "argmax_idx_1m": argmax_idx_1m,
+        "mom_1m": mom_1m, "bullish_perc": bullish_perc, "bearish_perc": bearish_perc,
+        "neg_ratio": neg_ratio, "pos_ratio": pos_ratio,
     }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -489,38 +399,20 @@ def compute_signals(candle_map):
 def calculate_sl_tp(entry_price, side):
     tp_dist = entry_price * TP_PRICE_PCT
     sl_dist = entry_price * SL_PRICE_PCT
-    
-    if side == "long":
-        sl_price = entry_price - sl_dist
-        tp_price = entry_price + tp_dist
-    else:
-        sl_price = entry_price + sl_dist
-        tp_price = entry_price - tp_dist
-        
+    if side == "long": sl_price, tp_price = entry_price - sl_dist, entry_price + tp_dist
+    else: sl_price, tp_price = entry_price + sl_dist, entry_price - tp_dist
     print(f"  [Risk Calc] TP Dist: {tp_dist:.2f} ({TAKE_PROFIT_ROE}% ROE gross / {NET_PROFIT_ROE}% net)")
     print(f"  [Risk Calc] SL Dist: {sl_dist:.2f} ({STOP_LOSS_ROE}% ROE)")
     print(f"  [Risk Calc] TP Price: {tp_price:.2f} | SL Price: {sl_price:.2f}")
-    
     return float(sl_price), float(tp_price)
 
 def check_sim_tp_sl(entry_price, current_price, side):
-    """Check if simulated trade hit TP or SL. Returns (hit, reason, roe_pct)"""
-    if side == "long":
-        price_change_pct = ((current_price - entry_price) / entry_price) * 100
-        roe_pct = price_change_pct * LEVERAGE - RT_FEE_ROE_PCT
-        if roe_pct >= TAKE_PROFIT_ROE:
-            return True, "TAKE PROFIT", roe_pct
-        elif roe_pct <= STOP_LOSS_ROE:
-            return True, "STOP LOSS", roe_pct
-        return False, None, roe_pct
-    else:  # short
-        price_change_pct = ((entry_price - current_price) / entry_price) * 100
-        roe_pct = price_change_pct * LEVERAGE - RT_FEE_ROE_PCT
-        if roe_pct >= TAKE_PROFIT_ROE:
-            return True, "TAKE PROFIT", roe_pct
-        elif roe_pct <= STOP_LOSS_ROE:
-            return True, "STOP LOSS", roe_pct
-        return False, None, roe_pct
+    if side == "long": price_change_pct = ((current_price - entry_price) / entry_price) * 100
+    else: price_change_pct = ((entry_price - current_price) / entry_price) * 100
+    roe_pct = price_change_pct * LEVERAGE - RT_FEE_ROE_PCT
+    if roe_pct >= TAKE_PROFIT_ROE: return True, "TAKE PROFIT", roe_pct
+    elif roe_pct <= STOP_LOSS_ROE: return True, "STOP LOSS", roe_pct
+    return False, None, roe_pct
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STATE & JOURNALING
@@ -528,72 +420,45 @@ def check_sim_tp_sl(entry_price, current_price, side):
 
 def save_trade_state(state):
     try:
-        with open(TRADE_STATE_FILE, "w") as f:
-            json.dump(state, f, indent=2)
-    except Exception as e:
-        print(f"  [state] save error: {e}")
+        with open(TRADE_STATE_FILE, "w") as f: json.dump(state, f, indent=2)
+    except Exception as e: print(f"  [state] save error: {e}")
 
 def load_trade_state():
-    if not os.path.exists(TRADE_STATE_FILE):
-        return None
+    if not os.path.exists(TRADE_STATE_FILE): return None
     try:
-        with open(TRADE_STATE_FILE, "r") as f:
-            return json.load(f)
-    except Exception:
-        return None
+        with open(TRADE_STATE_FILE, "r") as f: return json.load(f)
+    except Exception: return None
 
 def clear_trade_state():
     try:
-        if os.path.exists(TRADE_STATE_FILE):
-            os.remove(TRADE_STATE_FILE)
-    except Exception:
-        pass
+        if os.path.exists(TRADE_STATE_FILE): os.remove(TRADE_STATE_FILE)
+    except Exception: pass
 
 def write_trade_to_journal(trade_result):
-    """Write trade result to trades.txt in clean format."""
     mode = trade_result.get("mode", "LIVE")
-    line = (
-        f"{'='*60}\n"
-        f"MODE: {mode}\n"
-        f"TYPE: {trade_result.get('type', 'N/A').upper()}\n"
-        f"ENTRY TIME: {trade_result.get('entry_time', 'N/A')}\n"
-        f"EXIT TIME: {trade_result.get('exit_time', 'N/A')}\n"
-        f"DURATION: {trade_result.get('duration', 'N/A')}\n"
-        f"ENTRY PRICE: {trade_result.get('entry_price', 0):.2f}\n"
-        f"EXIT PRICE: {trade_result.get('exit_price', 0):.2f}\n"
-        f"PRICE CHANGE: {trade_result.get('price_change_pct', 0):+.4f}%\n"
-        f"GROSS ROE: {trade_result.get('gross_roe', 0):+.2f}%\n"
-        f"RT FEE DEDUCTED: {trade_result.get('rt_fee_pct', 0):.2f}%\n"
-        f"NET ROE: {trade_result.get('roe', 0):+.2f}%\n"
-        f"REASON: {trade_result.get('reason', 'N/A')}\n"
-        f"LEVERAGE: {LEVERAGE}x\n"
-        f"STRATEGY: 5m Sine + 1m Extrema + Strict FFT Dominance\n"
-        f"{'='*60}\n\n"
-    )
+    line = (f"{'='*60}\nMODE: {mode}\nTYPE: {trade_result.get('type', 'N/A').upper()}\n"
+            f"ENTRY TIME: {trade_result.get('entry_time', 'N/A')}\nEXIT TIME: {trade_result.get('exit_time', 'N/A')}\n"
+            f"DURATION: {trade_result.get('duration', 'N/A')}\nENTRY PRICE: {trade_result.get('entry_price', 0):.2f}\n"
+            f"EXIT PRICE: {trade_result.get('exit_price', 0):.2f}\nPRICE CHANGE: {trade_result.get('price_change_pct', 0):+.4f}%\n"
+            f"GROSS ROE: {trade_result.get('gross_roe', 0):+.2f}%\nRT FEE DEDUCTED: {trade_result.get('rt_fee_pct', 0):.2f}%\n"
+            f"NET ROE: {trade_result.get('roe', 0):+.2f}%\nREASON: {trade_result.get('reason', 'N/A')}\n"
+            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 5m Sine + 1m Extrema/Mom/Vol/FFT\n{'='*60}\n\n")
     try:
-        with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(line)
-    except Exception as e:
-        print(f"  [journal] write error: {e}")
+        with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f: f.write(line)
+    except Exception as e: print(f"  [journal] write error: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ORDER EXECUTION
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def get_contract_size(symbol):
-    if not API_CONNECTED:
-        return 0.001
-    try:
-        data = client.get(f"/api/v1/contracts/{symbol}")
-        return float(data["data"]["multiplier"])
-    except Exception:
-        return 0.001
+    if not API_CONNECTED: return 0.001
+    try: return float(client.get(f"/api/v1/contracts/{symbol}")["data"]["multiplier"])
+    except Exception: return 0.001
 
 def execute_entry(symbol, side, balance, price):
     try:
-        multiplier = get_contract_size(symbol)
-        notional = balance * LEVERAGE
-        contracts = max(1, int(notional / (price * multiplier)))
+        contracts = max(1, int((balance * LEVERAGE) / (price * get_contract_size(symbol))))
         resp = client.place_order(symbol, side, contracts, LEVERAGE)
         if resp.get("data", {}).get("orderId"):
             print(f"  >>> {side.upper()} PLACED: {contracts} contracts @ ~{price:.2f}")
@@ -610,50 +475,54 @@ def execute_entry(symbol, side, balance, price):
 
 def get_position_info(symbol):
     empty = {"is_open": False, "roe_pct": 0.0, "entry_price": 0.0, "mark_price": 0.0, "side": None, "size": 0}
-    if not API_CONNECTED:
-        return empty
+    if not API_CONNECTED: return empty
     try:
-        raw = client.get_position(symbol)
-        data = raw.get("data", {})
+        data = client.get_position(symbol).get("data", {})
         size = float(data.get("currentQty", 0) or 0)
-        if size == 0:
-            return empty
-        upnl = float(data.get("unrealisedPnl", 0) or 0)
-        margin = float(data.get("posMargin", 0) or 0)
-        roe = (upnl / margin * 100) if margin else 0.0
-        return {
-            "is_open": True, "side": "long" if size > 0 else "short",
-            "entry_price": float(data.get("avgEntryPrice", 0)), 
-            "mark_price": float(data.get("markPrice", 0)), 
-            "roe_pct": roe,
-            "size": size,
-        }
-    except Exception as e:
-        print(f"    [pos/error] {e}")
-        return empty
+        if size == 0: return empty
+        upnl, margin = float(data.get("unrealisedPnl", 0) or 0), float(data.get("posMargin", 0) or 0)
+        return {"is_open": True, "side": "long" if size > 0 else "short",
+                "entry_price": float(data.get("avgEntryPrice", 0)), "mark_price": float(data.get("markPrice", 0)), 
+                "roe_pct": (upnl / margin * 100) if margin else 0.0, "size": size}
+    except Exception: return empty
 
 def format_duration(start_dt, end_dt):
-    delta = end_dt - start_dt
-    total_sec = int(delta.total_seconds())
-    h, remainder = divmod(total_sec, 3600)
-    m, s = divmod(remainder, 60)
+    total_sec = int((end_dt - start_dt).total_seconds())
+    h, rem = divmod(total_sec, 3600)
+    m, s = divmod(rem, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def print_conditions(flags, is_long, is_short):
-    """Helper to strictly format conditions as True/False, explicitly labeling 1m vs 5m."""
-    print(f"  1. Sine Scale (5m)      LONG: {str(flags['sine_long']):<5} | SHORT: {str(flags['sine_short']):<5}")
-    print(f"  2. Extrema Cycle (1m)   LONG: {str(flags['cycle_long']):<5} | SHORT: {str(flags['cycle_short']):<5}")
-    print(f"  3. Momentum (5m)        LONG: {str(flags['mom_long']):<5} | SHORT: {str(flags['mom_short']):<5}")
-    print(f"  4. Volume (5m)          LONG: {str(flags['vol_long']):<5} | SHORT: {str(flags['vol_short']):<5}")
-    print(f"  5. FFT Dominance (5m)   LONG: {str(flags['fft_long']):<5} | SHORT: {str(flags['fft_short']):<5}")
+def print_conditions(sig):
+    """Print detailed values for each condition, then the True/False state."""
+    f = sig["cond_flags"]
     
-    long_true_count = sum([flags['sine_long'], flags['cycle_long'], flags['mom_long'], flags['vol_long'], flags['fft_long']])
-    short_true_count = sum([flags['cycle_short'], flags['sine_short'], flags['mom_short'], flags['vol_short'], flags['fft_short']])
+    print(f"  1. Sine Scale (5m)")
+    print(f"     Dist to Min: {sig['dist_to_min']:.2f}% | Dist to Max: {sig['dist_to_max']:.2f}%")
+    print(f"     LONG: {str(f['sine_long']):<5} | SHORT: {str(f['sine_short']):<5}")
+    
+    print(f"  2. Extrema Cycle (1m)")
+    print(f"     Argmin Idx: {sig['argmin_idx_1m']} | Argmax Idx: {sig['argmax_idx_1m']}")
+    print(f"     LONG: {str(f['cycle_long']):<5} | SHORT: {str(f['cycle_short']):<5}")
+    
+    print(f"  3. Momentum (1m)")
+    print(f"     MOM Value: {sig['mom_1m']:.2f}")
+    print(f"     LONG: {str(f['mom_long']):<5} | SHORT: {str(f['mom_short']):<5}")
+    
+    print(f"  4. Volume (1m)")
+    print(f"     Bullish %: {sig['bullish_perc']:.2f}% | Bearish %: {sig['bearish_perc']:.2f}%")
+    print(f"     LONG: {str(f['vol_long']):<5} | SHORT: {str(f['vol_short']):<5}")
+    
+    print(f"  5. FFT Dominance (1m Top 12 Freqs) [FIXED: Complex Signal]")
+    print(f"     Neg Freq Power: {sig['neg_ratio']:.2f}% | Pos Freq Power: {sig['pos_ratio']:.2f}%")
+    print(f"     Dominance Diff: {abs(sig['neg_ratio'] - sig['pos_ratio']):.2f}%")
+    print(f"     LONG: {str(f['fft_long']):<5} | SHORT: {str(f['fft_short']):<5}")
     
     print(f"  ──────────────────────────────────────────────────")
-    print(f"  True Count:         LONG: {long_true_count}/5      | SHORT: {short_true_count}/5")
-    print(f"  Overall LONG:  {is_long}")
-    print(f"  Overall SHORT: {is_short}")
+    long_true = sum([f['sine_long'], f['cycle_long'], f['mom_long'], f['vol_long'], f['fft_long']])
+    short_true = sum([f['sine_short'], f['cycle_short'], f['mom_short'], f['vol_short'], f['fft_short']])
+    print(f"  True Count:         LONG: {long_true}/5      | SHORT: {short_true}/5")
+    print(f"  Overall LONG:  {sig['is_long']}")
+    print(f"  Overall SHORT: {sig['is_short']}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
@@ -661,7 +530,7 @@ def print_conditions(flags, is_long, is_short):
 
 def main():
     print(f"\n{'='*60}")
-    print(f"HFT KuCoin Bot v5.3 Configuration:")
+    print(f"HFT KuCoin Bot Configuration:")
     print(f"{'='*60}")
     print(f"Symbol:              {TRADE_SYMBOL}")
     print(f"Leverage:            {LEVERAGE}x")
@@ -670,10 +539,9 @@ def main():
     print(f"Stop Loss:           {STOP_LOSS_ROE}% ROE")
     print(f"TP Price Move:       {TP_PRICE_PCT*100:.3f}%")
     print(f"SL Price Move:       {SL_PRICE_PCT*100:.3f}%")
-    print(f"Min Balance:         {MIN_BALANCE_USDT} USDT")
     print(f"Data Vectors:        1200 x 5m (~4.1 days) + 1200 x 1m (20 hours)")
-    print(f"Conditions:          Strict 5 (Sine 5m, Extrema 1m, Mom 5m, Vol 5m, FFT 5m)")
-    print(f"FFT Logic:           Strict Dominance (No '=' allowed)")
+    print(f"Conditions:          5m Sine | 1m Extrema | 1m Mom | 1m Vol | 1m FFT Top 12")
+    print(f"FFT Method:          Complex Signal (sine + j*leadsine) - Asymmetric Power")
     print(f"API Connected:       {API_CONNECTED}")
     print(f"{'='*60}\n")
 
@@ -691,156 +559,94 @@ def main():
             now_str = now.strftime("%Y-%m-%d %H:%M:%S")
             loop_count += 1
 
-            # Fetch BOTH 1m and 5m data
             candle_map = fetch_candle_map(TRADE_SYMBOL)
-            
             pos = get_position_info(TRADE_SYMBOL)
             current_price = get_price(TRADE_SYMBOL)
             balance = get_account_balance()
             has_sufficient_balance = balance >= MIN_BALANCE_USDT
             
-            # ═══════════════════════════════════════════════════════════════
-            # POSITION MANAGEMENT PHASE - LIVE POSITION ON EXCHANGE
-            # ═══════════════════════════════════════════════════════════════
             if pos["is_open"]:
-                roe = pos["roe_pct"]
-                side = pos["side"]
-                entry_price = pos["entry_price"]
-                mark_price = pos["mark_price"]
-                
+                roe, side, entry_price, mark_price = pos["roe_pct"], pos["side"], pos["entry_price"], pos["mark_price"]
                 sig = compute_signals(candle_map)
                 
                 if loop_count % 5 == 0:
                     print(f"\n[{now_str}] ╔══════ LIVE POSITION ══════╗")
-                    print(f"  Side:       {side.upper()}")
-                    print(f"  Entry:      {entry_price:.2f}")
-                    print(f"  Mark:       {mark_price:.2f}")
-                    print(f"  ROE:        {roe:+.2f}%")
-                    print(f"  TP Target:  {TAKE_PROFIT_ROE}% ROE")
-                    print(f"  SL Target:  {STOP_LOSS_ROE}% ROE")
+                    print(f"  Side:       {side.upper()}\n  Entry:      {entry_price:.2f}\n  Mark:       {mark_price:.2f}\n  ROE:        {roe:+.2f}%")
+                    print(f"  TP Target:  {TAKE_PROFIT_ROE}% ROE\n  SL Target:  {STOP_LOSS_ROE}% ROE")
                     if saved_state and saved_state.get("tp") and saved_state.get("sl"):
-                        print(f"  TP Price:   {saved_state['tp']:.2f}")
-                        print(f"  SL Price:   {saved_state['sl']:.2f}")
+                        print(f"  TP Price:   {saved_state['tp']:.2f}\n  SL Price:   {saved_state['sl']:.2f}")
                     print(f"  ─────────────────────────────")
-                    if sig:
-                        print(f"  CONDITIONS (monitoring only):")
-                        print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"])
+                    if sig: print_conditions(sig)
                     print(f"  ═════════════════════════════")
                 
                 reason = None
-                if roe >= TAKE_PROFIT_ROE:
-                    reason = "TAKE PROFIT"
-                elif roe <= STOP_LOSS_ROE:
-                    reason = "STOP LOSS"
+                if roe >= TAKE_PROFIT_ROE: reason = "TAKE PROFIT"
+                elif roe <= STOP_LOSS_ROE: reason = "STOP LOSS"
                     
                 if reason:
                     print(f"  >>> [{reason}] Triggered at {roe:+.2f}% ROE. Closing position...")
                     client.close_position(TRADE_SYMBOL)
-                    
-                    if side == "long":
-                        price_change_pct = ((mark_price - entry_price) / entry_price) * 100
-                    else:
-                        price_change_pct = ((entry_price - mark_price) / entry_price) * 100
-                    gross_roe = price_change_pct * LEVERAGE
-                    net_roe = gross_roe - RT_FEE_ROE_PCT
-                    
+                    price_change_pct = ((mark_price - entry_price) / entry_price) * 100 if side == "long" else ((entry_price - mark_price) / entry_price) * 100
                     start_dt = datetime.datetime.strptime(saved_state["entry_time"], "%Y-%m-%d %H:%M:%S")
-                    duration = format_duration(start_dt, datetime.datetime.now())
-                    
-                    trade_result = {
-                        "mode": "LIVE", "entry_time": saved_state["entry_time"], "exit_time": now_str,
-                        "type": side, "entry_price": entry_price, "exit_price": mark_price,
-                        "price_change_pct": price_change_pct, "gross_roe": gross_roe,
-                        "rt_fee_pct": RT_FEE_ROE_PCT, "roe": net_roe, "duration": duration, "reason": reason
-                    }
+                    trade_result = {"mode": "LIVE", "entry_time": saved_state["entry_time"], "exit_time": now_str,
+                                    "type": side, "entry_price": entry_price, "exit_price": mark_price,
+                                    "price_change_pct": price_change_pct, "gross_roe": price_change_pct * LEVERAGE,
+                                    "rt_fee_pct": RT_FEE_ROE_PCT, "roe": price_change_pct * LEVERAGE - RT_FEE_ROE_PCT,
+                                    "duration": format_duration(start_dt, datetime.datetime.now()), "reason": reason}
                     write_trade_to_journal(trade_result)
                     clear_trade_state()
                     saved_state = None
                     print(f"  [TRADE CLOSED] Written to {TRADES_LOG_FILE}")
-                    
                 time.sleep(LOOP_SLEEP)
                 continue
 
-            # ═══════════════════════════════════════════════════════════════
-            # SIMULATION POSITION MANAGEMENT
-            # ═══════════════════════════════════════════════════════════════
             if saved_state and saved_state.get("mode") == "SIMULATION":
-                sim_entry_price = saved_state["entry_price"]
-                sim_side = saved_state["side"]
-                sim_entry_time = saved_state["entry_time"]
-                
+                sim_entry_price, sim_side, sim_entry_time = saved_state["entry_price"], saved_state["side"], saved_state["entry_time"]
                 hit, reason, sim_roe = check_sim_tp_sl(sim_entry_price, current_price, sim_side)
                 sig = compute_signals(candle_map)
                 
                 if loop_count % 5 == 0:
                     start_dt = datetime.datetime.strptime(sim_entry_time, "%Y-%m-%d %H:%M:%S")
-                    elapsed = format_duration(start_dt, now)
-                    
                     print(f"\n[{now_str}] ╔══════ SIMULATION POSITION ══════╗")
-                    print(f"  Side:       {sim_side.upper()}")
-                    print(f"  Entry:      {sim_entry_price:.2f}")
-                    print(f"  Current:    {current_price:.2f}")
-                    print(f"  Sim ROE:    {sim_roe:+.2f}% (Net)")
-                    print(f"  Elapsed:    {elapsed}")
-                    print(f"  TP Target:  {TAKE_PROFIT_ROE}% ROE")
-                    print(f"  SL Target:  {STOP_LOSS_ROE}% ROE")
-                    if saved_state and saved_state.get("tp") and saved_state.get("sl"):
-                        print(f"  TP Price:   {saved_state['tp']:.2f}")
-                        print(f"  SL Price:   {saved_state['sl']:.2f}")
+                    print(f"  Side:       {sim_side.upper()}\n  Entry:      {sim_entry_price:.2f}\n  Current:    {current_price:.2f}\n  Sim ROE:    {sim_roe:+.2f}% (Net)\n  Elapsed:    {format_duration(start_dt, now)}")
+                    print(f"  TP Target:  {TAKE_PROFIT_ROE}% ROE\n  SL Target:  {STOP_LOSS_ROE}% ROE")
+                    if saved_state.get("tp") and saved_state.get("sl"):
+                        print(f"  TP Price:   {saved_state['tp']:.2f}\n  SL Price:   {saved_state['sl']:.2f}")
                     print(f"  ─────────────────────────────")
-                    if sig:
-                        print(f"  CONDITIONS (monitoring only):")
-                        print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"])
+                    if sig: print_conditions(sig)
                     print(f"  ═══════════════════════════════")
                 
                 if hit and reason:
                     print(f"  >>> [SIM {reason}] Triggered at {sim_roe:+.2f}% ROE")
-                    
-                    if sim_side == "long":
-                        price_change_pct = ((current_price - sim_entry_price) / sim_entry_price) * 100
-                    else:
-                        price_change_pct = ((sim_entry_price - current_price) / sim_entry_price) * 100
-                    gross_roe = price_change_pct * LEVERAGE
-                    
+                    price_change_pct = ((current_price - sim_entry_price) / sim_entry_price) * 100 if sim_side == "long" else ((sim_entry_price - current_price) / sim_entry_price) * 100
                     start_dt = datetime.datetime.strptime(sim_entry_time, "%Y-%m-%d %H:%M:%S")
-                    duration = format_duration(start_dt, now)
-                    
-                    trade_result = {
-                        "mode": "SIMULATION", "entry_time": sim_entry_time, "exit_time": now_str,
-                        "type": sim_side, "entry_price": sim_entry_price, "exit_price": current_price,
-                        "price_change_pct": price_change_pct, "gross_roe": gross_roe,
-                        "rt_fee_pct": RT_FEE_ROE_PCT, "roe": sim_roe, "duration": duration, "reason": reason
-                    }
+                    trade_result = {"mode": "SIMULATION", "entry_time": sim_entry_time, "exit_time": now_str,
+                                    "type": sim_side, "entry_price": sim_entry_price, "exit_price": current_price,
+                                    "price_change_pct": price_change_pct, "gross_roe": price_change_pct * LEVERAGE,
+                                    "rt_fee_pct": RT_FEE_ROE_PCT, "roe": sim_roe,
+                                    "duration": format_duration(start_dt, now), "reason": reason}
                     write_trade_to_journal(trade_result)
                     clear_trade_state()
                     saved_state = None
                     print(f"  [SIM TRADE CLOSED] Written to {TRADES_LOG_FILE}")
-                    
                 time.sleep(LOOP_SLEEP)
                 continue
 
-            # ═══════════════════════════════════════════════════════════════
-            # ORPHANED STATE CLEANUP
-            # ═══════════════════════════════════════════════════════════════
             if saved_state and saved_state.get("mode") == "LIVE" and not pos["is_open"]:
                 print("  [recovery] Live state active but no position on exchange. Clearing state.")
                 clear_trade_state()
                 saved_state = None
 
-            # ═══════════════════════════════════════════════════════════════
-            # SIGNAL SCANNING PHASE (Only if FLAT)
-            # ═══════════════════════════════════════════════════════════════
             if not pos["is_open"] and not saved_state:
                 sig = compute_signals(candle_map)
                 if not sig:
-                    if loop_count % 20 == 0: 
-                        print(f"[{now_str}] Gathering 1m + 5m data...")
+                    if loop_count % 20 == 0: print(f"[{now_str}] Gathering 1m + 5m data...")
                     time.sleep(LOOP_SLEEP)
                     continue
 
                 if loop_count % 5 == 0:
-                    print(f"\n[{now_str}] Scanning Conditions (FLAT) [1m Extrema / 5m Sine+FFT]:")
-                    print_conditions(sig["cond_flags"], sig["is_long"], sig["is_short"])
+                    print(f"\n[{now_str}] Scanning Conditions (FLAT) [5m Sine / 1m Extremas+Mom+Vol+FFT]:")
+                    print_conditions(sig)
                     print(f"  ──────────────────────────────────────────────────")
                     print(f"  Balance: {balance:.2f} USDT | Sufficient: {has_sufficient_balance}")
 
