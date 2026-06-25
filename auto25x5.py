@@ -957,7 +957,7 @@ def main():
                 if loop_count % 10 == 0:
                     print(f"\n[{now_str}] Scanning (FLAT) | Net: {parallel_ms:.0f}ms | Calc: {compute_ms:.0f}ms")
                     print_conditions(sig)
-                print(f"  Balance: {balance:.2f} USDT  (trade alloc: {balance*TRADE_BALANCE_PCT:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}%)")
+                    print(f"  Balance: {balance:.2f} USDT  (trade alloc: {balance*TRADE_BALANCE_PCT:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}%)")
 
                 if sig["is_long"]:
                     print(f"\n  *** 3/5 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> LONG ***")
