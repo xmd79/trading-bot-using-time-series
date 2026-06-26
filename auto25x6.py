@@ -1,13 +1,15 @@
 """
 HFT Auto Trading Bot — KuCoin Futures Edition (CONCURRENT OPTIMIZED)
 ====================================================================
-SIGNAL LOGIC:
+SIGNAL LOGIC (6 CONDITIONS - NO NEUTRAL STATE):
   - Mandatory: Momentum (1m), Volume (1m), ML Forecast, AND TP Reachability MUST be true.
-  - ML Forecast (1m): forecast_price > current_close → LONG allowed;
-                      forecast_price < current_close → SHORT allowed.
-  - TP Reachability: Consensus Forecast Price MUST transit (cross) the TP target.
-  - Flexible: At least 3 out of 5 total conditions must be true for the direction.
-  - (Since Mom + Vol = 2 mandatory true, you only need 1 more from Sine/Cycle/FFT).
+  - Extrema Direction (HARD FILTER): Most recent 1m extreme over 1200 bars
+      determines ALLOWED direction only - NO NEUTRAL STATE exists.
+      argmin (lowest low) most recent -> ONLY LONG allowed
+      argmax (highest high) most recent -> ONLY SHORT allowed
+  - Flexible: At least 3 out of 6 total conditions must be true for the direction.
+    (Sine, Cycle, Momentum, Volume, FFT, Extrema Direction)
+  - (Since Mom + Vol = 2 mandatory true, you need 1 more from Sine/Cycle/FFT/ExtDir).
 
 POSITION SIZING:
   - Only 5% of available balance is used per trade.
@@ -87,7 +89,7 @@ del _f
 gc.collect()
 clean_trades_file()
 
-print("HFT KuCoin Bot (25x / 3-OUT-OF-5 LOGIC / TP-REACHABILITY ML) initialising...")
+print("HFT KuCoin Bot (25x / EXTREMA DIRECTION / NO NEUTRAL STATE) initialising...")
 if _cleaned:
     print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
 del _cleaned
@@ -187,8 +189,9 @@ LOOP_SLEEP = 0.5
 MIN_BALANCE_USDT = 5.0
 TRADE_BALANCE_PCT = 0.05
 ML_LOOKBACK = 100
-ANALYSIS_WINDOW_5M = 1200 
-ANALYSIS_WINDOW_1M = 500
+ANALYSIS_WINDOW_5M = 1200
+ANALYSIS_WINDOW_1M = 1200  
+EXTREMA_LOOKBACK = 1200     
 KUCOIN_TAKER_FEE = 0.0006
 RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100
 NET_PROFIT_ROE = 2.55                                  
@@ -211,7 +214,7 @@ except Exception as e:
     client, API_CONNECTED = None, False
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TRADE HISTORY TRACKER (Clean Single Line)
+# TRADE HISTORY TRACKER
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TradeHistoryTracker:
@@ -239,14 +242,11 @@ class TradeHistoryTracker:
         with self.lock:
             roe = trade_result.get("roe", 0.0)
             side = trade_result.get("type", "long")
-            
             self.trades.append(trade_result)
             self.total_trades += 1
             self.last_trade_time = datetime.datetime.now()
-            
             if side == "long": self.long_trades += 1
             else: self.short_trades += 1
-            
             if roe >= 0:
                 self.wins += 1
                 self.total_profit_roe += roe
@@ -258,7 +258,6 @@ class TradeHistoryTracker:
                 self.total_loss_roe += abs(roe)
                 self.current_streak = self.current_streak - 1 if self.current_streak <= 0 else -1
                 self.max_consecutive_losses = max(self.max_consecutive_losses, abs(self.current_streak))
-            
             self.best_trade_roe = max(self.best_trade_roe, roe)
             self.worst_trade_roe = min(self.worst_trade_roe, roe)
     
@@ -282,14 +281,11 @@ class TradeHistoryTracker:
     
     def print_stats_line(self, position_status="FLAT", current_roe=0.0):
         s = self.get_stats()
-        
         if s['net_roe'] > 0: net_str = f"+{s['net_roe']:.2f}%"
         elif s['net_roe'] < 0: net_str = f"{s['net_roe']:.2f}%"
         else: net_str = "0.00%"
-            
         wr_str = f"{s['win_rate']:.1f}%"
         pos_str = "FLAT" if position_status == "FLAT" else f"{position_status} ({current_roe:+.2f}%)"
-        
         line = f"  [P&L] Trades: {s['total_trades']} W:{s['wins']} L:{s['losses']} WR:{wr_str} | Profit: +{s['total_profit_roe']:.2f}% Loss: -{s['total_loss_roe']:.2f}% | ═══ NET: {net_str} | Pos: {pos_str} | Last: {s['time_since_last_trade']}   "
         sys.stdout.write(f"\r{line}")
         sys.stdout.flush()
@@ -302,17 +298,14 @@ class TradeHistoryTracker:
         entry = trade_result.get("entry_price", 0)
         exit_p = trade_result.get("exit_price", 0)
         duration = trade_result.get("duration", "N/A")
-        
         icon = "🟢" if roe >= 0 else "🔴"
         result_str = f"PROFIT +{roe:.2f}%" if roe >= 0 else f"LOSS {roe:.2f}%"
-        
         print() 
         print(f"  {icon}════════════════════════════════════════{icon}")
         print(f"  │ TRADE CLOSED: {mode} {side}")
         print(f"  │ {reason}")
         print(f"  │ Entry: {entry:.2f} → Exit: {exit_p:.2f} | Duration: {duration}")
         print(f"  │ Result: {result_str}")
-        
         s = self.get_stats()
         if s["net_roe"] >= 0: net_str = f"+{s['net_roe']:.2f}%"
         else: net_str = f"{s['net_roe']:.2f}%"
@@ -342,7 +335,6 @@ class CandleBuffer:
         except (IndexError, TypeError, ValueError): return None
     
     def initialize(self, client_obj):
-        """Initialize buffer with full historical data - takes only client_obj as argument"""
         if not API_CONNECTED: return False
         with self.lock:
             print(f"  [Buffer:{self.timeframe}] Fetching {self.max_candles} candles...")
@@ -370,7 +362,6 @@ class CandleBuffer:
         self.candles = list(reversed(unique))
     
     def update(self, client_obj, fetch_limit=3):
-        """Update buffer with recent candles - takes client_obj and optional fetch_limit"""
         if not API_CONNECTED or not self.candles: return 0
         with self.lock:
             try:
@@ -427,7 +418,7 @@ def get_buy_sell_volume_perc(candles):
     return (buy_vol / total) * 100.0, (sell_vol / total) * 100.0 if total else (50.0, 50.0)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CONCURRENT DATA FETCHER (FIXED)
+# CONCURRENT DATA FETCHER
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class ConcurrentDataFetcher:
@@ -438,26 +429,19 @@ class ConcurrentDataFetcher:
     def fetch_all_parallel(self, do_full_refresh=False):
         futures, results = {}, {"price": 0.0, "balance": 0.0, "position": {"is_open": False, "roe_pct": 0.0, "entry_price": 0.0, "mark_price": 0.0, "side": None, "size": 0}, "new_5m": 0, "new_1m": 0, "times": {}}
         t0 = time.perf_counter()
-        
-        # FIX: initialize() takes only client, update() takes client and fetch_limit
-        # Must call them separately with correct arguments
         need_full_5m = do_full_refresh or self.buffer_5m.needs_full_refresh()
         need_full_1m = do_full_refresh or self.buffer_1m.needs_full_refresh()
-        
         if need_full_5m:
             futures["5m"] = self.executor.submit(self.buffer_5m.initialize, client)
         else:
             futures["5m"] = self.executor.submit(self.buffer_5m.update, client, 3)
-            
         if need_full_1m:
             futures["1m"] = self.executor.submit(self.buffer_1m.initialize, client)
         else:
             futures["1m"] = self.executor.submit(self.buffer_1m.update, client, 3)
-        
         futures["price"] = self.executor.submit(get_price, self.symbol)
         futures["balance"] = self.executor.submit(get_account_balance)
         futures["position"] = self.executor.submit(get_position_info, self.symbol)
-        
         for name, future in futures.items():
             try:
                 t_s = time.perf_counter()
@@ -473,6 +457,71 @@ class ConcurrentDataFetcher:
         return results
     
     def shutdown(self): self.executor.shutdown(wait=False)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EXTREMA DIRECTION — MARKET STRUCTURE (NO NEUTRAL STATE)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_extrema_direction_1m(candles_1m, window=1200):
+    if len(candles_1m) < 50:
+        return None
+
+    w = candles_1m[-window:] if len(candles_1m) >= window else candles_1m
+    lows = np.array([c["low"] for c in w], dtype=np.float64)
+    highs = np.array([c["high"] for c in w], dtype=np.float64)
+    closes = np.array([c["close"] for c in w], dtype=np.float64)
+    n = len(w)
+
+    argmin_idx = int(np.argmin(lows))
+    argmax_idx = int(np.argmax(highs))
+
+    bars_ago_min = (n - 1) - argmin_idx
+    bars_ago_max = (n - 1) - argmax_idx
+
+    if bars_ago_min < bars_ago_max:
+        return {
+            "direction": "long",
+            "extreme_type": "ARGMIN (LOW)",
+            "extreme_price": float(lows[argmin_idx]),
+            "bars_ago": bars_ago_min,
+            "idx": argmin_idx,
+            "opposite_price": float(highs[argmax_idx]),
+            "opposite_bars_ago": bars_ago_max,
+            "swing_range": float(highs[argmax_idx] - lows[argmin_idx]),
+            "current_price": float(closes[-1]),
+            "progress_pct": float((closes[-1] - lows[argmin_idx]) / (highs[argmax_idx] - lows[argmin_idx]) * 100) if (highs[argmax_idx] - lows[argmin_idx]) > 0 else 0.0
+        }
+    elif bars_ago_max < bars_ago_min:
+        return {
+            "direction": "short",
+            "extreme_type": "ARGMAX (HIGH)",
+            "extreme_price": float(highs[argmax_idx]),
+            "bars_ago": bars_ago_max,
+            "idx": argmax_idx,
+            "opposite_price": float(lows[argmin_idx]),
+            "opposite_bars_ago": bars_ago_min,
+            "swing_range": float(highs[argmax_idx] - lows[argmin_idx]),
+            "current_price": float(closes[-1]),
+            "progress_pct": float((highs[argmax_idx] - closes[-1]) / (highs[argmax_idx] - lows[argmin_idx]) * 100) if (highs[argmax_idx] - lows[argmin_idx]) > 0 else 0.0
+        }
+    else:
+        if len(closes) >= 5:
+            recent_move = closes[-1] - closes[-5]
+            if recent_move >= 0:
+                return {
+                    "direction": "long", "extreme_type": "ARGMIN (LOW) [tie]", "extreme_price": float(lows[argmin_idx]),
+                    "bars_ago": bars_ago_min, "idx": argmin_idx, "opposite_price": float(highs[argmax_idx]),
+                    "opposite_bars_ago": bars_ago_max, "swing_range": float(highs[argmax_idx] - lows[argmin_idx]),
+                    "current_price": float(closes[-1]), "progress_pct": 0.0
+                }
+            else:
+                return {
+                    "direction": "short", "extreme_type": "ARGMAX (HIGH) [tie]", "extreme_price": float(highs[argmax_idx]),
+                    "bars_ago": bars_ago_max, "idx": argmax_idx, "opposite_price": float(lows[argmin_idx]),
+                    "opposite_bars_ago": bars_ago_min, "swing_range": float(highs[argmax_idx] - lows[argmin_idx]),
+                    "current_price": float(closes[-1]), "progress_pct": 0.0
+                }
+        return None
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TECHNICAL ANALYSIS
@@ -525,40 +574,28 @@ def generate_ml_forecast(candles_1m):
     except Exception: return 0.0, cur
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TP REACHABILITY ML ENSEMBLE (REALISTIC BOUND FORECASTING)
+# TP REACHABILITY — BIASED BY EXTREMA DIRECTION (NO NEUTRAL STATE)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _fft_price_forecast(closes, steps):
     try:
         w = closes[-200:]; n = len(w)
         if n < 20: return closes[-1]
-        
-        # 1. Extract linear trend
         x = np.arange(n, dtype=np.float64)
         slope, intercept = np.polyfit(x, w, 1)
-        
-        # 2. Detrend and center
         detrended = w - (slope * x + intercept)
-        
-        # 3. FFT to find dominant cycle safely
         windowed = detrended * np.hanning(n)
         f = fft(windowed)
         freqs = fftfreq(n)
         mags = np.abs(f)
-        
-        # Ignore DC and Nyquist to find actual cycles
         mags[0] = 0
         if n % 2 == 0: mags[n//2] = 0
-        
         dom_idx = np.argmax(mags)
         dom_freq = freqs[dom_idx]
         dom_phase = np.angle(f[dom_idx])
-        dom_amp = mags[dom_idx] / n  # Proper scaling
-        
-        # 4. Extrapolate trend + single dominant cycle
+        dom_amp = mags[dom_idx] / n
         t_target = n + steps - 1
         forecast = (slope * t_target + intercept) + (dom_amp * np.sin(2 * np.pi * dom_freq * t_target + dom_phase))
-        
         return forecast
     except Exception:
         return closes[-1]
@@ -611,15 +648,19 @@ def _lstm_price_forecast(closes, volumes):
         return closes[-1] * (1 + expected_ret)
     except Exception: return closes[-1]
 
-def tp_reachability_forecast(candles_1m, current_price, tp_long_price, sl_long_price, tp_short_price, sl_short_price):
+def tp_reachability_forecast(candles_1m, current_price, tp_long_price, sl_long_price, tp_short_price, sl_short_price, extrema_data=None):
+    """
+    TP Reachability strictly governed by Extrema Direction.
+    NO NEUTRAL STATE. Price is either moving UP or DOWN between extremes.
+    """
     if len(candles_1m) < 100 or current_price <= 0:
-        return False, False, current_price, {"fft": current_price, "random_walk": current_price, "forest": current_price, "lstm": current_price}
-    
+        if extrema_data:
+            return False, False, current_price, {}, extrema_data["direction"], f"{extrema_data['direction'].upper()} BIAS (No ML Data)"
+        return False, False, current_price, {}, "long", "LONG BIAS (No Data)"
+        
     closes = np.array([c["close"] for c in candles_1m], dtype=np.float64)
     volumes = np.array([c["volume"] for c in candles_1m], dtype=np.float64)
     
-    # REALISTIC BOUNDS: Maximum 1% move per step (30% total over 30 steps)
-    # This entirely prevents mathematical artifacts like -2344763.33
     max_move = current_price * 0.01 * TP_REACH_FORECAST_STEPS
     min_bound = current_price - max_move
     max_bound = current_price + max_move
@@ -630,15 +671,40 @@ def tp_reachability_forecast(candles_1m, current_price, tp_long_price, sl_long_p
     p_lstm = np.clip(_lstm_price_forecast(closes, volumes), min_bound, max_bound)
     
     method_prices = {"fft": p_fft, "random_walk": p_rw, "forest": p_for, "lstm": p_lstm}
-    consensus_price = 0.20*p_fft + 0.25*p_rw + 0.30*p_for + 0.25*p_lstm
+    raw_consensus = 0.20*p_fft + 0.25*p_rw + 0.30*p_for + 0.25*p_lstm
     
-    reach_long = consensus_price >= tp_long_price
-    reach_short = consensus_price <= tp_short_price
+    bias_dir = extrema_data["direction"] if extrema_data else "long"
+    display_state = ""
+    reach_long = False
+    reach_short = False
     
-    return reach_long, reach_short, consensus_price, method_prices
+    if bias_dir == "long":
+        reach_short = False # STRICTLY FORBIDDEN BY STRUCTURE
+        struct_target = extrema_data["opposite_price"] if extrema_data else max_bound
+        if struct_target >= tp_long_price:
+            reach_long = True
+            display_state = "LONG CONSENSUS (Structure Transits TP)"
+        elif raw_consensus >= tp_long_price:
+            reach_long = True
+            display_state = "LONG CONSENSUS (ML Transits TP)"
+        else:
+            display_state = "LONG BIAS (Structure Up)"
+    else: # short
+        reach_long = False # STRICTLY FORBIDDEN BY STRUCTURE
+        struct_target = extrema_data["opposite_price"] if extrema_data else min_bound
+        if struct_target <= tp_short_price:
+            reach_short = True
+            display_state = "SHORT CONSENSUS (Structure Transits TP)"
+        elif raw_consensus <= tp_short_price:
+            reach_short = True
+            display_state = "SHORT CONSENSUS (ML Transits TP)"
+        else:
+            display_state = "SHORT BIAS (Structure Down)"
+            
+    return reach_long, reach_short, raw_consensus, method_prices, bias_dir, display_state
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SIGNAL COMPUTATION
+# SIGNAL COMPUTATION (6 CONDITIONS - HARD EXTREMA FILTER)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def compute_signals(buffer_5m, buffer_1m, live_price):
@@ -680,20 +746,37 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     tp_d, sl_d = live_price * TP_PRICE_PCT, live_price * SL_PRICE_PCT
     tpl, sll, tps, sls = live_price + tp_d, live_price - sl_d, live_price - tp_d, live_price + sl_d
     
-    r_l, r_s, cons_p, meth_p = tp_reachability_forecast(c1, live_price, tpl, sll, tps, sls)
+    # 1. Evaluate Extrema Direction (1200 bars)
+    extrema_data = get_extrema_direction_1m(c1, window=EXTREMA_LOOKBACK)
+    if extrema_data:
+        bias_dir = extrema_data["direction"]
+        c_ext_l = (bias_dir == "long")
+        c_ext_s = (bias_dir == "short")
+    else:
+        c_ext_l, c_ext_s = c_mom_l, c_mom_s
+        bias_dir = "long" if c_mom_l else "short"
+        extrema_data = {"direction": bias_dir, "extreme_type": "FALLBACK", "bars_ago": 0, "opposite_price": live_price, "progress_pct": 0.0}
     
-    lt = sum([c_sin_l, c_cyc_l, c_mom_l, c_vol_l, f_l])
-    st = sum([c_sin_s, c_cyc_s, c_mom_s, c_vol_s, f_s])
+    # 2. Evaluate TP Reachability governed by Extrema
+    r_l, r_s, cons_p, meth_p, consensus_bias_dir, consensus_display = tp_reachability_forecast(c1, live_price, tpl, sll, tps, sls, extrema_data)
     
-    is_l = c_mom_l and c_vol_l and c_ml_l and r_l and lt >= 3
-    is_s = c_mom_s and c_vol_s and c_ml_s and r_s and st >= 3
+    # 3. Count flexible conditions (now 6 total)
+    lt = sum([c_sin_l, c_cyc_l, c_mom_l, c_vol_l, f_l, c_ext_l])
+    st = sum([c_sin_s, c_cyc_s, c_mom_s, c_vol_s, f_s, c_ext_s])
+    
+    # 4. HARD FILTER + Mandatory Checks + >= 3/6 Flexible
+    # If extrema says short, is_long is FORCED False (no exceptions)
+    # If extrema says long, is_short is FORCED False (no exceptions)
+    is_l = c_mom_l and c_vol_l and c_ml_l and r_l and lt >= 3 and (bias_dir != "short")
+    is_s = c_mom_s and c_vol_s and c_ml_s and r_s and st >= 3 and (bias_dir != "long")
     
     return {
         "price": live_price, "is_long": is_l, "is_short": is_s,
         "cond_flags": {"sine_long": c_sin_l, "sine_short": c_sin_s, "cycle_long": c_cyc_l, "cycle_short": c_cyc_s,
                        "mom_long": c_mom_l, "mom_short": c_mom_s, "vol_long": c_vol_l, "vol_short": c_vol_s,
                        "fft_long": f_l, "fft_short": f_s, "ml_long": c_ml_l, "ml_short": c_ml_s,
-                       "tp_reach_long": r_l, "tp_reach_short": r_s},
+                       "tp_reach_long": r_l, "tp_reach_short": r_s,
+                       "ext_long": c_ext_l, "ext_short": c_ext_s},
         "long_true_count": lt, "short_true_count": st,
         "dist_to_min": dmin, "dist_to_max": dmax, "argmin_idx_1m": ai1, "argmax_idx_1m": ax1,
         "cycle_min_price": cpmin, "cycle_max_price": cpmax, "current_close_1m": cur1,
@@ -701,7 +784,8 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         "mom_1m": mom, "bullish_perc": bp, "bearish_perc": sp, "neg_ratio": nr, "pos_ratio": pr,
         "ml_forecast_price": mlp, "ml_current_close": mlc,
         "tp_reach_long": r_l, "tp_reach_short": r_s, "consensus_price": cons_p, "method_prices": meth_p,
-        "tp_long_price": tpl, "sl_long_price": sll, "tp_short_price": tps, "sl_short_price": sls
+        "tp_long_price": tpl, "sl_long_price": sll, "tp_short_price": tps, "sl_short_price": sls,
+        "ext_dir": bias_dir, "extrema_data": extrema_data, "consensus_display": consensus_display
     }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -748,7 +832,7 @@ def write_trade_to_journal(tr):
             f"EXIT PRICE: {tr.get('exit_price', 0):.2f}\nPRICE CHANGE: {tr.get('price_change_pct', 0):+.4f}%\n"
             f"GROSS ROE: {tr.get('gross_roe', 0):+.2f}%\nRT FEE DEDUCTED: {tr.get('rt_fee_pct', 0):.2f}%\n"
             f"NET ROE: {tr.get('roe', 0):+.2f}%\nREASON: {tr.get('reason', 'N/A')}\n"
-            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 3/5 Cond (Mom+Vol+ML+TPReach Mandatory) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%\n{'='*60}\n\n")
+            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 3/6 Cond (Extrema Hard Filter + Mom+Vol+ML+TPReach Mandatory) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%\n{'='*60}\n\n")
     try:
         with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f: f.write(line)
     except Exception as e: print(f"  [journal] write error: {e}")
@@ -792,26 +876,29 @@ def print_conditions(sig):
     print(f"  3. Mom (1m):   {sig['mom_1m']:.2f} L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
     print(f"  4. Vol (1m):   Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
     print(f"  5. FFT (1m):   Neg:{sig['neg_ratio']:.2f}% Pos:{sig['pos_ratio']:.2f}% L:{f['fft_long']} S:{f['fft_short']}")
+    
+    ext = sig.get("extrema_data", {})
+    ext_dir = sig.get("ext_dir", "N/A").upper()
+    print(f"  6. Extrema:    {ext.get('extreme_type', 'N/A')} | {ext.get('bars_ago', 0)} bars ago | Swing: {ext.get('swing_range', 0):.2f} | L:{f['ext_long']} S:{f['ext_short']} [HARD FILTER]")
+    
     ml_fc, ml_cur = sig.get("ml_forecast_price", 0.0), sig.get("ml_current_close", 0.0)
     ml_diff = ((ml_fc - ml_cur) / ml_cur * 100) if ml_cur else 0.0
-    print(f"  6. ML (1m):    Cur:{ml_cur:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
+    print(f"  7. ML (1m):    Cur:{ml_cur:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
     
     mp = sig.get("method_prices", {})
     cp = sig.get("consensus_price", 0.0)
     tpl = sig.get("tp_long_price", 0.0)
     tps = sig.get("tp_short_price", 0.0)
     
-    print(f"  7. TP-Reach:   Tgt-L:{tpl:.2f} Tgt-S:{tps:.2f}")
+    print(f"  8. TP-Reach:   Tgt-L:{tpl:.2f} Tgt-S:{tps:.2f}")
     print(f"     Forecast-> FFT:{mp.get('fft',0):.2f} RW:{mp.get('random_walk',0):.2f} Forest:{mp.get('forest',0):.2f} LSTM:{mp.get('lstm',0):.2f}")
     
-    if cp >= tpl: cons_dir = "🟢 LONG CONSENSUS (Transits TP)"
-    elif cp <= tps: cons_dir = "🔴 SHORT CONSENSUS (Transits TP)"
-    else: cons_dir = "⚪ NEUTRAL (Fails to Transit TP)"
-        
-    print(f"     ═══ CONSENSUS PRICE: {cp:.2f} -> {cons_dir}")
+    cons_disp = sig.get("consensus_display", "N/A")
+    icon = "🟢" if "LONG" in cons_disp else "🔴"
+    print(f"     {icon} ═══ {cons_disp}")
     print(f"     L:{f['tp_reach_long']} S:{f['tp_reach_short']} [MANDATORY]")
     
-    print(f"  ═══ LONG:{sig['long_true_count']}/5 SHORT:{sig['short_true_count']}/5 (Rule: Mom+Vol+ML+TPReach Mandatory + >=3/5) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
+    print(f"  ═══ LONG:{sig['long_true_count']}/6 SHORT:{sig['short_true_count']}/6 (Rule: Extrema Filter + Mom+Vol+ML+TPReach Mandatory + >=3/6) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
@@ -819,15 +906,15 @@ def print_conditions(sig):
 
 def main():
     print(f"\n{'='*60}")
-    print(f"HFT KuCoin Bot - 3/5 CONDITIONS (MOM+VOL+ML+TPREACH MANDATORY)")
+    print(f"HFT KuCoin Bot - 6 CONDITIONS (EXTREMA HARD FILTER / NO NEUTRAL)")
     print(f"{'='*60}")
     print(f"Symbol:              {TRADE_SYMBOL}")
     print(f"Leverage:            {LEVERAGE}x")
     print(f"TP: {TAKE_PROFIT_ROE}% ROE | SL: {STOP_LOSS_ROE}% ROE")
     print(f"Loop Sleep:          {LOOP_SLEEP}s")
-    print(f"Entry Logic:         Mom & Vol & ML & TP-Reach MANDATORY + At least 3/5 Total")
+    print(f"Extrema Window:      {EXTREMA_LOOKBACK} bars (1m)")
+    print(f"Entry Logic:         Extrema Hard Filter + Mom & Vol & ML & TP-Reach MANDATORY + At least 3/6 Total")
     print(f"Position Sizing:     {TRADE_BALANCE_PCT*100:.0f}% of balance per trade")
-    print(f"TP Reach Rule:       Consensus Forecast MUST transit TP Target Price")
     print(f"API Connected:       {API_CONNECTED}")
     print(f"{'='*60}\n")
 
@@ -953,7 +1040,7 @@ def main():
 
                 if sig["is_long"]:
                     print()
-                    print(f"\n  *** 4 MANDATORY MET + 3/5 Total -> LONG ***")
+                    print(f"\n  *** EXTREMA LONG + 4 MANDATORY MET + 3/6 Total -> LONG ***")
                     if has_bal:
                         print(f"  [LIVE] Executing LONG...")
                         if execute_entry(TRADE_SYMBOL, "buy", bal, sig["price"]):
@@ -968,7 +1055,7 @@ def main():
 
                 elif sig["is_short"]:
                     print()
-                    print(f"\n  *** 4 MANDATORY MET + 3/5 Total -> SHORT ***")
+                    print(f"\n  *** EXTREMA SHORT + 4 MANDATORY MET + 3/6 Total -> SHORT ***")
                     if has_bal:
                         print(f"  [LIVE] Executing SHORT...")
                         if execute_entry(TRADE_SYMBOL, "sell", bal, sig["price"]):
