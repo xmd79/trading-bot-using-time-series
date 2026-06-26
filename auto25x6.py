@@ -452,7 +452,10 @@ class ConcurrentDataFetcher:
                 elif name == "price": results["price"] = result
                 elif name == "balance": results["balance"] = result
                 elif name == "position": results["position"] = result
-            except Exception as e: results["times"][name] = -1; print(f"  [Concurrent] Task '{name}' failed: {e}")
+            except Exception as e: 
+                results["times"][name] = -1
+                print()
+                print(f"  [Concurrent] Task '{name}' failed: {e}")
         results["parallel_total_ms"] = (time.perf_counter() - t0) * 1000
         return results
     
@@ -765,8 +768,6 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     st = sum([c_sin_s, c_cyc_s, c_mom_s, c_vol_s, f_s, c_ext_s])
     
     # 4. HARD FILTER + Mandatory Checks + >= 3/6 Flexible
-    # If extrema says short, is_long is FORCED False (no exceptions)
-    # If extrema says long, is_short is FORCED False (no exceptions)
     is_l = c_mom_l and c_vol_l and c_ml_l and r_l and lt >= 3 and (bias_dir != "short")
     is_s = c_mom_s and c_vol_s and c_ml_s and r_s and st >= 3 and (bias_dir != "long")
     
@@ -983,8 +984,10 @@ def main():
                 
                 if loop_count % 10 == 0:
                     print()
+                    print()
                     print(f"[{now_str}] === LIVE {side.upper()} | Entry:{ep:.2f} Mark:{mp:.2f} ROE:{roe:+.2f}% ===")
                     if sig: print_conditions(sig)
+                    print()
                 
                 reason = None
                 if roe >= TAKE_PROFIT_ROE: reason = "TAKE PROFIT"
@@ -1010,8 +1013,10 @@ def main():
                 
                 if loop_count % 10 == 0:
                     print()
+                    print()
                     print(f"[{now_str}] === SIM {ss.upper()} | Entry:{sep:.2f} Now:{cp:.2f} ROE:{sroe:+.2f}% ===")
                     if sig: print_conditions(sig)
+                    print()
                 
                 if hit and reason:
                     print()
@@ -1035,8 +1040,10 @@ def main():
 
                 if loop_count % 10 == 0:
                     print()
+                    print()
                     print(f"[{now_str}] Scanning (FLAT) | Calc: {c_ms:.0f}ms")
                     print_conditions(sig)
+                    print()
 
                 if sig["is_long"]:
                     print()
