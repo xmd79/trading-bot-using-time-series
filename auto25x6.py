@@ -1,22 +1,21 @@
 """
-HFT Auto Trading Bot — KuCoin Futures Edition v6c (STRICT BINARY 8-COND + ML + FFT)
-==========================================================================
-ENTRY LOGIC — ALL 8 CONDITIONS MUST BE TRUE SIMULTANEOUSLY:
-  Every condition outputs EXACTLY one of {LONG=TRUE, SHORT=TRUE}.
-  Never both true, never both false. Strict XOR per condition.
-  1. Sine Scale (5m)           — directional bias from adaptive HT_SINE
-  2. Extrema Cycle (1m)        — timing: most recent extreme matches direction
-  3. Momentum (1m)             — MOM >= 0 long, < 0 short
-  4. Volume (1m)               — bullish% >= bearish% long, else short
-  5. FFT Dominance (1m)        — TOP 5 consistent freqs, 10pp threshold + fallback
-  6. ML Forecast (1m)          — Random Forest multi-indicator regression forecast
-  7. FFT Cycle Target (1m)     — WEIGHTED SCORING (phase 4, dir 3, reach 2, path 1)
-  8. Regression Forecast (1m)  — weighted linear regression price forecast
+HFT Auto Trading Bot — KuCoin Futures Edition (CONCURRENT OPTIMIZED)
+====================================================================
+SIGNAL LOGIC:
+  - Mandatory: Momentum (1m), Volume (1m), ML Forecast, AND TP Reachability MUST be true.
+  - ML Forecast (1m): forecast_price > current_close → LONG allowed;
+                      forecast_price < current_close → SHORT allowed.
+  - TP Reachability: Ensemble ML (FFT+RW+Forest+LSTM) must predict >55% chance of hitting TP before SL.
+  - Flexible: At least 3 out of 5 total conditions must be true for the direction.
+  - (Since Mom + Vol = 2 mandatory true, you only need 1 more from Sine/Cycle/FFT).
 
-POSITION SIZING: 5% of available balance per trade
-LEVERAGE: 25x
-TP: 2.55% NET ROE (5.55% gross after 3.0% RT fee)
-SL: -50% ROE
+POSITION SIZING:
+  - Only 5% of available balance is used per trade.
+  - Remaining 95% stays untouched in the account.
+
+25x Leverage
+TP: 2.55% NET Profit (5.55% Gross ROE after 3.0% RT fee deduction)
+SL: -90% ROE
 """
 
 import time
@@ -27,18 +26,12 @@ import hashlib
 import datetime
 import os
 import requests
-import logging
-import gc
 import numpy as np
-import pandas as pd
 import talib
-from decimal import Decimal
-from scipy.fft import fft, fftfreq, rfft, rfftfreq
-import scipy.fftpack as fftpack
+import gc
+from scipy.fft import fft, fftfreq
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TIMING UTILITIES
@@ -58,11 +51,12 @@ def print_timing_summary():
     for section, values in timing_stats.items():
         if values:
             avg = sum(values) / len(values)
+            last = values[-1]
             mn = min(values)
             mx = max(values)
-            print(f"  │ {section:<24} avg:{avg:>6.0f}ms min:{mn:>5.0f}ms max:{mx:>6.0f}ms │")
+            print(f"  │ {section:<22} avg:{avg:>6.0f}ms min:{mn:>5.0f}ms max:{mx:>6.0f}ms │")
     total_avg = sum(timing_stats.get("total_loop", [1000])) / max(1, len(timing_stats.get("total_loop", [1])))
-    print(f"  │ {'LOOP FREQUENCY':<24} ~{1000/max(1,total_avg):>5.1f} loops/sec{' '*25} │")
+    print(f"  │ {'LOOP FREQUENCY':<22} ~{1000/max(1,total_avg):>5.1f} loops/sec{' '*25} │")
     print(f"  └─────────────────────────────────────────────────────────────────┘\n")
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -93,7 +87,7 @@ del _f
 gc.collect()
 clean_trades_file()
 
-print("HFT KuCoin Bot v6c (STRICT BINARY ALL-8 + RF ML + FFT) initialising...")
+print("HFT KuCoin Bot (25x / 3-OUT-OF-5 LOGIC / TP-REACHABILITY ML) initialising...")
 if _cleaned:
     print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
 del _cleaned
@@ -156,27 +150,27 @@ class KuCoinFuturesClient:
 
     def get_account_overview(self):
         return self.get("/api/v1/account-overview", {"currency": "USDT"})
-
+    
     def get_klines(self, symbol, granularity, start_ms=None, end_ms=None):
         params = {"symbol": symbol, "granularity": granularity}
         if start_ms: params["from"] = start_ms
         if end_ms: params["to"] = end_ms
         return self.get("/api/v1/kline/query", params).get("data", [])
-
+    
     def get_ticker(self, symbol):
         return self.get("/api/v1/ticker", {"symbol": symbol})
-
+    
     def get_position(self, symbol):
         return self.get("/api/v1/position", {"symbol": symbol})
-
+    
     def place_order(self, symbol, side, size, leverage):
         payload = {
             "clientOid": hashlib.md5(f"{time.time()}{side}".encode()).hexdigest(),
-            "symbol": symbol, "side": side, "type": "market",
+            "symbol": symbol, "side": side, "type": "market", 
             "size": size, "leverage": str(leverage)
         }
         return self.post("/api/v1/orders", payload)
-
+    
     def close_position(self, symbol):
         payload = {
             "clientOid": hashlib.md5(str(time.time()).encode()).hexdigest(),
@@ -190,31 +184,30 @@ class KuCoinFuturesClient:
 
 TRADE_SYMBOL = "XBTUSDTM"
 LEVERAGE = 25
-LOOP_SLEEP = 3.0
+LOOP_SLEEP = 0.5
 MIN_BALANCE_USDT = 5.0
-TRADE_BALANCE_PCT = 0.05
+TRADE_BALANCE_PCT = 0.05          # Use only 5% of balance per trade
 
-ML_LOOKBACK = 100
-REG_FORECAST_LOOKBACK = 60
-ANALYSIS_WINDOW_5M = 1200
+ML_LOOKBACK = 100                  # Bars used for ML forecast feature window
+
+ANALYSIS_WINDOW_5M = 1200 
 ANALYSIS_WINDOW_1M = 500
 
 KUCOIN_TAKER_FEE = 0.0006
 RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100
-NET_PROFIT_ROE = 2.55
-TAKE_PROFIT_ROE = NET_PROFIT_ROE + RT_FEE_ROE_PCT
-STOP_LOSS_ROE = -50.0
+NET_PROFIT_ROE = 2.55                                  
+TAKE_PROFIT_ROE = NET_PROFIT_ROE + RT_FEE_ROE_PCT      
+STOP_LOSS_ROE = -90.0                                   # CHANGED FROM -50% TO -90%
 
 TP_PRICE_PCT = TAKE_PROFIT_ROE / LEVERAGE / 100.0
 SL_PRICE_PCT = abs(STOP_LOSS_ROE) / LEVERAGE / 100.0
 
-FFT_TARGET_TOP_N = 3
-FFT_TARGET_MIN_RATIO = 1.0
-FFT_TARGET_WINDOW = 256
-FFT_DOMINANCE_THRESHOLD = 10.0
-FFT_TOP_N_FREQ = 5
-
 FULL_REFRESH_INTERVAL = 3600
+
+# TP Reachability ML Config
+TP_REACH_PROBABILITY_THRESHOLD = 0.55  # Minimum 55% confidence TP will be hit before SL
+TP_REACH_SIMULATIONS = 500
+TP_REACH_FORECAST_STEPS = 30
 
 try:
     with open("credentials_kucoin.txt", "r") as _f:
@@ -240,7 +233,7 @@ class CandleBuffer:
         self.granularity = int(timeframe[0])
         self.duration_ms = self.granularity * 60 * 1000
         self.lock = Lock()
-
+        
     def _parse_kline(self, k):
         try:
             return {
@@ -253,7 +246,7 @@ class CandleBuffer:
             }
         except (IndexError, TypeError, ValueError):
             return None
-
+    
     def initialize(self, client_obj):
         if not API_CONNECTED:
             return False
@@ -263,6 +256,7 @@ class CandleBuffer:
             now_ms = int(time.time() * 1000)
             limit = 200
             num_requests = (self.max_candles + limit - 1) // limit
+            
             for i in range(num_requests):
                 end_ms = now_ms - (i * limit * self.duration_ms)
                 start_ms = end_ms - (limit * self.duration_ms)
@@ -274,12 +268,13 @@ class CandleBuffer:
                             self.candles.append(candle)
                 except Exception as e:
                     print(f"  [Buffer:{self.timeframe}] Init error batch {i}: {e}")
+            
             self._deduplicate()
             self.candles = self.candles[-self.max_candles:]
             self.last_full_refresh = time.time()
             print(f"  [Buffer:{self.timeframe}] Ready: {len(self.candles)} candles")
             return len(self.candles) >= 50
-
+    
     def _deduplicate(self):
         seen_times = set()
         unique = []
@@ -288,7 +283,7 @@ class CandleBuffer:
                 seen_times.add(c["time"])
                 unique.append(c)
         self.candles = list(reversed(unique))
-
+    
     def update(self, client_obj, fetch_limit=3):
         if not API_CONNECTED or not self.candles:
             return 0
@@ -296,6 +291,7 @@ class CandleBuffer:
             now_ms = int(time.time() * 1000)
             end_ms = now_ms
             start_ms = end_ms - (fetch_limit * self.duration_ms)
+            
             new_candles = []
             try:
                 klines = client_obj.get_klines(self.symbol, self.granularity, start_ms=start_ms, end_ms=end_ms)
@@ -305,33 +301,36 @@ class CandleBuffer:
                         new_candles.append(candle)
             except Exception:
                 return 0
+            
             if self.candles:
                 last_time = self.candles[-1]["time"]
                 new_to_add = [c for c in new_candles if c["time"] > last_time]
             else:
                 new_to_add = new_candles
+            
             if new_to_add:
                 self.candles.extend(new_to_add)
                 self.candles = self.candles[-self.max_candles:]
+            
             return len(new_to_add)
-
+    
     def needs_full_refresh(self):
         if not self.last_full_refresh:
             return True
         return (time.time() - self.last_full_refresh) > FULL_REFRESH_INTERVAL
-
+    
     def get_closes(self):
         with self.lock:
             return [c["close"] for c in self.candles]
-
+    
     def get_candles(self):
         with self.lock:
             return self.candles.copy()
-
+    
     def is_ready(self, min_candles=50):
         with self.lock:
             return len(self.candles) >= min_candles
-
+    
     def __len__(self):
         with self.lock:
             return len(self.candles)
@@ -359,16 +358,16 @@ def get_position_info(symbol):
         if size == 0: return empty
         upnl, margin = float(data.get("unrealisedPnl", 0) or 0), float(data.get("posMargin", 0) or 0)
         return {"is_open": True, "side": "long" if size > 0 else "short",
-                "entry_price": float(data.get("avgEntryPrice", 0)), "mark_price": float(data.get("markPrice", 0)),
+                "entry_price": float(data.get("avgEntryPrice", 0)), "mark_price": float(data.get("markPrice", 0)), 
                 "roe_pct": (upnl / margin * 100) if margin else 0.0, "size": size}
     except Exception: return empty
 
 def get_buy_sell_volume_perc(candles):
     buy_vol = sell_vol = 0.0
     for c in candles:
-        if c["close"] >= c["open"]:
+        if c["close"] >= c["open"]: 
             buy_vol += c["volume"]
-        else:
+        else: 
             sell_vol += c["volume"]
     total_vol = buy_vol + sell_vol
     if total_vol == 0: return 50.0, 50.0
@@ -384,111 +383,69 @@ class ConcurrentDataFetcher:
         self.buffer_1m = buffer_1m
         self.symbol = symbol
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
-
+        
     def fetch_all_parallel(self, do_full_refresh=False):
         futures = {}
         results = {
-            "price": 0.0, "balance": 0.0,
-            "position": {"is_open": False, "roe_pct": 0.0, "entry_price": 0.0,
-                         "mark_price": 0.0, "side": None, "size": 0},
-            "new_5m": 0, "new_1m": 0, "times": {}
+            "price": 0.0,
+            "balance": 0.0,
+            "position": {"is_open": False, "roe_pct": 0.0, "entry_price": 0.0, 
+                        "mark_price": 0.0, "side": None, "size": 0},
+            "new_5m": 0,
+            "new_1m": 0,
+            "times": {}
         }
+        
         t0 = time.perf_counter()
-
+        
         if do_full_refresh or self.buffer_5m.needs_full_refresh():
             futures["5m"] = self.executor.submit(self._full_refresh_buffer, self.buffer_5m)
         else:
             futures["5m"] = self.executor.submit(self.buffer_5m.update, client, 3)
-
+        
         if do_full_refresh or self.buffer_1m.needs_full_refresh():
             futures["1m"] = self.executor.submit(self._full_refresh_buffer, self.buffer_1m)
         else:
             futures["1m"] = self.executor.submit(self.buffer_1m.update, client, 3)
-
+        
         futures["price"] = self.executor.submit(get_price, self.symbol)
         futures["balance"] = self.executor.submit(get_account_balance)
         futures["position"] = self.executor.submit(get_position_info, self.symbol)
-
+        
         for name, future in futures.items():
             try:
                 t_start = time.perf_counter()
                 result = future.result(timeout=10)
                 t_elapsed = (time.perf_counter() - t_start) * 1000
                 results["times"][name] = t_elapsed
-                if name == "5m":   results["new_5m"] = result
-                elif name == "1m": results["new_1m"] = result
-                elif name == "price":   results["price"] = result
-                elif name == "balance": results["balance"] = result
-                elif name == "position": results["position"] = result
+                
+                if name == "5m":
+                    results["new_5m"] = result
+                elif name == "1m":
+                    results["new_1m"] = result
+                elif name == "price":
+                    results["price"] = result
+                elif name == "balance":
+                    results["balance"] = result
+                elif name == "position":
+                    results["position"] = result
+                    
             except Exception as e:
                 results["times"][name] = -1
                 print(f"  [Concurrent] Task '{name}' failed: {e}")
-
+        
         results["parallel_total_ms"] = (time.perf_counter() - t0) * 1000
         return results
-
+    
     def _full_refresh_buffer(self, buffer):
         buffer.initialize(client)
         return len(buffer)
-
+    
     def shutdown(self):
         self.executor.shutdown(wait=False)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ML & FFT UTILITY FUNCTIONS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def clean_data(arr):
-    arr = np.array(arr, dtype=np.float64)
-    for i in range(len(arr)):
-        if not np.isfinite(arr[i]) or arr[i] <= 0:
-            arr[i] = arr[i-1] if i > 0 else arr[0]
-    return arr
-
-def calculate_thresholds(closes):
-    if len(closes) == 0: return Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0')
-    min_th = Decimal(str(np.min(closes)))
-    q25 = Decimal(str(np.percentile(closes, 25)))
-    q75 = Decimal(str(np.percentile(closes, 75)))
-    max_th = Decimal(str(np.max(closes)))
-    return min_th, q25, q75, max_th
-
-def compute_Hc(data, kind='price', simplified=True):
-    if simplified:
-        N = len(data)
-        if N < 20: return 0.5, [], []
-        max_k = int(np.floor(N / 2))
-        RS_list = []
-        lags = range(2, max_k)
-        for lag in lags:
-            num_subseries = N // lag
-            if num_subseries < 1: continue
-            RS_vals = []
-            for i in range(num_subseries):
-                sub_series = data[i*lag : (i+1)*lag]
-                if len(sub_series) < 2: continue
-                mean_s = np.mean(sub_series)
-                std_s = np.std(sub_series, ddof=1)
-                if std_s == 0: continue
-                cumdev = np.cumsum(sub_series - mean_s)
-                R = np.max(cumdev) - np.min(cumdev)
-                S = std_s
-                RS_vals.append(R / S)
-            if len(RS_vals) == 0: continue
-            RS_list.append((lag, np.mean(RS_vals)))
-        if len(RS_list) < 2: return 0.5, [], []
-        lags_arr = np.array([x[0] for x in RS_list])
-        rs_arr = np.array([x[1] for x in RS_list])
-        try:
-            poly = np.polyfit(np.log(lags_arr), np.log(rs_arr), 1)
-            H = poly[0]
-        except Exception:
-            H = 0.5
-        return H, lags_arr, rs_arr
-    return 0.5, [], []
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TECHNICAL ANALYSIS — CORE INDICATORS
+# TECHNICAL ANALYSIS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
@@ -503,378 +460,671 @@ def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
     dist_to_max = max(0, min(100, ((cycle_max - current_sine) / rng) * 100))
     return dist_to_min, dist_to_max
 
-
 def analyze_fft_dominance_1m(close_prices_1m):
-    if len(close_prices_1m) < 32: return 50.0, 50.0
-    close_arr = np.array(close_prices_1m, dtype=np.float64)
-    sine_raw, lead_raw = talib.HT_SINE(close_arr)
-    valid_mask = np.isfinite(sine_raw) & np.isfinite(lead_raw)
-    sine_valid = sine_raw[valid_mask]
-    lead_valid = lead_raw[valid_mask]
-    if len(sine_valid) < 32: return 50.0, 50.0
-    sine_valid = -sine_valid
-    lead_valid = -lead_valid
-    n = len(sine_valid)
-    analytic = sine_valid + 1j * lead_valid
-    analytic -= np.mean(analytic)
+    if len(close_prices_1m) < 32: 
+        return False, False, 0.0, 0.0
+    
+    sine_wave_1m, lead_sine_1m = talib.HT_SINE(close_prices_1m)
+    sine_wave_1m = np.nan_to_num(-sine_wave_1m)
+    lead_sine_1m = np.nan_to_num(-lead_sine_1m)
+    
+    valid_mask = ~(np.isnan(sine_wave_1m) | np.isnan(lead_sine_1m))
+    sine_wave_1m = sine_wave_1m[valid_mask]
+    lead_sine_1m = lead_sine_1m[valid_mask]
+    
+    if len(sine_wave_1m) < 32:
+        return False, False, 0.0, 0.0
+    
+    n = len(sine_wave_1m)
+    complex_signal = sine_wave_1m + 1j * lead_sine_1m
     window = np.hanning(n)
-    analytic *= window
-    spectrum = fft(analytic)
-    power = np.abs(spectrum) ** 2
-    freqs = fftfreq(n)
-    min_freq = 1.0 / (n / 2)
-    max_freq = 1.0 / 4.0
-    band_mask = ((freqs < -min_freq) & (freqs >= -max_freq)) | \
-                ((freqs > min_freq) & (freqs <= max_freq))
-    valid_power = power[band_mask]
-    valid_freqs = freqs[band_mask]
-    if len(valid_power) == 0: return 50.0, 50.0
-    top_n = min(FFT_TOP_N_FREQ, len(valid_power))
-    top_indices = np.argsort(valid_power)[-top_n:]
-    top_neg_power = 0.0
-    top_pos_power = 0.0
-    for idx in top_indices:
-        if valid_freqs[idx] < 0: top_neg_power += valid_power[idx]
-        else: top_pos_power += valid_power[idx]
-    total = top_neg_power + top_pos_power
-    if total < 1e-12: return 50.0, 50.0
-    neg_ratio = (top_neg_power / total) * 100.0
-    pos_ratio = (top_pos_power / total) * 100.0
-    return neg_ratio, pos_ratio
-
+    complex_signal = complex_signal * window
+    complex_signal = complex_signal - np.mean(complex_signal)
+    
+    fft_result = fft(complex_signal)
+    fft_power = np.abs(fft_result) ** 2
+    freq_bins = fftfreq(n)
+    
+    powers = fft_power[1:]
+    frequencies = freq_bins[1:]
+    
+    neg_mask = frequencies < 0
+    pos_mask = frequencies > 0
+    
+    neg_powers = powers[neg_mask]
+    pos_powers = powers[pos_mask]
+    
+    if len(neg_powers) >= 12:
+        top_12_neg = np.sort(neg_powers)[-12:]
+        neg_power = np.sum(top_12_neg)
+    elif len(neg_powers) > 0:
+        neg_power = np.sum(neg_powers)
+    else:
+        neg_power = 0.0
+        
+    if len(pos_powers) >= 12:
+        top_12_pos = np.sort(pos_powers)[-12:]
+        pos_power = np.sum(top_12_pos)
+    elif len(pos_powers) > 0:
+        pos_power = np.sum(pos_powers)
+    else:
+        pos_power = 0.0
+    
+    total_power = neg_power + pos_power
+    if total_power == 0: 
+        return False, False, 0.0, 0.0
+    
+    neg_ratio = (neg_power / total_power) * 100
+    pos_ratio = (pos_power / total_power) * 100
+    
+    DOMINANCE_THRESHOLD = 0.1
+    fft_long_signal = neg_ratio > (pos_ratio + DOMINANCE_THRESHOLD)
+    fft_short_signal = pos_ratio > (neg_ratio + DOMINANCE_THRESHOLD)
+    
+    return fft_long_signal, fft_short_signal, neg_ratio, pos_ratio
 
 def calculate_momentum(close_arr, period=14):
     if len(close_arr) < period + 1: return np.nan
     return float(talib.MOM(close_arr, timeperiod=period)[-1])
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# ML FORECAST (RANDOM FOREST) — Condition #6
-# ═══════════════════════════════════════════════════════════════════════════════
-
 def generate_ml_forecast(candles_1m):
-    forecast_periods = 5
+    """
+    Lightweight ML-style forecast using talib indicators + linear regression slope.
+    Uses only numpy and talib (no sklearn/pandas dependency).
+
+    Returns:
+        forecast_price (float): predicted price one step ahead
+        current_close  (float): last close used as baseline
+    """
     if len(candles_1m) < ML_LOOKBACK:
         return 0.0, 0.0
+
+    window = candles_1m[-ML_LOOKBACK:]
+    closes  = np.array([c["close"]  for c in window], dtype=np.float64)
+    highs   = np.array([c["high"]   for c in window], dtype=np.float64)
+    lows    = np.array([c["low"]    for c in window], dtype=np.float64)
+    volumes = np.array([c["volume"] for c in window], dtype=np.float64)
+
+    # Replace any NaN / zero with previous value
+    for arr in (closes, highs, lows, volumes):
+        for i in range(len(arr)):
+            if not np.isfinite(arr[i]) or arr[i] == 0:
+                arr[i] = arr[i-1] if i > 0 else arr[0]
+
+    current_close = float(closes[-1])
+
     try:
-        closes = np.array([float(c['close']) for c in candles_1m[-ML_LOOKBACK:]], dtype=np.float64)
-        highs = np.array([float(c['high']) for c in candles_1m[-ML_LOOKBACK:]], dtype=np.float64)
-        lows = np.array([float(c['low']) for c in candles_1m[-ML_LOOKBACK:]], dtype=np.float64)
-        volumes = np.array([float(c['volume']) for c in candles_1m[-ML_LOOKBACK:]], dtype=np.float64)
-        
-        closes = clean_data(closes)
-        highs = clean_data(highs)
-        lows = clean_data(lows)
-        volumes = clean_data(volumes)
-        
-        df = pd.DataFrame({'close': closes, 'high': highs, 'low': lows, 'volume': volumes})
-        df['returns'] = df['close'].pct_change()
-        df['log_returns'] = np.log(df['close'] / df['close'].shift(1))
-        
-        for lag in range(1, 6):
-            df[f'lagged_return_{lag}'] = df['returns'].shift(lag)
-        for window in [5, 10, 20]:
-            df[f'rolling_mean_{window}'] = df['close'].rolling(window=window).mean()
-            df[f'rolling_std_{window}'] = df['close'].rolling(window=window).std()
-            df[f'rolling_min_{window}'] = df['close'].rolling(window=window).min()
-            df[f'rolling_max_{window}'] = df['close'].rolling(window=window).max()
-            
-        df['rsi'] = talib.RSI(df['close'], timeperiod=14)
-        df['macd'], df['macdsignal'], df['macdhist'] = talib.MACD(df['close'], fastperiod=12, slowperiod=26, signalperiod=9)
-        df['adx'] = talib.ADX(df['high'], df['low'], df['close'], timeperiod=14)
-        df['cci'] = talib.CCI(df['high'], df['low'], df['close'], timeperiod=14)
-        df['willr'] = talib.WILLR(df['high'], df['low'], df['close'], timeperiod=14)
-        df['stoch_k'], df['stoch_d'] = talib.STOCH(df['high'], df['low'], df['close'], fastk_period=14, slowk_period=3, slowd_period=3)
-        df['bb_upper'], df['bb_middle'], df['bb_lower'] = talib.BBANDS(df['close'], timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
-        df['atr'] = talib.ATR(df['high'], df['low'], df['close'], timeperiod=14)
-        df['obv'] = talib.OBV(df['close'], df['volume'])
-        
-        df['hurst'] = 0.5
-        for i in range(20, len(df)):
-            window_data = df['close'].iloc[i-20:i].values
-            if len(window_data) > 10:
-                try:
-                    H, _, _ = compute_Hc(window_data, kind='price', simplified=True)
-                    df.at[df.index[i], 'hurst'] = H
-                except: pass
-                    
-        df['fft_real'] = 0.0
-        df['fft_imag'] = 0.0
-        df['fft_power'] = 0.0
-        for i in range(20, len(df)):
-            window_data = df['close'].iloc[i-20:i].values
-            if len(window_data) > 10:
-                try:
-                    fft_result = fft(window_data - np.mean(window_data))
-                    freqs = np.fft.fftfreq(len(window_data))
-                    power = np.abs(fft_result[1:]) ** 2
-                    if len(power) > 0:
-                        dominant_idx = np.argmax(power) + 1
-                        df.at[df.index[i], 'fft_real'] = np.real(fft_result[dominant_idx])
-                        df.at[df.index[i], 'fft_imag'] = np.imag(fft_result[dominant_idx])
-                        df.at[df.index[i], 'fft_power'] = power[dominant_idx - 1]
-                except: pass
-                    
-        df['target'] = df['close'].shift(-forecast_periods) / df['close'] - 1
-        df_clean = df.dropna()
-        
-        if len(df_clean) < 50: return 0.0, 0.0
-            
-        feature_columns = [col for col in df.columns if col not in ['close', 'high', 'low', 'volume', 'target']]
-        
-        X_train = df_clean[feature_columns].values
-        y_train = df_clean['target'].values
-        
-        scaler = StandardScaler()
-        X_scaled_train = scaler.fit_transform(X_train)
-        
-        model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42, n_jobs=-1)
-        model.fit(X_scaled_train, y_train)
-        
-        # FIX: Predict on absolute latest row to avoid stale data
-        last_data = df.iloc[-1:][feature_columns].values
-        last_data_scaled = scaler.transform(last_data)
-        predicted_return = model.predict(last_data_scaled)[0]
-        
-        current_close = Decimal(str(df['close'].iloc[-1]))
-        forecast_price = current_close * (Decimal('1') + Decimal(str(predicted_return)))
-        
-        recent_returns = df['returns'].iloc[-5:].dropna().values
-        if len(recent_returns) >= 3:
-            if np.mean(recent_returns) > 0:
-                forecast_price = max(forecast_price, current_close * Decimal('1.001'))
-            else:
-                forecast_price = min(forecast_price, current_close * Decimal('0.999'))
-                
-        recent_min = Decimal(str(df['close'].iloc[-20:].min()))
-        recent_max = Decimal(str(df['close'].iloc[-20:].max()))
-        forecast_price = max(forecast_price, recent_min * Decimal('0.95'))
-        forecast_price = min(forecast_price, recent_max * Decimal('1.05'))
-        
-        return float(forecast_price), float(current_close)
+        # ── Feature 1: RSI momentum bias ─────────────────────────────────────
+        rsi = talib.RSI(closes, timeperiod=14)
+        rsi_last = float(rsi[-1]) if np.isfinite(rsi[-1]) else 50.0
+        rsi_bias = (rsi_last - 50.0) / 50.0           # −1..+1
+
+        # ── Feature 2: MACD histogram sign & magnitude ────────────────────────
+        macd, macd_sig, macd_hist = talib.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
+        hist_last = float(macd_hist[-1]) if np.isfinite(macd_hist[-1]) else 0.0
+        hist_norm = hist_last / (current_close + 1e-12)
+
+        # ── Feature 3: Bollinger Band position ───────────────────────────────
+        bb_up, bb_mid, bb_lo = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+        bb_range = float(bb_up[-1] - bb_lo[-1]) if np.isfinite(bb_up[-1]) and np.isfinite(bb_lo[-1]) else 1e-9
+        if bb_range < 1e-12:
+            bb_range = 1e-9
+        bb_pos = float((closes[-1] - bb_lo[-1]) / bb_range) if np.isfinite(bb_lo[-1]) else 0.5   # 0..1
+
+        # ── Feature 4: Short-term linear regression slope ────────────────────
+        n_lr = 20
+        lr_closes = closes[-n_lr:]
+        x = np.arange(n_lr, dtype=np.float64)
+        slope = float(np.polyfit(x, lr_closes, 1)[0])
+        slope_norm = slope / (current_close + 1e-12)   # normalised slope
+
+        # ── Feature 5: Volume-weighted price change ───────────────────────────
+        recent_ret = (closes[-1] - closes[-6]) / (closes[-6] + 1e-12)
+        vol_ratio = float(np.mean(volumes[-3:])) / (float(np.mean(volumes[-20:])) + 1e-12)
+        vol_weighted_ret = recent_ret * vol_ratio
+
+        # ── Combine features into a single directional score ─────────────────
+        # Weights chosen to reflect relative signal reliability
+        score = (
+            0.30 * rsi_bias
+          + 0.25 * np.sign(hist_norm) * min(abs(hist_norm) * 1e4, 1.0)
+          + 0.20 * (bb_pos - 0.5) * 2          # map 0..1 → −1..+1
+          + 0.15 * np.sign(slope_norm) * min(abs(slope_norm) * 1e3, 1.0)
+          + 0.10 * np.sign(vol_weighted_ret) * min(abs(vol_weighted_ret) * 10, 1.0)
+        )
+
+        # ── Translate score into a 1-bar ahead price forecast ─────────────────
+        # Max expected single-bar move ~ 0.3% at score magnitude of 1.0
+        MAX_MOVE_FRAC = 0.003
+        forecast_price = current_close * (1.0 + score * MAX_MOVE_FRAC)
+
+        return float(forecast_price), current_close
+
     except Exception as e:
         print(f"  [ML Forecast] Error: {e}")
-        return 0.0, 0.0
+        return 0.0, current_close
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# FFT FORECAST (DOMINANT FREQUENCY)
+# TP REACHABILITY ML ENSEMBLE (FFT + RANDOM WALK + FOREST + LSTM)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def generate_fft_forecast(candles_1m):
-    if len(candles_1m) < 20: return 0.0, "N/A"
-    try:
-        closes = np.array([float(c['close']) for c in candles_1m], dtype=np.float64)
-        closes = clean_data(closes)
-        current_close = Decimal(str(closes[-1]))
-        mean_close = np.mean(closes)
-        
-        fft_result = fft(closes - mean_close)
-        freqs = np.fft.fftfreq(len(closes))
-        magnitudes = np.abs(fft_result)
-        
-        pos_idx = np.where(freqs > 0)[0]
-        neg_idx = np.where(freqs < 0)[0]
-        pos_amp, neg_amp = 0, 0
-        dominant_freq, dominant_amp, dominant_phase = 0, 0, 0
-        cycle_direction = "N/A"
-        
-        if len(pos_idx) > 0:
-            p_idx = pos_idx[np.argmax(magnitudes[pos_idx])]
-            pos_amp = magnitudes[p_idx] / len(closes) * 2
-            pos_phase = np.angle(fft_result[p_idx])
-            pos_freq = freqs[p_idx]
-        if len(neg_idx) > 0:
-            n_idx = neg_idx[np.argmax(magnitudes[neg_idx])]
-            neg_amp = magnitudes[n_idx] / len(closes) * 2
-            neg_phase = np.angle(fft_result[n_idx])
-            neg_freq = freqs[n_idx]
-            
-        if pos_amp > neg_amp:
-            dominant_freq, dominant_amp, dominant_phase = pos_freq, pos_amp, pos_phase
-            cycle_direction = "Down"
-        else:
-            dominant_freq, dominant_amp, dominant_phase = neg_freq, neg_amp, neg_phase
-            cycle_direction = "Up"
-            
-        future_t = np.arange(len(closes), len(closes) + 5)
-        forecast_val = 0
-        if dominant_amp > 0:
-            forecast_val = dominant_amp * np.cos(2 * np.pi * dominant_freq * future_t[-1] + dominant_phase)
-            
-        forecast_price = Decimal(str(forecast_val + mean_close))
-        min_th, _, max_th, _ = calculate_thresholds(closes)
-        amp_adjust = (max_th - min_th) / Decimal('2')
-        mean_close_decimal = Decimal(str(mean_close))
-        
-        if cycle_direction == "Up":
-            forecast_price = max(forecast_price, current_close)
-            forecast_price = min(forecast_price, mean_close_decimal + amp_adjust)
-        else:
-            forecast_price = min(forecast_price, current_close)
-            forecast_price = max(forecast_price, mean_close_decimal - amp_adjust)
-            
-        return float(forecast_price), cycle_direction
-    except Exception as e:
-        print(f"  [FFT Forecast] Error: {e}")
-        return 0.0, "N/A"
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# CYCLE TARGET EXTRACTION
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def get_target(closes, n_components=5, target_distance=56):
-    if len(closes) < 20: return None, 0.0, 0.0, 0.0, "N/A"
-    try:
-        fft_res = fftpack.rfft(closes) 
-        frequencies = fftpack.rfftfreq(len(closes))
-        idx = np.argsort(np.abs(fft_res))[::-1][:n_components]
-        filtered_fft = np.zeros_like(fft_res)
-        filtered_fft[idx] = fft_res[idx]
-        filtered_signal = fftpack.irfft(filtered_fft)
-        
-        current_close = closes[-1]
-        target_price = filtered_signal[-1] + target_distance
-        current_time = datetime.datetime.now(datetime.timezone.utc)
-        
-        diff = target_price - current_close
-        market_mood = "Bullish" if diff > 0 else "Bearish"
-        fastest_target = current_close + target_distance / 2
-        entry_price = closes[-1]    
-        stop_loss = entry_price - 3 * np.std(closes)
-        return current_time, entry_price, stop_loss, fastest_target, market_mood
-    except Exception as e:
-        print(f"  [Get Target] Error: {e}")
-        return None, 0.0, 0.0, 0.0, "N/A"
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TECHNICAL ANALYSIS — FFT CYCLE TARGET (Condition #7)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def compute_fft_cycle_target_both(close_prices_1m, entry_price):
-    EMPTY = {
-        "phase_lock_long": False, "phase_lock_short": False,
-        "init_dir_long": False, "init_dir_short": False,
-        "reaches_tp_long": False, "reaches_tp_short": False,
-        "path_safe_long": False, "path_safe_short": False,
-        "target_price_long": 0.0, "target_price_short": 0.0,
-        "proj_min": 0.0, "proj_max": 0.0,
-        "dom_period": 0.0, "dom_freq": 0.0, "cycle_amp_pct": 0.0,
-        "long_score": 0, "short_score": 0, "long_ok": False, "short_ok": False,
+def tp_reachability_forecast(candles_1m, current_price, tp_price, sl_price, side, 
+                             n_simulations=TP_REACH_SIMULATIONS, 
+                             forecast_steps=TP_REACH_FORECAST_STEPS):
+    """
+    Ensemble ML forecast combining FFT, Random Walk, Forest, and LSTM-like approaches
+    to predict if price will reach TP before SL.
+    
+    Returns:
+        tuple: (will_reach_tp: bool, confidence: float, tp_probability: float, 
+                sl_probability: float, method_scores: dict)
+    """
+    if len(candles_1m) < 100 or current_price <= 0:
+        return False, 0.0, 0.0, 1.0, {"fft": 0.0, "random_walk": 0.0, "forest": 0.0, "lstm": 0.0}
+    
+    closes = np.array([c["close"] for c in candles_1m], dtype=np.float64)
+    volumes = np.array([c["volume"] for c in candles_1m], dtype=np.float64)
+    highs = np.array([c["high"] for c in candles_1m], dtype=np.float64)
+    lows = np.array([c["low"] for c in candles_1m], dtype=np.float64)
+    
+    # Calculate distances to TP and SL
+    if side == "long":
+        dist_to_tp = tp_price - current_price
+        dist_to_sl = current_price - sl_price
+    else:
+        dist_to_tp = current_price - tp_price
+        dist_to_sl = sl_price - current_price
+    
+    if dist_to_tp <= 0 or dist_to_sl <= 0:
+        return False, 0.0, 0.0, 1.0, {"fft": 0.0, "random_walk": 0.0, "forest": 0.0, "lstm": 0.0}
+    
+    # Risk-reward ratio
+    rr_ratio = dist_to_tp / dist_to_sl
+    
+    method_scores = {}
+    
+    # === METHOD 1: FFT Spectral Extrapolation ===
+    fft_tp_prob = _fft_extrapolation_forecast(closes, current_price, tp_price, sl_price, 
+                                               side, forecast_steps)
+    method_scores["fft"] = fft_tp_prob
+    
+    # === METHOD 2: Random Walk Monte Carlo ===
+    rw_tp_prob = _random_walk_forecast(closes, current_price, tp_price, sl_price, 
+                                        side, n_simulations, forecast_steps)
+    method_scores["random_walk"] = rw_tp_prob
+    
+    # === METHOD 3: Decision Forest (simplified) ===
+    forest_tp_prob = _forest_forecast(closes, highs, lows, volumes, current_price, 
+                                       tp_price, sl_price, side)
+    method_scores["forest"] = forest_tp_prob
+    
+    # === METHOD 4: LSTM-like Recurrent Forecast ===
+    lstm_tp_prob = _lstm_like_forecast(closes, volumes, current_price, 
+                                        tp_price, sl_price, side)
+    method_scores["lstm"] = lstm_tp_prob
+    
+    # === ENSEMBLE: Weighted average ===
+    # Give higher weight to methods that tend to be more reliable
+    weights = {
+        "fft": 0.20,
+        "random_walk": 0.25,
+        "forest": 0.30,
+        "lstm": 0.25
     }
+    
+    ensemble_tp_prob = sum(method_scores[k] * weights[k] for k in weights)
+    
+    # Apply risk-reward bonus/penalty
+    # If RR is good (>1.5), give a small bonus to TP probability
+    if rr_ratio > 1.5:
+        ensemble_tp_prob = min(1.0, ensemble_tp_prob + 0.05)
+    elif rr_ratio < 0.8:
+        ensemble_tp_prob = max(0.0, ensemble_tp_prob - 0.05)
+    
+    ensemble_sl_prob = 1.0 - ensemble_tp_prob
+    
+    # Decision threshold
+    will_reach_tp = ensemble_tp_prob >= TP_REACH_PROBABILITY_THRESHOLD
+    confidence = abs(ensemble_tp_prob - 0.5) * 2  # 0 to 1, where 1 = 100% confident
+    
+    return will_reach_tp, confidence, ensemble_tp_prob, ensemble_sl_prob, method_scores
+
+
+def _fft_extrapolation_forecast(closes, current_price, tp_price, sl_price, side, steps):
+    """Use FFT to extrapolate price path and check if TP is reached before SL"""
     try:
-        n_window = FFT_TARGET_WINDOW
-        if len(close_prices_1m) < n_window: return EMPTY
-        prices = np.array(close_prices_1m[-n_window:], dtype=np.float64)
-        x = np.arange(n_window, dtype=np.float64)
-        trend_coeffs = np.polyfit(x, prices, 1)
-        trend = np.polyval(trend_coeffs, x)
-        detrended = prices - trend
-        window_func = np.hanning(n_window)
-        windowed = detrended * window_func
-        fft_coeffs = rfft(windowed)
-        freqs = rfftfreq(n_window)
-        magnitudes = np.abs(fft_coeffs)
-        MIN_PERIOD_BARS = 4
-        MAX_FREQ = 1.0 / MIN_PERIOD_BARS
-        valid_mask = (freqs > 1e-9) & (freqs <= MAX_FREQ)
-        valid_indices = np.where(valid_mask)[0]
-        if len(valid_indices) < 1: return EMPTY
-        valid_mags = magnitudes[valid_indices]
-        valid_freqs = freqs[valid_indices]
-        dom_idx_in_valid = int(np.argmax(valid_mags))
-        dom_rfft_idx = valid_indices[dom_idx_in_valid]
-        dom_freq = float(valid_freqs[dom_idx_in_valid])
-        dom_period = 1.0 / dom_freq if dom_freq > 1e-9 else n_window
-        dom_coeff = fft_coeffs[dom_rfft_idx]
-        phase_at_end = 2.0 * np.pi * dom_freq * (n_window - 1) + np.angle(dom_coeff)
-        sin_phase = np.sin(phase_at_end)
-        phase_lock_long  = (sin_phase < 0)
-        phase_lock_short = (sin_phase > 0)
-        projection_steps = max(5, int(dom_period / 2))
-        window_mean = np.mean(window_func)
-        if window_mean < 1e-9: window_mean = 1.0
-        window_correction = 1.0 / window_mean
-        top_n_indices = valid_indices[np.argsort(valid_mags)[-FFT_TARGET_TOP_N:]]
-        projected_prices = []
-        for step in range(1, projection_steps + 1):
-            t_future = float(n_window + step)
-            projected_osc = 0.0
-            for idx in top_n_indices:
-                freq_i = float(freqs[idx])
-                coeff_i = fft_coeffs[idx]
-                phase_factor = np.exp(2j * np.pi * freq_i * t_future)
-                contribution = np.real(coeff_i * phase_factor) * (2.0 / n_window)
-                projected_osc += contribution
-            trend_at_future = np.polyval(trend_coeffs, t_future)
-            proj_price = float(trend_at_future + projected_osc * window_correction)
-            projected_prices.append(proj_price)
-        if not projected_prices: return EMPTY
-        proj_max = max(projected_prices)
-        proj_min = min(projected_prices)
-        n_init = min(5, len(projected_prices))
-        x_init = np.arange(n_init, dtype=np.float64)
-        init_slope = float(np.polyfit(x_init, projected_prices[:n_init], 1)[0])
-        init_dir_long  = (init_slope >= 0)
-        init_dir_short = (init_slope < 0)
-        tp_long_price  = entry_price * (1.0 + TP_PRICE_PCT)
-        tp_short_price = entry_price * (1.0 - TP_PRICE_PCT)
-        sl_long_price  = entry_price * (1.0 - SL_PRICE_PCT)
-        sl_short_price = entry_price * (1.0 + SL_PRICE_PCT)
-        required_long_tp = entry_price + (tp_long_price - entry_price) * FFT_TARGET_MIN_RATIO
-        reaches_tp_long  = (proj_max >= required_long_tp)
-        path_safe_long   = (proj_min >= sl_long_price)
-        required_short_tp = entry_price - (entry_price - tp_short_price) * FFT_TARGET_MIN_RATIO
-        reaches_tp_short  = (proj_min <= required_short_tp)
-        path_safe_short   = (proj_max <= sl_short_price)
-        target_price_long  = proj_max
-        target_price_short = proj_min
-        dom_amplitude_raw = float(valid_mags[dom_idx_in_valid]) * (2.0 / n_window) * window_correction
-        cycle_amp_pct = (dom_amplitude_raw / (entry_price + 1e-12)) * 100.0
-        weights = [4, 3, 2, 1]
-        long_checks  = [phase_lock_long,  init_dir_long,  reaches_tp_long,  path_safe_long]
-        short_checks = [phase_lock_short, init_dir_short, reaches_tp_short, path_safe_short]
-        long_score  = sum(w * c for w, c in zip(weights, long_checks))
-        short_score = sum(w * c for w, c in zip(weights, short_checks))
-        long_ok  = (long_score >= short_score)
-        short_ok = (short_score > long_score)
-        return {
-            "phase_lock_long": phase_lock_long, "phase_lock_short": phase_lock_short,
-            "init_dir_long": init_dir_long, "init_dir_short": init_dir_short,
-            "reaches_tp_long": reaches_tp_long, "reaches_tp_short": reaches_tp_short,
-            "path_safe_long": path_safe_long, "path_safe_short": path_safe_short,
-            "target_price_long": target_price_long, "target_price_short": target_price_short,
-            "proj_min": proj_min, "proj_max": proj_max,
-            "dom_period": dom_period, "dom_freq": dom_freq, "cycle_amp_pct": cycle_amp_pct,
-            "long_score": long_score, "short_score": short_score,
-            "long_ok": long_ok, "short_ok": short_ok,
-        }
+        window = closes[-200:]
+        n = len(window)
+        
+        # Apply Hanning window to reduce spectral leakage
+        windowed = window * np.hanning(n)
+        windowed = windowed - np.mean(windowed)
+        
+        # FFT
+        fft_result = fft(windowed)
+        freqs = fftfreq(n)
+        
+        # Keep only significant frequencies (top 20% by magnitude)
+        magnitudes = np.abs(fft_result)
+        threshold = np.percentile(magnitudes, 80)
+        filtered_fft = np.where(magnitudes >= threshold, fft_result, 0)
+        
+        # Extrapolate
+        extrapolated = np.zeros(steps)
+        for i in range(steps):
+            t = n + i
+            extrapolated[i] = np.real(np.sum(filtered_fft * np.exp(2j * np.pi * freqs * t / n)))
+        
+        # Add back the mean
+        mean_price = np.mean(closes[-200:])
+        extrapolated = extrapolated + mean_price
+        
+        # Check path
+        tp_hits = 0
+        sl_hits = 0
+        
+        for price in extrapolated:
+            if side == "long":
+                if price >= tp_price:
+                    tp_hits += 1
+                    break
+                if price <= sl_price:
+                    sl_hits += 1
+                    break
+            else:
+                if price <= tp_price:
+                    tp_hits += 1
+                    break
+                if price >= sl_price:
+                    sl_hits += 1
+                    break
+        
+        # Also check final price direction
+        final_price = extrapolated[-1]
+        direction_correct = (side == "long" and final_price > current_price) or \
+                           (side == "short" and final_price < current_price)
+        
+        if tp_hits > 0:
+            return 0.75 if direction_correct else 0.55
+        elif sl_hits > 0:
+            return 0.25 if direction_correct else 0.15
+        else:
+            return 0.6 if direction_correct else 0.4
+            
     except Exception as e:
-        print(f"  [FFT Target] Error: {e}")
-        return EMPTY
+        return 0.5
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# TECHNICAL ANALYSIS — REGRESSION FORECAST (Condition #8)
-# ═══════════════════════════════════════════════════════════════════════════════
 
-def compute_regression_forecast(closes_1m, lookback=60):
-    if len(closes_1m) < lookback: return 0.0, 0.0, 0.0
-    window = np.array(closes_1m[-lookback:], dtype=np.float64)
-    x = np.arange(lookback, dtype=np.float64)
-    current_price = float(window[-1])
-    decay = 0.05
-    weights = np.exp(-decay * (lookback - 1 - x))
-    weights /= weights.sum()
-    W = np.diag(weights)
-    X = np.column_stack([np.ones(lookback), x])
+def _random_walk_forecast(closes, current_price, tp_price, sl_price, side, 
+                          n_sims, steps):
+    """Monte Carlo random walk simulation"""
     try:
-        XtWX = X.T @ W @ X
-        XtWy = X.T @ W @ window
-        coeffs = np.linalg.solve(XtWX, XtWy)
-    except np.linalg.LinAlgError:
-        coeffs = np.polyfit(x, window, 1)[::-1]
-    intercept, slope = float(coeffs[0]), float(coeffs[1])
-    forecast_price = intercept + slope * lookback
-    slope_normalized = slope / (current_price + 1e-12)
-    return float(forecast_price), current_price, slope_normalized
+        returns = np.diff(closes[-100:]) / closes[-101:-1]
+        mu = np.mean(returns)
+        sigma = np.std(returns)
+        
+        # Add drift based on recent momentum (last 20 bars)
+        recent_returns = np.diff(closes[-20:]) / closes[-21:-1]
+        recent_mu = np.mean(recent_returns)
+        
+        # Blend historical and recent drift
+        blended_mu = 0.6 * mu + 0.4 * recent_mu
+        
+        tp_count = 0
+        sl_count = 0
+        
+        for _ in range(n_sims):
+            price = current_price
+            hit_tp = False
+            hit_sl = False
+            
+            for _ in range(steps):
+                # Random walk with drift and mean reversion
+                mean_reversion = 0.1 * (np.mean(closes[-50:]) - price) / current_price
+                rand_return = np.random.normal(blended_mu + mean_reversion, sigma)
+                price = price * (1 + rand_return)
+                
+                if side == "long":
+                    if price >= tp_price:
+                        hit_tp = True
+                        break
+                    if price <= sl_price:
+                        hit_sl = True
+                        break
+                else:
+                    if price <= tp_price:
+                        hit_tp = True
+                        break
+                    if price >= sl_price:
+                        hit_sl = True
+                        break
+            
+            if hit_tp:
+                tp_count += 1
+            elif hit_sl:
+                sl_count += 1
+            else:
+                # Didn't hit either - check final position
+                if side == "long":
+                    if price > current_price:
+                        tp_count += 0.3  # Partial credit
+                    else:
+                        sl_count += 0.3
+                else:
+                    if price < current_price:
+                        tp_count += 0.3
+                    else:
+                        sl_count += 0.3
+        
+        total = tp_count + sl_count
+        if total == 0:
+            return 0.5
+        
+        return tp_count / total
+        
+    except Exception as e:
+        return 0.5
+
+
+def _forest_forecast(closes, highs, lows, volumes, current_price, tp_price, sl_price, side):
+    """Simplified decision forest using feature-based rules"""
+    try:
+        n = len(closes)
+        if n < 50:
+            return 0.5
+        
+        # Extract features
+        recent_closes = closes[-50:]
+        recent_volumes = volumes[-50:]
+        recent_highs = highs[-50:]
+        recent_lows = lows[-50:]
+        
+        # Feature 1: Recent trend (linear regression slope)
+        x = np.arange(len(recent_closes))
+        slope = np.polyfit(x, recent_closes, 1)[0]
+        slope_normalized = slope / current_price
+        
+        # Feature 2: Volatility
+        returns = np.diff(recent_closes) / recent_closes[:-1]
+        volatility = np.std(returns)
+        
+        # Feature 3: Volume trend
+        vol_slope = np.polyfit(x, recent_volumes, 1)[0]
+        vol_trend_up = vol_slope > 0
+        
+        # Feature 4: Price position relative to recent range
+        recent_low = np.min(recent_lows[-20:])
+        recent_high = np.max(recent_highs[-20:])
+        price_position = (current_price - recent_low) / (recent_high - recent_low + 1e-12)
+        
+        # Feature 5: Momentum consistency
+        up_bars = np.sum(np.diff(recent_closes[-10:]) > 0)
+        momentum_consistency = up_bars / 9
+        
+        # Feature 6: Distance ratios
+        dist_to_tp = abs(tp_price - current_price)
+        dist_to_sl = abs(sl_price - current_price)
+        distance_ratio = dist_to_sl / (dist_to_tp + 1e-12)  # Higher = TP closer
+        
+        # Feature 7: ATR-based expected move
+        atr_values = talib.ATR(recent_highs, recent_lows, recent_closes, timeperiod=14)
+        atr_last = float(atr_values[-1]) if np.isfinite(atr_values[-1]) else volatility * current_price
+        expected_moves_to_tp = dist_to_tp / (atr_last + 1e-12)
+        expected_moves_to_sl = dist_to_sl / (atr_last + 1e-12)
+        
+        # Decision trees (simplified rules)
+        tree_scores = []
+        
+        # Tree 1: Trend + Momentum
+        if side == "long":
+            if slope_normalized > 0 and momentum_consistency > 0.6:
+                tree_scores.append(0.7)
+            elif slope_normalized > 0 or momentum_consistency > 0.5:
+                tree_scores.append(0.55)
+            else:
+                tree_scores.append(0.35)
+        else:
+            if slope_normalized < 0 and momentum_consistency < 0.4:
+                tree_scores.append(0.7)
+            elif slope_normalized < 0 or momentum_consistency < 0.5:
+                tree_scores.append(0.55)
+            else:
+                tree_scores.append(0.35)
+        
+        # Tree 2: Volatility + Distance (ATR-based)
+        if expected_moves_to_tp < expected_moves_to_sl:
+            tree_scores.append(0.65)
+        elif expected_moves_to_tp < expected_moves_to_sl * 1.5:
+            tree_scores.append(0.5)
+        else:
+            tree_scores.append(0.35)
+        
+        # Tree 3: Price position + Volume
+        if side == "long":
+            if price_position < 0.5 and vol_trend_up:
+                tree_scores.append(0.7)
+            elif price_position < 0.6:
+                tree_scores.append(0.55)
+            else:
+                tree_scores.append(0.4)
+        else:
+            if price_position > 0.5 and vol_trend_up:
+                tree_scores.append(0.7)
+            elif price_position > 0.4:
+                tree_scores.append(0.55)
+            else:
+                tree_scores.append(0.4)
+        
+        # Tree 4: Combined momentum + volatility (Sharpe-like ratio)
+        risk_adjusted_momentum = slope_normalized / (volatility + 1e-12)
+        if side == "long":
+            if risk_adjusted_momentum > 0.1:
+                tree_scores.append(0.7)
+            elif risk_adjusted_momentum > 0:
+                tree_scores.append(0.55)
+            else:
+                tree_scores.append(0.35)
+        else:
+            if risk_adjusted_momentum < -0.1:
+                tree_scores.append(0.7)
+            elif risk_adjusted_momentum < 0:
+                tree_scores.append(0.55)
+            else:
+                tree_scores.append(0.35)
+        
+        # Tree 5: Distance ratio consideration
+        if distance_ratio > 1.5:
+            tree_scores.append(0.65)
+        elif distance_ratio > 1.0:
+            tree_scores.append(0.55)
+        elif distance_ratio > 0.7:
+            tree_scores.append(0.45)
+        else:
+            tree_scores.append(0.35)
+        
+        # Tree 6: Support/Resistance proximity
+        recent_low_50 = np.min(recent_lows)
+        recent_high_50 = np.max(recent_highs)
+        range_50 = recent_high_50 - recent_low_50
+        
+        if side == "long":
+            # Check if near support
+            dist_to_support = (current_price - recent_low_50) / (range_50 + 1e-12)
+            if dist_to_support < 0.2:  # Near support - good for long
+                tree_scores.append(0.65)
+            elif dist_to_support < 0.4:
+                tree_scores.append(0.55)
+            else:
+                tree_scores.append(0.45)
+        else:
+            # Check if near resistance
+            dist_to_resistance = (recent_high_50 - current_price) / (range_50 + 1e-12)
+            if dist_to_resistance < 0.2:  # Near resistance - good for short
+                tree_scores.append(0.65)
+            elif dist_to_resistance < 0.4:
+                tree_scores.append(0.55)
+            else:
+                tree_scores.append(0.45)
+        
+        # Tree 7: RSI-based overbought/oversold filter
+        rsi = talib.RSI(recent_closes, timeperiod=14)
+        rsi_last = float(rsi[-1]) if np.isfinite(rsi[-1]) else 50.0
+        
+        if side == "long":
+            if rsi_last < 30:  # Oversold - good for long
+                tree_scores.append(0.7)
+            elif rsi_last < 50:
+                tree_scores.append(0.55)
+            elif rsi_last < 70:
+                tree_scores.append(0.45)
+            else:  # Overbought - bad for long
+                tree_scores.append(0.3)
+        else:
+            if rsi_last > 70:  # Overbought - good for short
+                tree_scores.append(0.7)
+            elif rsi_last > 50:
+                tree_scores.append(0.55)
+            elif rsi_last > 30:
+                tree_scores.append(0.45)
+            else:  # Oversold - bad for short
+                tree_scores.append(0.3)
+        
+        return np.mean(tree_scores)
+        
+    except Exception as e:
+        return 0.5
+
+
+def _lstm_like_forecast(closes, volumes, current_price, tp_price, sl_price, side):
+    """Simplified LSTM-like recurrent network using gated operations"""
+    try:
+        n = len(closes)
+        if n < 60:
+            return 0.5
+        
+        # Prepare sequences
+        seq_len = 20
+        closes_norm = (closes[-60:] - np.mean(closes[-60:])) / (np.std(closes[-60:]) + 1e-12)
+        vols_norm = (volumes[-60:] - np.mean(volumes[-60:])) / (np.std(volumes[-60:]) + 1e-12)
+        
+        # Calculate additional features
+        returns = np.diff(closes[-60:]) / closes[-61:-1]
+        returns_padded = np.concatenate([[0], returns])
+        
+        # Combine features: [price, volume, return]
+        combined = np.stack([closes_norm, vols_norm, returns_padded], axis=-1)
+        
+        # Simplified LSTM cell parameters (heuristic weights designed for trend detection)
+        input_size = 3
+        hidden_size = 4
+        
+        # Input gate weights - designed to activate on consistent trends
+        W_i = np.array([
+            [0.3, 0.1, 0.2, -0.1],
+            [0.2, 0.4, 0.1, 0.2],
+            [0.1, 0.1, 0.3, 0.1]
+        ])
+        W_hi = np.array([
+            [0.2, -0.1, 0.3, 0.1],
+            [0.1, 0.3, -0.2, 0.2],
+            [0.2, 0.1, 0.1, -0.1],
+            [-0.1, 0.2, 0.2, 0.3]
+        ])
+        b_i = np.array([0.1, -0.1, 0.1, 0.0])
+        
+        # Forget gate weights - designed to retain relevant memory
+        W_f = np.array([
+            [0.4, 0.1, 0.2, 0.1],
+            [0.2, 0.3, 0.1, 0.2],
+            [0.1, 0.2, 0.3, 0.1]
+        ])
+        W_hf = np.array([
+            [0.1, 0.3, 0.2, 0.1],
+            [0.2, 0.1, 0.3, 0.2],
+            [0.1, 0.2, 0.1, 0.3],
+            [0.3, 0.1, 0.1, 0.2]
+        ])
+        b_f = np.array([0.3, 0.3, 0.2, 0.3])
+        
+        # Cell gate weights - for candidate values
+        W_c = np.array([
+            [0.2, 0.3, 0.1, 0.2],
+            [0.3, 0.1, 0.2, 0.1],
+            [0.1, 0.2, 0.3, 0.2]
+        ])
+        W_hc = np.array([
+            [0.1, 0.2, 0.3, 0.1],
+            [0.2, 0.1, 0.1, 0.3],
+            [0.3, 0.2, 0.1, 0.2],
+            [0.1, 0.3, 0.2, 0.1]
+        ])
+        b_c = np.array([0.0, 0.0, 0.0, 0.0])
+        
+        # Output gate weights
+        W_o = np.array([
+            [0.3, 0.2, 0.1, 0.2],
+            [0.2, 0.3, 0.2, 0.1],
+            [0.1, 0.1, 0.3, 0.2]
+        ])
+        W_ho = np.array([
+            [0.2, 0.1, 0.2, 0.3],
+            [0.1, 0.2, 0.3, 0.1],
+            [0.3, 0.1, 0.1, 0.2],
+            [0.1, 0.3, 0.2, 0.1]
+        ])
+        b_o = np.array([0.2, 0.2, 0.1, 0.2])
+        
+        # Initialize hidden state and cell state
+        h = np.zeros(hidden_size)
+        c = np.zeros(hidden_size)
+        
+        # Process sequence through LSTM cells
+        for t in range(len(combined) - seq_len, len(combined)):
+            x = combined[t]
+            
+            # Sigmoid for gates
+            def sigmoid(x_arr):
+                return 1 / (1 + np.exp(-np.clip(x_arr, -10, 10)))
+            
+            # Gated operations
+            i = sigmoid(np.dot(W_i.T, x) + np.dot(W_hi.T, h) + b_i)  # Input gate
+            f = sigmoid(np.dot(W_f.T, x) + np.dot(W_hf.T, h) + b_f)  # Forget gate
+            c_tilde = np.tanh(np.dot(W_c.T, x) + np.dot(W_hc.T, h) + b_c)  # Cell candidate
+            c = f * c + i * c_tilde  # Cell state update
+            o = sigmoid(np.dot(W_o.T, x) + np.dot(W_ho.T, h) + b_o)  # Output gate
+            h = o * np.tanh(c)  # Hidden state
+        
+        # Interpret hidden state for TP probability
+        # h[0]: Price direction signal
+        # h[1]: Momentum strength
+        # h[2]: Volatility awareness
+        # h[3]: Confidence level
+        
+        direction_signal = h[0]
+        momentum_signal = h[1]
+        volatility_signal = np.tanh(h[2])
+        confidence_signal = np.tanh(h[3])
+        
+        # Combine signals
+        if side == "long":
+            # For long: positive direction and momentum are good
+            raw_score = (direction_signal * 0.4 + momentum_signal * 0.3 + 
+                        (1 - abs(volatility_signal)) * 0.15 + confidence_signal * 0.15)
+        else:
+            # For short: negative direction and momentum are good
+            raw_score = (-direction_signal * 0.4 - momentum_signal * 0.3 + 
+                        (1 - abs(volatility_signal)) * 0.15 + confidence_signal * 0.15)
+        
+        # Map to probability [0.1, 0.9]
+        base_prob = 0.5 + raw_score * 0.35
+        final_prob = np.clip(base_prob, 0.1, 0.9)
+        
+        return final_prob
+        
+    except Exception as e:
+        return 0.5
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SIGNAL COMPUTATION
@@ -883,22 +1133,25 @@ def compute_regression_forecast(closes_1m, lookback=60):
 def compute_signals(buffer_5m, buffer_1m, live_price):
     candles_5m = buffer_5m.get_candles()
     candles_1m = buffer_1m.get_candles()
+    
     closes_5m_raw = [c["close"] for c in candles_5m]
     closes_1m_raw = [c["close"] for c in candles_1m]
-    if len(closes_5m_raw) < 50 or len(closes_1m_raw) < 50: return None
-
+    
+    if len(closes_5m_raw) < 50 or len(closes_1m_raw) < 50: 
+        return None
+    
     close_arr_5m = np.array(closes_5m_raw, dtype=float)
     close_arr_1m = np.array(closes_1m_raw, dtype=float)
-
-    # 1. Sine
+    
+    # 1. Sine Scale (5m)
     last_1200_5m = close_arr_5m[-ANALYSIS_WINDOW_5M:]
     argmin_idx_5m = int(np.argmin(last_1200_5m))
     argmax_idx_5m = int(np.argmax(last_1200_5m))
     dist_to_min, dist_to_max = scale_to_sine(close_arr_5m, argmin_idx_5m, argmax_idx_5m)
-    cond_sine_long  = (dist_to_min < dist_to_max)
-    cond_sine_short = (dist_to_max < dist_to_min)
-
-    # 2. Cycle
+    cond_sine_long = dist_to_min < dist_to_max
+    cond_sine_short = dist_to_max < dist_to_min
+    
+    # 2. Extrema Cycle (1m) - STRICT MUTUAL EXCLUSIVITY
     candles_1m_window = candles_1m[-500:]
     last_500_1m = close_arr_1m[-500:]
     window_len_1m = len(last_500_1m)
@@ -907,96 +1160,115 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     cycle_min_price = float(last_500_1m[argmin_idx_1m])
     cycle_max_price = float(last_500_1m[argmax_idx_1m])
     current_close_1m = float(close_arr_1m[-1])
+    
     bars_ago_min = (window_len_1m - 1) - argmin_idx_1m
     bars_ago_max = (window_len_1m - 1) - argmax_idx_1m
+    
     try:
-        ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S")
-        ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S")
-    except Exception: ts_min = ts_max = "N/A"
-
-    if bars_ago_min <= bars_ago_max:
+        ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S UTC")
+        ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S UTC")
+    except Exception:
+        ts_min = ts_max = "N/A"
+    
+    if bars_ago_min < bars_ago_max:
         most_recent_extreme = "ARGMIN (LOW)"
-        cond_cycle_long, cond_cycle_short = True, False
-    else:
+        cond_cycle_long = (current_close_1m > cycle_min_price)
+        cond_cycle_short = False
+    elif bars_ago_max < bars_ago_min:
         most_recent_extreme = "ARGMAX (HIGH)"
-        cond_cycle_long, cond_cycle_short = False, True
-
-    # 3. Mom
+        cond_cycle_short = (current_close_1m < cycle_max_price)
+        cond_cycle_long = False
+    else:
+        most_recent_extreme = "TIE"
+        cond_cycle_long = False
+        cond_cycle_short = False
+    
+    # 3. Momentum (1m)
     mom_1m = calculate_momentum(close_arr_1m)
     if np.isnan(mom_1m): return None
-    cond_mom_long  = (mom_1m >= 0)
-    cond_mom_short = (mom_1m < 0)
-
-    # 4. Vol
+    cond_mom_long = mom_1m > 0
+    cond_mom_short = mom_1m < 0
+    
+    # 4. Volume (1m)
     bullish_perc, bearish_perc = get_buy_sell_volume_perc(candles_1m)
-    cond_vol_long  = (bullish_perc >= bearish_perc)
-    cond_vol_short = (bearish_perc > bullish_perc)
+    cond_vol_long = bullish_perc > bearish_perc
+    cond_vol_short = bearish_perc > bullish_perc
+    
+    # 5. FFT Dominance (1m)
+    fft_long, fft_short, neg_ratio, pos_ratio = analyze_fft_dominance_1m(close_arr_1m)
+    cond_fft_long = fft_long
+    cond_fft_short = fft_short
 
-    # 5. FFT Dom
-    neg_ratio, pos_ratio = analyze_fft_dominance_1m(close_arr_1m)
-    if neg_ratio > pos_ratio + FFT_DOMINANCE_THRESHOLD:
-        cond_fft_long, cond_fft_short = True, False
-    elif pos_ratio > neg_ratio + FFT_DOMINANCE_THRESHOLD:
-        cond_fft_long, cond_fft_short = False, True
-    else:
-        cond_fft_long  = (neg_ratio >= pos_ratio)
-        cond_fft_short = (pos_ratio > neg_ratio)
-
-    # 6. ML Forecast (Random Forest)
+    # 6. ML Forecast (1m) — MANDATORY
     ml_forecast_price, ml_current_close = generate_ml_forecast(candles_1m)
-    if ml_forecast_price <= 0.0 or ml_current_close <= 0.0: return None
-    cond_ml_long  = (ml_forecast_price >= ml_current_close)
-    cond_ml_short = (ml_forecast_price < ml_current_close)
+    ml_forecast_valid = (ml_forecast_price > 0.0 and ml_current_close > 0.0)
+    cond_ml_long  = ml_forecast_valid and (ml_forecast_price > ml_current_close)
+    cond_ml_short = ml_forecast_valid and (ml_forecast_price < ml_current_close)
 
-    # 7. FFT Target
-    fft_target = compute_fft_cycle_target_both(closes_1m_raw, live_price)
-    if fft_target["dom_period"] < 4.0: return None
-    cond_fft_target_long  = fft_target["long_ok"]
-    cond_fft_target_short = fft_target["short_ok"]
+    # 7. TP Reachability Forecast (Ensemble ML) — MANDATORY
+    # Calculate TP and SL prices for both directions
+    tp_dist = live_price * TP_PRICE_PCT
+    sl_dist = live_price * SL_PRICE_PCT
+    
+    tp_long_price = live_price + tp_dist
+    sl_long_price = live_price - sl_dist
+    tp_short_price = live_price - tp_dist
+    sl_short_price = live_price + sl_dist
+    
+    # Run TP reachability for both directions
+    tp_reach_long, tp_conf_long, tp_prob_long, sl_prob_long, method_scores_long = \
+        tp_reachability_forecast(candles_1m, live_price, tp_long_price, sl_long_price, "long")
+    
+    tp_reach_short, tp_conf_short, tp_prob_short, sl_prob_short, method_scores_short = \
+        tp_reachability_forecast(candles_1m, live_price, tp_short_price, sl_short_price, "short")
+    
+    cond_tp_reach_long = tp_reach_long
+    cond_tp_reach_short = tp_reach_short
 
-    # 8. Regr
-    reg_forecast, reg_current, reg_slope = compute_regression_forecast(closes_1m_raw, REG_FORECAST_LOOKBACK)
-    if reg_forecast <= 0.0 or reg_current <= 0.0: return None
-    cond_reg_long  = (reg_forecast >= reg_current)
-    cond_reg_short = (reg_forecast < reg_current)
-
-    # Extra FFT & Target
-    fft_forecast_price, fft_cycle_dir = generate_fft_forecast(candles_1m)
-    target_time, target_entry, target_sl, fastest_target, market_mood = get_target(close_arr_1m)
-
-    is_long  = (cond_sine_long and cond_cycle_long and cond_mom_long and cond_vol_long
-                and cond_fft_long and cond_ml_long and cond_fft_target_long and cond_reg_long)
-    is_short = (cond_sine_short and cond_cycle_short and cond_mom_short and cond_vol_short
-                and cond_fft_short and cond_ml_short and cond_fft_target_short and cond_reg_short)
-
-    long_true_count  = sum([cond_sine_long,  cond_cycle_long,  cond_mom_long,  cond_vol_long,
-                            cond_fft_long,  cond_ml_long,  cond_fft_target_long,  cond_reg_long])
-    short_true_count = sum([cond_sine_short, cond_cycle_short, cond_mom_short, cond_vol_short,
-                            cond_fft_short, cond_ml_short, cond_fft_target_short, cond_reg_short])
-
+    # ══════════════════════════════════════════════════════════════════
+    # LOGIC: 3 out of 5 conditions, AND Mom, Vol, ML, TP-Reach are ALL MANDATORY
+    # ══════════════════════════════════════════════════════════════════
+    long_true_count = sum([cond_sine_long, cond_cycle_long, cond_mom_long, cond_vol_long, cond_fft_long])
+    short_true_count = sum([cond_sine_short, cond_cycle_short, cond_mom_short, cond_vol_short, cond_fft_short])
+    
+    # MANDATORY: Mom + Vol + ML + TP-Reachability must all be true.
+    # Still need >=3/5 from the original five.
+    is_long  = (cond_mom_long and cond_vol_long and cond_ml_long and cond_tp_reach_long and long_true_count >= 3)
+    is_short = (cond_mom_short and cond_vol_short and cond_ml_short and cond_tp_reach_short and short_true_count >= 3)
+    
     return {
         "price": live_price, "is_long": is_long, "is_short": is_short,
         "cond_flags": {
-            "sine_long": cond_sine_long,      "sine_short": cond_sine_short,
-            "cycle_long": cond_cycle_long,     "cycle_short": cond_cycle_short,
-            "mom_long": cond_mom_long,         "mom_short": cond_mom_short,
-            "vol_long": cond_vol_long,         "vol_short": cond_vol_short,
-            "fft_long": cond_fft_long,         "fft_short": cond_fft_short,
-            "ml_long": cond_ml_long,           "ml_short": cond_ml_short,
-            "fft_target_long": cond_fft_target_long, "fft_target_short": cond_fft_target_short,
-            "reg_long": cond_reg_long,         "reg_short": cond_reg_short,
+            "sine_long": cond_sine_long, "sine_short": cond_sine_short,
+            "cycle_long": cond_cycle_long, "cycle_short": cond_cycle_short,
+            "mom_long": cond_mom_long, "mom_short": cond_mom_short,
+            "vol_long": cond_vol_long, "vol_short": cond_vol_short,
+            "fft_long": cond_fft_long, "fft_short": cond_fft_short,
+            "ml_long": cond_ml_long, "ml_short": cond_ml_short,
+            "tp_reach_long": cond_tp_reach_long, "tp_reach_short": cond_tp_reach_short,
         },
-        "long_true_count": long_true_count, "short_true_count": short_true_count,
+        "long_true_count": long_true_count,
+        "short_true_count": short_true_count,
         "dist_to_min": dist_to_min, "dist_to_max": dist_to_max,
+        "argmin_idx_1m": argmin_idx_1m, "argmax_idx_1m": argmax_idx_1m,
+        "cycle_min_price": cycle_min_price, "cycle_max_price": cycle_max_price,
+        "current_close_1m": current_close_1m,
+        "bars_ago_min": bars_ago_min, "bars_ago_max": bars_ago_max,
+        "ts_min": ts_min, "ts_max": ts_max,
         "most_recent_extreme": most_recent_extreme,
+        "window_len_1m": window_len_1m,
         "mom_1m": mom_1m, "bullish_perc": bullish_perc, "bearish_perc": bearish_perc,
         "neg_ratio": neg_ratio, "pos_ratio": pos_ratio,
         "ml_forecast_price": ml_forecast_price, "ml_current_close": ml_current_close,
-        "fft_target": fft_target,
-        "reg_forecast": reg_forecast, "reg_current": reg_current, "reg_slope": reg_slope,
-        "fft_forecast_price": fft_forecast_price, "fft_cycle_dir": fft_cycle_dir,
-        "target_entry": target_entry, "fastest_target": fastest_target, 
-        "target_sl": target_sl, "market_mood": market_mood
+        # TP Reachability data
+        "tp_reach_long": tp_reach_long, "tp_reach_short": tp_reach_short,
+        "tp_prob_long": tp_prob_long, "tp_prob_short": tp_prob_short,
+        "sl_prob_long": sl_prob_long, "sl_prob_short": sl_prob_short,
+        "tp_conf_long": tp_conf_long, "tp_conf_short": tp_conf_short,
+        "method_scores_long": method_scores_long,
+        "method_scores_short": method_scores_short,
+        "tp_long_price": tp_long_price, "sl_long_price": sl_long_price,
+        "tp_short_price": tp_short_price, "sl_short_price": sl_short_price,
     }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1008,6 +1280,7 @@ def calculate_sl_tp(entry_price, side):
     sl_dist = entry_price * SL_PRICE_PCT
     if side == "long": sl_price, tp_price = entry_price - sl_dist, entry_price + tp_dist
     else: sl_price, tp_price = entry_price + sl_dist, entry_price - tp_dist
+    print(f"  [Risk Calc] TP: {tp_price:.2f} ({TAKE_PROFIT_ROE}% ROE) | SL: {sl_price:.2f} ({STOP_LOSS_ROE}% ROE)")
     return float(sl_price), float(tp_price)
 
 def check_sim_tp_sl(entry_price, current_price, side):
@@ -1040,12 +1313,13 @@ def clear_trade_state():
 
 def write_trade_to_journal(trade_result):
     mode = trade_result.get("mode", "LIVE")
-    line = (f"{'='*65}\nMODE: {mode}\nTYPE: {trade_result.get('type', 'N/A').upper()}\n"
-            f"ENTRY TIME: {trade_result.get('entry_time', 'N/A')}\nEXIT TIME:  {trade_result.get('exit_time', 'N/A')}\n"
-            f"DURATION:   {trade_result.get('duration', 'N/A')}\nENTRY PRICE: {trade_result.get('entry_price', 0):.2f}\n"
-            f"EXIT PRICE:  {trade_result.get('exit_price', 0):.2f}\nNET ROE:     {trade_result.get('roe', 0):+.2f}%\n"
-            f"REASON:      {trade_result.get('reason', 'N/A')}\nREGR FCAST:  Price: {trade_result.get('reg_forecast', 0.0):.2f}\n"
-            f"{'='*65}\n\n")
+    line = (f"{'='*60}\nMODE: {mode}\nTYPE: {trade_result.get('type', 'N/A').upper()}\n"
+            f"ENTRY TIME: {trade_result.get('entry_time', 'N/A')}\nEXIT TIME: {trade_result.get('exit_time', 'N/A')}\n"
+            f"DURATION: {trade_result.get('duration', 'N/A')}\nENTRY PRICE: {trade_result.get('entry_price', 0):.2f}\n"
+            f"EXIT PRICE: {trade_result.get('exit_price', 0):.2f}\nPRICE CHANGE: {trade_result.get('price_change_pct', 0):+.4f}%\n"
+            f"GROSS ROE: {trade_result.get('gross_roe', 0):+.2f}%\nRT FEE DEDUCTED: {trade_result.get('rt_fee_pct', 0):.2f}%\n"
+            f"NET ROE: {trade_result.get('roe', 0):+.2f}%\nREASON: {trade_result.get('reason', 'N/A')}\n"
+            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 3/5 Cond (Mom+Vol+ML+TPReach Mandatory) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%\n{'='*60}\n\n")
     try:
         with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f: f.write(line)
     except Exception as e: print(f"  [journal] write error: {e}")
@@ -1061,12 +1335,11 @@ def get_contract_size(symbol):
 
 def execute_entry(symbol, side, balance, price):
     try:
-        trade_balance = balance * TRADE_BALANCE_PCT
+        trade_balance = balance * TRADE_BALANCE_PCT   # use only 5% of available balance
         contracts = max(1, int((trade_balance * LEVERAGE) / (price * get_contract_size(symbol))))
         resp = client.place_order(symbol, side, contracts, LEVERAGE)
         if resp.get("data", {}).get("orderId"):
-            print(f"  >>> {side.upper()} PLACED: {contracts} contracts @ ~{price:.2f}  "
-                  f"(used {trade_balance:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}% of balance)")
+            print(f"  >>> {side.upper()} PLACED: {contracts} contracts @ ~{price:.2f}  (used {trade_balance:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}% of balance)")
             return True
         print(f"  [ORDER FAIL] {side.upper()} [{resp.get('code')}]: {resp.get('msg')}")
         return False
@@ -1078,9 +1351,6 @@ def execute_entry(symbol, side, balance, price):
 # DISPLAY HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _ck(truth):
-    return "\033[92m✓\033[0m" if truth else "\033[91m✗\033[0m"
-
 def format_duration(start_dt, end_dt):
     total_sec = int((end_dt - start_dt).total_seconds())
     h, rem = divmod(total_sec, 3600)
@@ -1089,179 +1359,230 @@ def format_duration(start_dt, end_dt):
 
 def print_conditions(sig):
     f = sig["cond_flags"]
-    print(f"  ┌────────────────────── ALL 8 CONDITIONS ──────────────────────┐")
-    print(f"  │ 1. Sine (5m)       dMin:{sig['dist_to_min']:>5.1f}% dMax:{sig['dist_to_max']:>5.1f}%"
-          f"  L:{_ck(f['sine_long'])}  S:{_ck(f['sine_short'])}       │")
-    print(f"  │ 2. Cycle (1m)      {sig['most_recent_extreme']:<14s}"
-          f"  L:{_ck(f['cycle_long'])}  S:{_ck(f['cycle_short'])}       │")
-    print(f"  │ 3. Mom (1m)        {sig['mom_1m']:>10.2f}"
-          f"       L:{_ck(f['mom_long'])}  S:{_ck(f['mom_short'])}       │")
-    print(f"  │ 4. Vol (1m)        Bull:{sig['bullish_perc']:>5.1f}% Bear:{sig['bearish_perc']:>5.1f}%"
-          f"  L:{_ck(f['vol_long'])}  S:{_ck(f['vol_short'])} │")
-    print(f"  │ 5. FFT Dom (1m)    Neg:{sig['neg_ratio']:>5.1f}% Pos:{sig['pos_ratio']:>5.1f}%"
-          f"  L:{_ck(f['fft_long'])}  S:{_ck(f['fft_short'])} │")
+    print(f"  1. Sine (5m):  dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{f['sine_long']} S:{f['sine_short']}")
+    print(f"  2. Cycle (1m): Low@{sig['ts_min']} High@{sig['ts_max']} | Most Recent: {sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
+    print(f"  3. Mom (1m):   {sig['mom_1m']:.2f} L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
+    print(f"  4. Vol (1m):   Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
+    print(f"  5. FFT (1m):   Neg:{sig['neg_ratio']:.2f}% Pos:{sig['pos_ratio']:.2f}% L:{f['fft_long']} S:{f['fft_short']}")
     ml_fc  = sig.get("ml_forecast_price", 0.0)
     ml_cur = sig.get("ml_current_close", 0.0)
-    ml_d   = ((ml_fc - ml_cur) / ml_cur * 100) if ml_cur > 0 else 0.0
-    print(f"  │ 6. ML (1m)         Fcst:{ml_fc:>10.2f} ({ml_d:+.4f}%)"
-          f"  L:{_ck(f['ml_long'])}  S:{_ck(f['ml_short'])} │")
-    ft = sig.get("fft_target", {})
-    ftp_l, ftp_s = ft.get("target_price_long", 0.0), ft.get("target_price_short", 0.0)
-    fl_sc, fs_sc = ft.get("long_score", 0), ft.get("short_score", 0)
-    print(f"  │ 7. FFT Target(v6c) L_Tgt:{ftp_l:>9.2f} S_Tgt:{ftp_s:>9.2f}"
-          f"       │")
-    print(f"  │    Score: L:{fl_sc}/10 S:{fs_sc}/10  Gate: L:{_ck(f['fft_target_long'])}  S:{_ck(f['fft_target_short'])}"
-          f"       │")
-    reg_fc, reg_cur = sig.get("reg_forecast", 0.0), sig.get("reg_current", 0.0)
-    reg_d = ((reg_fc - reg_cur) / reg_cur * 100) if reg_cur > 0 else 0.0
-    print(f"  │ 8. Regr Fcst (1m)  Fcst:{reg_fc:>10.2f} ({reg_d:+.4f}%)"
-          f"  L:{_ck(f['reg_long'])}  S:{_ck(f['reg_short'])} │")
+    ml_diff = ((ml_fc - ml_cur) / ml_cur * 100) if ml_cur else 0.0
+    print(f"  6. ML (1m):    Cur:{ml_cur:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
     
-    # Extra Info
-    fft_fc = sig.get("fft_forecast_price", 0.0)
-    fft_cd = sig.get("fft_cycle_dir", "N/A")
-    ft_fast = sig.get("fastest_target", 0.0)
-    ft_mood = sig.get("market_mood", "N/A")
-    print(f"  ├──────────────────────────────────────────────────────────────┤")
-    print(f"  │ EXTRA: FFT Fcst:{fft_fc:.2f}({fft_cd}) | FastTgt:{ft_fast:.2f} | Mood:{ft_mood} │")
-    print(f"  ├──────────────────────────────────────────────────────────────┤")
+    # TP Reachability display
+    ms_l = sig.get("method_scores_long", {})
+    ms_s = sig.get("method_scores_short", {})
+    print(f"  7. TP-Reach:   L: {sig['tp_prob_long']*100:.1f}% (FFT:{ms_l.get('fft',0)*100:.0f}% RW:{ms_l.get('random_walk',0)*100:.0f}% Forest:{ms_l.get('forest',0)*100:.0f}% LSTM:{ms_l.get('lstm',0)*100:.0f}%) L:{f['tp_reach_long']} [MANDATORY]")
+    print(f"                S: {sig['tp_prob_short']*100:.1f}% (FFT:{ms_s.get('fft',0)*100:.0f}% RW:{ms_s.get('random_walk',0)*100:.0f}% Forest:{ms_s.get('forest',0)*100:.0f}% LSTM:{ms_s.get('lstm',0)*100:.0f}%) S:{f['tp_reach_short']} [MANDATORY]")
     
-    lc, sc = sig["long_true_count"], sig["short_true_count"]
-    print(f"  │ SCORE: LONG {lc}/8  SHORT {sc}/8  (ALL 8 MUST BE TRUE)      │")
-    print(f"  │ RESULT:  LONG:{_ck(sig['is_long'])}   SHORT:{_ck(sig['is_short'])}"
-          f"{' '*22}│")
-    print(f"  └──────────────────────────────────────────────────────────────┘")
+    long_true  = sig["long_true_count"]
+    short_true = sig["short_true_count"]
+    
+    print(f"  ═══ LONG:{long_true}/5 SHORT:{short_true}/5 (Rule: Mom+Vol+ML+TPReach Mandatory + >=3/5 Total) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main():
-    print(f"\n{'='*65}")
-    print(f" HFT KuCoin Bot v6c — ALL 8 CONDITIONS (STRICT BINARY)")
-    print(f"{'='*65}")
-    print(f" Loop Sleep:          {LOOP_SLEEP}s | GC: Enabled")
-    print(f" API Connected:       {API_CONNECTED}")
-    print(f"{'='*65}\n")
+    print(f"\n{'='*60}")
+    print(f"HFT KuCoin Bot - 3/5 CONDITIONS (MOM+VOL+ML+TPREACH MANDATORY)")
+    print(f"{'='*60}")
+    print(f"Symbol:              {TRADE_SYMBOL}")
+    print(f"Leverage:            {LEVERAGE}x")
+    print(f"TP: {TAKE_PROFIT_ROE}% ROE | SL: {STOP_LOSS_ROE}% ROE")
+    print(f"Loop Sleep:          {LOOP_SLEEP}s")
+    print(f"Entry Logic:         Mom & Vol & ML & TP-Reach MANDATORY + At least 3/5 Total")
+    print(f"Position Sizing:     {TRADE_BALANCE_PCT*100:.0f}% of balance per trade")
+    print(f"TP Reach Threshold:  {TP_REACH_PROBABILITY_THRESHOLD*100:.0f}% minimum confidence")
+    print(f"TP Reach Methods:    FFT + RandomWalk + Forest + LSTM Ensemble")
+    print(f"API Connected:       {API_CONNECTED}")
+    print(f"{'='*60}\n")
 
     buffer_5m = CandleBuffer(TRADE_SYMBOL, "5m", ANALYSIS_WINDOW_5M)
     buffer_1m = CandleBuffer(TRADE_SYMBOL, "1m", ANALYSIS_WINDOW_1M)
-
+    
     if API_CONNECTED:
         print("  === INITIALIZING BUFFERS (one-time) ===\n")
         t0 = time.perf_counter()
         buffer_5m.initialize(client)
         buffer_1m.initialize(client)
         print(f"  Total init: {(time.perf_counter()-t0)*1000:.0f}ms\n")
+        
         if not buffer_5m.is_ready() or not buffer_1m.is_ready():
             print("  [ERROR] Buffer init failed. Exiting.")
             return
-
-    fetcher = ConcurrentDataFetcher(buffer_5m, buffer_1m, TRADE_SYMBOL)
-    trade_state = load_trade_state()
-    if trade_state and trade_state.get("is_open"):
-        print(f"  [STATE] Resuming tracked trade: {trade_state.get('side','?').upper()} "
-              f"@ {trade_state.get('entry_price',0):.2f}")
-
+    
+    fetcher = ConcurrentDataFetcher(buffer_5m, buffer_1m, TRADE_SYMBOL, max_workers=5)
+    
+    saved_state = load_trade_state()
+    if saved_state:
+        print(f"  [recovery] State: {saved_state.get('mode')} {saved_state.get('side')} @ {saved_state.get('entry_price', 0):.2f}")
+    
     loop_count = 0
+    last_timing_print = time.time()
+    last_buffer_log = 0
 
-    try:
-        while True:
-            gc.collect() # Enforce fresh memory and prevent cache staleness
-            t_loop_start = time.perf_counter()
+    print("  === STARTING MAIN LOOP ===\n")
 
-            t_net_start = time.perf_counter()
-            do_full = (loop_count == 0)
-            data = fetcher.fetch_all_parallel(do_full_refresh=do_full)
-            net_ms = (time.perf_counter() - t_net_start) * 1000
-
-            live_price = data["price"]
-            balance = data["balance"]
-            position = data["position"]
-            trade_alloc = balance * TRADE_BALANCE_PCT
-
-            if trade_state and trade_state.get("is_open"):
-                entry_p = trade_state["entry_price"]
-                side = trade_state["side"]
-                hit, reason, roe = check_sim_tp_sl(entry_p, live_price, side)
-                if hit:
-                    exit_price = live_price
-                    price_chg = ((exit_price - entry_p) / entry_p) * 100 if side == "long" else ((entry_p - exit_price) / entry_p) * 100
-                    net_roe = (price_chg * LEVERAGE) - RT_FEE_ROE_PCT
-                    entry_dt = datetime.datetime.fromisoformat(trade_state["entry_time"]).replace(tzinfo=datetime.timezone.utc)
-                    exit_dt = datetime.datetime.now(datetime.timezone.utc)
-                    dur = format_duration(entry_dt, exit_dt)
-                    print(f"\n  {'*'*55}\n  *** {reason} *** {side.upper()} | ROE: {net_roe:+.2f}%\n  {'*'*55}\n")
-                    if API_CONNECTED and position.get("is_open"):
-                        try: client.close_position(TRADE_SYMBOL)
-                        except Exception as e: print(f"  [EXCHANGE] Close error: {e}")
-                    write_trade_to_journal({"mode": "LIVE" if API_CONNECTED else "SIM", "type": side, "entry_time": trade_state["entry_time"], "exit_time": exit_dt.isoformat(), "duration": dur, "entry_price": entry_p, "exit_price": exit_price, "roe": net_roe, "reason": reason, "reg_forecast": trade_state.get("reg_forecast", 0.0)})
-                    clear_trade_state()
-                    trade_state = None
-                else:
-                    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
-                    print(f"  [{now_str}] IN {side.upper()} | ROE: {roe:+.2f}% | Price: {live_price:.2f} | Net:{net_ms:.0f}ms", end="\r")
-                time.sleep(LOOP_SLEEP)
-                loop_count += 1
-                continue
-
-            t_calc_start = time.perf_counter()
-            sig = compute_signals(buffer_5m, buffer_1m, live_price)
-            calc_ms = (time.perf_counter() - t_calc_start) * 1000
-
-            now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
-            if sig is None:
-                print(f"  [{now_str}] Waiting for data... (5m:{len(buffer_5m)} 1m:{len(buffer_1m)})")
-                time.sleep(LOOP_SLEEP)
-                loop_count += 1
-                continue
-
-            pos_label = "FLAT"
-            if sig["is_long"]:  pos_label = "LONG"
-            elif sig["is_short"]: pos_label = "SHORT"
-
-            print(f"\n[{now_str}] Scanning ({pos_label}) | Net:{net_ms:.0f}ms Calc:{calc_ms:.0f}ms")
-            print_conditions(sig)
-            print(f"  Balance: {balance:.2f} USDT  (trade alloc: {trade_alloc:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}%)")
-
-            if sig["is_long"] or sig["is_short"]:
-                side = "long" if sig["is_long"] else "short"
-                if balance < MIN_BALANCE_USDT:
-                    print(f"  [SKIP] Balance {balance:.2f} USDT < minimum {MIN_BALANCE_USDT} USDT")
-                elif not API_CONNECTED:
-                    print(f"  [SIM] Would enter {side.upper()} @ {live_price:.2f} (no API)")
-                    trade_state = {
-                        "is_open": True, "side": side, "entry_price": live_price,
-                        "entry_time": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                        "fft_target_price": sig["fft_target"].get("target_price_long" if side == "long" else "target_price_short", 0.0),
-                        "reg_forecast": sig.get("reg_forecast", 0.0),
-                    }
-                    save_trade_state(trade_state)
-                else:
-                    success = execute_entry(TRADE_SYMBOL, side, balance, live_price)
-                    if success:
-                        trade_state = {
-                            "is_open": True, "side": side, "entry_price": live_price,
-                            "entry_time": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                            "fft_target_price": sig["fft_target"].get("target_price_long" if side == "long" else "target_price_short", 0.0),
-                            "reg_forecast": sig.get("reg_forecast", 0.0),
-                        }
-                        save_trade_state(trade_state)
-
-            total_ms = (time.perf_counter() - t_loop_start) * 1000
-            log_timing("total_loop", total_ms)
+    while True:
+        try:
+            loop_start = time.perf_counter()
+            now = datetime.datetime.now()
+            now_str = now.strftime("%Y-%m-%d %H:%M:%S")
             loop_count += 1
-            if loop_count % 200 == 0: print_timing_summary()
+
+            do_full_refresh = buffer_5m.needs_full_refresh() or buffer_1m.needs_full_refresh()
+            data = fetcher.fetch_all_parallel(do_full_refresh=do_full_refresh)
+            
+            current_price = data["price"]
+            balance = data["balance"]
+            pos = data["position"]
+            has_sufficient_balance = balance >= MIN_BALANCE_USDT
+            
+            parallel_ms = data["parallel_total_ms"]
+            log_timing("parallel_total", parallel_ms)
+            for k, v in data["times"].items():
+                log_timing(f"task_{k}", v)
+            
+            if loop_count - last_buffer_log >= 100:
+                print(f"  [Buffers] 5m:{len(buffer_5m)} 1m:{len(buffer_1m)} | Parallel: {parallel_ms:.0f}ms | Tasks: {data['times']}")
+                last_buffer_log = loop_count
+            
+            t = time.perf_counter()
+            sig = compute_signals(buffer_5m, buffer_1m, current_price)
+            compute_ms = (time.perf_counter() - t) * 1000
+            log_timing("compute_signals", compute_ms)
+
+            if pos["is_open"]:
+                roe, side, entry_price, mark_price = pos["roe_pct"], pos["side"], pos["entry_price"], pos["mark_price"]
+                
+                if loop_count % 10 == 0:
+                    print(f"\n[{now_str}] === LIVE {side.upper()} | Entry:{entry_price:.2f} Mark:{mark_price:.2f} ROE:{roe:+.2f}% ===")
+                    if sig: print_conditions(sig)
+                
+                reason = None
+                if roe >= TAKE_PROFIT_ROE: reason = "TAKE PROFIT"
+                elif roe <= STOP_LOSS_ROE: reason = "STOP LOSS"
+                    
+                if reason:
+                    print(f"  >>> [{reason}] {roe:+.2f}% ROE - Closing...")
+                    client.close_position(TRADE_SYMBOL)
+                    price_change_pct = ((mark_price - entry_price) / entry_price) * 100 if side == "long" else ((entry_price - mark_price) / entry_price) * 100
+                    start_dt = datetime.datetime.strptime(saved_state["entry_time"], "%Y-%m-%d %H:%M:%S")
+                    trade_result = {"mode": "LIVE", "entry_time": saved_state["entry_time"], "exit_time": now_str,
+                                    "type": side, "entry_price": entry_price, "exit_price": mark_price,
+                                    "price_change_pct": price_change_pct, "gross_roe": price_change_pct * LEVERAGE,
+                                    "rt_fee_pct": RT_FEE_ROE_PCT, "roe": price_change_pct * LEVERAGE - RT_FEE_ROE_PCT,
+                                    "duration": format_duration(start_dt, datetime.datetime.now()), "reason": reason}
+                    write_trade_to_journal(trade_result)
+                    clear_trade_state()
+                    saved_state = None
+                
+                loop_ms = (time.perf_counter() - loop_start) * 1000
+                log_timing("total_loop", loop_ms)
+                time.sleep(LOOP_SLEEP)
+                continue
+
+            if saved_state and saved_state.get("mode") == "SIMULATION":
+                sim_entry_price, sim_side, sim_entry_time = saved_state["entry_price"], saved_state["side"], saved_state["entry_time"]
+                hit, reason, sim_roe = check_sim_tp_sl(sim_entry_price, current_price, sim_side)
+                
+                if loop_count % 10 == 0:
+                    start_dt = datetime.datetime.strptime(sim_entry_time, "%Y-%m-%d %H:%M:%S")
+                    print(f"\n[{now_str}] === SIM {sim_side.upper()} | Entry:{sim_entry_price:.2f} Now:{current_price:.2f} ROE:{sim_roe:+.2f}% ===")
+                    if sig: print_conditions(sig)
+                
+                if hit and reason:
+                    print(f"  >>> [SIM {reason}] {sim_roe:+.2f}% ROE")
+                    price_change_pct = ((current_price - sim_entry_price) / sim_entry_price) * 100 if sim_side == "long" else ((sim_entry_price - current_price) / sim_entry_price) * 100
+                    start_dt = datetime.datetime.strptime(sim_entry_time, "%Y-%m-%d %H:%M:%S")
+                    trade_result = {"mode": "SIMULATION", "entry_time": sim_entry_time, "exit_time": now_str,
+                                    "type": sim_side, "entry_price": sim_entry_price, "exit_price": current_price,
+                                    "price_change_pct": price_change_pct, "gross_roe": price_change_pct * LEVERAGE,
+                                    "rt_fee_pct": RT_FEE_ROE_PCT, "roe": sim_roe,
+                                    "duration": format_duration(start_dt, now), "reason": reason}
+                    write_trade_to_journal(trade_result)
+                    clear_trade_state()
+                    saved_state = None
+                
+                loop_ms = (time.perf_counter() - loop_start) * 1000
+                log_timing("total_loop", loop_ms)
+                time.sleep(LOOP_SLEEP)
+                continue
+
+            if saved_state and saved_state.get("mode") == "LIVE" and not pos["is_open"]:
+                print("  [recovery] Orphaned live state - clearing.")
+                clear_trade_state()
+                saved_state = None
+
+            if not pos["is_open"] and not saved_state:
+                if not sig:
+                    loop_ms = (time.perf_counter() - loop_start) * 1000
+                    log_timing("total_loop", loop_ms)
+                    time.sleep(LOOP_SLEEP)
+                    continue
+
+                if loop_count % 10 == 0:
+                    print(f"\n[{now_str}] Scanning (FLAT) | Net: {parallel_ms:.0f}ms | Calc: {compute_ms:.0f}ms")
+                    print_conditions(sig)
+                    print(f"  Balance: {balance:.2f} USDT  (trade alloc: {balance*TRADE_BALANCE_PCT:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}%)")
+
+                if sig["is_long"]:
+                    print(f"\n  *** 4 MANDATORY CONDITIONS MET (Mom+Vol+ML+TPReach) + 3/5 Total -> LONG ***")
+                    if has_sufficient_balance:
+                        print(f"  [LIVE] Executing LONG...")
+                        if execute_entry(TRADE_SYMBOL, "buy", balance, sig["price"]):
+                            sl_price, tp_price = calculate_sl_tp(sig["price"], "long")
+                            saved_state = {"active": True, "mode": "LIVE", "side": "long", 
+                                           "entry_price": sig["price"], "sl": sl_price, "tp": tp_price, "entry_time": now_str,
+                                           "tp_reach_prob": sig["tp_prob_long"]}
+                            save_trade_state(saved_state)
+                    else:
+                        print(f"  [SIM] LONG (low balance)")
+                        sl_price, tp_price = calculate_sl_tp(sig["price"], "long")
+                        saved_state = {"active": True, "mode": "SIMULATION", "side": "long", 
+                                       "entry_price": sig["price"], "sl": sl_price, "tp": tp_price, "entry_time": now_str,
+                                       "tp_reach_prob": sig["tp_prob_long"]}
+                        save_trade_state(saved_state)
+
+                elif sig["is_short"]:
+                    print(f"\n  *** 4 MANDATORY CONDITIONS MET (Mom+Vol+ML+TPReach) + 3/5 Total -> SHORT ***")
+                    if has_sufficient_balance:
+                        print(f"  [LIVE] Executing SHORT...")
+                        if execute_entry(TRADE_SYMBOL, "sell", balance, sig["price"]):
+                            sl_price, tp_price = calculate_sl_tp(sig["price"], "short")
+                            saved_state = {"active": True, "mode": "LIVE", "side": "short", 
+                                           "entry_price": sig["price"], "sl": sl_price, "tp": tp_price, "entry_time": now_str,
+                                           "tp_reach_prob": sig["tp_prob_short"]}
+                            save_trade_state(saved_state)
+                    else:
+                        print(f"  [SIM] SHORT (low balance)")
+                        sl_price, tp_price = calculate_sl_tp(sig["price"], "short")
+                        saved_state = {"active": True, "mode": "SIMULATION", "side": "short", 
+                                       "entry_price": sig["price"], "sl": sl_price, "tp": tp_price, "entry_time": now_str,
+                                       "tp_reach_prob": sig["tp_prob_short"]}
+                        save_trade_state(saved_state)
+
+            loop_ms = (time.perf_counter() - loop_start) * 1000
+            log_timing("total_loop", loop_ms)
+            
+            if time.time() - last_timing_print > 300:
+                print_timing_summary()
+                last_timing_print = time.time()
+            
             time.sleep(LOOP_SLEEP)
 
-    except KeyboardInterrupt:
-        print(f"\n\n  [EXIT] Bot stopped cleanly.")
-        fetcher.shutdown()
-    except Exception as e:
-        print(f"\n  [FATAL] {e}")
-        import traceback; traceback.print_exc()
-        fetcher.shutdown()
+        except KeyboardInterrupt:
+            print("\n[Bot] Shutting down safely.")
+            print_timing_summary()
+            fetcher.shutdown()
+            break
+        except Exception as e:
+            print(f"\n[CRITICAL ERROR] {e}")
+            import traceback
+            traceback.print_exc()
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()
