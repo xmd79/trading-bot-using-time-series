@@ -1024,21 +1024,34 @@ def _multi_length_regression_forecast(closes, steps):
 def tp_reachability_forecast(candles_1m, current_price, tp_long_price, sl_long_price,
                               tp_short_price, sl_short_price, extrema_data=None):
     """
-    TP Reachability — Full ML Ensemble Consensus.
-    All methods must independently agree that price will transit the TP target.
+    TP Reachability — Full ML Ensemble with Bias-Aware Weighted Consensus.
     NO NEUTRAL STATE. Governed by MTF extrema direction.
 
-    Methods:
-      1. FFT spectral projection (FIXED — raw price, not HT_SINE)
-      2. Monte Carlo Random Walk
-      3. Bagged Random Forest (bootstrap polynomial ensemble)
-      4. LSTM with proper forget/input/cell/output gates (FIXED)
-      5. Ridge Regression over feature matrix
-      6. RBF Kernel SVR (Nadaraya-Watson)
-      7. Exponential Smoothing (Holt-Winters)
-      8. Multi-length Regression (200/500/1200 bar trends)
+    VOTING SYSTEM (replaces naive >=TP count):
+    ─────────────────────────────────────────
+    Each method casts a WEIGHTED DIRECTIONAL VOTE, not a binary pass/fail.
 
-    Consensus rule: weighted vote — at least 6/8 methods must agree with bias direction.
+    Vote score per method (for LONG bias):
+      - forecast > tp_long_price                  → full vote  = 1.0
+      - forecast in (current_price, tp_long_price) → partial vote proportional to progress
+      - forecast <= current_price                  → 0.0 vote (wrong direction, discounted)
+
+    Rationale: A method forecasting 59800 when TP is 59922 is 85% of the way there —
+    it shouldn't count the same as a method forecasting 58000. The old binary check
+    was discarding partial-progress methods that genuinely agreed on direction.
+
+    Trend slope alignment bonus:
+      - Large(1200) slope aligns with bias_dir → +0.5 bonus votes
+      - Medium(500) slope aligns              → +0.3 bonus votes
+      - Small(200) slope aligns               → +0.2 bonus votes
+      Max slope bonus = 1.0 (counts as one extra confirming method)
+
+    Thresholds:
+      - weighted_score >= 5.5/8  OR  struct_ok + weighted_score >= 4.0/8 → reach = True
+      - struct_ok alone + any 3 partial votes → reach = True (structure is primary)
+
+    MTF extrema confidence multiplier:
+      - unanimous MTF (all 3 TFs agree) → threshold drops by 0.5
     """
     if len(candles_1m) < 100 or current_price <= 0:
         if extrema_data:
@@ -1048,7 +1061,6 @@ def tp_reachability_forecast(candles_1m, current_price, tp_long_price, sl_long_p
 
     closes = np.array([c["close"] for c in candles_1m], dtype=np.float64)
     volumes = np.array([c["volume"] for c in candles_1m], dtype=np.float64)
-    # Sanitize
     for arr in (closes, volumes):
         for i in range(len(arr)):
             if not np.isfinite(arr[i]) or arr[i] <= 0:
@@ -1069,55 +1081,153 @@ def tp_reachability_forecast(candles_1m, current_price, tp_long_price, sl_long_p
     p_mlr, mlr_details = _multi_length_regression_forecast(closes, steps)
     p_mlr   = float(np.clip(p_mlr, min_bound, max_bound))
 
+    # Slope info for bonus votes
+    slope_small  = mlr_details.get("small",  {}).get("slope", 0.0)
+    slope_medium = mlr_details.get("medium", {}).get("slope", 0.0)
+    slope_large  = mlr_details.get("large",  {}).get("slope", 0.0)
+
     method_prices = {
         "fft": p_fft, "random_walk": p_rw, "forest": p_for, "lstm": p_lstm,
         "ridge": p_ridge, "svr_rbf": p_svr, "exp_smooth": p_exp, "mlr": p_mlr,
-        "mlr_small_slope": mlr_details.get("small", {}).get("slope", 0.0),
-        "mlr_medium_slope": mlr_details.get("medium", {}).get("slope", 0.0),
-        "mlr_large_slope": mlr_details.get("large", {}).get("slope", 0.0),
+        "mlr_small_slope": slope_small,
+        "mlr_medium_slope": slope_medium,
+        "mlr_large_slope": slope_large,
     }
 
-    # Core 8 forecast prices (equal weight for consensus vote)
     all_forecasts = [p_fft, p_rw, p_for, p_lstm, p_ridge, p_svr, p_exp, p_mlr]
     raw_consensus = float(np.mean(all_forecasts))
 
     bias_dir = extrema_data["direction"] if extrema_data else "long"
+    mtf_unanimous = extrema_data.get("unanimous", False) if extrema_data else False
+    # MTF unanimous: lower required threshold by 0.5
+    threshold_adjust = -0.5 if mtf_unanimous else 0.0
+
     reach_long = False
     reach_short = False
     display_state = ""
 
+    def _weighted_vote_long(forecasts, tp, cp):
+        """
+        For each forecast, compute its vote weight toward reaching tp from cp.
+        - Above tp:   full vote 1.0
+        - cp < f < tp: partial proportional to progress = (f-cp)/(tp-cp)
+        - f <= cp:     0.0 (wrong direction — no negative votes, just no contribution)
+        """
+        tp_range = tp - cp
+        if tp_range <= 0: return 0.0, []
+        votes = []
+        for f in forecasts:
+            if f >= tp:
+                votes.append(1.0)
+            elif f > cp:
+                votes.append(float((f - cp) / tp_range))
+            else:
+                votes.append(0.0)
+        return float(sum(votes)), votes
+
+    def _weighted_vote_short(forecasts, tp, cp):
+        """Mirror of long: tp < cp for short."""
+        tp_range = cp - tp
+        if tp_range <= 0: return 0.0, []
+        votes = []
+        for f in forecasts:
+            if f <= tp:
+                votes.append(1.0)
+            elif f < cp:
+                votes.append(float((cp - f) / tp_range))
+            else:
+                votes.append(0.0)
+        return float(sum(votes)), votes
+
+    def _slope_bonus(bias, sl_s, sl_m, sl_l):
+        """
+        Trend slope alignment bonus (max 1.0 extra vote).
+        Large(1200) carries most weight — it's the dominant trend.
+        """
+        bonus = 0.0
+        if bias == "long":
+            if sl_l > 0: bonus += 0.40
+            if sl_m > 0: bonus += 0.35
+            if sl_s > 0: bonus += 0.25
+        else:
+            if sl_l < 0: bonus += 0.40
+            if sl_m < 0: bonus += 0.35
+            if sl_s < 0: bonus += 0.25
+        return bonus
+
     if bias_dir == "long":
         reach_short = False  # STRICTLY FORBIDDEN BY STRUCTURE
-        # Count how many methods forecast price >= tp_long_price
-        votes_for_tp = sum(1 for p in all_forecasts if p >= tp_long_price)
-        # Also count structural target
         struct_ok = (extrema_data["opposite_price"] >= tp_long_price) if extrema_data else False
-        # Rule: >=6/8 methods must agree, OR structure + >=4/8
-        if votes_for_tp >= 6:
+
+        wt_score, vote_list = _weighted_vote_long(all_forecasts, tp_long_price, current_price)
+        slope_bonus = _slope_bonus("long", slope_small, slope_medium, slope_large)
+        total_score = wt_score + slope_bonus
+
+        # Hard count: methods fully above TP
+        full_votes = sum(1 for v in vote_list if v >= 1.0)
+        # Partial contributors: methods moving in right direction
+        partial_votes = sum(1 for v in vote_list if 0 < v < 1.0)
+        # Directional consensus: methods above current price (any upward forecast)
+        directional_votes = sum(1 for p in all_forecasts if p > current_price)
+
+        base_threshold   = 5.5 + threshold_adjust   # need this weighted score to confirm
+        struct_threshold = 4.0 + threshold_adjust    # lower bar when structure confirms
+        struct_any_threshold = 3.0 + threshold_adjust  # structure primary + any 3 partial
+
+        if total_score >= base_threshold:
             reach_long = True
-            display_state = f"LONG CONSENSUS [{votes_for_tp}/8 ML + Struct:{struct_ok}] — TP TRANSIT CONFIRMED"
-        elif struct_ok and votes_for_tp >= 4:
+            display_state = (f"LONG CONSENSUS [Score:{total_score:.1f}/8 Full:{full_votes} Partial:{partial_votes} "
+                             f"Slope:{slope_bonus:.1f}] — TP TRANSIT CONFIRMED")
+        elif struct_ok and total_score >= struct_threshold:
             reach_long = True
-            display_state = f"LONG CONSENSUS [Struct+{votes_for_tp}/8 ML] — STRUCTURE+ML AGREE"
+            display_state = (f"LONG CONSENSUS [Struct+Score:{total_score:.1f} Full:{full_votes} Partial:{partial_votes} "
+                             f"Slope:{slope_bonus:.1f}] — STRUCTURE+ML AGREE")
+        elif struct_ok and directional_votes >= 4:
+            # Structure is primary. If majority of methods point up AND structure confirms, enter.
+            reach_long = True
+            display_state = (f"LONG CONSENSUS [Struct+Dir:{directional_votes}/8 up "
+                             f"Slope:{slope_bonus:.1f}] — STRUCTURE DOMINANT")
         elif struct_ok:
-            display_state = f"LONG BIAS [Struct OK, ML:{votes_for_tp}/8] — BELOW THRESHOLD"
+            display_state = (f"LONG BIAS [Struct OK Score:{total_score:.1f} Dir:{directional_votes}/8 up "
+                             f"Slope:{slope_bonus:.1f}] — BELOW THRESHOLD")
         else:
-            display_state = f"LONG BIAS [ML:{votes_for_tp}/8] — INSUFFICIENT VOTES"
+            display_state = (f"LONG BIAS [No Struct Score:{total_score:.1f} Dir:{directional_votes}/8 up] "
+                             f"— INSUFFICIENT CONVICTION")
+
     else:  # short
         reach_long = False  # STRICTLY FORBIDDEN BY STRUCTURE
-        # Count how many methods forecast price <= tp_short_price
-        votes_for_tp = sum(1 for p in all_forecasts if p <= tp_short_price)
         struct_ok = (extrema_data["opposite_price"] <= tp_short_price) if extrema_data else False
-        if votes_for_tp >= 6:
+
+        wt_score, vote_list = _weighted_vote_short(all_forecasts, tp_short_price, current_price)
+        slope_bonus = _slope_bonus("short", slope_small, slope_medium, slope_large)
+        total_score = wt_score + slope_bonus
+
+        full_votes = sum(1 for v in vote_list if v >= 1.0)
+        partial_votes = sum(1 for v in vote_list if 0 < v < 1.0)
+        directional_votes = sum(1 for p in all_forecasts if p < current_price)
+
+        base_threshold   = 5.5 + threshold_adjust
+        struct_threshold = 4.0 + threshold_adjust
+        struct_any_threshold = 3.0 + threshold_adjust
+
+        if total_score >= base_threshold:
             reach_short = True
-            display_state = f"SHORT CONSENSUS [{votes_for_tp}/8 ML + Struct:{struct_ok}] — TP TRANSIT CONFIRMED"
-        elif struct_ok and votes_for_tp >= 4:
+            display_state = (f"SHORT CONSENSUS [Score:{total_score:.1f}/8 Full:{full_votes} Partial:{partial_votes} "
+                             f"Slope:{slope_bonus:.1f}] — TP TRANSIT CONFIRMED")
+        elif struct_ok and total_score >= struct_threshold:
             reach_short = True
-            display_state = f"SHORT CONSENSUS [Struct+{votes_for_tp}/8 ML] — STRUCTURE+ML AGREE"
+            display_state = (f"SHORT CONSENSUS [Struct+Score:{total_score:.1f} Full:{full_votes} Partial:{partial_votes} "
+                             f"Slope:{slope_bonus:.1f}] — STRUCTURE+ML AGREE")
+        elif struct_ok and directional_votes >= 4:
+            reach_short = True
+            display_state = (f"SHORT CONSENSUS [Struct+Dir:{directional_votes}/8 down "
+                             f"Slope:{slope_bonus:.1f}] — STRUCTURE DOMINANT")
         elif struct_ok:
-            display_state = f"SHORT BIAS [Struct OK, ML:{votes_for_tp}/8] — BELOW THRESHOLD"
+            display_state = (f"SHORT BIAS [Struct OK Score:{total_score:.1f} Dir:{directional_votes}/8 down "
+                             f"Slope:{slope_bonus:.1f}] — BELOW THRESHOLD")
         else:
-            display_state = f"SHORT BIAS [ML:{votes_for_tp}/8] — INSUFFICIENT VOTES"
+            display_state = (f"SHORT BIAS [No Struct Score:{total_score:.1f} Dir:{directional_votes}/8 down] "
+                             f"— INSUFFICIENT CONVICTION")
 
     return reach_long, reach_short, raw_consensus, method_prices, bias_dir, display_state
 
@@ -1326,7 +1436,7 @@ def print_conditions(sig):
     cons_disp = sig.get("consensus_display", "N/A")
     icon = "🟢" if "LONG" in cons_disp else "🔴"
     print(f"     {icon} ═══ {cons_disp}")
-    print(f"     L:{f['tp_reach_long']} S:{f['tp_reach_short']} [MANDATORY — >=6/8 ML or Struct+>=4/8]")
+    print(f"     L:{f['tp_reach_long']} S:{f['tp_reach_short']} [Weighted Score — Base:5.5 Struct+ML:4.0 Struct+Dir>=4:auto | MTF Unanimous→-0.5]")
 
     print(f"  ═══ LONG:{sig['long_true_count']}/6 SHORT:{sig['short_true_count']}/6 (Rule: MTF Extrema Filter + Mom+Vol+ML+TPReach Mandatory + >=3/6) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
 
