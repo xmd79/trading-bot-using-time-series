@@ -5,8 +5,8 @@ SIGNAL LOGIC:
   - Mandatory: Momentum (1m), Volume (1m), AND ML Forecast MUST be true for the direction.
   - ML Forecast (1m): forecast_price > current_close → LONG allowed;
                       forecast_price < current_close → SHORT allowed.
-  - Flexible: At least 3 out of 5 total conditions must be true for the direction.
-  - (Since Mom + Vol = 2 mandatory true, you only need 1 more from Sine/Cycle/FFT).
+  - Flexible: At least 4 out of 7 total conditions must be true for the direction.
+  - Conditions: 1.Sine 2.Cycle 3.Mid 4.Mom* 5.Vol* 6.FFT 7.ML*  (* = mandatory)
 
 POSITION SIZING:
   - Only 5% of available balance is used per trade.
@@ -791,13 +791,16 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     cond_ml_short = ml_forecast_valid and (ml_forecast_price < ml_current_close)
 
     # ══════════════════════════════════════════════════════════════════
-    # LOGIC: 3 out of 5 conditions, AND Mom, Vol, ML are ALL MANDATORY
+    # LOGIC: 4 out of 7 conditions, AND Mom, Vol, ML are ALL MANDATORY
+    # Conditions: 1.Sine 2.Cycle 3.Mid 4.Mom* 5.Vol* 6.FFT 7.ML*
     # ══════════════════════════════════════════════════════════════════
-    long_true_count = sum([cond_sine_long, cond_cycle_long, cond_mom_long, cond_vol_long, cond_fft_long])
-    short_true_count = sum([cond_sine_short, cond_cycle_short, cond_mom_short, cond_vol_short, cond_fft_short])
+    long_true_count  = sum([cond_sine_long,  cond_cycle_long,  cond_mid_long,
+                            cond_mom_long,   cond_vol_long,    cond_fft_long,  cond_ml_long])
+    short_true_count = sum([cond_sine_short, cond_cycle_short, cond_mid_short,
+                            cond_mom_short,  cond_vol_short,   cond_fft_short, cond_ml_short])
     
-    is_long  = (cond_mom_long  and cond_vol_long  and cond_ml_long  and long_true_count  >= 3)
-    is_short = (cond_mom_short and cond_vol_short and cond_ml_short and short_true_count >= 3)
+    is_long  = (cond_mom_long  and cond_vol_long  and cond_ml_long  and long_true_count  >= 4)
+    is_short = (cond_mom_short and cond_vol_short and cond_ml_short and short_true_count >= 4)
     
     return {
         "price": live_price, "is_long": is_long, "is_short": is_short,
@@ -880,7 +883,7 @@ def write_trade_to_journal(trade_result):
             f"EXIT PRICE: {trade_result.get('exit_price', 0):.2f}\nPRICE CHANGE: {trade_result.get('price_change_pct', 0):+.4f}%\n"
             f"GROSS ROE: {trade_result.get('gross_roe', 0):+.2f}%\nRT FEE DEDUCTED: {trade_result.get('rt_fee_pct', 0):.2f}%\n"
             f"NET ROE: {trade_result.get('roe', 0):+.2f}%\nREASON: {trade_result.get('reason', 'N/A')}\n"
-            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 3/5 Cond (Mom+Vol+ML Mandatory) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%\n{'='*60}\n\n")
+            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 4/7 Cond (Mom+Vol+ML Mandatory) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%\n{'='*60}\n\n")
     try:
         with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f: f.write(line)
     except Exception as e: print(f"  [journal] write error: {e}")
@@ -921,26 +924,36 @@ def format_duration(start_dt, end_dt):
 def print_conditions(sig):
     f = sig["cond_flags"]
     cur = sig["current_close_1m"]
+    mid = sig["cycle_middle_price"]
+    pos_str = "BELOW" if cur < mid else ("ABOVE" if cur > mid else "AT")
+
     print(f"  1. Sine (1m):  dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{f['sine_long']} S:{f['sine_short']}")
     print(f"  2. Cycle (1m): ArgMin(LOW) {sig['cycle_min_price']:.2f}@{sig['ts_min']}({sig['bars_ago_min']}barsago) "
           f"ArgMax(HIGH) {sig['cycle_max_price']:.2f}@{sig['ts_max']}({sig['bars_ago_max']}barsago) "
           f"| MostRecent:{sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
-    mid = sig["cycle_middle_price"]
-    pos_str = "BELOW" if cur < mid else ("ABOVE" if cur > mid else "AT")
-    print(f"  2b.Mid (1m):   Low:{sig['cycle_min_price']:.2f} Mid:{mid:.2f} High:{sig['cycle_max_price']:.2f} | "
+    print(f"  3. Mid  (1m):  Low:{sig['cycle_min_price']:.2f} Mid:{mid:.2f} High:{sig['cycle_max_price']:.2f} | "
           f"Now:{cur:.2f} is {pos_str} Mid | L:{f['mid_long']} S:{f['mid_short']}")
-    print(f"  3. Mom (1m):   {sig['mom_1m']:.2f} | HiMOM:{sig['mom_max_val']:.2f}@{sig['mom_bars_ago_max']}barsago LoMOM:{sig['mom_min_val']:.2f}@{sig['mom_bars_ago_min']}barsago | L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
-    print(f"  4. Vol (1m):   Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
-    print(f"  5. FFT (1m):   DomFreq:{sig['fft_dominant_freq']:.6f}c/bar Period:{sig['fft_period_bars']:.1f}bars Fcst:{sig['fft_forecast_price']:.2f} L:{f['fft_long']} S:{f['fft_short']}")
+    print(f"  4. Mom  (1m):  {sig['mom_1m']:.2f} | HiMOM:{sig['mom_max_val']:.2f}@{sig['mom_bars_ago_max']}barsago "
+          f"LoMOM:{sig['mom_min_val']:.2f}@{sig['mom_bars_ago_min']}barsago | L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
+    print(f"  5. Vol  (1m):  Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
+    print(f"  6. FFT  (1m):  DomFreq:{sig['fft_dominant_freq']:.6f}c/bar Period:{sig['fft_period_bars']:.1f}bars "
+          f"Fcst:{sig['fft_forecast_price']:.2f} L:{f['fft_long']} S:{f['fft_short']}")
     ml_fc  = sig.get("ml_forecast_price", 0.0)
     ml_cur = sig.get("ml_current_close", 0.0)
     ml_diff = ((ml_fc - ml_cur) / ml_cur * 100) if ml_cur else 0.0
-    print(f"  6. ML (1m):    Cur:{ml_cur:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
-    
+    print(f"  7. ML   (1m):  Cur:{ml_cur:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
+
     long_true  = sig["long_true_count"]
     short_true = sig["short_true_count"]
-    
-    print(f"  ═══ LONG:{long_true}/5 SHORT:{short_true}/5 (Rule: Mom+Vol+ML Mandatory + >=3/5 Total) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
+
+    # Mandatory gate summary
+    mand_long  = sum([f['mom_long'],  f['vol_long'],  f['ml_long']])
+    mand_short = sum([f['mom_short'], f['vol_short'], f['ml_short']])
+
+    print(f"  ═══ LONG:{long_true}/7 SHORT:{short_true}/7 "
+          f"(Rule: Mom+Vol+ML Mandatory + >=4/7 Total) "
+          f"| Mand L:{mand_long}/3 S:{mand_short}/3 "
+          f"-> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
@@ -948,13 +961,14 @@ def print_conditions(sig):
 
 def main():
     print(f"\n{'='*60}")
-    print(f"HFT KuCoin Bot - 3/5 CONDITIONS (MOM+VOL+ML MANDATORY)")
+    print(f"HFT KuCoin Bot - 4/7 CONDITIONS (MOM+VOL+ML MANDATORY)")
     print(f"{'='*60}")
     print(f"Symbol:              {TRADE_SYMBOL}")
     print(f"Leverage:            {LEVERAGE}x")
     print(f"TP: {TAKE_PROFIT_ROE}% ROE | SL: {STOP_LOSS_ROE}% ROE")
     print(f"Loop Sleep:          {LOOP_SLEEP}s")
-    print(f"Entry Logic:         Mom & Vol & ML MANDATORY + At least 3/5 Total")
+    print(f"Entry Logic:         Mom & Vol & ML MANDATORY + At least 4/7 Total")
+    print(f"Conditions:          1.Sine 2.Cycle 3.Mid 4.Mom* 5.Vol* 6.FFT 7.ML*")
     print(f"Position Sizing:     {TRADE_BALANCE_PCT*100:.0f}% of balance per trade")
     print(f"Sine Timeframe:      1m (changed from 5m)")
     print(f"Mom Logic:           Recency-based (LoMOM recent=LONG, HiMOM recent=SHORT)")
@@ -1092,7 +1106,7 @@ def main():
                     print(f"  Balance: {balance:.2f} USDT  (trade alloc: {balance*TRADE_BALANCE_PCT:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}%)")
 
                 if sig["is_long"]:
-                    print(f"\n  *** 3/5 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> LONG ***")
+                    print(f"\n  *** 4/7 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> LONG ***")
                     if has_sufficient_balance:
                         print(f"  [LIVE] Executing LONG...")
                         if execute_entry(TRADE_SYMBOL, "buy", balance, sig["price"]):
@@ -1108,7 +1122,7 @@ def main():
                         save_trade_state(saved_state)
 
                 elif sig["is_short"]:
-                    print(f"\n  *** 3/5 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> SHORT ***")
+                    print(f"\n  *** 4/7 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> SHORT ***")
                     if has_sufficient_balance:
                         print(f"  [LIVE] Executing SHORT...")
                         if execute_entry(TRADE_SYMBOL, "sell", balance, sig["price"]):
