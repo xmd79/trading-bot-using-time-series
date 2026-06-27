@@ -7,7 +7,7 @@ SIGNAL LOGIC:
   - 2. Extrema Cycle (1m)     — Strictly Lowest Low vs Highest High (last 500)
   - 3. Momentum (1m)          — MOM > 0 -> LONG, < 0 -> SHORT
   - 4. Volume (1m)            — bullish% > bearish% -> LONG
-  - 5. FFT Dominance (1m)     — neg spectral power dominant -> LONG
+  - 5. FFT Spectrum (1m)      — HT_SINE cycle type "Up" -> LONG, "Down" -> SHORT
   - 6. ML Forecast (1m)       — Random Forest forecast_price > close -> LONG
   - 7. FFT Mood (1m)          — slope-projected next bar > close -> LONG (Bullish)
   - 8. SMA Stack (1m)         — close < SMA9 -> LONG / close > SMA9 -> SHORT
@@ -491,34 +491,179 @@ def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
     dist_to_max = max(0, min(100, ((cycle_max - current_sine) / rng) * 100))
     return dist_to_min, dist_to_max
 
-def analyze_fft_dominance_1m(close_prices_1m):
-    if len(close_prices_1m) < 32: return False, False, 0.0, 0.0
-    sine_wave_1m, lead_sine_1m = talib.HT_SINE(close_prices_1m)
-    sine_wave_1m = np.nan_to_num(-sine_wave_1m)
-    lead_sine_1m = np.nan_to_num(-lead_sine_1m)
-    valid_mask = ~(np.isnan(sine_wave_1m) | np.isnan(lead_sine_1m))
-    sine_wave_1m = sine_wave_1m[valid_mask]
-    lead_sine_1m = lead_sine_1m[valid_mask]
-    if len(sine_wave_1m) < 32: return False, False, 0.0, 0.0
-
-    n = len(sine_wave_1m)
-    complex_signal = sine_wave_1m + 1j * lead_sine_1m
-    complex_signal = complex_signal * np.hanning(n) - np.mean(complex_signal)
-    fft_result = fft(complex_signal)
-    fft_power = np.abs(fft_result) ** 2
-    freq_bins = fftfreq(n)
-    powers, frequencies = fft_power[1:], freq_bins[1:]
-    neg_powers, pos_powers = powers[frequencies < 0], powers[frequencies > 0]
-
-    neg_power = np.sum(np.sort(neg_powers)[-12:]) if len(neg_powers) >= 12 else (np.sum(neg_powers) if len(neg_powers) > 0 else 0.0)
-    pos_power = np.sum(np.sort(pos_powers)[-12:]) if len(pos_powers) >= 12 else (np.sum(pos_powers) if len(pos_powers) > 0 else 0.0)
-    total_power = neg_power + pos_power
-    if total_power == 0: return False, False, 0.0, 0.0
-
-    neg_ratio = (neg_power / total_power) * 100
-    pos_ratio = (pos_power / total_power) * 100
-    DOMINANCE_THRESHOLD = 0.1
-    return neg_ratio > (pos_ratio + DOMINANCE_THRESHOLD), pos_ratio > (neg_ratio + DOMINANCE_THRESHOLD), neg_ratio, pos_ratio
+def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, max_threshold, current_close):
+    """
+    Analyze the frequency spectrum to determine the current stage in the stationary circuit of energy flow.
+    
+    Parameters:
+    - candles: List of candle data
+    - timeframe: Timeframe string (e.g., "1m", "5m")
+    - cycle_status: Current cycle status ("Up" or "Down")
+    - min_threshold: Minimum price threshold
+    - max_threshold: Maximum price threshold
+    - current_close: Current closing price
+    
+    Returns:
+    - dominant_freq: The predominant frequency
+    - spectral_power: Power of the predominant frequency
+    - intensity: Normalized intensity (0-1)
+    - freq_range: Frequency range
+    - degree: Phase degree (0-1)
+    - stage: Current stage in the cycle ("Early", "Middle", "Late")
+    - cycle_direction: Determined cycle direction ("Up" or "Down")
+    - top_frequencies: List of top frequencies
+    - ht_sine: Sine wave generated via Hilbert Transform
+    - ht_sine_cycle_type: "Up" or "Down" based on HT_SINE analysis
+    """
+    closes = np.array([float(c['close']) for c in candles], dtype=np.float64)
+    volumes = np.array([float(c['volume']) for c in candles], dtype=np.float64)
+    n = len(closes)
+    
+    if n < 10:
+        return 0.0, 0.0, 0.0, 0.0, 0.0, "N/A", "N/A", [], np.zeros(n), "N/A"
+    
+    # Clean the data
+    closes = clean_data(closes)
+    volumes = clean_data(volumes)
+    
+    # Center the data
+    mean_close = np.mean(closes)
+    mean_volume = np.mean(volumes)
+    centered_closes = closes - mean_close
+    centered_volumes = volumes - mean_volume
+    
+    # Perform FFT
+    fft_result = fft(centered_closes)
+    freqs = np.fft.fftfreq(n)
+    
+    # Calculate power spectrum (magnitude squared)
+    power = np.abs(fft_result) ** 2
+    
+    # Skip DC component (index 0)
+    indices = np.arange(1, n)
+    
+    # Get the middle threshold frequency (equilibrium point)
+    middle_threshold = (min_threshold + max_threshold) / 2
+    middle_idx = np.argmin(np.abs(closes - float(middle_threshold)))
+    middle_freq = freqs[middle_idx]
+    
+    # Get min and max threshold frequencies
+    min_idx = np.argmin(closes)
+    max_idx = np.argmax(closes)
+    min_freq = freqs[min_idx]
+    max_freq = freqs[max_idx]
+    
+    # Determine if we're in an up or down cycle
+    cycle_direction = "Up" if cycle_status == "Up" else "Down"
+    
+    # Get 16 frequencies for the current cycle direction
+    if cycle_direction == "Up":
+        # For up cycle, get frequencies from the lower half (negative frequencies)
+        up_indices = indices[freqs[indices] < 0]
+        if len(up_indices) > 16:
+            # Sort by power and get top 16
+            sorted_indices = up_indices[np.argsort(power[up_indices])[-16:]]
+        else:
+            sorted_indices = up_indices
+        cycle_frequencies = list(freqs[sorted_indices])
+    else:
+        # For down cycle, get frequencies from the upper half (positive frequencies)
+        down_indices = indices[freqs[indices] > 0]
+        if len(down_indices) > 16:
+            # Sort by power and get top 16
+            sorted_indices = down_indices[np.argsort(power[down_indices])[-16:]]
+        else:
+            sorted_indices = down_indices
+        cycle_frequencies = list(freqs[sorted_indices])
+    
+    # Combine all frequencies: 16 cycle frequencies + 3 threshold frequencies
+    all_freqs = cycle_frequencies + [min_freq, middle_freq, max_freq]
+    
+    # Calculate weighted average based on power to determine dominant frequency
+    weights = []
+    for f in all_freqs:
+        if f in freqs:
+            idx = np.where(freqs == f)[0][0]
+            weights.append(power[idx])
+        else:
+            weights.append(0.0)
+    
+    weights = np.array(weights)
+    weights = weights / np.sum(weights) if np.sum(weights) > 0 else np.ones_like(weights) / len(weights)
+    dominant_freq = np.sum(np.array(all_freqs) * weights)
+    
+    # Find the index of the frequency closest to the dominant_freq
+    idx = np.argmin(np.abs(freqs - dominant_freq))
+    spectral_power = power[idx]
+    
+    # Calculate total power (excluding DC component)
+    total_power = np.sum(power[indices])
+    
+    # Calculate intensity (normalized power)
+    if total_power > 0:
+        # Normalized power (0-1 scale)
+        intensity = spectral_power / total_power
+    else:
+        intensity = 0.0
+    
+    # Calculate frequency range
+    freq_range = np.max(freqs[indices]) - np.min(freqs[indices]) if len(indices) > 0 else 0.0
+    
+    # Calculate degree (phase of the predominant frequency)
+    phase = np.angle(fft_result[idx])
+    degree = (phase + np.pi) / (2 * np.pi)  # maps from [-pi, pi] to [0, 1]
+    
+    # Determine the stage in the stationary circuit
+    cycle_position = (current_close - min_threshold) / (max_threshold - min_threshold) if max_threshold != min_threshold else 0.5
+    
+    if cycle_direction == "Up":
+        if cycle_position < 0.33:
+            stage = "Early"
+        elif cycle_position < 0.66:
+            stage = "Middle"
+        else:
+            stage = "Late"
+    else:  # Down
+        if cycle_position > 0.66:
+            stage = "Early"
+        elif cycle_position > 0.33:
+            stage = "Middle"
+        else:
+            stage = "Late"
+    
+    # Generate sine wave using TALib's HT_SINE
+    try:
+        # Use TALib's HT_SINE function on the close prices
+        ht_sine, _ = talib.HT_SINE(closes)
+        
+        # Handle any NaN values that might result from HT_SINE
+        ht_sine = np.nan_to_num(ht_sine, nan=0.0)
+        
+        # Determine HT_SINE cycle type based on the slope of the last few values
+        if len(ht_sine) >= 3:
+            # Calculate the slope of the last 3 values
+            recent_sine = ht_sine[-3:]
+            x = np.array([0, 1, 2])
+            y = recent_sine
+            
+            # Fit a line to the recent sine values
+            slope = np.polyfit(x, y, 1)[0]
+            
+            # Determine cycle type based on slope
+            ht_sine_cycle_type = "Up" if slope > 0 else "Down"
+        else:
+            # Not enough data points, use current cycle direction
+            ht_sine_cycle_type = cycle_direction
+    except Exception as e:
+        logging.error(f"Error generating HT sine wave for {timeframe}: {e}")
+        ht_sine = np.zeros(n)
+        ht_sine_cycle_type = "N/A"
+    
+    # Store top frequencies for analysis
+    sorted_indices = indices[np.argsort(power[indices])[-5:]]
+    top_frequencies = [(freqs[i], power[i]) for i in sorted_indices]
+    
+    return dominant_freq, spectral_power, intensity, freq_range, degree, stage, cycle_direction, top_frequencies, ht_sine, ht_sine_cycle_type
 
 def calculate_momentum(close_arr, period=14):
     if len(close_arr) < period + 1: return np.nan
@@ -720,14 +865,17 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         most_recent_extreme = "ARGMIN (LOW)"
         cond_cycle_long = True
         cond_cycle_short = False
+        cycle_status_for_fft = "Up"  # Low was more recent, potential up cycle
     elif bars_ago_max > bars_ago_min:
         most_recent_extreme = "ARGMAX (HIGH)"
         cond_cycle_short = True
         cond_cycle_long = False
+        cycle_status_for_fft = "Down"  # High was more recent, potential down cycle
     else:
         most_recent_extreme = "TIE"
         cond_cycle_long = False
         cond_cycle_short = False
+        cycle_status_for_fft = "Down"  # Default to down on tie
 
     # 3. Momentum (1m)
     mom_1m = calculate_momentum(close_arr_1m)
@@ -740,10 +888,13 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     cond_vol_long = bullish_perc > bearish_perc
     cond_vol_short = bearish_perc > bullish_perc
 
-    # 5. FFT Dominance (1m)
-    fft_long, fft_short, neg_ratio, pos_ratio = analyze_fft_dominance_1m(close_arr_1m)
-    cond_fft_long = fft_long
-    cond_fft_short = fft_short
+    # 5. FFT Frequency Spectrum Analysis (1m) — NEW IMPLEMENTATION
+    fft_dominant_freq, fft_spectral_power, fft_intensity, fft_freq_range, fft_degree, fft_stage, fft_cycle_direction, fft_top_frequencies, fft_ht_sine, fft_ht_sine_cycle_type = analyze_frequency_spectrum(
+        candles_1m_window, "1m", cycle_status_for_fft, float(min_th), float(max_th), current_close_1m
+    )
+    # Use HT_SINE cycle type for condition - "Up" for LONG, "Down" for SHORT
+    cond_fft_long = (fft_ht_sine_cycle_type == "Up")
+    cond_fft_short = (fft_ht_sine_cycle_type == "Down")
 
     # 6. ML Forecast (1m) — MANDATORY (Random Forest)
     ml_forecast_price, ml_current_close = generate_ml_forecast(candles_1m, "1m")
@@ -804,7 +955,17 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         "most_recent_extreme": most_recent_extreme,
         "momentum_signal": momentum_sig,
         "mom_1m": mom_1m, "bullish_perc": bullish_perc, "bearish_perc": bearish_perc,
-        "neg_ratio": neg_ratio, "pos_ratio": pos_ratio,
+        # FFT Spectrum Analysis Results (replacing neg_ratio/pos_ratio)
+        "fft_dominant_freq": fft_dominant_freq,
+        "fft_spectral_power": fft_spectral_power,
+        "fft_intensity": fft_intensity,
+        "fft_freq_range": fft_freq_range,
+        "fft_degree": fft_degree,
+        "fft_stage": fft_stage,
+        "fft_cycle_direction": fft_cycle_direction,
+        "fft_top_frequencies": fft_top_frequencies,
+        "fft_ht_sine_cycle_type": fft_ht_sine_cycle_type,
+        # ML Forecast
         "ml_forecast_price": ml_forecast_price, "ml_current_close": ml_current_close,
         "fft_mood": fft_mood,
         "fft_mood_forecast": fft_mood_forecast if fft_mood_forecast is not None else 0.0,
@@ -904,7 +1065,14 @@ def print_conditions(sig):
     print(f"  2. Cycle (1m):     Low:{sig['cycle_min_price']:.2f}@{sig['ts_min']} High:{sig['cycle_max_price']:.2f}@{sig['ts_max']} | Recency:{sig['most_recent_extreme']} | MomSig:{sig['momentum_signal']:.2f} | L:{f['cycle_long']} S:{f['cycle_short']} [MANDATORY]")
     print(f"  3. Mom (1m):       {sig['mom_1m']:.2f} L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
     print(f"  4. Vol (1m):       Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
-    print(f"  5. FFT Dom (1m):   Neg:{sig['neg_ratio']:.2f}% Pos:{sig['pos_ratio']:.2f}% L:{f['fft_long']} S:{f['fft_short']} [MANDATORY]")
+    
+    # 5. FFT Spectrum Analysis - NEW FORMAT
+    fft_cycle_type = sig.get('fft_ht_sine_cycle_type', 'N/A')
+    fft_stage = sig.get('fft_stage', 'N/A')
+    fft_intensity = sig.get('fft_intensity', 0.0)
+    fft_degree = sig.get('fft_degree', 0.0)
+    fft_dir = sig.get('fft_cycle_direction', 'N/A')
+    print(f"  5. FFT Spec(1m):   HT_Sine:{fft_cycle_type:<4} Stage:{fft_stage:<6} Int:{fft_intensity:.4f} Deg:{fft_degree:.3f} Dir:{fft_dir:<4} L:{f['fft_long']} S:{f['fft_short']} [MANDATORY]")
     
     ml_fc  = sig.get("ml_forecast_price", 0.0)
     ml_cur = sig.get("ml_current_close", 0.0)
@@ -951,6 +1119,7 @@ def main():
     print(f"Extrema Logic:       Strictly Lowest Low vs Highest High (Last 500 1m bars)")
     print(f"SMA 1m Rule:         LONG: close < SMA9 | SHORT: close > SMA9")
     print(f"SMA 5m Rule:         LONG: close < SMA9 | SHORT: close > SMA9")
+    print(f"FFT Spectrum Rule:   LONG: HT_SINE Cycle=Up | SHORT: HT_SINE Cycle=Down")
     print(f"Position Sizing:     {TRADE_BALANCE_PCT*100:.0f}% of balance per trade")
     print(f"API Connected:       {API_CONNECTED}")
     print(f"{'='*60}\n")
@@ -1064,59 +1233,55 @@ def main():
                 continue
 
             # ── ORPHANED STATE CLEANUP ──
-            if saved_state and saved_state.get("mode") == "LIVE" and not pos["is_open"]:
-                print("  [recovery] Orphaned live state - clearing.")
+            if saved_state and saved_state.get("mode") not in ("SIMULATION", "LIVE"):
+                print(f"  [cleanup] Orphaned state detected: {saved_state.get('mode')}")
                 clear_trade_state()
                 saved_state = None
 
-            # ── SCANNING FOR NEW ENTRY ──
-            if not pos["is_open"] and not saved_state:
-                if not sig:
-                    loop_ms = (time.perf_counter() - loop_start) * 1000
-                    log_timing("total_loop", loop_ms)
-                    time.sleep(LOOP_SLEEP)
-                    continue
-
-                if loop_count % 10 == 0:
-                    print(f"\n[{now_str}] Scanning (FLAT) | Net: {parallel_ms:.0f}ms | Calc: {compute_ms:.0f}ms")
+            # ── NO POSITION: CHECK FOR SIGNALS ──
+            if sig:
+                # Print signal status periodically
+                if loop_count % 20 == 0:
+                    print(f"\n[{now_str}] Price:{current_price:.2f} Bal:{balance:.2f}USDT")
                     print_conditions(sig)
-                    print(f"  Balance: {balance:.2f} USDT  (trade alloc: {balance*TRADE_BALANCE_PCT:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}%)")
 
-                if sig["is_long"]:
-                    print(f"\n  *** ALL 10/10 CONDITIONS MET -> LONG ***")
-                    entry_now = get_realtime_price(TRADE_SYMBOL) or sig["price"]
-                    if has_sufficient_balance:
-                        print(f"  [LIVE] Executing LONG @ {entry_now:.2f}...")
-                        if execute_entry(TRADE_SYMBOL, "buy", balance, entry_now):
-                            sl_price, tp_price = calculate_sl_tp(entry_now, "long")
-                            saved_state = {"active": True, "mode": "LIVE", "side": "long",
-                                           "entry_price": entry_now, "sl": sl_price, "tp": tp_price, "entry_time": now_str}
-                            save_trade_state(saved_state)
+                if sig["is_long"] or sig["is_short"]:
+                    side = "buy" if sig["is_long"] else "sell"
+                    side_label = "LONG" if sig["is_long"] else "SHORT"
+                    
+                    print(f"\n{'='*60}")
+                    print(f"[{now_str}] *** SIGNAL: {side_label} ***")
+                    print(f"{'='*60}")
+                    print_conditions(sig)
+
+                    if API_CONNECTED and has_sufficient_balance:
+                        sl_price, tp_price = calculate_sl_tp(current_price, "long" if sig["is_long"] else "short")
+                        success = execute_entry(TRADE_SYMBOL, side, balance, current_price)
+                        if success:
+                            new_state = {
+                                "mode": "LIVE", "side": "long" if sig["is_long"] else "short",
+                                "entry_price": current_price, "entry_time": now_str,
+                                "sl_price": sl_price, "tp_price": tp_price
+                            }
+                            save_trade_state(new_state)
+                            saved_state = new_state
+                            print(f"  [state] Saved LIVE {side_label} @ {current_price:.2f}")
+                    elif not API_CONNECTED:
+                        # Simulation mode
+                        sl_price, tp_price = calculate_sl_tp(current_price, "long" if sig["is_long"] else "short")
+                        new_state = {
+                            "mode": "SIMULATION", "side": "long" if sig["is_long"] else "short",
+                            "entry_price": current_price, "entry_time": now_str,
+                            "sl_price": sl_price, "tp_price": tp_price
+                        }
+                        save_trade_state(new_state)
+                        saved_state = new_state
+                        print(f"  [sim] SIMULATION {side_label} @ {current_price:.2f}")
                     else:
-                        print(f"  [SIM] LONG @ {entry_now:.2f} (low balance)")
-                        sl_price, tp_price = calculate_sl_tp(entry_now, "long")
-                        saved_state = {"active": True, "mode": "SIMULATION", "side": "long",
-                                       "entry_price": entry_now, "sl": sl_price, "tp": tp_price, "entry_time": now_str}
-                        save_trade_state(saved_state)
+                        print(f"  [skip] Insufficient balance: {balance:.2f} < {MIN_BALANCE_USDT}")
 
-                elif sig["is_short"]:
-                    print(f"\n  *** ALL 10/10 CONDITIONS MET -> SHORT ***")
-                    entry_now = get_realtime_price(TRADE_SYMBOL) or sig["price"]
-                    if has_sufficient_balance:
-                        print(f"  [LIVE] Executing SHORT @ {entry_now:.2f}...")
-                        if execute_entry(TRADE_SYMBOL, "sell", balance, entry_now):
-                            sl_price, tp_price = calculate_sl_tp(entry_now, "short")
-                            saved_state = {"active": True, "mode": "LIVE", "side": "short",
-                                           "entry_price": entry_now, "sl": sl_price, "tp": tp_price, "entry_time": now_str}
-                            save_trade_state(saved_state)
-                    else:
-                        print(f"  [SIM] SHORT @ {entry_now:.2f} (low balance)")
-                        sl_price, tp_price = calculate_sl_tp(entry_now, "short")
-                        saved_state = {"active": True, "mode": "SIMULATION", "side": "short",
-                                       "entry_price": entry_now, "sl": sl_price, "tp": tp_price, "entry_time": now_str}
-                        save_trade_state(saved_state)
-
-            if time.time() - last_timing_print >= 60:
+            # ── TIMING SUMMARY ──
+            if time.time() - last_timing_print >= 300:
                 print_timing_summary()
                 last_timing_print = time.time()
 
@@ -1125,13 +1290,16 @@ def main():
             time.sleep(LOOP_SLEEP)
 
         except KeyboardInterrupt:
-            print("\n  [INFO] Keyboard interrupt received. Shutting down...")
+            print("\n  [exit] Keyboard interrupt received")
             fetcher.shutdown()
-            print_timing_summary()
             break
         except Exception as e:
             print(f"  [ERROR] Loop exception: {e}")
+            import traceback
+            traceback.print_exc()
             time.sleep(1)
+
+    print("\n  [exit] Bot stopped")
 
 if __name__ == "__main__":
     main()
