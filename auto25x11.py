@@ -20,7 +20,9 @@ CHANGES FROM ORIGINAL:
   - Sine: Now uses 1m timeframe instead of 5m
   - Mom (1m) MANDATORY: HiMOM most recent (lowest bars ago) -> SHORT (peaked)
                         LoMOM most recent (lowest bars ago) -> LONG (bottomed)
-  - FFT: Replaced with new Frequency Spectrum Analyzer evaluating Up/Down intensity
+  - FFT: Detrended FFT on 1m closes — dominant frequency, period, and one-bar-ahead
+         forecast price from top-5 amplitude components. Forecast > close = LONG (always
+         exactly one of L/S is True — no ties possible).
 """
 
 import time
@@ -485,148 +487,80 @@ def scale_to_sine(close_prices, argmin_idx, argmax_idx):
     dist_to_max = max(0, min(100, ((cycle_max - current_sine) / rng) * 100))
     return dist_to_min, dist_to_max
 
-def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, max_threshold, current_close):
+def fft_forecast_1m(candles, n_components=5):
     """
-    Analyze the frequency spectrum to determine the current stage in the stationary circuit of energy flow.
+    True FFT forecast for 1m closes.
+
+    1. Detrend closes (remove linear trend so DC/drift don't pollute spectrum).
+    2. FFT → pick top-N dominant positive-frequency components by amplitude.
+    3. Reconstruct signal at bar N (one bar ahead of the last observed bar).
+    4. Add trend back → fft_forecast_price.
+    5. dominant_freq = cycles-per-bar of the single highest-amplitude component.
+    6. period_bars   = 1 / dominant_freq  (bars per cycle).
+    7. Direction: fft_forecast_price > current_close → LONG, else SHORT (never tie).
+
+    Returns:
+        fft_forecast_price  (float)  – predicted close one bar ahead
+        dominant_freq       (float)  – cycles per bar of dominant component
+        period_bars         (float)  – bars per dominant cycle
+        fft_long            (bool)
+        fft_short           (bool)
     """
     closes = np.array([float(c['close']) for c in candles], dtype=np.float64)
-    volumes = np.array([float(c['volume']) for c in candles], dtype=np.float64)
-    n = len(closes)
-    
-    if n < 10:
-        return 0.0, 0.0, 0.0, 0.0, 0.0, "N/A", "N/A", [], np.zeros(n), "N/A"
-    
-    # Clean the data
     closes = clean_data(closes)
-    volumes = clean_data(volumes)
-    
-    # Center the data
-    mean_close = np.mean(closes)
-    mean_volume = np.mean(volumes)
-    centered_closes = closes - mean_close
-    centered_volumes = volumes - mean_volume
-    
-    # Perform FFT
-    fft_result = fft(centered_closes)
-    freqs = np.fft.fftfreq(n)
-    
-    # Calculate power spectrum (magnitude squared)
-    power = np.abs(fft_result) ** 2
-    
-    # Skip DC component (index 0)
-    indices = np.arange(1, n)
-    
-    # Get the middle threshold frequency (equilibrium point)
-    middle_threshold = (min_threshold + max_threshold) / 2
-    middle_idx = np.argmin(np.abs(closes - float(middle_threshold)))
-    middle_freq = freqs[middle_idx]
-    
-    # Get min and max threshold frequencies
-    min_idx = np.argmin(closes)
-    max_idx = np.argmax(closes)
-    min_freq = freqs[min_idx]
-    max_freq = freqs[max_idx]
-    
-    # Determine if we're in an up or down cycle
-    cycle_direction = "Up" if cycle_status == "Up" else "Down"
-    
-    # Get 16 frequencies for the current cycle direction
-    if cycle_direction == "Up":
-        # For up cycle, get frequencies from the lower half (negative frequencies)
-        up_indices = indices[freqs[indices] < 0]
-        if len(up_indices) > 16:
-            # Sort by power and get top 16
-            sorted_indices = up_indices[np.argsort(power[up_indices])[-16:]]
-        else:
-            sorted_indices = up_indices
-        cycle_frequencies = list(freqs[sorted_indices])
-    else:
-        # For down cycle, get frequencies from the upper half (positive frequencies)
-        down_indices = indices[freqs[indices] > 0]
-        if len(down_indices) > 16:
-            # Sort by power and get top 16
-            sorted_indices = down_indices[np.argsort(power[down_indices])[-16:]]
-        else:
-            sorted_indices = down_indices
-        cycle_frequencies = list(freqs[sorted_indices])
-    
-    # Combine all frequencies: 16 cycle frequencies + 3 threshold frequencies
-    all_freqs = cycle_frequencies + [min_freq, middle_freq, max_freq]
-    
-    # Calculate weighted average based on power to determine dominant frequency
-    weights = []
-    for f in all_freqs:
-        if f in freqs:
-            idx = np.where(freqs == f)[0][0]
-            weights.append(power[idx])
-        else:
-            weights.append(0.0)
-    
-    weights = np.array(weights)
-    weights = weights / np.sum(weights) if np.sum(weights) > 0 else np.ones_like(weights) / len(weights)
-    dominant_freq = np.sum(np.array(all_freqs) * weights)
-    
-    # Find the index of the frequency closest to the dominant_freq
-    idx = np.argmin(np.abs(freqs - dominant_freq))
-    spectral_power = power[idx]
-    
-    # Calculate total power (excluding DC component)
-    total_power = np.sum(power[indices])
-    
-    # Calculate intensity (normalized power)
-    if total_power > 0:
-        intensity = spectral_power / total_power
-    else:
-        intensity = 0.0
-    
-    # Calculate frequency range
-    freq_range = np.max(freqs[indices]) - np.min(freqs[indices]) if len(indices) > 0 else 0.0
-    
-    # Calculate degree (phase of the predominant frequency)
-    phase = np.angle(fft_result[idx])
-    degree = (phase + np.pi) / (2 * np.pi)  # maps from [-pi, pi] to [0, 1]
-    
-    # Determine the stage in the stationary circuit
-    cycle_position = (current_close - min_threshold) / (max_threshold - min_threshold) if max_threshold != min_threshold else 0.5
-    
-    if cycle_direction == "Up":
-        if cycle_position < 0.33:
-            stage = "Early"
-        elif cycle_position < 0.66:
-            stage = "Middle"
-        else:
-            stage = "Late"
-    else:  # Down
-        if cycle_position > 0.66:
-            stage = "Early"
-        elif cycle_position > 0.33:
-            stage = "Middle"
-        else:
-            stage = "Late"
-    
-    # Generate sine wave using TALib's HT_SINE
-    try:
-        ht_sine, _ = talib.HT_SINE(closes)
-        ht_sine = np.nan_to_num(ht_sine, nan=0.0)
-        
-        if len(ht_sine) >= 3:
-            recent_sine = ht_sine[-3:]
-            x = np.array([0, 1, 2])
-            y = recent_sine
-            slope = np.polyfit(x, y, 1)[0]
-            ht_sine_cycle_type = "Up" if slope > 0 else "Down"
-        else:
-            ht_sine_cycle_type = cycle_direction
-    except Exception as e:
-        logging.error(f"Error generating HT sine wave for {timeframe}: {e}")
-        ht_sine = np.zeros(n)
-        ht_sine_cycle_type = "N/A"
-    
-    # Store top frequencies for analysis
-    sorted_indices = indices[np.argsort(power[indices])[-5:]]
-    top_frequencies = [(freqs[i], power[i]) for i in sorted_indices]
-    
-    return dominant_freq, spectral_power, intensity, freq_range, degree, stage, cycle_direction, top_frequencies, ht_sine, ht_sine_cycle_type
+    n = len(closes)
+
+    if n < 32:
+        cur = float(closes[-1]) if n > 0 else 0.0
+        return cur, 0.0, 0.0, False, False
+
+    # --- detrend ---
+    x = np.arange(n, dtype=np.float64)
+    slope, intercept = np.polyfit(x, closes, 1)
+    trend = slope * x + intercept
+    detrended = closes - trend
+
+    # --- FFT on positive frequencies only (indices 1 .. n//2) ---
+    F = fft(detrended)
+    freqs = np.fft.fftfreq(n)            # cycles per bar, range [-0.5, 0.5]
+    pos_mask = freqs > 0
+    pos_idx  = np.where(pos_mask)[0]
+
+    if len(pos_idx) == 0:
+        cur = float(closes[-1])
+        return cur, 0.0, 0.0, False, False
+
+    amplitudes = np.abs(F[pos_idx])
+    # pick top-N components
+    top_n = min(n_components, len(pos_idx))
+    top_local = np.argsort(amplitudes)[-top_n:][::-1]
+    top_global = pos_idx[top_local]
+
+    # dominant = highest amplitude component
+    dom_global = top_global[0]
+    dominant_freq = float(freqs[dom_global])
+    period_bars   = 1.0 / dominant_freq if dominant_freq > 0 else float('inf')
+
+    # reconstruct at bar index n  (one step ahead)
+    next_bar = float(n)
+    recon = 0.0
+    for gi in top_global:
+        amp   = np.abs(F[gi]) * 2.0 / n      # one-sided amplitude
+        phase = np.angle(F[gi])
+        freq  = float(freqs[gi])
+        recon += amp * np.cos(2.0 * np.pi * freq * next_bar + phase)
+
+    # add trend back at next bar
+    trend_next = slope * next_bar + intercept
+    fft_forecast_price = float(trend_next + recon)
+
+    current_close = float(closes[-1])
+
+    # guaranteed mutual exclusivity: strictly > vs <=
+    fft_long  = fft_forecast_price > current_close
+    fft_short = not fft_long
+
+    return fft_forecast_price, dominant_freq, period_bars, fft_long, fft_short
 
 def calculate_momentum_recency(close_arr, lookback=200, period=14):
     """
@@ -824,27 +758,20 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     cond_vol_long = bullish_perc > bearish_perc
     cond_vol_short = bearish_perc > bullish_perc
     
-    # 5. FFT Frequency Spectrum (1m)
-    intensity_up = 0.0
-    intensity_down = 0.0
+    # 5. FFT Forecast (1m) — dominant frequency + one-bar-ahead price forecast
+    fft_forecast_price = 0.0
+    fft_dominant_freq  = 0.0
+    fft_period_bars    = 0.0
+    cond_fft_long      = False
+    cond_fft_short     = False
     try:
-        res_up = analyze_frequency_spectrum(
-            candles_1m, "1m", "Up", 
-            cycle_min_price, cycle_max_price, current_close_1m
-        )
-        intensity_up = res_up[2]  # intensity is at index 2
-        
-        res_down = analyze_frequency_spectrum(
-            candles_1m, "1m", "Down", 
-            cycle_min_price, cycle_max_price, current_close_1m
-        )
-        intensity_down = res_down[2] # intensity is at index 2
+        fft_forecast_price, fft_dominant_freq, fft_period_bars, cond_fft_long, cond_fft_short = \
+            fft_forecast_1m(candles_1m, n_components=5)
     except Exception as e:
-        logging.error(f"FFT Spectrum Analysis Error: {e}")
-    
-    # Determine FFT signal based on which direction has higher spectral intensity
-    cond_fft_long = (intensity_up > intensity_down)
-    cond_fft_short = (intensity_down > intensity_up)
+        logging.error(f"FFT Forecast Error: {e}")
+        # fallback: guaranteed direction from cycle extrema
+        cond_fft_long  = (cycle_status_for_fft == "Up")
+        cond_fft_short = not cond_fft_long
 
     # 6. ML Forecast (1m) — MANDATORY
     ml_forecast_price, ml_current_close = generate_ml_forecast(candles_1m)
@@ -886,7 +813,9 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         "mom_max_idx": mom_max_idx, "mom_min_idx": mom_min_idx,
         "mom_bars_ago_max": mom_bars_ago_max, "mom_bars_ago_min": mom_bars_ago_min,
         "bullish_perc": bullish_perc, "bearish_perc": bearish_perc,
-        "intensity_up": intensity_up, "intensity_down": intensity_down,
+        "fft_forecast_price": fft_forecast_price,
+        "fft_dominant_freq": fft_dominant_freq,
+        "fft_period_bars": fft_period_bars,
         "ml_forecast_price": ml_forecast_price, "ml_current_close": ml_current_close,
     }
 
@@ -982,7 +911,7 @@ def print_conditions(sig):
     print(f"  2. Cycle (1m): Low@{sig['ts_min']} High@{sig['ts_max']} | Most Recent: {sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
     print(f"  3. Mom (1m):   {sig['mom_1m']:.2f} | HiMOM:{sig['mom_max_val']:.2f}@{sig['mom_bars_ago_max']}barsago LoMOM:{sig['mom_min_val']:.2f}@{sig['mom_bars_ago_min']}barsago | L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
     print(f"  4. Vol (1m):   Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
-    print(f"  5. FFT (1m):   UpInt:{sig['intensity_up']:.4f} DnInt:{sig['intensity_down']:.4f} L:{f['fft_long']} S:{f['fft_short']}")
+    print(f"  5. FFT (1m):   DomFreq:{sig['fft_dominant_freq']:.6f}c/bar Period:{sig['fft_period_bars']:.1f}bars Fcst:{sig['fft_forecast_price']:.2f} L:{f['fft_long']} S:{f['fft_short']}")
     ml_fc  = sig.get("ml_forecast_price", 0.0)
     ml_cur = sig.get("ml_current_close", 0.0)
     ml_diff = ((ml_fc - ml_cur) / ml_cur * 100) if ml_cur else 0.0
