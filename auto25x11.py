@@ -712,39 +712,50 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     cond_sine_short = dist_to_max < dist_to_min
     
     # 2. Extrema Cycle (1m) - STRICT MUTUAL EXCLUSIVITY
+    # Uses live_price as current close for real-time accuracy
     candles_1m_window = candles_1m[-500:]
     last_500_1m = close_arr_1m[-500:]
     window_len_1m = len(last_500_1m)
     argmin_idx_1m = int(np.argmin(last_500_1m))
     argmax_idx_1m = int(np.argmax(last_500_1m))
-    cycle_min_price = float(last_500_1m[argmin_idx_1m])
-    cycle_max_price = float(last_500_1m[argmax_idx_1m])
-    current_close_1m = float(close_arr_1m[-1])
-    
+    cycle_min_price = float(last_500_1m[argmin_idx_1m])   # lowest low in window
+    cycle_max_price = float(last_500_1m[argmax_idx_1m])   # highest high in window
+    current_close_1m = float(live_price)                   # REAL-TIME price
+    cycle_middle_price = (cycle_min_price + cycle_max_price) / 2.0
+
     bars_ago_min = (window_len_1m - 1) - argmin_idx_1m
     bars_ago_max = (window_len_1m - 1) - argmax_idx_1m
-    
+
     try:
-        ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S UTC")
-        ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S UTC")
+        ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"]).strftime("%Y-%m-%d %H:%M:%S")
+        ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"]).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         ts_min = ts_max = "N/A"
-    
+
+    # Recency rule: most recently formed extreme determines bias
+    #   ARGMIN (lowest low) most recent -> bounced from bottom -> LONG
+    #   ARGMAX (highest high) most recent -> peaked -> SHORT
     if bars_ago_min < bars_ago_max:
         most_recent_extreme = "ARGMIN (LOW)"
-        cond_cycle_long = (current_close_1m > cycle_min_price)
+        cond_cycle_long  = True
         cond_cycle_short = False
         cycle_status_for_fft = "Up"
     elif bars_ago_max < bars_ago_min:
         most_recent_extreme = "ARGMAX (HIGH)"
-        cond_cycle_short = (current_close_1m < cycle_max_price)
-        cond_cycle_long = False
+        cond_cycle_long  = False
+        cond_cycle_short = True
         cycle_status_for_fft = "Down"
     else:
         most_recent_extreme = "TIE"
-        cond_cycle_long = False
+        cond_cycle_long  = False
         cond_cycle_short = False
         cycle_status_for_fft = "Up"
+
+    # 2b. Middle-line condition: price vs midpoint of cycle range
+    #     Below middle -> bullish position in range -> long bias
+    #     Above middle -> bearish position in range -> short bias
+    cond_mid_long  = current_close_1m < cycle_middle_price
+    cond_mid_short = current_close_1m > cycle_middle_price
     
     # 3. Momentum (1m) — MANDATORY FIXED LOGIC
     (cond_mom_long, cond_mom_short, mom_1m,
@@ -793,6 +804,7 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         "cond_flags": {
             "sine_long": cond_sine_long, "sine_short": cond_sine_short,
             "cycle_long": cond_cycle_long, "cycle_short": cond_cycle_short,
+            "mid_long": cond_mid_long, "mid_short": cond_mid_short,
             "mom_long": cond_mom_long, "mom_short": cond_mom_short,
             "vol_long": cond_vol_long, "vol_short": cond_vol_short,
             "fft_long": cond_fft_long, "fft_short": cond_fft_short,
@@ -803,6 +815,7 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         "dist_to_min": dist_to_min, "dist_to_max": dist_to_max,
         "argmin_idx_1m": argmin_idx_1m, "argmax_idx_1m": argmax_idx_1m,
         "cycle_min_price": cycle_min_price, "cycle_max_price": cycle_max_price,
+        "cycle_middle_price": cycle_middle_price,
         "current_close_1m": current_close_1m,
         "bars_ago_min": bars_ago_min, "bars_ago_max": bars_ago_max,
         "ts_min": ts_min, "ts_max": ts_max,
@@ -907,8 +920,15 @@ def format_duration(start_dt, end_dt):
 
 def print_conditions(sig):
     f = sig["cond_flags"]
+    cur = sig["current_close_1m"]
     print(f"  1. Sine (1m):  dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{f['sine_long']} S:{f['sine_short']}")
-    print(f"  2. Cycle (1m): Low@{sig['ts_min']} High@{sig['ts_max']} | Most Recent: {sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
+    print(f"  2. Cycle (1m): ArgMin(LOW) {sig['cycle_min_price']:.2f}@{sig['ts_min']}({sig['bars_ago_min']}barsago) "
+          f"ArgMax(HIGH) {sig['cycle_max_price']:.2f}@{sig['ts_max']}({sig['bars_ago_max']}barsago) "
+          f"| MostRecent:{sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
+    mid = sig["cycle_middle_price"]
+    pos_str = "BELOW" if cur < mid else ("ABOVE" if cur > mid else "AT")
+    print(f"  2b.Mid (1m):   Low:{sig['cycle_min_price']:.2f} Mid:{mid:.2f} High:{sig['cycle_max_price']:.2f} | "
+          f"Now:{cur:.2f} is {pos_str} Mid | L:{f['mid_long']} S:{f['mid_short']}")
     print(f"  3. Mom (1m):   {sig['mom_1m']:.2f} | HiMOM:{sig['mom_max_val']:.2f}@{sig['mom_bars_ago_max']}barsago LoMOM:{sig['mom_min_val']:.2f}@{sig['mom_bars_ago_min']}barsago | L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
     print(f"  4. Vol (1m):   Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
     print(f"  5. FFT (1m):   DomFreq:{sig['fft_dominant_freq']:.6f}c/bar Period:{sig['fft_period_bars']:.1f}bars Fcst:{sig['fft_forecast_price']:.2f} L:{f['fft_long']} S:{f['fft_short']}")
