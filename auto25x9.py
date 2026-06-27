@@ -8,11 +8,11 @@ SIGNAL LOGIC:
   - 3. Momentum (1m)          — MOM > 0 -> LONG, < 0 -> SHORT
   - 4. Volume (1m)            — bullish% > bearish% -> LONG
   - 5. FFT Spectrum (1m)      — HT_SINE cycle type "Up" -> LONG, "Down" -> SHORT
-  - 6. ML Forecast (1m)       — Random Forest forecast_price > close -> LONG
-  - 7. FFT Mood (1m)          — slope-projected next bar > close -> LONG (Bullish)
-  - 8. SMA Stack (1m)         — close < SMA9 -> LONG / close > SMA9 -> SHORT
-  - 9. SMA Stack (5m)         — close < SMA9 -> LONG / close > SMA9 -> SHORT
-  - 10. LinReg (1m)           — Linear Regression forecast > close -> LONG
+  - 6. ML Forecast (1m)       — Random Forest forecast_price > live_price -> LONG
+  - 7. FFT Mood (1m)          — slope-projected next bar > live_price -> LONG (Bullish)
+  - 8. SMA Stack (1m)         — live_price < SMA9 -> LONG / live_price > SMA9 -> SHORT
+  - 9. SMA Stack (5m)         — live_price < SMA9 -> LONG / live_price > SMA9 -> SHORT
+  - 10. LinReg (1m)           — Linear Regression forecast > live_price -> LONG
 
 POSITION SIZING:
   - Only 10% of available balance is used per trade.
@@ -494,26 +494,6 @@ def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
 def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, max_threshold, current_close):
     """
     Analyze the frequency spectrum to determine the current stage in the stationary circuit of energy flow.
-    
-    Parameters:
-    - candles: List of candle data
-    - timeframe: Timeframe string (e.g., "1m", "5m")
-    - cycle_status: Current cycle status ("Up" or "Down")
-    - min_threshold: Minimum price threshold
-    - max_threshold: Maximum price threshold
-    - current_close: Current closing price
-    
-    Returns:
-    - dominant_freq: The predominant frequency
-    - spectral_power: Power of the predominant frequency
-    - intensity: Normalized intensity (0-1)
-    - freq_range: Frequency range
-    - degree: Phase degree (0-1)
-    - stage: Current stage in the cycle ("Early", "Middle", "Late")
-    - cycle_direction: Determined cycle direction ("Up" or "Down")
-    - top_frequencies: List of top frequencies
-    - ht_sine: Sine wave generated via Hilbert Transform
-    - ht_sine_cycle_type: "Up" or "Down" based on HT_SINE analysis
     """
     closes = np.array([float(c['close']) for c in candles], dtype=np.float64)
     volumes = np.array([float(c['volume']) for c in candles], dtype=np.float64)
@@ -522,64 +502,47 @@ def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, 
     if n < 10:
         return 0.0, 0.0, 0.0, 0.0, 0.0, "N/A", "N/A", [], np.zeros(n), "N/A"
     
-    # Clean the data
     closes = clean_data(closes)
     volumes = clean_data(volumes)
     
-    # Center the data
     mean_close = np.mean(closes)
     mean_volume = np.mean(volumes)
     centered_closes = closes - mean_close
     centered_volumes = volumes - mean_volume
     
-    # Perform FFT
     fft_result = fft(centered_closes)
     freqs = np.fft.fftfreq(n)
-    
-    # Calculate power spectrum (magnitude squared)
     power = np.abs(fft_result) ** 2
-    
-    # Skip DC component (index 0)
     indices = np.arange(1, n)
     
-    # Get the middle threshold frequency (equilibrium point)
     middle_threshold = (min_threshold + max_threshold) / 2
     middle_idx = np.argmin(np.abs(closes - float(middle_threshold)))
     middle_freq = freqs[middle_idx]
     
-    # Get min and max threshold frequencies
     min_idx = np.argmin(closes)
     max_idx = np.argmax(closes)
     min_freq = freqs[min_idx]
     max_freq = freqs[max_idx]
     
-    # Determine if we're in an up or down cycle
     cycle_direction = "Up" if cycle_status == "Up" else "Down"
     
-    # Get 16 frequencies for the current cycle direction
     if cycle_direction == "Up":
-        # For up cycle, get frequencies from the lower half (negative frequencies)
         up_indices = indices[freqs[indices] < 0]
         if len(up_indices) > 16:
-            # Sort by power and get top 16
             sorted_indices = up_indices[np.argsort(power[up_indices])[-16:]]
         else:
             sorted_indices = up_indices
         cycle_frequencies = list(freqs[sorted_indices])
     else:
-        # For down cycle, get frequencies from the upper half (positive frequencies)
         down_indices = indices[freqs[indices] > 0]
         if len(down_indices) > 16:
-            # Sort by power and get top 16
             sorted_indices = down_indices[np.argsort(power[down_indices])[-16:]]
         else:
             sorted_indices = down_indices
         cycle_frequencies = list(freqs[sorted_indices])
     
-    # Combine all frequencies: 16 cycle frequencies + 3 threshold frequencies
     all_freqs = cycle_frequencies + [min_freq, middle_freq, max_freq]
     
-    # Calculate weighted average based on power to determine dominant frequency
     weights = []
     for f in all_freqs:
         if f in freqs:
@@ -592,74 +555,48 @@ def analyze_frequency_spectrum(candles, timeframe, cycle_status, min_threshold, 
     weights = weights / np.sum(weights) if np.sum(weights) > 0 else np.ones_like(weights) / len(weights)
     dominant_freq = np.sum(np.array(all_freqs) * weights)
     
-    # Find the index of the frequency closest to the dominant_freq
     idx = np.argmin(np.abs(freqs - dominant_freq))
     spectral_power = power[idx]
-    
-    # Calculate total power (excluding DC component)
     total_power = np.sum(power[indices])
     
-    # Calculate intensity (normalized power)
     if total_power > 0:
-        # Normalized power (0-1 scale)
         intensity = spectral_power / total_power
     else:
         intensity = 0.0
     
-    # Calculate frequency range
     freq_range = np.max(freqs[indices]) - np.min(freqs[indices]) if len(indices) > 0 else 0.0
     
-    # Calculate degree (phase of the predominant frequency)
     phase = np.angle(fft_result[idx])
-    degree = (phase + np.pi) / (2 * np.pi)  # maps from [-pi, pi] to [0, 1]
+    degree = (phase + np.pi) / (2 * np.pi)
     
-    # Determine the stage in the stationary circuit
     cycle_position = (current_close - min_threshold) / (max_threshold - min_threshold) if max_threshold != min_threshold else 0.5
     
     if cycle_direction == "Up":
-        if cycle_position < 0.33:
-            stage = "Early"
-        elif cycle_position < 0.66:
-            stage = "Middle"
-        else:
-            stage = "Late"
-    else:  # Down
-        if cycle_position > 0.66:
-            stage = "Early"
-        elif cycle_position > 0.33:
-            stage = "Middle"
-        else:
-            stage = "Late"
+        if cycle_position < 0.33: stage = "Early"
+        elif cycle_position < 0.66: stage = "Middle"
+        else: stage = "Late"
+    else:
+        if cycle_position > 0.66: stage = "Early"
+        elif cycle_position > 0.33: stage = "Middle"
+        else: stage = "Late"
     
-    # Generate sine wave using TALib's HT_SINE
     try:
-        # Use TALib's HT_SINE function on the close prices
         ht_sine, _ = talib.HT_SINE(closes)
-        
-        # Handle any NaN values that might result from HT_SINE
         ht_sine = np.nan_to_num(ht_sine, nan=0.0)
         
-        # Determine HT_SINE cycle type based on the slope of the last few values
         if len(ht_sine) >= 3:
-            # Calculate the slope of the last 3 values
             recent_sine = ht_sine[-3:]
             x = np.array([0, 1, 2])
             y = recent_sine
-            
-            # Fit a line to the recent sine values
             slope = np.polyfit(x, y, 1)[0]
-            
-            # Determine cycle type based on slope
             ht_sine_cycle_type = "Up" if slope > 0 else "Down"
         else:
-            # Not enough data points, use current cycle direction
             ht_sine_cycle_type = cycle_direction
     except Exception as e:
         logging.error(f"Error generating HT sine wave for {timeframe}: {e}")
         ht_sine = np.zeros(n)
         ht_sine_cycle_type = "N/A"
     
-    # Store top frequencies for analysis
     sorted_indices = indices[np.argsort(power[indices])[-5:]]
     top_frequencies = [(freqs[i], power[i]) for i in sorted_indices]
     
@@ -787,7 +724,6 @@ def generate_ml_forecast(candles, timeframe, forecast_periods=5):
         
         return float(forecast_price), current_close
     except Exception as e:
-        # print(f"  [ML Forecast] Error generating for {timeframe}: {e}")
         return 0.0, 0.0
 
 def get_fft_market_mood(closes, n_components=5):
@@ -828,54 +764,46 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     # 2. Extrema Cycle (1m) — STRICTLY LOWEST LOW VS HIGHEST HIGH REVERSALS
     candles_1m_window = candles_1m[-500:]
     
-    # Strictly use 'low' array for absolute lowest and 'high' array for absolute highest
     lows_500 = np.array([c["low"] for c in candles_1m_window], dtype=np.float64)
     highs_500 = np.array([c["high"] for c in candles_1m_window], dtype=np.float64)
     closes_500 = np.array([c["close"] for c in candles_1m_window], dtype=np.float64)
     
     window_len_1m = len(candles_1m_window)
     
-    # Find exact indices of the absolute extremes
     argmin_idx_1m = int(np.argmin(lows_500))
     argmax_idx_1m = int(np.argmax(highs_500))
     
     cycle_min_price = float(lows_500[argmin_idx_1m])
     cycle_max_price = float(highs_500[argmax_idx_1m])
-    current_close_1m = float(close_arr_1m[-1])
 
-    # Calculate exactly how many bars ago each occurred
-    # Index 0 is oldest, Index (window_len_1m - 1) is current bar
     bars_ago_min = (window_len_1m - 1) - argmin_idx_1m
     bars_ago_max = (window_len_1m - 1) - argmax_idx_1m
 
-    # Convert UTC timestamp to Local Datetime for printing
     try:
         ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"]).strftime("%H:%M:%S")
         ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"]).strftime("%H:%M:%S")
     except Exception:
         ts_min = ts_max = "N/A"
 
-    # Calculate Thresholds for Momentum Context using close prices
     min_th, max_th, avg_mtf, momentum_sig, range_p = calculate_thresholds(
         closes_500, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05
     )
 
-    # Pure recency comparison (Lower bars_ago = More recent)
     if bars_ago_min > bars_ago_max:
         most_recent_extreme = "ARGMIN (LOW)"
         cond_cycle_long = True
         cond_cycle_short = False
-        cycle_status_for_fft = "Up"  # Low was more recent, potential up cycle
+        cycle_status_for_fft = "Up"
     elif bars_ago_max > bars_ago_min:
         most_recent_extreme = "ARGMAX (HIGH)"
         cond_cycle_short = True
         cond_cycle_long = False
-        cycle_status_for_fft = "Down"  # High was more recent, potential down cycle
+        cycle_status_for_fft = "Down"
     else:
         most_recent_extreme = "TIE"
         cond_cycle_long = False
         cond_cycle_short = False
-        cycle_status_for_fft = "Down"  # Default to down on tie
+        cycle_status_for_fft = "Down"
 
     # 3. Momentum (1m)
     mom_1m = calculate_momentum(close_arr_1m)
@@ -889,40 +817,43 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     cond_vol_short = bearish_perc > bullish_perc
 
     # 5. FFT Frequency Spectrum Analysis (1m) — NEW IMPLEMENTATION
+    # We pass live_price here so the stage calculation is perfectly real-time
     fft_dominant_freq, fft_spectral_power, fft_intensity, fft_freq_range, fft_degree, fft_stage, fft_cycle_direction, fft_top_frequencies, fft_ht_sine, fft_ht_sine_cycle_type = analyze_frequency_spectrum(
-        candles_1m_window, "1m", cycle_status_for_fft, float(min_th), float(max_th), current_close_1m
+        candles_1m_window, "1m", cycle_status_for_fft, float(min_th), float(max_th), live_price
     )
-    # Use HT_SINE cycle type for condition - "Up" for LONG, "Down" for SHORT
     cond_fft_long = (fft_ht_sine_cycle_type == "Up")
     cond_fft_short = (fft_ht_sine_cycle_type == "Down")
 
     # 6. ML Forecast (1m) — MANDATORY (Random Forest)
     ml_forecast_price, ml_current_close = generate_ml_forecast(candles_1m, "1m")
     ml_forecast_valid = (ml_forecast_price > 0.0 and ml_current_close > 0.0)
-    cond_ml_long  = ml_forecast_valid and (ml_forecast_price > ml_current_close)
-    cond_ml_short = ml_forecast_valid and (ml_forecast_price < ml_current_close)
+    # Compare forecast directly against REAL-TIME live price for instant execution
+    cond_ml_long  = ml_forecast_valid and (ml_forecast_price > live_price)
+    cond_ml_short = ml_forecast_valid and (ml_forecast_price < live_price)
 
     # 7. FFT Market Mood (1m) — MANDATORY
     fft_mood, fft_mood_forecast = get_fft_market_mood(closes_1m_raw)
     cond_fft_mood_long  = (fft_mood == "Bullish")
     cond_fft_mood_short = (fft_mood == "Bearish")
 
-    # 8. SMA Stack (1m) — MANDATORY (Rule: close < SMA9 -> LONG)
+    # 8. SMA Stack (1m) — MANDATORY 
     sma9_1m  = float(np.mean(close_arr_1m[-9:]))
-    cond_sma_long_1m  = (current_close_1m < sma9_1m)
-    cond_sma_short_1m = (current_close_1m > sma9_1m)
+    # Compare REAL-TIME live price against SMA to avoid lag
+    cond_sma_long_1m  = (live_price < sma9_1m)
+    cond_sma_short_1m = (live_price > sma9_1m)
 
-    # 9. SMA Stack (5m) — MANDATORY (Rule: close < SMA9 -> LONG)
-    current_close_5m = float(close_arr_5m[-1])
+    # 9. SMA Stack (5m) — MANDATORY 
     sma9_5m  = float(np.mean(close_arr_5m[-9:]))
-    cond_sma_long_5m  = (current_close_5m < sma9_5m)
-    cond_sma_short_5m = (current_close_5m > sma9_5m)
+    # Compare REAL-TIME live price against SMA to avoid lag
+    cond_sma_long_5m  = (live_price < sma9_5m)
+    cond_sma_short_5m = (live_price > sma9_5m)
 
     # 10. Price Regression (1m) — MANDATORY
     _, reg_future_prices = price_regression(close_arr_1m)
     reg_forecast = float(reg_future_prices[0])
-    cond_reg_long = reg_forecast > current_close_1m
-    cond_reg_short = reg_forecast < current_close_1m
+    # Compare forecast directly against REAL-TIME live price
+    cond_reg_long = reg_forecast > live_price
+    cond_reg_short = reg_forecast < live_price
 
     # ══════════════════════════════════════════════════════════════════
     # LOGIC: ALL 10 CONDITIONS MANDATORY
@@ -950,12 +881,10 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         },
         "dist_to_min": dist_to_min, "dist_to_max": dist_to_max,
         "cycle_min_price": cycle_min_price, "cycle_max_price": cycle_max_price,
-        "current_close_1m": current_close_1m, "current_close_5m": current_close_5m,
         "ts_min": ts_min, "ts_max": ts_max,
         "most_recent_extreme": most_recent_extreme,
         "momentum_signal": momentum_sig,
         "mom_1m": mom_1m, "bullish_perc": bullish_perc, "bearish_perc": bearish_perc,
-        # FFT Spectrum Analysis Results (replacing neg_ratio/pos_ratio)
         "fft_dominant_freq": fft_dominant_freq,
         "fft_spectral_power": fft_spectral_power,
         "fft_intensity": fft_intensity,
@@ -965,7 +894,6 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         "fft_cycle_direction": fft_cycle_direction,
         "fft_top_frequencies": fft_top_frequencies,
         "fft_ht_sine_cycle_type": fft_ht_sine_cycle_type,
-        # ML Forecast
         "ml_forecast_price": ml_forecast_price, "ml_current_close": ml_current_close,
         "fft_mood": fft_mood,
         "fft_mood_forecast": fft_mood_forecast if fft_mood_forecast is not None else 0.0,
@@ -1061,6 +989,9 @@ def format_duration(start_dt, end_dt):
 
 def print_conditions(sig):
     f = sig["cond_flags"]
+    # Extract unified live price for display across all timeframes
+    live_p = sig['price']
+    
     print(f"  1. Sine (5m):      dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{f['sine_long']} S:{f['sine_short']} [MANDATORY]")
     print(f"  2. Cycle (1m):     Low:{sig['cycle_min_price']:.2f}@{sig['ts_min']} High:{sig['cycle_max_price']:.2f}@{sig['ts_max']} | Recency:{sig['most_recent_extreme']} | MomSig:{sig['momentum_signal']:.2f} | L:{f['cycle_long']} S:{f['cycle_short']} [MANDATORY]")
     print(f"  3. Mom (1m):       {sig['mom_1m']:.2f} L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
@@ -1075,26 +1006,22 @@ def print_conditions(sig):
     print(f"  5. FFT Spec(1m):   HT_Sine:{fft_cycle_type:<4} Stage:{fft_stage:<6} Int:{fft_intensity:.4f} Deg:{fft_degree:.3f} Dir:{fft_dir:<4} L:{f['fft_long']} S:{f['fft_short']} [MANDATORY]")
     
     ml_fc  = sig.get("ml_forecast_price", 0.0)
-    ml_cur = sig.get("ml_current_close", 0.0)
-    ml_diff = ((ml_fc - ml_cur) / ml_cur * 100) if ml_cur else 0.0
-    print(f"  6. ML RF  (1m):    Cur:{ml_cur:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
+    ml_diff = ((ml_fc - live_p) / live_p * 100) if live_p else 0.0
+    print(f"  6. ML RF  (1m):    Live:{live_p:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
     
     fft_fc  = sig.get("fft_mood_forecast", 0.0)
-    fft_cur = sig.get("current_close_1m", 0.0)
-    fft_diff = ((fft_fc - fft_cur) / fft_cur * 100) if fft_cur else 0.0
-    print(f"  7. FFT Mood (1m):  {sig.get('fft_mood','N/A'):<8} Cur:{fft_cur:.2f} FcstNext:{fft_fc:.2f} ({fft_diff:+.4f}%) L:{f['fft_mood_long']} S:{f['fft_mood_short']} [MANDATORY]")
+    fft_diff = ((fft_fc - live_p) / live_p * 100) if live_p else 0.0
+    print(f"  7. FFT Mood (1m):  {sig.get('fft_mood','N/A'):<8} Live:{live_p:.2f} FcstNext:{fft_fc:.2f} ({fft_diff:+.4f}%) L:{f['fft_mood_long']} S:{f['fft_mood_short']} [MANDATORY]")
     
-    c1 = sig.get("current_close_1m", 0.0)
     s9_1 = sig.get("sma9_1m", 0.0)
-    print(f"  8. SMA Stack (1m): Close:{c1:.2f} SMA9:{s9_1:.2f} L:{f['sma_long_1m']} S:{f['sma_short_1m']} [MANDATORY]")
+    print(f"  8. SMA Stack (1m): Live:{live_p:.2f} SMA9:{s9_1:.2f} L:{f['sma_long_1m']} S:{f['sma_short_1m']} [MANDATORY]")
     
-    c5 = sig.get("current_close_5m", 0.0)
     s9_5 = sig.get("sma9_5m", 0.0)
-    print(f"  9. SMA Stack (5m): Close:{c5:.2f} SMA9:{s9_5:.2f} L:{f['sma_long_5m']} S:{f['sma_short_5m']} [MANDATORY]")
+    print(f"  9. SMA Stack (5m): Live:{live_p:.2f} SMA9:{s9_5:.2f} L:{f['sma_long_5m']} S:{f['sma_short_5m']} [MANDATORY]")
     
     reg_fc = sig.get("reg_forecast", 0.0)
-    reg_diff = ((reg_fc - c1) / c1 * 100) if c1 else 0.0
-    print(f"  10.LinReg (1m):    Cur:{c1:.2f} Fcst:{reg_fc:.2f} ({reg_diff:+.4f}%) L:{f['reg_long']} S:{f['reg_short']} [MANDATORY]")
+    reg_diff = ((reg_fc - live_p) / live_p * 100) if live_p else 0.0
+    print(f"  10.LinReg (1m):    Live:{live_p:.2f} Fcst:{reg_fc:.2f} ({reg_diff:+.4f}%) L:{f['reg_long']} S:{f['reg_short']} [MANDATORY]")
 
     # Explicit Overall Count Check
     long_all  = sum([f['sine_long'],  f['cycle_long'],  f['mom_long'],  f['vol_long'],  f['fft_long'],
@@ -1117,8 +1044,8 @@ def main():
     print(f"Loop Sleep:          {LOOP_SLEEP}s")
     print(f"Entry Logic:         ALL 10 CONDITIONS MANDATORY")
     print(f"Extrema Logic:       Strictly Lowest Low vs Highest High (Last 500 1m bars)")
-    print(f"SMA 1m Rule:         LONG: close < SMA9 | SHORT: close > SMA9")
-    print(f"SMA 5m Rule:         LONG: close < SMA9 | SHORT: close > SMA9")
+    print(f"SMA 1m Rule:         LONG: live_price < SMA9 | SHORT: live_price > SMA9")
+    print(f"SMA 5m Rule:         LONG: live_price < SMA9 | SHORT: live_price > SMA9")
     print(f"FFT Spectrum Rule:   LONG: HT_SINE Cycle=Up | SHORT: HT_SINE Cycle=Down")
     print(f"Position Sizing:     {TRADE_BALANCE_PCT*100:.0f}% of balance per trade")
     print(f"API Connected:       {API_CONNECTED}")
@@ -1242,7 +1169,7 @@ def main():
             if sig:
                 # Print signal status periodically
                 if loop_count % 20 == 0:
-                    print(f"\n[{now_str}] Price:{current_price:.2f} Bal:{balance:.2f}USDT")
+                    print(f"\n[{now_str}] Live Price:{current_price:.2f} Bal:{balance:.2f}USDT")
                     print_conditions(sig)
 
                 if sig["is_long"] or sig["is_short"]:
