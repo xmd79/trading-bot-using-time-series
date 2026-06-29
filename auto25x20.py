@@ -184,7 +184,7 @@ RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100
 
 # TP: gross ROE needed = target_net + fees = 5% + 3% = 8% -> price move = 8/(25*100)
 # SL: 99% ROE loss -> price move = 99/(25*100)
-_TARGET_NET_ROE_PCT = 5.0
+_TARGET_NET_ROE_PCT = 2.0
 _TARGET_SL_ROE_PCT  = 99.0
 TP_PCT = (_TARGET_NET_ROE_PCT + KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100) / (LEVERAGE * 100)
 SL_PCT = _TARGET_SL_ROE_PCT / (LEVERAGE * 100)
