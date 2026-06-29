@@ -5,8 +5,8 @@ SIGNAL LOGIC:
   - Mandatory: Momentum (1m), Volume (1m), AND ML Forecast MUST be true for the direction.
   - ML Forecast (1m): forecast_price > current_close → LONG allowed;
                       forecast_price < current_close → SHORT allowed.
-  - Flexible: At least 3 out of 5 total conditions must be true for the direction.
-  - (Since Mom + Vol = 2 mandatory true, you only need 1 more from Sine/Cycle/FFT).
+  - Flexible: At least 3 out of 4 total conditions must be true for the direction.
+  - (Since Mom + Vol = 2 mandatory true, you only need 1 more from Sine/Cycle).
 
 POSITION SIZING:
   - Only 5% of available balance is used per trade.
@@ -28,7 +28,6 @@ import requests
 import numpy as np
 import talib
 import gc
-from scipy.fft import fft, fftfreq
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -86,7 +85,7 @@ del _f
 gc.collect()
 clean_trades_file()
 
-print("HFT KuCoin Bot (25x / 3-OUT-OF-5 LOGIC) initialising...")
+print("HFT KuCoin Bot (25x / 3-OUT-OF-4 LOGIC) initialising...")
 if _cleaned:
     print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
 del _cleaned
@@ -196,7 +195,7 @@ KUCOIN_TAKER_FEE = 0.0006
 RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100
 NET_PROFIT_ROE = 2.55                                  
 TAKE_PROFIT_ROE = NET_PROFIT_ROE + RT_FEE_ROE_PCT      
-STOP_LOSS_ROE = -50.0                                  
+STOP_LOSS_ROE = -99.0                                  
 
 TP_PRICE_PCT = TAKE_PROFIT_ROE / LEVERAGE / 100.0
 SL_PRICE_PCT = abs(STOP_LOSS_ROE) / LEVERAGE / 100.0
@@ -454,69 +453,6 @@ def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
     dist_to_max = max(0, min(100, ((cycle_max - current_sine) / rng) * 100))
     return dist_to_min, dist_to_max
 
-def analyze_fft_dominance_1m(close_prices_1m):
-    if len(close_prices_1m) < 32: 
-        return False, False, 0.0, 0.0
-    
-    sine_wave_1m, lead_sine_1m = talib.HT_SINE(close_prices_1m)
-    sine_wave_1m = np.nan_to_num(-sine_wave_1m)
-    lead_sine_1m = np.nan_to_num(-lead_sine_1m)
-    
-    valid_mask = ~(np.isnan(sine_wave_1m) | np.isnan(lead_sine_1m))
-    sine_wave_1m = sine_wave_1m[valid_mask]
-    lead_sine_1m = lead_sine_1m[valid_mask]
-    
-    if len(sine_wave_1m) < 32:
-        return False, False, 0.0, 0.0
-    
-    n = len(sine_wave_1m)
-    complex_signal = sine_wave_1m + 1j * lead_sine_1m
-    window = np.hanning(n)
-    complex_signal = complex_signal * window
-    complex_signal = complex_signal - np.mean(complex_signal)
-    
-    fft_result = fft(complex_signal)
-    fft_power = np.abs(fft_result) ** 2
-    freq_bins = fftfreq(n)
-    
-    powers = fft_power[1:]
-    frequencies = freq_bins[1:]
-    
-    neg_mask = frequencies < 0
-    pos_mask = frequencies > 0
-    
-    neg_powers = powers[neg_mask]
-    pos_powers = powers[pos_mask]
-    
-    if len(neg_powers) >= 12:
-        top_12_neg = np.sort(neg_powers)[-12:]
-        neg_power = np.sum(top_12_neg)
-    elif len(neg_powers) > 0:
-        neg_power = np.sum(neg_powers)
-    else:
-        neg_power = 0.0
-        
-    if len(pos_powers) >= 12:
-        top_12_pos = np.sort(pos_powers)[-12:]
-        pos_power = np.sum(top_12_pos)
-    elif len(pos_powers) > 0:
-        pos_power = np.sum(pos_powers)
-    else:
-        pos_power = 0.0
-    
-    total_power = neg_power + pos_power
-    if total_power == 0: 
-        return False, False, 0.0, 0.0
-    
-    neg_ratio = (neg_power / total_power) * 100
-    pos_ratio = (pos_power / total_power) * 100
-    
-    DOMINANCE_THRESHOLD = 0.1
-    fft_long_signal = neg_ratio > (pos_ratio + DOMINANCE_THRESHOLD)
-    fft_short_signal = pos_ratio > (neg_ratio + DOMINANCE_THRESHOLD)
-    
-    return fft_long_signal, fft_short_signal, neg_ratio, pos_ratio
-
 def calculate_momentum(close_arr, period=14):
     if len(close_arr) < period + 1: return np.nan
     return float(talib.MOM(close_arr, timeperiod=period)[-1])
@@ -663,25 +599,20 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     cond_vol_long = bullish_perc > bearish_perc
     cond_vol_short = bearish_perc > bullish_perc
     
-    # 5. FFT Dominance (1m)
-    fft_long, fft_short, neg_ratio, pos_ratio = analyze_fft_dominance_1m(close_arr_1m)
-    cond_fft_long = fft_long
-    cond_fft_short = fft_short
-
-    # 6. ML Forecast (1m) — MANDATORY
+    # 5. ML Forecast (1m) — MANDATORY
     ml_forecast_price, ml_current_close = generate_ml_forecast(candles_1m)
     ml_forecast_valid = (ml_forecast_price > 0.0 and ml_current_close > 0.0)
     cond_ml_long  = ml_forecast_valid and (ml_forecast_price > ml_current_close)
     cond_ml_short = ml_forecast_valid and (ml_forecast_price < ml_current_close)
 
     # ══════════════════════════════════════════════════════════════════
-    # LOGIC: 3 out of 5 conditions, AND Mom, Vol, ML are ALL MANDATORY
+    # LOGIC: 3 out of 4 conditions, AND Mom, Vol, ML are ALL MANDATORY
     # ══════════════════════════════════════════════════════════════════
-    long_true_count = sum([cond_sine_long, cond_cycle_long, cond_mom_long, cond_vol_long, cond_fft_long])
-    short_true_count = sum([cond_sine_short, cond_cycle_short, cond_mom_short, cond_vol_short, cond_fft_short])
+    long_true_count = sum([cond_sine_long, cond_cycle_long, cond_mom_long, cond_vol_long])
+    short_true_count = sum([cond_sine_short, cond_cycle_short, cond_mom_short, cond_vol_short])
     
     # MANDATORY: Mom + Vol + ML must all be true.
-    # ML acts as directional gate; still need >=3/5 from the original five.
+    # ML acts as directional gate; still need >=3/4 from the four.
     is_long  = (cond_mom_long  and cond_vol_long  and cond_ml_long  and long_true_count  >= 3)
     is_short = (cond_mom_short and cond_vol_short and cond_ml_short and short_true_count >= 3)
     
@@ -692,7 +623,6 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
             "cycle_long": cond_cycle_long, "cycle_short": cond_cycle_short,
             "mom_long": cond_mom_long, "mom_short": cond_mom_short,
             "vol_long": cond_vol_long, "vol_short": cond_vol_short,
-            "fft_long": cond_fft_long, "fft_short": cond_fft_short,
             "ml_long": cond_ml_long, "ml_short": cond_ml_short,
         },
         "long_true_count": long_true_count,
@@ -706,7 +636,6 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         "most_recent_extreme": most_recent_extreme,
         "window_len_1m": window_len_1m,
         "mom_1m": mom_1m, "bullish_perc": bullish_perc, "bearish_perc": bearish_perc,
-        "neg_ratio": neg_ratio, "pos_ratio": pos_ratio,
         "ml_forecast_price": ml_forecast_price, "ml_current_close": ml_current_close,
     }
 
@@ -758,7 +687,7 @@ def write_trade_to_journal(trade_result):
             f"EXIT PRICE: {trade_result.get('exit_price', 0):.2f}\nPRICE CHANGE: {trade_result.get('price_change_pct', 0):+.4f}%\n"
             f"GROSS ROE: {trade_result.get('gross_roe', 0):+.2f}%\nRT FEE DEDUCTED: {trade_result.get('rt_fee_pct', 0):.2f}%\n"
             f"NET ROE: {trade_result.get('roe', 0):+.2f}%\nREASON: {trade_result.get('reason', 'N/A')}\n"
-            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 3/5 Cond (Mom+Vol+ML Mandatory) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%\n{'='*60}\n\n")
+            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 3/4 Cond (Mom+Vol+ML Mandatory) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%\n{'='*60}\n\n")
     try:
         with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f: f.write(line)
     except Exception as e: print(f"  [journal] write error: {e}")
@@ -802,7 +731,6 @@ def print_conditions(sig):
     print(f"  2. Cycle (1m): Low@{sig['ts_min']} High@{sig['ts_max']} | Most Recent: {sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
     print(f"  3. Mom (1m):   {sig['mom_1m']:.2f} L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
     print(f"  4. Vol (1m):   Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
-    print(f"  5. FFT (1m):   Neg:{sig['neg_ratio']:.2f}% Pos:{sig['pos_ratio']:.2f}% L:{f['fft_long']} S:{f['fft_short']}")
     ml_fc  = sig.get("ml_forecast_price", 0.0)
     ml_cur = sig.get("ml_current_close", 0.0)
     ml_diff = ((ml_fc - ml_cur) / ml_cur * 100) if ml_cur else 0.0
@@ -811,7 +739,7 @@ def print_conditions(sig):
     long_true  = sig["long_true_count"]
     short_true = sig["short_true_count"]
     
-    print(f"  ═══ LONG:{long_true}/5 SHORT:{short_true}/5 (Rule: Mom+Vol+ML Mandatory + >=3/5 Total) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
+    print(f"  ═══ LONG:{long_true}/4 SHORT:{short_true}/4 (Rule: Mom+Vol+ML Mandatory + >=3/4 Total) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
@@ -819,13 +747,13 @@ def print_conditions(sig):
 
 def main():
     print(f"\n{'='*60}")
-    print(f"HFT KuCoin Bot - 3/5 CONDITIONS (MOM+VOL+ML MANDATORY)")
+    print(f"HFT KuCoin Bot - 3/4 CONDITIONS (MOM+VOL+ML MANDATORY)")
     print(f"{'='*60}")
     print(f"Symbol:              {TRADE_SYMBOL}")
     print(f"Leverage:            {LEVERAGE}x")
     print(f"TP: {TAKE_PROFIT_ROE}% ROE | SL: {STOP_LOSS_ROE}% ROE")
     print(f"Loop Sleep:          {LOOP_SLEEP}s")
-    print(f"Entry Logic:         Mom & Vol & ML MANDATORY + At least 3/5 Total")
+    print(f"Entry Logic:         Mom & Vol & ML MANDATORY + At least 3/4 Total")
     print(f"Position Sizing:     {TRADE_BALANCE_PCT*100:.0f}% of balance per trade")
     print(f"API Connected:       {API_CONNECTED}")
     print(f"{'='*60}\n")
@@ -960,7 +888,7 @@ def main():
                     print(f"  Balance: {balance:.2f} USDT  (trade alloc: {balance*TRADE_BALANCE_PCT:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}%)")
 
                 if sig["is_long"]:
-                    print(f"\n  *** 3/5 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> LONG ***")
+                    print(f"\n  *** 3/4 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> LONG ***")
                     if has_sufficient_balance:
                         print(f"  [LIVE] Executing LONG...")
                         if execute_entry(TRADE_SYMBOL, "buy", balance, sig["price"]):
@@ -976,7 +904,7 @@ def main():
                         save_trade_state(saved_state)
 
                 elif sig["is_short"]:
-                    print(f"\n  *** 3/5 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> SHORT ***")
+                    print(f"\n  *** 3/4 CONDITIONS MET (Mom+Vol+ML MANDATORY) -> SHORT ***")
                     if has_sufficient_balance:
                         print(f"  [LIVE] Executing SHORT...")
                         if execute_entry(TRADE_SYMBOL, "sell", balance, sig["price"]):
