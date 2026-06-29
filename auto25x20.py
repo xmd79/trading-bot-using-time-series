@@ -3,7 +3,7 @@ HFT Auto Trading Bot — KuCoin Futures Edition (CONCURRENT OPTIMIZED)
 ====================================================================
 SIGNAL LOGIC:
   - ALL 6/6 CONDITIONS MUST AGREE ON THE SAME SIDE TO TRIGGER.
-  - Conditions: Sine(5m), Cycle(1m), Momentum(1m), Volume(1m), 3mMid, 45°Angle
+  - Conditions: Sine(1m), Cycle(1m), Momentum(1m), Volume(1m), 3mMid, 45°Angle
   - Long:  All 6 long conditions  = True
   - Short: All 6 short conditions = True
 
@@ -189,7 +189,6 @@ TP_PCT = (_TARGET_NET_ROE_PCT + KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100) / (LEVERA
 SL_PCT = _TARGET_SL_ROE_PCT / (LEVERAGE * 100)
 
 ATR_PERIOD = 14
-
 FULL_REFRESH_INTERVAL = 3600
 
 try:
@@ -428,84 +427,92 @@ def check_dynamic_tp_sl(entry_price, current_price, side, sl_price, tp_price):
     if hit: return True, "TAKE PROFIT" if hit_type == "TP" else "STOP LOSS", roe_pct
     return False, None, roe_pct
 
-def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
-    if len(close_prices_5m) < 32: return 50.0, 50.0
-    sine_wave, _ = talib.HT_SINE(close_prices_5m)
-    sine_wave = np.nan_to_num(-sine_wave)
-    sine_window = sine_wave[-ANALYSIS_WINDOW_5M:] if len(sine_wave) >= ANALYSIS_WINDOW_5M else sine_wave
-    c_min, c_max = sine_window[argmin_idx], sine_window[argmax_idx]
-    rng = c_max - c_min if c_max != c_min else 1e-9
-    cur = sine_wave[-1]
-    return max(0, min(100, ((cur - c_min) / rng) * 100)), max(0, min(100, ((c_max - cur) / rng) * 100))
+def scale_to_sine(close_prices):
+    if len(close_prices) < 32: return 50.0, 50.0, 0.0
+    close_prices = np.array(close_prices, dtype=float)
+    current_close = close_prices[-1]      
+    sine_wave, leadsine = talib.HT_SINE(close_prices)
+    sine_wave = np.nan_to_num(sine_wave)
+    sine_wave = -sine_wave
+    current_sine = sine_wave[-1]
+    sine_wave_min = np.min(sine_wave)        
+    sine_wave_max = np.max(sine_wave)
+    dist_from_close_to_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100            
+    dist_from_close_to_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
+    return dist_from_close_to_min, dist_from_close_to_max, current_sine
 
 def calculate_momentum(close_arr, period=14):
     if len(close_arr) < period + 1: return np.nan
     return float(talib.MOM(close_arr, timeperiod=period)[-1])
 
 def calculate_45_degree_angle(close_prices):
-    """
-    Calculate 45-degree angle trend using simple linear regression.
-    Returns: expected_price, slope, intercept, forecast_string
-    """
     if len(close_prices) < 10:
         return 0.0, 0.0, 0.0, "Insufficient data for 45-degree angle"
-    
     x = np.arange(len(close_prices), dtype=float)
     slope, intercept = np.polyfit(x, close_prices, 1)
-    
-    # Calculate the expected trend line value for the last close price
     expected_price = slope * (len(close_prices) - 1) + intercept
-    
     return expected_price, slope, intercept, None
+
 
 def compute_signals(buffer_5m, buffer_3m, buffer_1m, live_price):
     candles_5m, candles_3m, candles_1m = buffer_5m.get_candles(), buffer_3m.get_candles(), buffer_1m.get_candles()
-    c5, c1 = [x["close"] for x in candles_5m], [x["close"] for x in candles_1m]
-    if len(c5) < 50 or len(c1) < 50 or len(candles_3m) < 50: return None
+    c1 = [x["close"] for x in candles_1m]
+    if len(c1) < 50 or len(candles_3m) < 50: return None
     
-    arr5, arr1 = np.array(c5, dtype=float), np.array(c1, dtype=float)
+    arr1 = np.array(c1, dtype=float)
     cc = live_price
     
-    # ── 1. Sine (5m) ── FIXED: Find most recent extrema
-    w5 = arr5[-ANALYSIS_WINDOW_5M:]
-    l5 = len(w5)
-    ai5_min = l5 - 1 - int(np.argmax(w5[::-1] == np.min(w5)))
-    ai5_max = l5 - 1 - int(np.argmax(w5[::-1] == np.max(w5)))
-    d_min, d_max = scale_to_sine(arr5, ai5_min, ai5_max)
+    # ── 1. Sine (1m) ──
+    d_min, d_max, current_sine = scale_to_sine(arr1)
     c_sine_l, c_sine_s = d_min < d_max, d_max < d_min
     
-    # ── 2. Cycle (1m) ── FIXED: Find most recent extrema correctly
+    # ── 2. Cycle (1m) ── FIXED: Datetime comparison instead of index math
     w1_candles = candles_1m[-500:]
     w1 = arr1[-500:]
     wl1 = len(w1)
     
-    # FIXED: Find the MOST RECENT occurrence of min and max
+    # Find the most recent index of min and max price
     ai1_min = wl1 - 1 - int(np.argmax(w1[::-1] == np.min(w1)))
     ai1_max = wl1 - 1 - int(np.argmax(w1[::-1] == np.max(w1)))
     
     p_min, p_max = float(w1[ai1_min]), float(w1[ai1_max])
     
-    # Calculate bars since each extreme (0 = most recent bar)
-    bars_since_min = (wl1 - 1) - ai1_min
-    bars_since_max = (wl1 - 1) - ai1_max
-    
     try:
-        t_min = datetime.datetime.fromtimestamp(w1_candles[ai1_min]["time"]).strftime("%H:%M:%S")
-        t_max = datetime.datetime.fromtimestamp(w1_candles[ai1_max]["time"]).strftime("%H:%M:%S")
-    except Exception: t_min = t_max = "N/A"
-    
-    # FIXED: Determine which extreme is MORE RECENT
-    if bars_since_min < bars_since_max:
-        # Most recent extreme is LOW -> expect price to go UP (long bias)
-        recent = "ARGMIN (LOW)"
-        c_cyc_l = cc > p_min
-        c_cyc_s = False
-    elif bars_since_max < bars_since_min:
-        # Most recent extreme is HIGH -> expect price to go DOWN (short bias)
-        recent = "ARGMAX (HIGH)"
-        c_cyc_s = cc < p_max
-        c_cyc_l = False
-    else:
+        # Get actual datetime objects
+        dt_min = datetime.datetime.fromtimestamp(w1_candles[ai1_min]["time"])
+        dt_max = datetime.datetime.fromtimestamp(w1_candles[ai1_max]["time"])
+        now_dt = datetime.datetime.now()
+        
+        # Calculate true time difference in seconds
+        diff_min_sec = (now_dt - dt_min).total_seconds()
+        diff_max_sec = (now_dt - dt_max).total_seconds()
+        
+        # Convert to 1m bars accurately based on real time elapsed
+        bars_since_min = int(diff_min_sec / 60)
+        bars_since_max = int(diff_max_sec / 60)
+        
+        t_min = dt_min.strftime("%H:%M:%S")
+        t_max = dt_max.strftime("%H:%M:%S")
+        
+        # Determine true most recent by comparing actual time difference
+        if diff_min_sec < diff_max_sec:
+            # Low happened more recently than High
+            recent = "ARGMIN (LOW)"
+            c_cyc_l = cc > p_min
+            c_cyc_s = False
+        elif diff_max_sec < diff_min_sec:
+            # High happened more recently than Low
+            recent = "ARGMAX (HIGH)"
+            c_cyc_s = cc < p_max
+            c_cyc_l = False
+        else:
+            recent = "TIE"
+            c_cyc_l, c_cyc_s = False, False
+            
+    except Exception as e:
+        # Fallback if timestamp parsing fails
+        t_min = t_max = "N/A"
+        bars_since_min = bars_since_max = 0
         recent = "TIE"
         c_cyc_l, c_cyc_s = False, False
         
@@ -529,10 +536,10 @@ def compute_signals(buffer_5m, buffer_3m, buffer_1m, live_price):
         c_angle_l, c_angle_s = False, False
     else:
         if cc < expected_price:
-            angle_forecast = "Bullish: Close below 45-degree angle moving towards it"
+            angle_forecast = "Bullish: Close below 45-degree angle"
             c_angle_l, c_angle_s = True, False
         elif cc > expected_price:
-            angle_forecast = "Bearish: Close above 45-degree angle moving towards it"
+            angle_forecast = "Bearish: Close above 45-degree angle"
             c_angle_s, c_angle_l = True, False
         else:
             angle_forecast = "Neutral: Close at the 45-degree angle"
@@ -545,11 +552,9 @@ def compute_signals(buffer_5m, buffer_3m, buffer_1m, live_price):
     lt = sum(long_conds)
     st = sum(short_conds)
     
-    # ══════════════════════════════════════════════════════════════════════════
     # SIGNAL RULE: ALL 6/6 CONDITIONS MUST BE TRUE ON THE SAME SIDE
-    # ══════════════════════════════════════════════════════════════════════════
-    is_long  = all(long_conds)   # 6/6 True
-    is_short = all(short_conds)  # 6/6 True
+    is_long  = all(long_conds)   
+    is_short = all(short_conds)  
     
     return {
         "price": live_price, "current_close": cc, 
@@ -564,6 +569,7 @@ def compute_signals(buffer_5m, buffer_3m, buffer_1m, live_price):
         },
         "long_true_count": lt, "short_true_count": st,
         "dist_to_min": d_min, "dist_to_max": d_max,
+        "current_sine": current_sine,
         "ts_min": t_min, "ts_max": t_max, "most_recent_extreme": recent,
         "bars_since_min": bars_since_min, "bars_since_max": bars_since_max,
         "mom_1m": mom, "bullish_perc": bull, "bearish_perc": bear,
@@ -633,10 +639,9 @@ def format_duration(s, e):
 def print_conditions(sig):
     f, cc = sig["cond_flags"], sig["current_close"]
     
-    # Visual indicator: checkmark or X
     def mark(val): return "✓" if val else "✗"
     
-    print(f"  1. Sine (5m):    dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{mark(f['sine_long'])} S:{mark(f['sine_short'])}")
+    print(f"  1. Sine (1m):    dMin:{sig['dist_to_min']:.2f}% dMax:{sig['dist_to_max']:.2f}% (RawSine:{sig.get('current_sine', 0):.4f}) L:{mark(f['sine_long'])} S:{mark(f['sine_short'])}")
     
     print(f"  2. Cycle (1m):   Low@{sig['ts_min']}({sig['bars_since_min']}bars) High@{sig['ts_max']}({sig['bars_since_max']}bars) | Recent: {sig['most_recent_extreme']} | L:{mark(f['cycle_long'])} S:{mark(f['cycle_short'])}")
     
@@ -658,7 +663,6 @@ def print_conditions(sig):
     
     lt, st = sig["long_true_count"], sig["short_true_count"]
     
-    # Build visual bar
     long_bar  = "█" * lt + "░" * (6 - lt)
     short_bar = "█" * st + "░" * (6 - st)
     
@@ -677,7 +681,7 @@ def main():
     print(f"{'='*70}")
     print(f"Symbol: {TRADE_SYMBOL} | Leverage: {LEVERAGE}x | API: {API_CONNECTED}")
     print(f"TP: +{TP_PCT*100:.3f}% price (~{_TARGET_NET_ROE_PCT:.0f}% net ROE) | SL: -{SL_PCT*100:.3f}% price (~{_TARGET_SL_ROE_PCT:.0f}% ROE)")
-    print(f"Conditions: Sine(5m) + Cycle(1m) + Mom(1m) + Vol(1m) + 3mMid + 45°Angle")
+    print(f"Conditions: Sine(1m) + Cycle(1m) + Mom(1m) + Vol(1m) + 3mMid + 45°Angle")
     print(f"Rule: ALL 6/6 must be TRUE on same side = UNANIMOUS CONSENSUS")
     print(f"{'='*70}\n")
 
@@ -690,7 +694,7 @@ def main():
         t0 = time.perf_counter()
         b5.initialize(client); b3.initialize(client); b1.initialize(client)
         print(f"  Total init: {(time.perf_counter()-t0)*1000:.0f}ms\n")
-        if not b5.is_ready() or not b1.is_ready() or not b3.is_ready():
+        if not b1.is_ready() or not b3.is_ready():
             print("  [ERROR] Buffer init failed."); return
     
     fetcher = ConcurrentDataFetcher(b5, b3, b1, TRADE_SYMBOL)
@@ -811,9 +815,6 @@ def main():
                     print_conditions(sig)
                     print(f"  Bal: {bal:.2f} USDT (alloc: {bal*TRADE_BALANCE_PCT:.2f})")
 
-                # ══════════════════════════════════════════════════════════════
-                # TRIGGER: is_long or is_short is ONLY True when ALL 6/6 match
-                # ══════════════════════════════════════════════════════════════
                 if sig["is_long"] or sig["is_short"]:
                     side = "long" if sig["is_long"] else "short"
                     print(f"\n  {'*'*60}")
