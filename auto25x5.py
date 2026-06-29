@@ -734,7 +734,7 @@ def print_conditions(sig):
     ml_fc  = sig.get("ml_forecast_price", 0.0)
     ml_cur = sig.get("ml_current_close", 0.0)
     ml_diff = ((ml_fc - ml_cur) / ml_cur * 100) if ml_cur else 0.0
-    print(f"  6. ML (1m):    Cur:{ml_cur:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
+    print(f"  5. ML (1m):    Cur:{ml_cur:.2f} Fcst:{ml_fc:.2f} ({ml_diff:+.4f}%) L:{f['ml_long']} S:{f['ml_short']} [MANDATORY]")
     
     long_true  = sig["long_true_count"]
     short_true = sig["short_true_count"]
