@@ -925,16 +925,44 @@ def clear_trade_state():
 
 def write_trade_to_journal(trade_result):
     mode = trade_result.get("mode", "LIVE")
-    line = (f"{'='*60}\nMODE: {mode}\nTYPE: {trade_result.get('type', 'N/A').upper()}\n"
-            f"ENTRY TIME: {trade_result.get('entry_time', 'N/A')}\nEXIT TIME: {trade_result.get('exit_time', 'N/A')}\n"
-            f"DURATION: {trade_result.get('duration', 'N/A')}\nENTRY PRICE: {trade_result.get('entry_price', 0):.2f}\n"
-            f"EXIT PRICE: {trade_result.get('exit_price', 0):.2f}\nPRICE CHANGE: {trade_result.get('price_change_pct', 0):+.4f}%\n"
-            f"GROSS ROE: {trade_result.get('gross_roe', 0):+.2f}%\nRT FEE DEDUCTED: {trade_result.get('rt_fee_pct', 0):.2f}%\n"
-            f"NET ROE: {trade_result.get('roe', 0):+.2f}%\nREASON: {trade_result.get('reason', 'N/A')}\n"
-            f"LEVERAGE: {LEVERAGE}x\nSTRATEGY: 4/4 Cond (Mom+HO Mandatory, ALL must agree) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%\n{'='*60}\n\n")
+    trade_type = trade_result.get("type", "N/A").upper()
+    entry_time = trade_result.get("entry_time", "N/A")
+    exit_time = trade_result.get("exit_time", "N/A")
+    duration = trade_result.get("duration", "N/A")
+    entry_price = trade_result.get("entry_price", 0)
+    exit_price = trade_result.get("exit_price", 0)
+    price_change_pct = trade_result.get("price_change_pct", 0)
+    gross_roe = trade_result.get("gross_roe", 0)
+    rt_fee_pct = trade_result.get("rt_fee_pct", 0)
+    net_roe = trade_result.get("roe", 0)
+    reason = trade_result.get("reason", "N/A")
+    strategy = trade_result.get("strategy", f"4/4 Cond (Mom+HO Mandatory, ALL must agree) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%")
+    
+    separator = "=" * 60
+    line = (
+        f"{separator}\n"
+        f"MODE: {mode}\n"
+        f"TYPE: {trade_type}\n"
+        f"ENTRY TIME: {entry_time}\n"
+        f"EXIT TIME: {exit_time}\n"
+        f"DURATION: {duration}\n"
+        f"ENTRY PRICE: {entry_price:.2f}\n"
+        f"EXIT PRICE: {exit_price:.2f}\n"
+        f"PRICE CHANGE: {price_change_pct:+.4f}%\n"
+        f"GROSS ROE: {gross_roe:+.2f}%\n"
+        f"RT FEE DEDUCTED: {rt_fee_pct:.2f}%\n"
+        f"NET ROE: {net_roe:+.2f}%\n"
+        f"REASON: {reason}\n"
+        f"LEVERAGE: {LEVERAGE}x\n"
+        f"STRATEGY: {strategy}\n"
+        f"{separator}\n\n"
+    )
     try:
-        with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f: f.write(line)
-    except Exception as e: print(f"  [journal] write error: {e}")
+        with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line)
+        print(f"  [journal] Trade written to {TRADES_LOG_FILE}")
+    except Exception as e:
+        print(f"  [journal] write error: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ORDER EXECUTION
@@ -1006,6 +1034,7 @@ def main():
     print(f"Entry Logic:         Mom & HarmonicOscillator MANDATORY + All 4 Must Agree")
     print(f"Position Sizing:     {TRADE_BALANCE_PCT*100:.0f}% of balance per trade")
     print(f"API Connected:       {API_CONNECTED}")
+    print(f"Trades Log File:     {TRADES_LOG_FILE}")
     print(f"{'='*60}\n")
 
     buffer_5m = CandleBuffer(TRADE_SYMBOL, "5m", ANALYSIS_WINDOW_5M)
@@ -1063,6 +1092,9 @@ def main():
             compute_ms = (time.perf_counter() - t) * 1000
             log_timing("compute_signals", compute_ms)
 
+            # ══════════════════════════════════════════════════════════════════
+            # POSITION MANAGEMENT — LIVE POSITION EXISTS
+            # ══════════════════════════════════════════════════════════════════
             if pos["is_open"]:
                 roe, side, entry_price, mark_price = pos["roe_pct"], pos["side"], pos["entry_price"], pos["mark_price"]
                 
@@ -1079,11 +1111,23 @@ def main():
                     client.close_position(TRADE_SYMBOL)
                     price_change_pct = ((mark_price - entry_price) / entry_price) * 100 if side == "long" else ((entry_price - mark_price) / entry_price) * 100
                     start_dt = datetime.datetime.strptime(saved_state["entry_time"], "%Y-%m-%d %H:%M:%S")
-                    trade_result = {"mode": "LIVE", "entry_time": saved_state["entry_time"], "exit_time": now_str,
-                                    "type": side, "entry_price": entry_price, "exit_price": mark_price,
-                                    "price_change_pct": price_change_pct, "gross_roe": price_change_pct * LEVERAGE,
-                                    "rt_fee_pct": RT_FEE_ROE_PCT, "roe": price_change_pct * LEVERAGE - RT_FEE_ROE_PCT,
-                                    "duration": format_duration(start_dt, datetime.datetime.now()), "reason": reason}
+                    gross_roe = price_change_pct * LEVERAGE
+                    net_roe = gross_roe - RT_FEE_ROE_PCT
+                    trade_result = {
+                        "mode": "LIVE",
+                        "entry_time": saved_state["entry_time"],
+                        "exit_time": now_str,
+                        "type": side,
+                        "entry_price": entry_price,
+                        "exit_price": mark_price,
+                        "price_change_pct": price_change_pct,
+                        "gross_roe": gross_roe,
+                        "rt_fee_pct": RT_FEE_ROE_PCT,
+                        "roe": net_roe,
+                        "duration": format_duration(start_dt, datetime.datetime.now()),
+                        "reason": reason,
+                        "strategy": f"4/4 Cond (Mom+HO Mandatory, ALL must agree) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%"
+                    }
                     write_trade_to_journal(trade_result)
                     clear_trade_state()
                     saved_state = None
@@ -1093,6 +1137,9 @@ def main():
                 time.sleep(LOOP_SLEEP)
                 continue
 
+            # ══════════════════════════════════════════════════════════════════
+            # POSITION MANAGEMENT — SIMULATION POSITION EXISTS
+            # ══════════════════════════════════════════════════════════════════
             if saved_state and saved_state.get("mode") == "SIMULATION":
                 sim_entry_price, sim_side, sim_entry_time = saved_state["entry_price"], saved_state["side"], saved_state["entry_time"]
                 hit, reason, sim_roe = check_sim_tp_sl(sim_entry_price, current_price, sim_side)
@@ -1106,11 +1153,23 @@ def main():
                     print(f"  >>> [SIM {reason}] {sim_roe:+.2f}% ROE")
                     price_change_pct = ((current_price - sim_entry_price) / sim_entry_price) * 100 if sim_side == "long" else ((sim_entry_price - current_price) / sim_entry_price) * 100
                     start_dt = datetime.datetime.strptime(sim_entry_time, "%Y-%m-%d %H:%M:%S")
-                    trade_result = {"mode": "SIMULATION", "entry_time": sim_entry_time, "exit_time": now_str,
-                                    "type": sim_side, "entry_price": sim_entry_price, "exit_price": current_price,
-                                    "price_change_pct": price_change_pct, "gross_roe": price_change_pct * LEVERAGE,
-                                    "rt_fee_pct": RT_FEE_ROE_PCT, "roe": sim_roe,
-                                    "duration": format_duration(start_dt, now), "reason": reason}
+                    gross_roe = price_change_pct * LEVERAGE
+                    net_roe = gross_roe - RT_FEE_ROE_PCT
+                    trade_result = {
+                        "mode": "SIMULATION",
+                        "entry_time": sim_entry_time,
+                        "exit_time": now_str,
+                        "type": sim_side,
+                        "entry_price": sim_entry_price,
+                        "exit_price": current_price,
+                        "price_change_pct": price_change_pct,
+                        "gross_roe": gross_roe,
+                        "rt_fee_pct": RT_FEE_ROE_PCT,
+                        "roe": net_roe,
+                        "duration": format_duration(start_dt, datetime.datetime.now()),
+                        "reason": reason,
+                        "strategy": f"4/4 Cond (Mom+HO Mandatory, ALL must agree) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%"
+                    }
                     write_trade_to_journal(trade_result)
                     clear_trade_state()
                     saved_state = None
@@ -1120,74 +1179,77 @@ def main():
                 time.sleep(LOOP_SLEEP)
                 continue
 
-            if saved_state and saved_state.get("mode") == "LIVE" and not pos["is_open"]:
-                print("  [recovery] Orphaned live state - clearing.")
-                clear_trade_state()
-                saved_state = None
-
-            if not pos["is_open"] and not saved_state:
-                if not sig:
-                    loop_ms = (time.perf_counter() - loop_start) * 1000
-                    log_timing("total_loop", loop_ms)
-                    time.sleep(LOOP_SLEEP)
-                    continue
-
-                if loop_count % 10 == 0:
-                    print(f"\n[{now_str}] Scanning (FLAT) | Net: {parallel_ms:.0f}ms | Calc: {compute_ms:.0f}ms")
+            # ══════════════════════════════════════════════════════════════════
+            # SIGNAL CHECKING & NEW TRADE ENTRY
+            # ══════════════════════════════════════════════════════════════════
+            if sig:
+                if loop_count % 20 == 0:
+                    print(f"\n[{now_str}] Price:{current_price:.2f} | Bal:{balance:.2f} USDT | No Position")
                     print_conditions(sig)
-                    print(f"  Balance: {balance:.2f} USDT  (trade alloc: {balance*TRADE_BALANCE_PCT:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}%)")
 
-                if sig["is_long"]:
-                    print(f"\n  *** ALL 4 CONDITIONS MET (Mom+HO MANDATORY) θ={sig['theta_deg']:.1f}° {sig['quad_label']} Forecast:{sig['forecast_price']:.2f} Trend:{sig['trend_str']} -> LONG ***")
-                    if has_sufficient_balance:
-                        print(f"  [LIVE] Executing LONG...")
-                        if execute_entry(TRADE_SYMBOL, "buy", balance, sig["price"]):
-                            sl_price, tp_price = calculate_sl_tp(sig["price"], "long")
-                            saved_state = {"active": True, "mode": "LIVE", "side": "long", 
-                                           "entry_price": sig["price"], "sl": sl_price, "tp": tp_price, "entry_time": now_str}
-                            save_trade_state(saved_state)
+                if sig["is_long"] or sig["is_short"]:
+                    side = "buy" if sig["is_long"] else "sell"
+                    side_label = "long" if sig["is_long"] else "short"
+
+                    if API_CONNECTED and has_sufficient_balance:
+                        print(f"\n  >>> SIGNAL: {side_label.upper()} @ {current_price:.2f} — Executing LIVE order...")
+                        success = execute_entry(TRADE_SYMBOL, side, balance, current_price)
+                        if success:
+                            save_trade_state({
+                                "mode": "LIVE",
+                                "side": side_label,
+                                "entry_price": current_price,
+                                "entry_time": now_str
+                            })
+                            saved_state = {
+                                "mode": "LIVE",
+                                "side": side_label,
+                                "entry_price": current_price,
+                                "entry_time": now_str
+                            }
+                            sl_price, tp_price = calculate_sl_tp(current_price, side_label)
+                            print(f"  [LIVE ENTRY] {side_label.upper()} @ {current_price:.2f} | TP:{tp_price:.2f} SL:{sl_price:.2f}")
                     else:
-                        print(f"  [SIM] LONG (low balance)")
-                        sl_price, tp_price = calculate_sl_tp(sig["price"], "long")
-                        saved_state = {"active": True, "mode": "SIMULATION", "side": "long", 
-                                       "entry_price": sig["price"], "sl": sl_price, "tp": tp_price, "entry_time": now_str}
-                        save_trade_state(saved_state)
+                        if not API_CONNECTED:
+                            print(f"\n  >>> SIGNAL: {side_label.upper()} @ {current_price:.2f} — Opening SIMULATION position...")
+                        elif not has_sufficient_balance:
+                            print(f"\n  >>> SIGNAL: {side_label.upper()} @ {current_price:.2f} — Balance too low ({balance:.2f} < {MIN_BALANCE_USDT}), opening SIMULATION position...")
+                        
+                        save_trade_state({
+                            "mode": "SIMULATION",
+                            "side": side_label,
+                            "entry_price": current_price,
+                            "entry_time": now_str
+                        })
+                        saved_state = {
+                            "mode": "SIMULATION",
+                            "side": side_label,
+                            "entry_price": current_price,
+                            "entry_time": now_str
+                        }
+                        sl_price, tp_price = calculate_sl_tp(current_price, side_label)
+                        print(f"  [SIM ENTRY] {side_label.upper()} @ {current_price:.2f} | TP:{tp_price:.2f} SL:{sl_price:.2f}")
 
-                elif sig["is_short"]:
-                    print(f"\n  *** ALL 4 CONDITIONS MET (Mom+HO MANDATORY) θ={sig['theta_deg']:.1f}° {sig['quad_label']} Forecast:{sig['forecast_price']:.2f} Trend:{sig['trend_str']} -> SHORT ***")
-                    if has_sufficient_balance:
-                        print(f"  [LIVE] Executing SHORT...")
-                        if execute_entry(TRADE_SYMBOL, "sell", balance, sig["price"]):
-                            sl_price, tp_price = calculate_sl_tp(sig["price"], "short")
-                            saved_state = {"active": True, "mode": "LIVE", "side": "short", 
-                                           "entry_price": sig["price"], "sl": sl_price, "tp": tp_price, "entry_time": now_str}
-                            save_trade_state(saved_state)
-                    else:
-                        print(f"  [SIM] SHORT (low balance)")
-                        sl_price, tp_price = calculate_sl_tp(sig["price"], "short")
-                        saved_state = {"active": True, "mode": "SIMULATION", "side": "short", 
-                                       "entry_price": sig["price"], "sl": sl_price, "tp": tp_price, "entry_time": now_str}
-                        save_trade_state(saved_state)
-
+            # ══════════════════════════════════════════════════════════════════
+            # TIMING & LOOP MAINTENANCE
+            # ══════════════════════════════════════════════════════════════════
             loop_ms = (time.perf_counter() - loop_start) * 1000
             log_timing("total_loop", loop_ms)
             
-            if time.time() - last_timing_print > 300:
+            if time.time() - last_timing_print >= 300:
                 print_timing_summary()
                 last_timing_print = time.time()
             
             time.sleep(LOOP_SLEEP)
 
         except KeyboardInterrupt:
-            print("\n[Bot] Shutting down safely.")
+            print("\n\n  [SHUTDOWN] Keyboard interrupt received.")
             print_timing_summary()
             fetcher.shutdown()
             break
         except Exception as e:
-            print(f"\n[CRITICAL ERROR] {e}")
-            import traceback
-            traceback.print_exc()
-            time.sleep(5)
+            print(f"  [LOOP ERROR] {e}")
+            time.sleep(2)
 
 if __name__ == "__main__":
     main()
