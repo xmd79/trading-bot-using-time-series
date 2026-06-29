@@ -570,16 +570,16 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     bars_ago_max = (window_len_1m - 1) - argmax_idx_1m
     
     try:
-        ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S UTC")
-        ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"], datetime.timezone.utc).strftime("%H:%M:%S UTC")
+        ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"]).strftime("%H:%M:%S")
+        ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"]).strftime("%H:%M:%S")
     except Exception:
         ts_min = ts_max = "N/A"
     
-    if bars_ago_min < bars_ago_max:
+    if bars_ago_min > bars_ago_max:
         most_recent_extreme = "ARGMIN (LOW)"
         cond_cycle_long = (current_close_1m > cycle_min_price)
         cond_cycle_short = False
-    elif bars_ago_max < bars_ago_min:
+    elif bars_ago_max > bars_ago_min:
         most_recent_extreme = "ARGMAX (HIGH)"
         cond_cycle_short = (current_close_1m < cycle_max_price)
         cond_cycle_long = False
@@ -728,7 +728,7 @@ def format_duration(start_dt, end_dt):
 def print_conditions(sig):
     f = sig["cond_flags"]
     print(f"  1. Sine (5m):  dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{f['sine_long']} S:{f['sine_short']}")
-    print(f"  2. Cycle (1m): Low@{sig['ts_min']} High@{sig['ts_max']} | Most Recent: {sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
+    print(f"  2. Cycle (1m): Low@{sig['ts_min']}={sig['cycle_min_price']:.2f}({sig['bars_ago_min']}bars) High@{sig['ts_max']}={sig['cycle_max_price']:.2f}({sig['bars_ago_max']}bars) | Recent:{sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
     print(f"  3. Mom (1m):   {sig['mom_1m']:.2f} L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
     print(f"  4. Vol (1m):   Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
     ml_fc  = sig.get("ml_forecast_price", 0.0)
