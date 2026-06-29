@@ -182,8 +182,12 @@ ANALYSIS_WINDOW_3M = 400
 KUCOIN_TAKER_FEE = 0.0006
 RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100
 
-TP_PCT = 0.025   # 2.5% price move from entry
-SL_PCT = 0.025   # 2.5% price move from entry
+# TP: gross ROE needed = target_net + fees = 10% + 3% = 13% -> price move = 13/(25*100)
+# SL: 10% ROE loss -> price move = 10/(25*100)
+_TARGET_NET_ROE_PCT = 10.0
+_TARGET_SL_ROE_PCT  = 10.0
+TP_PCT = (_TARGET_NET_ROE_PCT + KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100) / (LEVERAGE * 100)
+SL_PCT = _TARGET_SL_ROE_PCT / (LEVERAGE * 100)
 
 ATR_PERIOD = 14  # kept for signal display only (not used for TP/SL)
 
