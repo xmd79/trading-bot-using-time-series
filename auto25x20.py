@@ -77,7 +77,7 @@ del _f
 gc.collect()
 clean_trades_file()
 
-print("HFT KuCoin Bot (25x / FIXED 2.5% TP-SL / 3mMid MANDATORY) initialising...")
+print("HFT KuCoin Bot (25x / 5% net TP / 99% SL / Mom+Vol MANDATORY) initialising...")
 if _cleaned:
     print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
 del _cleaned
@@ -182,10 +182,10 @@ ANALYSIS_WINDOW_3M = 400
 KUCOIN_TAKER_FEE = 0.0006
 RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100
 
-# TP: gross ROE needed = target_net + fees = 10% + 3% = 13% -> price move = 13/(25*100)
-# SL: 10% ROE loss -> price move = 10/(25*100)
-_TARGET_NET_ROE_PCT = 10.0
-_TARGET_SL_ROE_PCT  = 10.0
+# TP: gross ROE needed = target_net + fees = 5% + 3% = 8% -> price move = 8/(25*100)
+# SL: 99% ROE loss -> price move = 99/(25*100)
+_TARGET_NET_ROE_PCT = 5.0
+_TARGET_SL_ROE_PCT  = 99.0
 TP_PCT = (_TARGET_NET_ROE_PCT + KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100) / (LEVERAGE * 100)
 SL_PCT = _TARGET_SL_ROE_PCT / (LEVERAGE * 100)
 
@@ -495,12 +495,16 @@ def compute_signals(buffer_5m, buffer_3m, buffer_1m, live_price):
     lon = [c_sine_l, c_cyc_l, c_mom_l, c_vol_l, c_mid_l]
     sho = [c_sine_s, c_cyc_s, c_mom_s, c_vol_s, c_mid_s]
     lt, st = sum(lon), sum(sho)
-    lm, sm = c_mom_l and c_vol_l and c_mid_l, c_mom_s and c_vol_s and c_mid_s
+    # Mandatory: Mom + Vol only
+    lm, sm = c_mom_l and c_vol_l, c_mom_s and c_vol_s
+    # Flexible: Sine + Cycle + 3mMid (need ≥2/3)
+    lf = sum([c_sine_l, c_cyc_l, c_mid_l])
+    sf = sum([c_sine_s, c_cyc_s, c_mid_s])
     
     return {
-        "price": live_price, "current_close": cc, "is_long": lm and lt >= 4, "is_short": sm and st >= 4,
+        "price": live_price, "current_close": cc, "is_long": lm and lf >= 2, "is_short": sm and sf >= 2,
         "cond_flags": {"sine_long": c_sine_l, "sine_short": c_sine_s, "cycle_long": c_cyc_l, "cycle_short": c_cyc_s, "mom_long": c_mom_l, "mom_short": c_mom_s, "vol_long": c_vol_l, "vol_short": c_vol_s, "mid_long": c_mid_l, "mid_short": c_mid_s},
-        "long_true_count": lt, "short_true_count": st, "long_flex": sum([c_sine_l, c_cyc_l]), "short_flex": sum([c_sine_s, c_cyc_s]),
+        "long_true_count": lt, "short_true_count": st, "long_flex": lf, "short_flex": sf,
         "long_mandatory_met": lm, "short_mandatory_met": sm,
         "dist_to_min": d_min, "dist_to_max": d_max,
         "ts_min": t_min, "ts_max": t_max, "most_recent_extreme": recent,
@@ -566,26 +570,26 @@ def format_duration(s, e):
 
 def print_conditions(sig):
     f, cc = sig["cond_flags"], sig["current_close"]
-    print(f"  1. Sine (5m):    dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{f['sine_long']} S:{f['sine_short']}")
-    print(f"  2. Cycle (1m):   Low@{sig['ts_min']} High@{sig['ts_max']} | Recent: {sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
+    print(f"  1. Sine (5m):    dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{f['sine_long']} S:{f['sine_short']} [flex]")
+    print(f"  2. Cycle (1m):   Low@{sig['ts_min']} High@{sig['ts_max']} | Recent: {sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']} [flex]")
     print(f"  3. Mom (1m):     {sig['mom_1m']:.2f} L:{f['mom_long']} S:{f['mom_short']} [MANDATORY]")
     print(f"  4. Vol (1m):     Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']} [MANDATORY]")
     mid, mn, mx = sig.get("midpoint_3m",0), sig.get("min_3m",0), sig.get("max_3m",0)
     mdp = ((cc - mid) / mid * 100) if mid > 0 else 0.0
-    print(f"  5. 3mMid:        Min:{mn:.2f} Max:{mx:.2f} Mid:{mid:.2f} | Cur:{cc:.2f} ({mdp:+.3f}%) L:{f['mid_long']} S:{f['mid_short']} [MANDATORY]")
+    print(f"  5. 3mMid:        Min:{mn:.2f} Max:{mx:.2f} Mid:{mid:.2f} | Cur:{cc:.2f} ({mdp:+.3f}%) L:{f['mid_long']} S:{f['mid_short']} [flex]")
     lt, st = sig["long_true_count"], sig["short_true_count"]
     lm, sm = sig["long_mandatory_met"], sig["short_mandatory_met"]
     lf, sf = sig["long_flex"], sig["short_flex"]
-    print(f"  ═══ LONG:{lt}/5 (Mand:{'✓' if lm else '✗'} Flex:{lf}/2) SHORT:{st}/5 (Mand:{'✓' if sm else '✗'} Flex:{sf}/2)")
-    print(f"     Rule: Mom+Vol+3mMid MANDATORY + ≥1 Flex = 4/5 -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
+    print(f"  ═══ LONG:{lt}/5 (Mand:{'✓' if lm else '✗'} Flex:{lf}/3) SHORT:{st}/5 (Mand:{'✓' if sm else '✗'} Flex:{sf}/3)")
+    print(f"     Rule: Mom+Vol MANDATORY + ≥2/3 Flex (Sine/Cycle/3mMid) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
 # ═══════════════════════════════════════════════════════════════════════════════
 def main():
-    print(f"\n{'='*70}\nHFT KuCoin Bot - 4/5 CONDITIONS (MOM+VOL+3mMID MANDATORY)\n{'='*70}")
+    print(f"\n{'='*70}\nHFT KuCoin Bot - Mom+Vol MANDATORY + ≥2/3 Flex (Sine/Cycle/3mMid)\n{'='*70}")
     print(f"Symbol: {TRADE_SYMBOL} | Leverage: {LEVERAGE}x | API: {API_CONNECTED}")
-    print(f"TP: +{TP_PCT*100:.1f}% price ({TP_PCT*LEVERAGE*100:.1f}% ROE net fees) | SL: -{SL_PCT*100:.1f}% price ({SL_PCT*LEVERAGE*100:.1f}% ROE) | R:R = 1:1\n{'='*70}\n")
+    print(f"TP: +{TP_PCT*100:.3f}% price (~{_TARGET_NET_ROE_PCT:.0f}% net ROE) | SL: -{SL_PCT*100:.3f}% price (~{_TARGET_SL_ROE_PCT:.0f}% ROE)\n{'='*70}\n")
 
     b5 = CandleBuffer(TRADE_SYMBOL, "5m", ANALYSIS_WINDOW_5M)
     b3 = CandleBuffer(TRADE_SYMBOL, "3m", ANALYSIS_WINDOW_3M)
@@ -724,7 +728,4 @@ def main():
         except KeyboardInterrupt:
             print("\n[Bot] Shutting down safely."); print_timing_summary(); fetcher.shutdown(); break
         except Exception as e:
-            print(f"\n[CRITICAL ERROR] {e}"); import traceback; traceback.print_exc(); time.sleep(5)
-
-if __name__ == "__main__":
-    main()
+            print(f"\n[CRITICA
