@@ -502,7 +502,7 @@ def compute_signals(buffer_5m, buffer_3m, buffer_1m, live_price):
     sf = sum([c_sine_s, c_cyc_s, c_mid_s])
     
     return {
-        "price": live_price, "current_close": cc, "is_long": lm and lf >= 1, "is_short": sm and sf >= 1,
+        "price": live_price, "current_close": cc, "is_long": lm and lf >= 3, "is_short": sm and sf >= 3,
         "cond_flags": {"sine_long": c_sine_l, "sine_short": c_sine_s, "cycle_long": c_cyc_l, "cycle_short": c_cyc_s, "mom_long": c_mom_l, "mom_short": c_mom_s, "vol_long": c_vol_l, "vol_short": c_vol_s, "mid_long": c_mid_l, "mid_short": c_mid_s},
         "long_true_count": lt, "short_true_count": st, "long_flex": lf, "short_flex": sf,
         "long_mandatory_met": lm, "short_mandatory_met": sm,
@@ -581,7 +581,7 @@ def print_conditions(sig):
     lm, sm = sig["long_mandatory_met"], sig["short_mandatory_met"]
     lf, sf = sig["long_flex"], sig["short_flex"]
     print(f"  ═══ LONG:{lt}/5 (Mand:{'✓' if lm else '✗'} Flex:{lf}/3) SHORT:{st}/5 (Mand:{'✓' if sm else '✗'} Flex:{sf}/3)")
-    print(f"     Rule: Mom+Vol MANDATORY + ≥1/3 Flex (Sine/Cycle/3mMid) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
+    print(f"     Rule: ALL 5 CONDITIONS MUST BE TRUE -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
