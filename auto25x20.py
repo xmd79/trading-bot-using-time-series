@@ -2,9 +2,10 @@
 HFT Auto Trading Bot — KuCoin Futures Edition (CONCURRENT OPTIMIZED)
 ====================================================================
 SIGNAL LOGIC:
-  - Mandatory: Momentum (1m), Volume (1m), AND 3m Midpoint MUST be true.
-  - Flexible: At least 1 out of 2 flexible conditions (Sine, Cycle) must be true.
-  - Total: All 3 mandatory + ≥1 flexible = 4/5 Total.
+  - ALL 6/6 CONDITIONS MUST AGREE ON THE SAME SIDE TO TRIGGER.
+  - Conditions: Sine(5m), Cycle(1m), Momentum(1m), Volume(1m), 3mMid, 45°Angle
+  - Long:  All 6 long conditions  = True
+  - Short: All 6 short conditions = True
 
 POSITION SIZING:
   - Only 5% of available balance per trade.
@@ -77,7 +78,7 @@ del _f
 gc.collect()
 clean_trades_file()
 
-print("HFT KuCoin Bot (25x / 2% net TP / 99% SL / ALL 5/5 CONDITIONS) initialising...")
+print("HFT KuCoin Bot (25x / 2% net TP / 99% SL / ALL 6/6 CONDITIONS MUST AGREE) initialising...")
 if _cleaned:
     print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
 del _cleaned
@@ -182,14 +183,12 @@ ANALYSIS_WINDOW_3M = 400
 KUCOIN_TAKER_FEE = 0.0006
 RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100
 
-# TP: gross ROE needed = target_net + fees = 5% + 3% = 8% -> price move = 8/(25*100)
-# SL: 99% ROE loss -> price move = 99/(25*100)
-_TARGET_NET_ROE_PCT = 2.0
+_TARGET_NET_ROE_PCT = 2.55
 _TARGET_SL_ROE_PCT  = 99.0
 TP_PCT = (_TARGET_NET_ROE_PCT + KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100) / (LEVERAGE * 100)
 SL_PCT = _TARGET_SL_ROE_PCT / (LEVERAGE * 100)
 
-ATR_PERIOD = 14  # kept for signal display only (not used for TP/SL)
+ATR_PERIOD = 14
 
 FULL_REFRESH_INTERVAL = 3600
 
@@ -386,8 +385,8 @@ def get_3m_midpoint_condition(candles_3m, current_price):
     if len(candles_3m) < 50: return False, False, 0.0, 0.0, 0.0, 0, 0
     closes_3m = np.array([c["close"] for c in candles_3m], dtype=float)
     len_3m = len(closes_3m)
-    argmin_idx = len_3m - 1 - int(np.argmin(closes_3m[::-1]))
-    argmax_idx = len_3m - 1 - int(np.argmax(closes_3m[::-1]))
+    argmin_idx = len_3m - 1 - int(np.argmax(closes_3m[::-1] == np.min(closes_3m)))
+    argmax_idx = len_3m - 1 - int(np.argmax(closes_3m[::-1] == np.max(closes_3m)))
     min_price, max_price = float(closes_3m[argmin_idx]), float(closes_3m[argmax_idx])
     midpoint = (min_price + max_price) / 2.0
     return current_price < midpoint, current_price > midpoint, midpoint, min_price, max_price, argmin_idx, argmax_idx
@@ -443,6 +442,22 @@ def calculate_momentum(close_arr, period=14):
     if len(close_arr) < period + 1: return np.nan
     return float(talib.MOM(close_arr, timeperiod=period)[-1])
 
+def calculate_45_degree_angle(close_prices):
+    """
+    Calculate 45-degree angle trend using simple linear regression.
+    Returns: expected_price, slope, intercept, forecast_string
+    """
+    if len(close_prices) < 10:
+        return 0.0, 0.0, 0.0, "Insufficient data for 45-degree angle"
+    
+    x = np.arange(len(close_prices), dtype=float)
+    slope, intercept = np.polyfit(x, close_prices, 1)
+    
+    # Calculate the expected trend line value for the last close price
+    expected_price = slope * (len(close_prices) - 1) + intercept
+    
+    return expected_price, slope, intercept, None
+
 def compute_signals(buffer_5m, buffer_3m, buffer_1m, live_price):
     candles_5m, candles_3m, candles_1m = buffer_5m.get_candles(), buffer_3m.get_candles(), buffer_1m.get_candles()
     c5, c1 = [x["close"] for x in candles_5m], [x["close"] for x in candles_1m]
@@ -451,66 +466,113 @@ def compute_signals(buffer_5m, buffer_3m, buffer_1m, live_price):
     arr5, arr1 = np.array(c5, dtype=float), np.array(c1, dtype=float)
     cc = live_price
     
-    # 1. Sine (5m)
+    # ── 1. Sine (5m) ── FIXED: Find most recent extrema
     w5 = arr5[-ANALYSIS_WINDOW_5M:]
     l5 = len(w5)
-    ai5_min = l5 - 1 - int(np.argmin(w5[::-1]))
-    ai5_max = l5 - 1 - int(np.argmax(w5[::-1]))
+    ai5_min = l5 - 1 - int(np.argmax(w5[::-1] == np.min(w5)))
+    ai5_max = l5 - 1 - int(np.argmax(w5[::-1] == np.max(w5)))
     d_min, d_max = scale_to_sine(arr5, ai5_min, ai5_max)
     c_sine_l, c_sine_s = d_min < d_max, d_max < d_min
     
-    # 2. Cycle (1m)
+    # ── 2. Cycle (1m) ── FIXED: Find most recent extrema correctly
     w1_candles = candles_1m[-500:]
     w1 = arr1[-500:]
     wl1 = len(w1)
-    ai1_min = wl1 - 1 - int(np.argmin(w1[::-1]))
-    ai1_max = wl1 - 1 - int(np.argmax(w1[::-1]))
+    
+    # FIXED: Find the MOST RECENT occurrence of min and max
+    ai1_min = wl1 - 1 - int(np.argmax(w1[::-1] == np.min(w1)))
+    ai1_max = wl1 - 1 - int(np.argmax(w1[::-1] == np.max(w1)))
+    
     p_min, p_max = float(w1[ai1_min]), float(w1[ai1_max])
-    bmin, bmax = (wl1 - 1) - ai1_min, (wl1 - 1) - ai1_max
+    
+    # Calculate bars since each extreme (0 = most recent bar)
+    bars_since_min = (wl1 - 1) - ai1_min
+    bars_since_max = (wl1 - 1) - ai1_max
     
     try:
         t_min = datetime.datetime.fromtimestamp(w1_candles[ai1_min]["time"]).strftime("%H:%M:%S")
         t_max = datetime.datetime.fromtimestamp(w1_candles[ai1_max]["time"]).strftime("%H:%M:%S")
     except Exception: t_min = t_max = "N/A"
     
-    if bmin > bmax:
-        recent = "ARGMIN (LOW)"; c_cyc_l, c_cyc_s = cc > p_min, False
-    elif bmax > bmin:
-        recent = "ARGMAX (HIGH)"; c_cyc_s, c_cyc_l = cc < p_max, False
+    # FIXED: Determine which extreme is MORE RECENT
+    if bars_since_min < bars_since_max:
+        # Most recent extreme is LOW -> expect price to go UP (long bias)
+        recent = "ARGMIN (LOW)"
+        c_cyc_l = cc > p_min
+        c_cyc_s = False
+    elif bars_since_max < bars_since_min:
+        # Most recent extreme is HIGH -> expect price to go DOWN (short bias)
+        recent = "ARGMAX (HIGH)"
+        c_cyc_s = cc < p_max
+        c_cyc_l = False
     else:
-        recent = "TIE"; c_cyc_l, c_cyc_s = False, False
+        recent = "TIE"
+        c_cyc_l, c_cyc_s = False, False
         
-    # 3. Mom (1m)
+    # ── 3. Momentum (1m) ──
     mom = calculate_momentum(arr1)
     if np.isnan(mom): return None
     c_mom_l, c_mom_s = mom > 0, mom < 0
     
-    # 4. Vol (1m)
+    # ── 4. Volume (1m) ──
     bull, bear = get_buy_sell_volume_perc(candles_1m)
     c_vol_l, c_vol_s = bull > bear, bear > bull
     
-    # 5. 3m Mid
+    # ── 5. 3m Midpoint ──
     c_mid_l, c_mid_s, mid, mn3, mx3, _, _ = get_3m_midpoint_condition(candles_3m, cc)
     
-    lon = [c_sine_l, c_cyc_l, c_mom_l, c_vol_l, c_mid_l]
-    sho = [c_sine_s, c_cyc_s, c_mom_s, c_vol_s, c_mid_s]
-    lt, st = sum(lon), sum(sho)
-    # Mandatory: Mom + Vol only
-    lm, sm = c_mom_l and c_vol_l, c_mom_s and c_vol_s
-    # Flexible: Sine + Cycle + 3mMid (need ≥2/3)
-    lf = sum([c_sine_l, c_cyc_l, c_mid_l])
-    sf = sum([c_sine_s, c_cyc_s, c_mid_s])
+    # ── 6. 45-Degree Angle (Linear Regression Trend) ──
+    expected_price, angle_slope, angle_intercept, angle_error = calculate_45_degree_angle(arr1)
+    
+    if angle_error:
+        angle_forecast = angle_error
+        c_angle_l, c_angle_s = False, False
+    else:
+        if cc < expected_price:
+            angle_forecast = "Bullish: Close below 45-degree angle moving towards it"
+            c_angle_l, c_angle_s = True, False
+        elif cc > expected_price:
+            angle_forecast = "Bearish: Close above 45-degree angle moving towards it"
+            c_angle_s, c_angle_l = True, False
+        else:
+            angle_forecast = "Neutral: Close at the 45-degree angle"
+            c_angle_l, c_angle_s = False, False
+    
+    # ── BUILD LONG / SHORT LISTS ──
+    long_conds  = [c_sine_l,  c_cyc_l,  c_mom_l,  c_vol_l,  c_mid_l,  c_angle_l]
+    short_conds = [c_sine_s,  c_cyc_s,  c_mom_s,  c_vol_s,  c_mid_s,  c_angle_s]
+    
+    lt = sum(long_conds)
+    st = sum(short_conds)
+    
+    # ══════════════════════════════════════════════════════════════════════════
+    # SIGNAL RULE: ALL 6/6 CONDITIONS MUST BE TRUE ON THE SAME SIDE
+    # ══════════════════════════════════════════════════════════════════════════
+    is_long  = all(long_conds)   # 6/6 True
+    is_short = all(short_conds)  # 6/6 True
     
     return {
-        "price": live_price, "current_close": cc, "is_long": lm and lf >= 3, "is_short": sm and sf >= 3,
-        "cond_flags": {"sine_long": c_sine_l, "sine_short": c_sine_s, "cycle_long": c_cyc_l, "cycle_short": c_cyc_s, "mom_long": c_mom_l, "mom_short": c_mom_s, "vol_long": c_vol_l, "vol_short": c_vol_s, "mid_long": c_mid_l, "mid_short": c_mid_s},
-        "long_true_count": lt, "short_true_count": st, "long_flex": lf, "short_flex": sf,
-        "long_mandatory_met": lm, "short_mandatory_met": sm,
+        "price": live_price, "current_close": cc, 
+        "is_long": is_long, "is_short": is_short,
+        "cond_flags": {
+            "sine_long": c_sine_l, "sine_short": c_sine_s, 
+            "cycle_long": c_cyc_l, "cycle_short": c_cyc_s, 
+            "mom_long": c_mom_l, "mom_short": c_mom_s, 
+            "vol_long": c_vol_l, "vol_short": c_vol_s, 
+            "mid_long": c_mid_l, "mid_short": c_mid_s,
+            "angle_long": c_angle_l, "angle_short": c_angle_s
+        },
+        "long_true_count": lt, "short_true_count": st,
         "dist_to_min": d_min, "dist_to_max": d_max,
         "ts_min": t_min, "ts_max": t_max, "most_recent_extreme": recent,
+        "bars_since_min": bars_since_min, "bars_since_max": bars_since_max,
         "mom_1m": mom, "bullish_perc": bull, "bearish_perc": bear,
         "midpoint_3m": mid, "min_3m": mn3, "max_3m": mx3,
-        "atr_value": calculate_atr(candles_1m, ATR_PERIOD)
+        "atr_value": calculate_atr(candles_1m, ATR_PERIOD),
+        "expected_price_45": expected_price,
+        "angle_slope": angle_slope,
+        "angle_intercept": angle_intercept,
+        "angle_forecast": angle_forecast
     }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -570,24 +632,54 @@ def format_duration(s, e):
 
 def print_conditions(sig):
     f, cc = sig["cond_flags"], sig["current_close"]
-    print(f"  1. Sine (5m):    dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{f['sine_long']} S:{f['sine_short']}")
-    print(f"  2. Cycle (1m):   Low@{sig['ts_min']} High@{sig['ts_max']} | Recent: {sig['most_recent_extreme']} | L:{f['cycle_long']} S:{f['cycle_short']}")
-    print(f"  3. Mom (1m):     {sig['mom_1m']:.2f} L:{f['mom_long']} S:{f['mom_short']}")
-    print(f"  4. Vol (1m):     Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{f['vol_long']} S:{f['vol_short']}")
-    mid, mn, mx = sig.get("midpoint_3m",0), sig.get("min_3m",0), sig.get("max_3m",0)
+    
+    # Visual indicator: checkmark or X
+    def mark(val): return "✓" if val else "✗"
+    
+    print(f"  1. Sine (5m):    dMin:{sig['dist_to_min']:.1f}% dMax:{sig['dist_to_max']:.1f}% L:{mark(f['sine_long'])} S:{mark(f['sine_short'])}")
+    
+    print(f"  2. Cycle (1m):   Low@{sig['ts_min']}({sig['bars_since_min']}bars) High@{sig['ts_max']}({sig['bars_since_max']}bars) | Recent: {sig['most_recent_extreme']} | L:{mark(f['cycle_long'])} S:{mark(f['cycle_short'])}")
+    
+    print(f"  3. Mom (1m):     {sig['mom_1m']:.2f} L:{mark(f['mom_long'])} S:{mark(f['mom_short'])}")
+    
+    print(f"  4. Vol (1m):     Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}% L:{mark(f['vol_long'])} S:{mark(f['vol_short'])}")
+    
+    mid, mn, mx = sig.get("midpoint_3m", 0), sig.get("min_3m", 0), sig.get("max_3m", 0)
     mdp = ((cc - mid) / mid * 100) if mid > 0 else 0.0
-    print(f"  5. 3mMid:        Min:{mn:.2f} Max:{mx:.2f} Mid:{mid:.2f} | Cur:{cc:.2f} ({mdp:+.3f}%) L:{f['mid_long']} S:{f['mid_short']}")
+    print(f"  5. 3mMid:        Min:{mn:.2f} Max:{mx:.2f} Mid:{mid:.2f} | Cur:{cc:.2f} ({mdp:+.3f}%) L:{mark(f['mid_long'])} S:{mark(f['mid_short'])}")
+    
+    exp_price = sig.get("expected_price_45", 0)
+    if exp_price > 0:
+        angle_diff = ((cc - exp_price) / exp_price * 100) if exp_price > 0 else 0
+        print(f"  6. 45°Angle:    Expected:{exp_price:.2f} | Cur:{cc:.2f} ({angle_diff:+.3f}%) | {sig.get('angle_forecast', 'N/A')}")
+        print(f"                 L:{mark(f['angle_long'])} S:{mark(f['angle_short'])}")
+    else:
+        print(f"  6. 45°Angle:    {sig.get('angle_forecast', 'N/A')}")
+    
     lt, st = sig["long_true_count"], sig["short_true_count"]
-    print(f"  ═══ LONG:{lt}/5 SHORT:{st}/5")
-    print(f"     Rule: ALL 5/5 CONDITIONS MUST AGREE -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
+    
+    # Build visual bar
+    long_bar  = "█" * lt + "░" * (6 - lt)
+    short_bar = "█" * st + "░" * (6 - st)
+    
+    print(f"  ═══════════════════════════════════════════════════════════════════")
+    print(f"  LONG : [{long_bar}] {lt}/6  {'<< TRIGGER >>' if sig['is_long'] else ''}")
+    print(f"  SHORT: [{short_bar}] {st}/6  {'<< TRIGGER >>' if sig['is_short'] else ''}")
+    print(f"  ═══════════════════════════════════════════════════════════════════")
+    print(f"     RULE: ALL 6/6 MUST AGREE -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN TRADING LOOP
 # ═══════════════════════════════════════════════════════════════════════════════
 def main():
-    print(f"\n{'='*70}\nHFT KuCoin Bot - ALL 5/5 CONDITIONS MUST AGREE TO TRIGGER\n{'='*70}")
+    print(f"\n{'='*70}")
+    print(f"HFT KuCoin Bot — ALL 6/6 CONDITIONS MUST AGREE TO TRIGGER")
+    print(f"{'='*70}")
     print(f"Symbol: {TRADE_SYMBOL} | Leverage: {LEVERAGE}x | API: {API_CONNECTED}")
-    print(f"TP: +{TP_PCT*100:.3f}% price (~{_TARGET_NET_ROE_PCT:.0f}% net ROE) | SL: -{SL_PCT*100:.3f}% price (~{_TARGET_SL_ROE_PCT:.0f}% ROE)\n{'='*70}\n")
+    print(f"TP: +{TP_PCT*100:.3f}% price (~{_TARGET_NET_ROE_PCT:.0f}% net ROE) | SL: -{SL_PCT*100:.3f}% price (~{_TARGET_SL_ROE_PCT:.0f}% ROE)")
+    print(f"Conditions: Sine(5m) + Cycle(1m) + Mom(1m) + Vol(1m) + 3mMid + 45°Angle")
+    print(f"Rule: ALL 6/6 must be TRUE on same side = UNANIMOUS CONSENSUS")
+    print(f"{'='*70}\n")
 
     b5 = CandleBuffer(TRADE_SYMBOL, "5m", ANALYSIS_WINDOW_5M)
     b3 = CandleBuffer(TRADE_SYMBOL, "3m", ANALYSIS_WINDOW_3M)
@@ -633,7 +725,7 @@ def main():
             cms = (time.perf_counter() - t) * 1000
             log_timing("compute_signals", cms)
 
-            # --- LIVE POSITION ---
+            # ── LIVE POSITION ──
             if pos["is_open"]:
                 roe, side, ep, mp = pos["roe_pct"], pos["side"], pos["entry_price"], pos["mark_price"]
                 sl_p = saved_state.get("sl", 0.0) if saved_state else 0.0
@@ -655,13 +747,22 @@ def main():
                     client.close_position(TRADE_SYMBOL)
                     pcp = ((mp - ep) / ep) * 100 if side == "long" else ((ep - mp) / ep) * 100
                     sdt = datetime.datetime.strptime(saved_state["entry_time"], "%Y-%m-%d %H:%M:%S")
-                    write_trade_to_journal({"mode": "LIVE", "entry_time": saved_state["entry_time"], "exit_time": now_str, "type": side, "entry_price": ep, "exit_price": mp, "sl_price": sl_p, "tp_price": tp_p, "atr_at_entry": saved_state.get("atr_at_entry", 0), "price_change_pct": pcp, "gross_roe": pcp * LEVERAGE, "rt_fee_pct": RT_FEE_ROE_PCT, "roe": roe, "duration": format_duration(sdt, datetime.datetime.now()), "reason": reason})
+                    write_trade_to_journal({
+                        "mode": "LIVE", "entry_time": saved_state["entry_time"], 
+                        "exit_time": now_str, "type": side, "entry_price": ep, 
+                        "exit_price": mp, "sl_price": sl_p, "tp_price": tp_p, 
+                        "atr_at_entry": saved_state.get("atr_at_entry", 0), 
+                        "price_change_pct": pcp, "gross_roe": pcp * LEVERAGE, 
+                        "rt_fee_pct": RT_FEE_ROE_PCT, "roe": roe, 
+                        "duration": format_duration(sdt, datetime.datetime.now()), 
+                        "reason": reason
+                    })
                     clear_trade_state(); saved_state = None
                 
                 log_timing("total_loop", (time.perf_counter() - loop_start) * 1000)
                 time.sleep(LOOP_SLEEP); continue
 
-            # --- SIMULATION POSITION ---
+            # ── SIMULATION POSITION ──
             if saved_state and saved_state.get("mode") == "SIMULATION":
                 s_ep, s_side, s_et = saved_state["entry_price"], saved_state["side"], saved_state["entry_time"]
                 s_sl, s_tp = saved_state.get("sl", 0.0), saved_state.get("tp", 0.0)
@@ -679,18 +780,27 @@ def main():
                     print(f"  >>> [SIM {reason}] {s_roe:+.2f}% ROE")
                     pcp = ((cur_p - s_ep) / s_ep) * 100 if s_side == "long" else ((s_ep - cur_p) / s_ep) * 100
                     sdt = datetime.datetime.strptime(s_et, "%Y-%m-%d %H:%M:%S")
-                    write_trade_to_journal({"mode": "SIMULATION", "entry_time": s_et, "exit_time": now_str, "type": s_side, "entry_price": s_ep, "exit_price": cur_p, "sl_price": s_sl, "tp_price": s_tp, "atr_at_entry": saved_state.get("atr_at_entry", 0), "price_change_pct": pcp, "gross_roe": pcp * LEVERAGE, "rt_fee_pct": RT_FEE_ROE_PCT, "roe": s_roe, "duration": format_duration(sdt, now), "reason": reason})
+                    write_trade_to_journal({
+                        "mode": "SIMULATION", "entry_time": s_et, 
+                        "exit_time": now_str, "type": s_side, 
+                        "entry_price": s_ep, "exit_price": cur_p, 
+                        "sl_price": s_sl, "tp_price": s_tp, 
+                        "atr_at_entry": saved_state.get("atr_at_entry", 0), 
+                        "price_change_pct": pcp, "gross_roe": pcp * LEVERAGE, 
+                        "rt_fee_pct": RT_FEE_ROE_PCT, "roe": s_roe, 
+                        "duration": format_duration(sdt, now), "reason": reason
+                    })
                     clear_trade_state(); saved_state = None
                 
                 log_timing("total_loop", (time.perf_counter() - loop_start) * 1000)
                 time.sleep(LOOP_SLEEP); continue
 
-            # --- ORPHAN CLEANUP ---
+            # ── ORPHAN CLEANUP ──
             if saved_state and saved_state.get("mode") == "LIVE" and not pos["is_open"]:
                 print("  [recovery] Orphaned live state - clearing.")
                 clear_trade_state(); saved_state = None
 
-            # --- SCANNING ---
+            # ── SCANNING ──
             if not pos["is_open"] and not saved_state:
                 if not sig:
                     log_timing("total_loop", (time.perf_counter() - loop_start) * 1000)
@@ -701,11 +811,20 @@ def main():
                     print_conditions(sig)
                     print(f"  Bal: {bal:.2f} USDT (alloc: {bal*TRADE_BALANCE_PCT:.2f})")
 
+                # ══════════════════════════════════════════════════════════════
+                # TRIGGER: is_long or is_short is ONLY True when ALL 6/6 match
+                # ══════════════════════════════════════════════════════════════
                 if sig["is_long"] or sig["is_short"]:
                     side = "long" if sig["is_long"] else "short"
-                    print(f"\n  *** 4/5 CONDITIONS MET -> {side.upper()} ***")
+                    print(f"\n  {'*'*60}")
+                    print(f"  *** ALL 6/6 CONDITIONS AGREE -> {side.upper()} ***")
+                    print(f"  {'*'*60}")
                     sl_p, tp_p, sl_r, tp_r = calculate_dynamic_sl_tp(sig["price"], side, sig["atr_value"])
-                    state_dict = {"active": True, "side": side, "entry_price": sig["price"], "sl": sl_p, "tp": tp_p, "sl_roe": sl_r, "tp_roe": tp_r, "atr_at_entry": sig["atr_value"], "entry_time": now_str}
+                    state_dict = {
+                        "active": True, "side": side, "entry_price": sig["price"], 
+                        "sl": sl_p, "tp": tp_p, "sl_roe": sl_r, "tp_roe": tp_r, 
+                        "atr_at_entry": sig["atr_value"], "entry_time": now_str
+                    }
                     
                     if has_bal:
                         state_dict["mode"] = "LIVE"
