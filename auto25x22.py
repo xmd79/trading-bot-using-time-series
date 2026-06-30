@@ -641,10 +641,6 @@ def compute_harmonic_oscillator(candles_5m, close_arr_5m, live_price,
     cur_label    = labels[confirmed_idx]
     last_label   = labels[prev_idx]
     next_label   = labels[next_idx]
-    tag          = "UP" if circuit_name == "UP" else "DN"
-    active_label = f"{tag}:{cur_label}"
-    last_full    = f"{tag}:{last_label}"
-    next_full    = f"{tag}:{next_label}"
 
     # Confirmed-quadrant phase boundaries (each EXACTLY 25% / 90° of cycle)
     quad_lo = confirmed_idx * 90.0
@@ -655,10 +651,11 @@ def compute_harmonic_oscillator(candles_5m, close_arr_5m, live_price,
     # so binary output always matches the displayed/enforced stage.
     # NOTE — INVERTED ON PURPOSE: live observation showed the raw UP/DOWN
     # circuit label moves opposite to actual price action (when this engine
-    # reads "UP" the market is actually falling, and vice versa). Labels,
-    # quadrant names, and stage tracking above are left untouched — only the
-    # final ho_long/ho_short/trend_str handed to the entry engine is flipped
-    # here so it correlates with real market direction.
+    # reads "UP" the market is actually falling, and vice versa). Quadrant
+    # NAMES (Reversal-Dip/Accumulation/Pump/... below) are left untouched —
+    # only the final ho_long/ho_short/trend_str AND the displayed circuit
+    # tag are flipped together here, so "DOWN-CYCLE" always prints next to
+    # "▼DOWN" and "UP-CYCLE" always prints next to "▲UP" — no more mismatch.
     if circuit_name == "UP":
         if confirmed_idx < 3:          # Q1u/Q2u/Q3u
             ho_long, ho_short, trend_str = False, True, "DOWN"
@@ -669,6 +666,14 @@ def compute_harmonic_oscillator(candles_5m, close_arr_5m, live_price,
             ho_long, ho_short, trend_str = True, False, "UP"
         else:                          # Q1d: down-cycle exhausted -> dip reversal
             ho_long, ho_short, trend_str = False, True, "DOWN"
+
+    # Displayed circuit tag now follows the CORRECTED trend_str, not the raw
+    # pole-selected circuit_name, so the printed cycle tag and trend arrow
+    # never disagree (e.g. never "UP-CYCLE ▼DOWN" again).
+    tag          = "UP" if trend_str == "UP" else "DN"
+    active_label = f"{tag}:{cur_label}"
+    last_full    = f"{tag}:{last_label}"
+    next_full    = f"{tag}:{next_label}"
 
     extra = {
         "quad_progress_pct":  quad_progress_pct,
