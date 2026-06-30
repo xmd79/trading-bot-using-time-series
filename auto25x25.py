@@ -553,38 +553,30 @@ def _cycle_tag_at_progress(unified_idx, quad_progress_pct):
     UP-CYCLE / DOWN-CYCLE label with the reversal quadrants (Q1u and Q4u)
     split 50/50 instead of switching the instant the quadrant is entered.
 
-    REVERSED PER LIVE FEEDBACK: the cycle that STARTS at Q1u (dip reversal)
-    is UP-CYCLE (price turning up off the bottom), and the cycle that
-    STARTS at Q4d/Q4u (top reversal) is DOWN-CYCLE (price turning down off
-    the top) — opposite of the original mapping.
+    CONFIRMED MAPPING (final):
+      Q4u-REVERSAL-TOP  (unified 3): 0%->50% still UP-CYCLE (exhausting the
+                                      prior rising energy). At 50% the
+                                      reversal is confirmed -> flips to
+                                      DOWN-CYCLE for the remaining half.
+      Q3d-DISTRIBUTION / Q2d-FALLING: always DOWN-CYCLE.
+      Q1u-REVERSAL-DIP  (unified 0): 0%->50% still DOWN-CYCLE (exhausting
+                                      the prior falling energy). At 50% the
+                                      reversal is confirmed -> flips to
+                                      UP-CYCLE for the remaining half.
+      Q2u-ACCUMULATION / Q3u-PUMP   : always UP-CYCLE.
 
-      Q1u-REVERSAL-DIP  (unified 0): first 50% of the quadrant still belongs
-                                      to the OUTGOING DOWN-CYCLE. At the 50%
-                                      mark the label flips to the NEW
-                                      UP-CYCLE for the remaining half of Q1u.
-      Q2u-ACCUMULATION / Q3u-PUMP   : always DOWN-CYCLE.
-      Q4u-REVERSAL-TOP  (unified 3): first 50% of the quadrant still belongs
-                                      to the OUTGOING DOWN-CYCLE. At the 50%
-                                      mark the label flips to UP-CYCLE for
-                                      the remaining half of Q4u.
-      Q3d-DISTRIBUTION / Q2d-FALLING: always UP-CYCLE.
-
-    Net effect (reversed from before):
+    Net effect:
       UP-CYCLE   = [Q1u 50%->100%] -> Q2u -> Q3u -> [Q4u 0%->50%]
-      DOWN-CYCLE = [Q4d 50%->100%] -> Q3d -> Q2d -> [Q1u 0%->50%]
-
-    i.e. the reversal FROM down TO up now happens at Q1u (not Q4u), and the
-    reversal FROM up TO down now happens at Q4u (not Q1u) — exactly swapped
-    relative to the previous version.
+      DOWN-CYCLE = [Q4u 50%->100%] -> Q3d -> Q2d -> [Q1u 0%->50%]
     """
     if unified_idx == 0:          # Q1u-REVERSAL-DIP
-        return "UP" if quad_progress_pct < 50.0 else "DOWN"
-    elif unified_idx in (1, 2):   # Q2u-ACCUMULATION, Q3u-PUMP
-        return "DOWN"
-    elif unified_idx == 3:        # Q4u-REVERSAL-TOP
         return "DOWN" if quad_progress_pct < 50.0 else "UP"
-    else:                          # Q3d-DISTRIBUTION, Q2d-FALLING
+    elif unified_idx in (1, 2):   # Q2u-ACCUMULATION, Q3u-PUMP
         return "UP"
+    elif unified_idx == 3:        # Q4u-REVERSAL-TOP
+        return "UP" if quad_progress_pct < 50.0 else "DOWN"
+    else:                          # Q3d-DISTRIBUTION, Q2d-FALLING
+        return "DOWN"
 
 
 def _tag_for_unified(unified_idx):
