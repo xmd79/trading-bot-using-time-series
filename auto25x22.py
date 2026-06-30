@@ -458,51 +458,31 @@ def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
 # HARMONIC OSCILLATOR — BIDIRECTIONAL DUAL CIRCUIT (Condition 4)
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# NOTE: base phase/cycle data now derives from the 5m timeframe (close_arr_5m /
-# candles_5m) instead of 1m — 1m HT_SINE was too noisy / whipped phase too fast.
-# Volume VROC nudge still reads 1m tick-level buy/sell dominance for fine nudging.
-#
-# Two independent oscillators run simultaneously, each STRICTLY divided into
-# 4 quadrants of exactly 25% of the 360° cycle each (90° per quadrant):
+# Two independent oscillators run simultaneously:
 #
 #  UP-CYCLE  (θ, driven by +sine):
-#    Q1u [0°–90°)   : Reversal-Dip     — EM exhaust LOW, dip confirmed → LONG entry
-#    Q2u [90°–180°) : Accumulation     — price rising off bottom        → LONG cont.
-#    Q3u [180°–270°): Pump / Mark-up   — ascending toward peak          → LONG cont.
-#    Q4u [270°–360°): Reversal-Top     — EM exhaust HIGH, top confirmed → cycle end
+#    Q1u [0°–90°)   : EM exhaust LOW  — dip reversal confirmed   → LONG entry
+#    Q2u [90°–180°) : Accumulation    — price rising off bottom   → LONG cont.
+#    Q3u [180°–270°): Mark-up/FOMO    — ascending toward peak     → LONG cont.
+#    Q4u [270°–360°): EM exhaust HIGH — top reversal confirmed    → cycle end
 #
 #  DOWN-CYCLE (φ, driven by –sine, i.e. inverted):
-#    Q4d [0°–90°)   : Reversal-Top     — EM exhaust HIGH, top confirmed → SHORT entry
-#    Q3d [90°–180°) : Distribution     — price falling off top          → SHORT cont.
-#    Q2d [180°–270°): Falling          — descending toward floor        → SHORT cont.
-#    Q1d [270°–360°): Reversal-Dip     — EM exhaust LOW, dip confirmed  → cycle end
+#    Q4d [0°–90°)   : EM exhaust HIGH — top reversal confirmed    → SHORT entry
+#    Q3d [90°–180°) : Distribution    — price falling off top     → SHORT cont.
+#    Q2d [180°–270°): Falling/panic   — descending toward floor   → SHORT cont.
+#    Q1d [270°–360°): EM exhaust LOW  — dip reversal confirmed    → cycle end
 #
-#  Active circuit selection (ARGMIN/ARGMAX pole, on the 5m window):
+#  Active circuit selection (ARGMIN/ARGMAX pole):
 #    recent extreme = ARGMIN (low) → UP-CYCLE  active (price bouncing up)
 #    recent extreme = ARGMAX (high)→ DOWN-CYCLE active (price falling down)
-#
-#  STAGE-ORDER ENFORCEMENT (quadrature):
-#    Each call may only advance the active circuit's stage by ONE quadrant
-#    relative to the previous call (or hold the same stage) — never skip a
-#    stage (e.g. straight from Reversal-Dip to Pump). A raw phase reading
-#    that jumps ahead more than one quadrant is clamped to "previous + 1".
-#    A full circuit flip (handled separately by the ARGMIN/ARGMAX pole
-#    switch) resets the stage tracker for the new circuit to its raw reading.
 #
 #  Volume VROC nudges phase ±15° toward the active cycle's entry quadrant.
 #  Forecast projects θ or φ forward HARMONIC_FORECAST_BARS along the active sine.
 #  Output: strictly binary — LONG xor SHORT, never both, never neither.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-HARMONIC_FORECAST_BARS = 8      # bars ahead for TP-direction forecast (5m bars)
-HARMONIC_VROC_PERIOD   = 10     # bars for Volume Rate-of-Change (1m tick bars)
-
-UP_QUAD_LABELS   = ["Q1u-REVERSAL-DIP", "Q2u-ACCUMULATION", "Q3u-PUMP", "Q4u-REVERSAL-TOP"]
-DOWN_QUAD_LABELS = ["Q4d-REVERSAL-TOP", "Q3d-DISTRIBUTION", "Q2d-FALLING", "Q1d-REVERSAL-DIP"]
-
-# Persistent stage tracker across calls — enforces sequential quadrant
-# progression (no skipping stages) within whichever circuit is active.
-_HO_STAGE_STATE = {"circuit": None, "stage_idx": 0}
+HARMONIC_FORECAST_BARS = 8      # bars ahead for TP-direction forecast
+HARMONIC_VROC_PERIOD   = 10     # bars for Volume Rate-of-Change
 
 
 def _sine_to_phase(sine_val, prev_sine_val):
@@ -514,176 +494,134 @@ def _sine_to_phase(sine_val, prev_sine_val):
         return 270.0 - raw         # descending half: 180° (top) … 360° (bottom)
 
 
-def _enforce_sequential_stage(circuit_name, raw_stage_idx):
-    """
-    Quadrature guard: only allow the active circuit's stage index (0-3) to
-    hold or advance by exactly +1 (mod 4) per call relative to the last
-    confirmed stage. A circuit switch (UP<->DOWN) resets the tracker to the
-    raw reading immediately (new cycle, no continuity constraint).
-    Returns (confirmed_stage_idx, prev_stage_idx).
-    """
-    state = _HO_STAGE_STATE
-    prev_circuit = state["circuit"]
-    prev_stage   = state["stage_idx"]
-
-    if prev_circuit != circuit_name:
-        # New circuit just became active -> accept raw reading, no clamp.
-        state["circuit"]   = circuit_name
-        state["stage_idx"] = raw_stage_idx
-        return raw_stage_idx, (prev_stage if prev_circuit is not None else raw_stage_idx)
-
-    # Same circuit: allow hold or +1 step only; clamp skips.
-    next_allowed = (prev_stage + 1) % 4
-    if raw_stage_idx == prev_stage or raw_stage_idx == next_allowed:
-        confirmed = raw_stage_idx
-    else:
-        confirmed = next_allowed   # force single sequential step forward
-
-    state["stage_idx"] = confirmed
-    return confirmed, prev_stage
-
-
-def compute_harmonic_oscillator(candles_5m, close_arr_5m, live_price,
-                                 argmin_idx_5m, argmax_idx_5m,
+def compute_harmonic_oscillator(candles_1m, close_arr_1m, live_price,
+                                 argmin_idx_1m, argmax_idx_1m,
                                  bars_ago_min, bars_ago_max,
-                                 bullish_perc, bearish_perc,
-                                 candles_1m=None):
+                                 bullish_perc, bearish_perc):
     """
-    Base data is the 5m timeframe (slower, far less noisy than 1m).
-    `candles_1m` (optional) is only used for the fine-grained volume VROC nudge.
-
     Returns:
-        ho_long          (bool)  : strictly binary
-        ho_short         (bool)  : strictly binary, always opposite of ho_long
-        theta_deg        (float) : active oscillator phase 0–360
-        forecast_price   (float) : projected price HARMONIC_FORECAST_BARS (5m) ahead
-        trend_str        (str)   : 'UP' or 'DOWN'
-        quad_label       (str)   : active quadrant label with cycle indicator
-        extra            (dict)  : quad_progress_pct, cycle_progress_pct,
-                                    last_quad_label, next_quad_label, cycle_period
+        ho_long        (bool)  : strictly binary
+        ho_short       (bool)  : strictly binary, always opposite of ho_long
+        theta_deg      (float) : active oscillator phase 0–360
+        forecast_price (float) : projected price HARMONIC_FORECAST_BARS ahead
+        trend_str      (str)   : 'UP' or 'DOWN'
+        quad_label     (str)   : active quadrant label with cycle indicator
     """
-    n = len(close_arr_5m)
+    n = len(candles_1m)
     if n < max(32, HARMONIC_VROC_PERIOD + 5):
-        return (True, False, 90.0, live_price, "UP", "UP:Q2u-ACCUMULATION",
-                {"quad_progress_pct": 0.0, "cycle_progress_pct": 25.0,
-                 "last_quad_label": "UP:Q1u-REVERSAL-DIP",
-                 "next_quad_label": "UP:Q3u-PUMP", "cycle_period": 20.0})
+        return True, False, 90.0, live_price, "UP", "UP:Q2u-ACCUMULATION"
 
-    # ── 1. COMPUTE BASE SINE ARRAYS (5m) ─────────────────────────────────────
+    # ── 1. COMPUTE BASE SINE ARRAYS ──────────────────────────────────────────
     try:
-        sine_raw, _ = talib.HT_SINE(close_arr_5m)
+        sine_raw, _ = talib.HT_SINE(close_arr_1m)
         up_sine   = np.nan_to_num(-sine_raw)   # +sine: bottom=–1, top=+1
         down_sine = np.nan_to_num(sine_raw)    # –sine: top=–1,    bottom=+1
     except Exception:
         up_sine = down_sine = np.zeros(n)
 
-    # ── 2. VOLUME VROC (fine nudge from 1m ticks if available, else neutral) ─
-    if candles_1m and len(candles_1m) >= HARMONIC_VROC_PERIOD + 1:
-        vols = np.array([c["volume"] for c in candles_1m[-HARMONIC_VROC_PERIOD-1:]], dtype=np.float64)
+    # ── 2. VOLUME VROC ───────────────────────────────────────────────────────
+    vols = np.array([c["volume"] for c in candles_1m[-HARMONIC_VROC_PERIOD-1:]], dtype=np.float64)
+    if len(vols) >= HARMONIC_VROC_PERIOD + 1:
         vroc = (float(vols[-1]) - float(vols[0])) / (float(vols[0]) + 1e-9)
     else:
         vroc = 0.0
     energy_dir = 1.0 if bullish_perc > bearish_perc else -1.0
     vol_nudge  = 15.0 * np.clip(abs(vroc), 0.0, 1.0)  # magnitude only; sign per cycle
 
-    # ── 3. CYCLE PERIOD (shared, 5m bars) ─────────────────────────────────────
+    # ── 3. CYCLE PERIOD (shared) ─────────────────────────────────────────────
     try:
-        period_arr   = talib.HT_DCPERIOD(close_arr_5m)
+        period_arr   = talib.HT_DCPERIOD(close_arr_1m)
         valid_p      = period_arr[np.isfinite(period_arr)]
         cycle_period = float(np.median(valid_p[-20:])) if len(valid_p) >= 5 else 20.0
     except Exception:
         cycle_period = 20.0
     cycle_period = max(4.0, min(cycle_period, 200.0))
 
-    window_p  = close_arr_5m[-int(cycle_period):]
+    window_p  = close_arr_1m[-int(cycle_period):]
     amplitude = (float(np.max(window_p)) - float(np.min(window_p))) / 2.0
     midline   = float(np.mean(window_p))
 
     # ── 4. UP-CYCLE OSCILLATOR (θ) ───────────────────────────────────────────
+    # Phase driven by +sine. Volume buy-dominance nudges toward Q1u (entry).
     up_cur  = float(up_sine[-1])
     up_prev = float(up_sine[-2]) if n >= 2 else up_cur
     theta_sine = _sine_to_phase(up_cur, up_prev)
-    up_vol_shift = -vol_nudge * energy_dir   # negative = toward 0° (Q1u entry)
+    # Buy energy → pull toward Q1u (0°); sell → push away from Q1u
+    up_vol_shift = -vol_nudge * energy_dir   # negative = toward 0°
     theta_deg = (theta_sine + up_vol_shift) % 360.0
+
+    if 0.0 <= theta_deg < 90.0:
+        up_label = "Q1u-DIP-REVERSAL"
+    elif 90.0 <= theta_deg < 180.0:
+        up_label = "Q2u-ACCUMULATION"
+    elif 180.0 <= theta_deg < 270.0:
+        up_label = "Q3u-MARKUP"
+    else:
+        up_label = "Q4u-CYCLE-END"
+
+    # Up-cycle forecast: project θ forward
     theta_advance = (HARMONIC_FORECAST_BARS / cycle_period) * 360.0
     theta_future  = (theta_deg + theta_advance) % 360.0
     up_forecast   = midline + amplitude * np.sin(np.radians(theta_future - 90.0))
 
     # ── 5. DOWN-CYCLE OSCILLATOR (φ) ─────────────────────────────────────────
+    # Phase driven by –sine (inverted). Sell-vol dominance nudges toward Q4d (entry).
     dn_cur  = float(down_sine[-1])
     dn_prev = float(down_sine[-2]) if n >= 2 else dn_cur
     phi_sine = _sine_to_phase(dn_cur, dn_prev)
-    dn_vol_shift = vol_nudge * energy_dir    # positive sell energy → toward 0° (Q4d entry)
+    # Sell energy → pull toward Q4d (0° on inverted); buy → push away
+    dn_vol_shift = vol_nudge * energy_dir    # positive sell energy → toward 0°
     phi_deg = (phi_sine + dn_vol_shift) % 360.0
+
+    if 0.0 <= phi_deg < 90.0:
+        dn_label = "Q4d-TOP-REVERSAL"
+    elif 90.0 <= phi_deg < 180.0:
+        dn_label = "Q3d-DISTRIBUTION"
+    elif 180.0 <= phi_deg < 270.0:
+        dn_label = "Q2d-FALLING"
+    else:
+        dn_label = "Q1d-CYCLE-END"
+
+    # Down-cycle forecast: project φ forward (on inverted sine = price descending)
     phi_advance  = (HARMONIC_FORECAST_BARS / cycle_period) * 360.0
     phi_future   = (phi_deg + phi_advance) % 360.0
     dn_forecast  = midline - amplitude * np.sin(np.radians(phi_future - 90.0))
 
-    # ── 6. ACTIVE CIRCUIT SELECTION (ARGMIN/ARGMAX pole, 5m window) ──────────
+    # ── 6. ACTIVE CIRCUIT SELECTION (ARGMIN/ARGMAX pole) ─────────────────────
+    # recent_extreme == ARGMIN → price just made a low → up-cycle is active
+    # recent_extreme == ARGMAX → price just made a high → down-cycle is active
     up_cycle_active = (bars_ago_min < bars_ago_max)   # True = up-cycle
 
     if up_cycle_active:
-        circuit_name  = "UP"
-        active_phase  = theta_deg
-        raw_stage_idx = int(theta_deg // 90.0) % 4
-        labels        = UP_QUAD_LABELS
-        forecast_price = float(np.clip(up_forecast, live_price * 0.95, live_price * 1.05))
+        active_theta   = theta_deg
+        active_label   = "UP:" + up_label
+        forecast_price = float(np.clip(up_forecast,
+                                        live_price * 0.95, live_price * 1.05))
+        # LONG only in Q1u/Q2u/Q3u; Q4u = cycle complete, flip to neutral (Mom decides)
+        if theta_deg < 270.0:
+            ho_long, ho_short = True, False
+            trend_str = "UP"
+        else:
+            # Q4u: up-cycle exhausted, but down-cycle not yet confirmed active
+            # Default to SHORT (top exhaust)
+            ho_long, ho_short = False, True
+            trend_str = "DOWN"
     else:
-        circuit_name  = "DOWN"
-        active_phase  = phi_deg
-        raw_stage_idx = int(phi_deg // 90.0) % 4
-        labels        = DOWN_QUAD_LABELS
-        forecast_price = float(np.clip(dn_forecast, live_price * 0.95, live_price * 1.05))
+        active_theta   = phi_deg
+        active_label   = "DN:" + dn_label
+        forecast_price = float(np.clip(dn_forecast,
+                                        live_price * 0.95, live_price * 1.05))
+        # SHORT only in Q4d/Q3d/Q2d; Q1d = cycle complete, flip to neutral (Mom decides)
+        if phi_deg < 270.0:
+            ho_long, ho_short = False, True
+            trend_str = "DOWN"
+        else:
+            # Q1d: down-cycle exhausted, but up-cycle not yet confirmed active
+            # Default to LONG (dip exhaust)
+            ho_long, ho_short = True, False
+            trend_str = "UP"
 
-    # ── 7. QUADRATURE STAGE GUARD — sequential progression only ─────────────
-    confirmed_idx, prev_idx = _enforce_sequential_stage(circuit_name, raw_stage_idx)
-    next_idx     = (confirmed_idx + 1) % 4
-    cur_label    = labels[confirmed_idx]
-    last_label   = labels[prev_idx]
-    next_label   = labels[next_idx]
-
-    # Confirmed-quadrant phase boundaries (each EXACTLY 25% / 90° of cycle)
-    quad_lo = confirmed_idx * 90.0
-    quad_progress_pct  = float(np.clip(((active_phase - quad_lo) / 90.0) * 100.0, 0.0, 100.0))
-    cycle_progress_pct = float(np.clip((active_phase / 360.0) * 100.0, 0.0, 100.0))
-
-    # Direction from the CONFIRMED (stage-guarded) quadrant, not raw phase,
-    # so binary output always matches the displayed/enforced stage.
-    # NOTE — INVERTED ON PURPOSE: live observation showed the raw UP/DOWN
-    # circuit label moves opposite to actual price action (when this engine
-    # reads "UP" the market is actually falling, and vice versa). Quadrant
-    # NAMES (Reversal-Dip/Accumulation/Pump/... below) are left untouched —
-    # only the final ho_long/ho_short/trend_str AND the displayed circuit
-    # tag are flipped together here, so "DOWN-CYCLE" always prints next to
-    # "▼DOWN" and "UP-CYCLE" always prints next to "▲UP" — no more mismatch.
-    if circuit_name == "UP":
-        if confirmed_idx < 3:          # Q1u/Q2u/Q3u
-            ho_long, ho_short, trend_str = False, True, "DOWN"
-        else:                          # Q4u: up-cycle exhausted -> top reversal
-            ho_long, ho_short, trend_str = True, False, "UP"
-    else:
-        if confirmed_idx < 3:          # Q4d/Q3d/Q2d
-            ho_long, ho_short, trend_str = True, False, "UP"
-        else:                          # Q1d: down-cycle exhausted -> dip reversal
-            ho_long, ho_short, trend_str = False, True, "DOWN"
-
-    # Displayed circuit tag now follows the CORRECTED trend_str, not the raw
-    # pole-selected circuit_name, so the printed cycle tag and trend arrow
-    # never disagree (e.g. never "UP-CYCLE ▼DOWN" again).
-    tag          = "UP" if trend_str == "UP" else "DN"
-    active_label = f"{tag}:{cur_label}"
-    last_full    = f"{tag}:{last_label}"
-    next_full    = f"{tag}:{next_label}"
-
-    extra = {
-        "quad_progress_pct":  quad_progress_pct,
-        "cycle_progress_pct": cycle_progress_pct,
-        "last_quad_label":    last_full,
-        "next_quad_label":    next_full,
-        "cycle_period":       cycle_period,
-    }
-
-    return ho_long, ho_short, active_phase, forecast_price, trend_str, active_label, extra
+    return ho_long, ho_short, active_theta, forecast_price, trend_str, active_label
 
 def calculate_momentum_cyclicity(close_arr, period=14, window=100):
     """
@@ -873,22 +811,12 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
     cond_45_short = above_45
 
     # ── 4. Harmonic Oscillator (Sine + Cycle + Volume fused) — MANDATORY ──────
-    # Base phase/cycle data now comes from the 5m timeframe (much less noisy
-    # than 1m); 1m candles are still passed in for the fine volume-VROC nudge.
-    last_5m_window   = close_arr_5m[-ANALYSIS_WINDOW_5M:] if len(close_arr_5m) >= ANALYSIS_WINDOW_5M else close_arr_5m
-    window_len_5m    = len(last_5m_window)
-    argmin_idx_5m    = int(np.argmin(last_5m_window))
-    argmax_idx_5m    = int(np.argmax(last_5m_window))
-    bars_ago_min_5m  = (window_len_5m - 1) - argmin_idx_5m
-    bars_ago_max_5m  = (window_len_5m - 1) - argmax_idx_5m
-
     bullish_perc, bearish_perc = get_buy_sell_volume_perc(candles_1m)
-    ho_long, ho_short, theta_deg, forecast_price, trend_str, quad_label, ho_extra = compute_harmonic_oscillator(
-        candles_5m, last_5m_window, live_price,
-        argmin_idx_5m, argmax_idx_5m,
-        bars_ago_min_5m, bars_ago_max_5m,
-        bullish_perc, bearish_perc,
-        candles_1m=candles_1m
+    ho_long, ho_short, theta_deg, forecast_price, trend_str, quad_label = compute_harmonic_oscillator(
+        candles_1m, close_arr_1m, live_price,
+        argmin_idx_1m, argmax_idx_1m,
+        bars_ago_min, bars_ago_max,
+        bullish_perc, bearish_perc
     )
     cond_ho_long  = ho_long
     cond_ho_short = ho_short
@@ -943,11 +871,6 @@ def compute_signals(buffer_5m, buffer_1m, live_price):
         "forecast_price": forecast_price,
         "trend_str":      trend_str,
         "quad_label":     quad_label,
-        "quad_progress_pct":  ho_extra["quad_progress_pct"],
-        "cycle_progress_pct": ho_extra["cycle_progress_pct"],
-        "last_quad_label":    ho_extra["last_quad_label"],
-        "next_quad_label":    ho_extra["next_quad_label"],
-        "ho_cycle_period":    ho_extra["cycle_period"],
         "bullish_perc":   bullish_perc,
         "bearish_perc":   bearish_perc,
         # Cycle data (kept for reference / journaling)
@@ -1083,18 +1006,10 @@ def print_conditions(sig):
     ql       = sig["quad_label"]          # e.g. "UP:Q2u-ACCUMULATION" or "DN:Q3d-DISTRIBUTION"
     cycle_tag = ql.split(":")[0]          # "UP" or "DN"
     quad_tag  = ql.split(":")[-1] if ":" in ql else ql
-    last_ql   = sig.get("last_quad_label", ql)
-    next_ql   = sig.get("next_quad_label", ql)
-    qpp       = sig.get("quad_progress_pct", 0.0)
-    cpp       = sig.get("cycle_progress_pct", 0.0)
 
-    print(f"  ┌─────────────────── DUAL-CIRCUIT HARMONIC STATE (5m) ────────────┐")
+    print(f"  ┌─────────────────── DUAL-CIRCUIT HARMONIC STATE ─────────────────┐")
     print(f"  │ Active: {cycle_tag}-CYCLE  {trend_arrow:<8}  Phase: {sig['theta_deg']:>6.1f}°            │")
-    print(f"  │ Last:    {last_ql:<28}                          │")
-    print(f"  │ Current: {quad_tag:<28} (each quad = 25% of cycle) │")
-    print(f"  │ Incoming:{next_ql:<28}                          │")
-    print(f"  │ Quad progress: {qpp:5.1f}%   Cycle progress: {cpp:5.1f}%               │")
-    print(f"  │ Forecast→{fc:.2f} ({fc_pct:+.3f}%)  CyclePeriod:{sig.get('ho_cycle_period',0):.1f}bars(5m){' '*10}│")
+    print(f"  │ Quadrant: {quad_tag:<28} Forecast→{fc:.2f} ({fc_pct:+.3f}%) │")
     print(f"  │ Vol: Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}%{" "*36}│")
     print(f"  └─────────────────────────────────────────────────────────────────┘")
     mom_recent = "argmax(HIGH)" if sig["mom_bars_ago_max"] < sig["mom_bars_ago_min"] else "argmin(LOW)"
