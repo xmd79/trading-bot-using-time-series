@@ -653,16 +653,22 @@ def compute_harmonic_oscillator(candles_5m, close_arr_5m, live_price,
 
     # Direction from the CONFIRMED (stage-guarded) quadrant, not raw phase,
     # so binary output always matches the displayed/enforced stage.
+    # NOTE — INVERTED ON PURPOSE: live observation showed the raw UP/DOWN
+    # circuit label moves opposite to actual price action (when this engine
+    # reads "UP" the market is actually falling, and vice versa). Labels,
+    # quadrant names, and stage tracking above are left untouched — only the
+    # final ho_long/ho_short/trend_str handed to the entry engine is flipped
+    # here so it correlates with real market direction.
     if circuit_name == "UP":
         if confirmed_idx < 3:          # Q1u/Q2u/Q3u
-            ho_long, ho_short, trend_str = True, False, "UP"
-        else:                          # Q4u: up-cycle exhausted -> top reversal
             ho_long, ho_short, trend_str = False, True, "DOWN"
+        else:                          # Q4u: up-cycle exhausted -> top reversal
+            ho_long, ho_short, trend_str = True, False, "UP"
     else:
         if confirmed_idx < 3:          # Q4d/Q3d/Q2d
-            ho_long, ho_short, trend_str = False, True, "DOWN"
-        else:                          # Q1d: down-cycle exhausted -> dip reversal
             ho_long, ho_short, trend_str = True, False, "UP"
+        else:                          # Q1d: down-cycle exhausted -> dip reversal
+            ho_long, ho_short, trend_str = False, True, "DOWN"
 
     extra = {
         "quad_progress_pct":  quad_progress_pct,
