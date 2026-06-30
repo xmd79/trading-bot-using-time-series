@@ -1,2405 +1,1335 @@
-##################################################
-##################################################
+"""
+HFT Auto Trading Bot — KuCoin Futures Edition (CONCURRENT OPTIMIZED)
+====================================================================
+SIGNAL LOGIC:
+  - Mandatory: Momentum (1m), Volume (1m), AND ML Forecast MUST be true for the direction.
+  - ML Forecast (1m): forecast_price > current_close → LONG allowed;
+                      forecast_price < current_close → SHORT allowed.
+  - Flexible: At least 4 out of 5 total conditions must be true for the direction.
+  - (Since Mom + Vol = 2 mandatory true, you only need 1 more from Sine/Cycle).
 
-# Start code:
+POSITION SIZING:
+  - Only 5% of available balance is used per trade.
+  - Remaining 95% stays untouched in the account.
 
-print()
+25x Leverage
+TP: 2.55% NET Profit (5.55% Gross ROE after 3.0% RT fee deduction)
+SL: -50% ROE
+"""
 
-##################################################
-##################################################
-
-print("Init code: ")
-print()
-
-##################################################
-##################################################
-
-print("Test")
-print()
-
-##################################################
-##################################################
-
-# Import modules:
-
-import math
 import time
-import numpy as np
-import hashlib
-import requests
 import hmac
-import talib
 import json
+import base64
+import hashlib
 import datetime
-from datetime import timedelta
-from decimal import Decimal
-import decimal
-import random
-import statistics
-from statistics import mean
-import scipy.fftpack as fftpack
+import os
+import requests
+import numpy as np
+import talib
 import gc
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from discord_webhook import DiscordWebhook
+# ═══════════════════════════════════════════════════════════════════════════════
+# TIMING UTILITIES
+# ═══════════════════════════════════════════════════════════════════════════════
 
-##################################################
-##################################################
+timing_stats = {}
 
-# binance module imports
-from binance.client import Client as BinanceClient
-from binance.exceptions import BinanceAPIException, BinanceOrderException
-from binance.enums import *
+def log_timing(section, elapsed_ms):
+    if section not in timing_stats:
+        timing_stats[section] = []
+    timing_stats[section].append(elapsed_ms)
+    if len(timing_stats[section]) > 30:
+        timing_stats[section].pop(0)
 
-##################################################
-##################################################
+def print_timing_summary():
+    print(f"\n  ┌────────────────────── PERFORMANCE SUMMARY ──────────────────────┐")
+    for section, values in timing_stats.items():
+        if values:
+            avg = sum(values) / len(values)
+            last = values[-1]
+            mn = min(values)
+            mx = max(values)
+            print(f"  │ {section:<22} avg:{avg:>6.0f}ms min:{mn:>5.0f}ms max:{mx:>6.0f}ms │")
+    total_avg = sum(timing_stats.get("total_loop", [1000])) / max(1, len(timing_stats.get("total_loop", [1])))
+    print(f"  │ {'LOOP FREQUENCY':<22} ~{1000/max(1,total_avg):>5.1f} loops/sec{' '*25} │")
+    print(f"  └─────────────────────────────────────────────────────────────────┘\n")
 
-# Load credentials from file
-with open("credentials.txt", "r") as f:
-    lines = f.readlines()
-    api_key = lines[0].strip()
-    api_secret = lines[1].strip()
+# ═══════════════════════════════════════════════════════════════════════════════
+# FILE SETUP
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# Instantiate Binance client
-client = BinanceClient(api_key, api_secret)
+TRADE_STATE_FILE = "trade_state.json"
+TRADES_LOG_FILE = "trades.txt"
+ANALYTICS_FILE = "analytics.json"
 
-##################################################
-##################################################
+def clean_trades_file():
+    try:
+        with open(TRADES_LOG_FILE, "w", encoding="utf-8") as f:
+            f.write("")
+        print(f"  [file] {TRADES_LOG_FILE} cleaned/created")
+    except Exception as e:
+        print(f"  [file] error cleaning {TRADES_LOG_FILE}: {e}")
 
-# Define a function to get the account balance in BUSD
+_cleaned = []
+for _f in [TRADE_STATE_FILE, ANALYTICS_FILE]:
+    try:
+        if os.path.exists(_f):
+            os.remove(_f)
+            _cleaned.append(_f)
+    except Exception:
+        pass
+del _f
+gc.collect()
+clean_trades_file()
 
-def get_account_balance():
-    accounts = client.futures_account_balance()
-    for account in accounts:
-        if account['asset'] == 'USDT':
-            bUSD_balance = float(account['balance'])
-            return bUSD_balance
+print("HFT KuCoin Bot (25x / 4-ALL-AGREE HARMONIC LOGIC) initialising...")
+if _cleaned:
+    print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
+del _cleaned
 
-# Get the USDT balance of the futures account
-bUSD_balance = float(get_account_balance())
+# ═══════════════════════════════════════════════════════════════════════════════
+# KUCOIN FUTURES REST CLIENT
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# Print account balance
-print("USDT Futures balance:", bUSD_balance)
-print()
+KUCOIN_FUTURES_BASE = "https://api-futures.kucoin.com"
 
-##################################################
-##################################################
+_http_session = requests.Session()
+_http_session.headers.update({"Connection": "keep-alive"})
 
-# Define Binance client reading api key and secret from local file:
+def _kucoin_sign(api_secret, timestamp, method, endpoint, body=""):
+    msg = timestamp + method.upper() + endpoint + body
+    return base64.b64encode(
+        hmac.new(api_secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).digest()
+    ).decode("utf-8")
 
-def get_binance_client():
-    # Read credentials from file    
-    with open("credentials.txt", "r") as f:   
-         lines = f.readlines()
-         api_key = lines[0].strip()  
-         api_secret = lines[1].strip()  
-          
-    # Instantiate client        
-    client = BinanceClient(api_key, api_secret)
-          
-    return client
+def _sign_passphrase(api_secret, passphrase):
+    return base64.b64encode(
+        hmac.new(api_secret.encode("utf-8"), passphrase.encode("utf-8"), hashlib.sha256).digest()
+    ).decode("utf-8")
 
-# Call the function to get the client  
-client = get_binance_client()
+class KuCoinFuturesClient:
+    def __init__(self, api_key, api_secret, api_passphrase):
+        self.api_key = api_key
+        self.api_secret = api_secret
+        self._signed_passphrase = _sign_passphrase(api_secret, api_passphrase)
+        self.session = _http_session
 
-##################################################
-##################################################
+    def _headers(self, method, signed_endpoint, body=""):
+        ts = str(int(time.time() * 1000))
+        sign = _kucoin_sign(self.api_secret, ts, method, signed_endpoint, body)
+        return {
+            "KC-API-KEY": self.api_key, "KC-API-SIGN": sign, "KC-API-TIMESTAMP": ts,
+            "KC-API-PASSPHRASE": self._signed_passphrase, "KC-API-KEY-VERSION": "2",
+            "Content-Type": "application/json",
+        }
 
-# Initialize variables for tracking trade state:
+    def get(self, endpoint, params=None, timeout=5):
+        if params:
+            qs = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+            signed_path = f"{endpoint}?{qs}"
+        else:
+            signed_path = endpoint
+        url = KUCOIN_FUTURES_BASE + signed_path
+        hdrs = self._headers("GET", signed_path)
+        resp = self.session.get(url, headers=hdrs, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
 
-TRADE_SYMBOL = "BTCUSDT"
+    def post(self, endpoint, payload, timeout=5):
+        body = json.dumps(payload, separators=(",", ":"))
+        url = KUCOIN_FUTURES_BASE + endpoint
+        hdrs = self._headers("POST", endpoint, body)
+        resp = self.session.post(url, headers=hdrs, data=body, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
 
-##################################################
-##################################################
+    def get_account_overview(self):
+        return self.get("/api/v1/account-overview", {"currency": "USDT"})
+    
+    def get_klines(self, symbol, granularity, start_ms=None, end_ms=None):
+        params = {"symbol": symbol, "granularity": granularity}
+        if start_ms: params["from"] = start_ms
+        if end_ms: params["to"] = end_ms
+        return self.get("/api/v1/kline/query", params).get("data", [])
+    
+    def get_ticker(self, symbol):
+        return self.get("/api/v1/ticker", {"symbol": symbol})
+    
+    def get_position(self, symbol):
+        return self.get("/api/v1/position", {"symbol": symbol})
+    
+    def place_order(self, symbol, side, size, leverage):
+        payload = {
+            "clientOid": hashlib.md5(f"{time.time()}{side}".encode()).hexdigest(),
+            "symbol": symbol, "side": side, "type": "market", 
+            "size": size, "leverage": str(leverage)
+        }
+        return self.post("/api/v1/orders", payload)
+    
+    def close_position(self, symbol):
+        payload = {
+            "clientOid": hashlib.md5(str(time.time()).encode()).hexdigest(),
+            "symbol": symbol, "type": "market", "closeOrder": True
+        }
+        return self.post("/api/v1/orders", payload)
 
-# Define timeframes and get candles:
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONFIG & CREDENTIALS
+# ═══════════════════════════════════════════════════════════════════════════════
 
-timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
+TRADE_SYMBOL = "XBTUSDTM"
+LEVERAGE = 25
+LOOP_SLEEP = 0.5
+MIN_BALANCE_USDT = 5.0
+TRADE_BALANCE_PCT = 0.05          # Use only 5% of balance per trade
 
-def get_candles(symbol, timeframes):
-    candles = []
-    for timeframe in timeframes:
-        limit = 10000  # default limit
-        tf_value = int(timeframe[:-1])  # extract numeric value of timeframe
-        if tf_value >= 4:  # check if timeframe is 4h or above
-            limit = 20000  # increase limit for 4h timeframe and above
-        klines = client.get_klines(
-            symbol=symbol,
-            interval=timeframe,
-            limit=limit
-        )
-        # Convert klines to candle dict
-        for k in klines:
-            candle = {
-                "time": k[0] / 1000,
+ML_LOOKBACK = 100                  # Bars used for ML forecast feature window
+
+ANALYSIS_WINDOW_5M = 1200 
+ANALYSIS_WINDOW_1M = 500
+
+KUCOIN_TAKER_FEE = 0.0006
+RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100
+NET_PROFIT_ROE = 2.55                                  
+TAKE_PROFIT_ROE = NET_PROFIT_ROE + RT_FEE_ROE_PCT      
+STOP_LOSS_ROE = -99.0                                  
+
+TP_PRICE_PCT = TAKE_PROFIT_ROE / LEVERAGE / 100.0
+SL_PRICE_PCT = abs(STOP_LOSS_ROE) / LEVERAGE / 100.0
+
+FULL_REFRESH_INTERVAL = 3600
+
+try:
+    with open("credentials_kucoin.txt", "r") as _f:
+        _lines = _f.readlines()
+        _API_KEY, _API_SECRET, _API_PASSPHRASE = _lines[0].strip(), _lines[1].strip(), _lines[2].strip()
+    client = KuCoinFuturesClient(_API_KEY, _API_SECRET, _API_PASSPHRASE)
+    API_CONNECTED = True
+except Exception as e:
+    print(f"  [WARN] API credentials not found or invalid: {e}\n  [WARN] Running in SIMULATION-ONLY mode")
+    client, API_CONNECTED = None, False
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CANDLE BUFFER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class CandleBuffer:
+    def __init__(self, symbol, timeframe, max_candles=1200):
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.max_candles = max_candles
+        self.candles = []
+        self.last_full_refresh = 0
+        self.granularity = int(timeframe[0])
+        self.duration_ms = self.granularity * 60 * 1000
+        self.lock = Lock()
+        
+    def _parse_kline(self, k):
+        try:
+            return {
+                "time": int(k[0]) / 1000,
                 "open": float(k[1]),
                 "high": float(k[2]),
                 "low": float(k[3]),
                 "close": float(k[4]),
-                "volume": float(k[5]),
-                "timeframe": timeframe
+                "volume": float(k[5])
             }
-            candles.append(candle)
-    return candles
+        except (IndexError, TypeError, ValueError):
+            return None
+    
+    def initialize(self, client_obj):
+        if not API_CONNECTED:
+            return False
+        with self.lock:
+            print(f"  [Buffer:{self.timeframe}] Fetching {self.max_candles} candles (one-time)...")
+            self.candles = []
+            now_ms = int(time.time() * 1000)
+            limit = 200
+            num_requests = (self.max_candles + limit - 1) // limit
+            
+            for i in range(num_requests):
+                end_ms = now_ms - (i * limit * self.duration_ms)
+                start_ms = end_ms - (limit * self.duration_ms)
+                try:
+                    klines = client_obj.get_klines(self.symbol, self.granularity, start_ms=start_ms, end_ms=end_ms)
+                    for k in reversed(klines):
+                        candle = self._parse_kline(k)
+                        if candle:
+                            self.candles.append(candle)
+                except Exception as e:
+                    print(f"  [Buffer:{self.timeframe}] Init error batch {i}: {e}")
+            
+            self._deduplicate()
+            self.candles = self.candles[-self.max_candles:]
+            self.last_full_refresh = time.time()
+            print(f"  [Buffer:{self.timeframe}] Ready: {len(self.candles)} candles")
+            return len(self.candles) >= 50
+    
+    def _deduplicate(self):
+        seen_times = set()
+        unique = []
+        for c in reversed(self.candles):
+            if c["time"] not in seen_times:
+                seen_times.add(c["time"])
+                unique.append(c)
+        self.candles = list(reversed(unique))
+    
+    def update(self, client_obj, fetch_limit=3):
+        if not API_CONNECTED or not self.candles:
+            return 0
+        with self.lock:
+            now_ms = int(time.time() * 1000)
+            end_ms = now_ms
+            start_ms = end_ms - (fetch_limit * self.duration_ms)
+            
+            new_candles = []
+            try:
+                klines = client_obj.get_klines(self.symbol, self.granularity, start_ms=start_ms, end_ms=end_ms)
+                for k in klines:
+                    candle = self._parse_kline(k)
+                    if candle:
+                        new_candles.append(candle)
+            except Exception:
+                return 0
+            
+            if self.candles:
+                last_time = self.candles[-1]["time"]
+                new_to_add = [c for c in new_candles if c["time"] > last_time]
+            else:
+                new_to_add = new_candles
+            
+            if new_to_add:
+                self.candles.extend(new_to_add)
+                self.candles = self.candles[-self.max_candles:]
+            
+            return len(new_to_add)
+    
+    def needs_full_refresh(self):
+        if not self.last_full_refresh:
+            return True
+        return (time.time() - self.last_full_refresh) > FULL_REFRESH_INTERVAL
+    
+    def get_closes(self):
+        with self.lock:
+            return [c["close"] for c in self.candles]
+    
+    def get_candles(self):
+        with self.lock:
+            return self.candles.copy()
+    
+    def is_ready(self, min_candles=50):
+        with self.lock:
+            return len(self.candles) >= min_candles
+    
+    def __len__(self):
+        with self.lock:
+            return len(self.candles)
 
-# Get candles  
-candles = get_candles(TRADE_SYMBOL, timeframes) 
-#print(candles)
+# ═══════════════════════════════════════════════════════════════════════════════
+# DATA HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# Organize candles by timeframe        
-candle_map = {}  
-for candle in candles:
-    timeframe = candle["timeframe"]  
-    candle_map.setdefault(timeframe, []).append(candle)
-
-#print(candle_map)
-
-##################################################
-##################################################
-
-def get_latest_candle(symbol, interval, start_time=None):
-    """Retrieve the latest candle for a given symbol and interval"""
-    if start_time is None:
-        klines = client.futures_klines(symbol=symbol, interval=interval, limit=1)
-    else:
-        klines = client.futures_klines(symbol=symbol, interval=interval, startTime=start_time, limit=1)
-    candle = {
-        "time": klines[0][0],
-        "open": float(klines[0][1]),
-        "high": float(klines[0][2]),
-        "low": float(klines[0][3]),
-        "close": float(klines[0][4]),
-        "volume": float(klines[0][5]),
-        "timeframe": interval
-    }
-    return candle
-
-##################################################
-##################################################
-
-# Get current price as <class 'float'>
+def get_account_balance():
+    if not API_CONNECTED: return 0.0
+    try: return float(client.get_account_overview()["data"]["availableBalance"])
+    except Exception: return 0.0
 
 def get_price(symbol):
+    if not API_CONNECTED: return 0.0
+    try: return float(client.get_ticker(symbol)["data"]["price"])
+    except Exception: return 0.0
+
+def get_position_info(symbol):
+    empty = {"is_open": False, "roe_pct": 0.0, "entry_price": 0.0, "mark_price": 0.0, "side": None, "size": 0}
+    if not API_CONNECTED: return empty
     try:
-        url = "https://fapi.binance.com/fapi/v1/ticker/price"
-        params = {
-            "symbol": symbol 
-            }
-        response = requests.get(url, params=params)
-        data = response.json()
-        if "price" in data:
-            price = float(data["price"])
+        data = client.get_position(symbol).get("data", {})
+        size = float(data.get("currentQty", 0) or 0)
+        if size == 0: return empty
+        upnl, margin = float(data.get("unrealisedPnl", 0) or 0), float(data.get("posMargin", 0) or 0)
+        return {"is_open": True, "side": "long" if size > 0 else "short",
+                "entry_price": float(data.get("avgEntryPrice", 0)), "mark_price": float(data.get("markPrice", 0)), 
+                "roe_pct": (upnl / margin * 100) if margin else 0.0, "size": size}
+    except Exception: return empty
+
+def get_buy_sell_volume_perc(candles):
+    buy_vol = sell_vol = 0.0
+    for c in candles:
+        if c["close"] >= c["open"]: 
+            buy_vol += c["volume"]
+        else: 
+            sell_vol += c["volume"]
+    total_vol = buy_vol + sell_vol
+    if total_vol == 0: return 50.0, 50.0
+    return (buy_vol / total_vol) * 100.0, (sell_vol / total_vol) * 100.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONCURRENT DATA FETCHER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ConcurrentDataFetcher:
+    def __init__(self, buffer_5m, buffer_1m, symbol, max_workers=5):
+        self.buffer_5m = buffer_5m
+        self.buffer_1m = buffer_1m
+        self.symbol = symbol
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        
+    def fetch_all_parallel(self, do_full_refresh=False):
+        futures = {}
+        results = {
+            "price": 0.0,
+            "balance": 0.0,
+            "position": {"is_open": False, "roe_pct": 0.0, "entry_price": 0.0, 
+                        "mark_price": 0.0, "side": None, "size": 0},
+            "new_5m": 0,
+            "new_1m": 0,
+            "times": {}
+        }
+        
+        t0 = time.perf_counter()
+        
+        if do_full_refresh or self.buffer_5m.needs_full_refresh():
+            futures["5m"] = self.executor.submit(self._full_refresh_buffer, self.buffer_5m)
         else:
-            raise KeyError("price key not found in API response")
-        return price      
-    except (BinanceAPIException, KeyError) as e:
-        print(f"Error fetching price for {symbol}: {e}")
-        return 0
-
-price = get_price("BTCUSDT")
-
-print(price)
-
-print()
-
-##################################################
-##################################################
-
-# Get entire list of close prices as <class 'list'> type
-def get_close(timeframe):
-    closes = []
-    candles = candle_map[timeframe]
-
-    for c in candles:
-        close = c['close']
-        if not np.isnan(close):
-            closes.append(close)
-
-    # Append current price to the list of closing prices
-    current_price = get_price(TRADE_SYMBOL)
-    closes.append(current_price)
-
-    return closes
-
-close = get_close('1m')
-#print(close)
-
-##################################################
-##################################################
-
-# Get entire list of close prices as <class 'list'> type
-
-def get_closes(timeframe):
-    closes = []
-    candles = candle_map[timeframe]
-    
-    for c in candles:
-        close = c['close']
-        if not np.isnan(close):     
-            closes.append(close)
-            
-    return closes
-
-closes = get_closes('1m')
-
-#print(closes)
-
-print()
-
-##################################################
-##################################################
-
-# Scale current close price to sine wave       
-def scale_to_sine(timeframe):  
-  
-    close_prices = np.array(get_close(timeframe))
-  
-    # Get last close price 
-    current_close = close_prices[-1]      
+            futures["5m"] = self.executor.submit(self.buffer_5m.update, client, 3)
         
-    # Calculate sine wave        
-    sine_wave, leadsine = talib.HT_SINE(close_prices)
-            
-    # Replace NaN values with 0        
-    sine_wave = np.nan_to_num(sine_wave)
-    sine_wave = -sine_wave
+        if do_full_refresh or self.buffer_1m.needs_full_refresh():
+            futures["1m"] = self.executor.submit(self._full_refresh_buffer, self.buffer_1m)
+        else:
+            futures["1m"] = self.executor.submit(self.buffer_1m.update, client, 3)
         
-    # Get the sine value for last close      
-    current_sine = sine_wave[-1]
-            
-    # Calculate the min and max sine           
-    sine_wave_min = np.min(sine_wave)        
-    sine_wave_max = np.max(sine_wave)
-
-    # Calculate % distances            
-    dist_min, dist_max = [], []
- 
-    for close in close_prices:    
-        # Calculate distances as percentages        
-        dist_from_close_to_min = ((current_sine - sine_wave_min) /  
-                           (sine_wave_max - sine_wave_min)) * 100            
-        dist_from_close_to_max = ((sine_wave_max - current_sine) / 
-                           (sine_wave_max - sine_wave_min)) * 100
+        futures["price"] = self.executor.submit(get_price, self.symbol)
+        futures["balance"] = self.executor.submit(get_account_balance)
+        futures["position"] = self.executor.submit(get_position_info, self.symbol)
+        
+        for name, future in futures.items():
+            try:
+                t_start = time.perf_counter()
+                result = future.result(timeout=10)
+                t_elapsed = (time.perf_counter() - t_start) * 1000
+                results["times"][name] = t_elapsed
                 
-        dist_min.append(dist_from_close_to_min)       
-        dist_max.append(dist_from_close_to_max)
-
-    return dist_from_close_to_min, dist_from_close_to_max, current_sine
-      
-# Iterate over each timeframe and call the scale_to_sine function
-for timeframe in timeframes:
-    dist_from_close_to_min, dist_from_close_to_max, current_sine = scale_to_sine(timeframe)
-    
-    # Print the results for each timeframe
-    print(f"For {timeframe} timeframe:")
-    print(f"Distance to min: {dist_from_close_to_min:.2f}%")
-    print(f"Distance to max: {dist_from_close_to_max:.2f}%")
-    print(f"Current Sine value: {current_sine}\n")
-
-print()
-
-##################################################
-##################################################
-
-def calculate_thresholds(close_prices, period=14, minimum_percentage=3, maximum_percentage=3, range_distance=0.05):
-    """
-    Calculate thresholds and averages based on min and max percentages. 
-    """
-  
-    # Get min/max close    
-    min_close = np.nanmin(close_prices)
-    max_close = np.nanmax(close_prices)
-    
-    # Convert close_prices to numpy array
-    close_prices = np.array(close_prices)
-    
-    # Calculate momentum
-    momentum = talib.MOM(close_prices, timeperiod=period)
-    
-    # Get min/max momentum    
-    min_momentum = np.nanmin(momentum)   
-    max_momentum = np.nanmax(momentum)
-    
-    # Calculate custom percentages 
-    min_percentage_custom = minimum_percentage / 100  
-    max_percentage_custom = maximum_percentage / 100
-
-    # Calculate thresholds       
-    min_threshold = np.minimum(min_close - (max_close - min_close) * min_percentage_custom, close_prices[-1])
-    max_threshold = np.maximum(max_close + (max_close - min_close) * max_percentage_custom, close_prices[-1])
-
-    # Calculate range of prices within a certain distance from the current close price
-    range_price = np.linspace(close_prices[-1] * (1 - range_distance), close_prices[-1] * (1 + range_distance), num=50)
-
-    # Filter close prices
-    with np.errstate(invalid='ignore'):
-        filtered_close = np.where(close_prices < min_threshold, min_threshold, close_prices)      
-        filtered_close = np.where(filtered_close > max_threshold, max_threshold, filtered_close)
-        
-    # Calculate avg    
-    avg_mtf = np.nanmean(filtered_close)
-
-    # Get current momentum       
-    current_momentum = momentum[-1]
-
-    # Calculate % to min/max momentum    
-    with np.errstate(invalid='ignore', divide='ignore'):
-        percent_to_min_momentum = ((max_momentum - current_momentum) /   
-                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan               
-
-        percent_to_max_momentum = ((current_momentum - min_momentum) / 
-                                   (max_momentum - min_momentum)) * 100 if max_momentum - min_momentum != 0 else np.nan
- 
-    # Calculate combined percentages              
-    percent_to_min_combined = (minimum_percentage + percent_to_min_momentum) / 2         
-    percent_to_max_combined = (maximum_percentage + percent_to_max_momentum) / 2
-      
-    # Combined momentum signal     
-    momentum_signal = percent_to_max_combined - percent_to_min_combined
-
-    return min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
-
-
-# Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
-min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-
-print("Momentum signal:", momentum_signal)
-print()
-
-print("Minimum threshold:", min_threshold)
-print("Maximum threshold:", max_threshold)
-print("Average MTF:", avg_mtf)
-
-#print("Range of prices within distance from current close price:")
-#print(range_price[-1])
-
-# Determine which threshold is closest to the current close
-closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - close[-1]))
-
-if closest_threshold == min_threshold:
-    print("The last minimum value is closest to the current close.")
-elif closest_threshold == max_threshold:
-    print("The last maximum value is closest to the current close.")
-else:
-    print("No threshold value found.")
-
-print()
-
-
-##################################################
-##################################################
-
-def get_momentum(timeframe):
-    """Calculate momentum for a single timeframe"""
-    # Get candle data               
-    candles = candle_map[timeframe][-100:]  
-    # Calculate momentum using talib MOM
-    momentum = talib.MOM(np.array([c["close"] for c in candles]), timeperiod=14)
-    return momentum[-1]
-
-# Calculate momentum for each timeframe
-momentum_values = {}
-for timeframe in timeframes:
-    momentum = get_momentum(timeframe)
-    momentum_values[timeframe] = momentum
-    print(f"Momentum for {timeframe}: {momentum}")
-
-# Convert momentum to a normalized scale and determine if it's positive or negative
-normalized_momentum = {}
-for timeframe, momentum in momentum_values.items():
-    normalized_value = (momentum + 100) / 2  # Normalize to a scale between 0 and 100
-    normalized_momentum[timeframe] = normalized_value
-    print(f"Normalized Momentum for {timeframe}: {normalized_value:.2f}%")
-
-# Calculate dominant ratio
-positive_count = sum(1 for value in normalized_momentum.values() if value > 50)
-negative_count = len(normalized_momentum) - positive_count
-
-print(f"Positive momentum timeframes: {positive_count}/{len(normalized_momentum)}")
-print(f"Negative momentum timeframes: {negative_count}/{len(normalized_momentum)}")
-
-if positive_count > negative_count:
-    print("Overall dominant momentum: Positive")
-elif positive_count < negative_count:
-    print("Overall dominant momentum: Negative")
-else:
-    print("Overall dominant momentum: Balanced")
-
-print()
-
-##################################################
-##################################################
-
-# Define the current time and close price
-current_time = datetime.datetime.now()
-current_close = closes[-1]
-
-print("Current local Time is now at: ", current_time)
-print("Current close price is at : ", current_close)
-
-print()
-
-
-##################################################
-##################################################
-
-def get_closes_last_n_minutes(interval, n):
-    """Generate mock closing prices for the last n minutes"""
-    closes = []
-    for i in range(n):
-        closes.append(random.uniform(0, 100))
-    return closes
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-import scipy.fftpack as fftpack
-import datetime
-
-def get_target(closes, n_components, target_distance=0.01):
-    # Calculate FFT of closing prices
-    fft = fftpack.rfft(closes) 
-    frequencies = fftpack.rfftfreq(len(closes))
-    
-    # Sort frequencies by magnitude and keep only the top n_components 
-    idx = np.argsort(np.abs(fft))[::-1][:n_components]
-    top_frequencies = frequencies[idx]
-    
-    # Filter out the top frequencies and reconstruct the signal
-    filtered_fft = np.zeros_like(fft)
-    filtered_fft[idx] = fft[idx]
-    filtered_signal = fftpack.irfft(filtered_fft)
-    
-    # Calculate the target price as the next value after the last closing price, plus a small constant
-    current_close = closes[-1]
-    target_price = filtered_signal[-1] + target_distance
-    
-    # Get the current time           
-    current_time = datetime.datetime.now()
-    
-    # Calculate the market mood based on the predicted target price and the current close price
-    diff = target_price - current_close
-    if diff > 0:           
-        market_mood = "Bullish"
-    else:
-        market_mood = "Bearish"
-    
-    # Calculate fast cycle targets
-    fastest_target = current_close + target_distance / 2
-    fast_target1 = current_close + target_distance / 4
-    fast_target2 = current_close + target_distance / 8
-    fast_target3 = current_close + target_distance / 16
-    fast_target4 = current_close + target_distance / 32
-    
-    # Calculate other targets
-    target1 = target_price + np.std(closes) / 16
-    target2 = target_price + np.std(closes) / 8
-    target3 = target_price + np.std(closes) / 4
-    target4 = target_price + np.std(closes) / 2
-    target5 = target_price + np.std(closes)
-    
-    # Calculate the stop loss and target levels
-    entry_price = closes[-1]    
-    stop_loss = entry_price - 3 * np.std(closes)   
-    target6 = target_price + np.std(closes)
-    target7 = target_price + 2 * np.std(closes)
-    target8 = target_price + 3 * np.std(closes)
-    target9 = target_price + 4 * np.std(closes)
-    target10 = target_price + 5 * np.std(closes)
-    
-    return current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood
-
-closes = get_closes("1m")     
-n_components = 5
-
-current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
-
-print("Current local Time is now at:", current_time)
-print("Market mood is:", market_mood)
-
-print()
-
-current_close = closes[-1]
-print("Current close price is at:", current_close)
-
-print()
-
-print("Fast target 1 is:", fast_target4)
-print("Fast target 2 is:", fast_target3)
-print("Fast target 3 is:", fast_target2)
-print("Fast target 4 is:", fast_target1)
-
-print()
-
-print("Fastest target is:", fastest_target)
-
-print()
-
-print("Target 1 is:", target1)
-print("Target 2 is:", target2)
-print("Target 3 is:", target3)
-print("Target 4 is:", target4)
-print("Target 5 is:", target5)
-
-print()
-
-##################################################
-##################################################
-
-def get_current_price():
-    url = "https://fapi.binance.com/fapi/v1/ticker/price"
-    params = {
-        "symbol": "BTCUSDT" 
-    }
-    response = requests.get(url, params=params)
-    data = response.json()
-    price = float(data["price"])
-    return price
-
-# Get the current price
-price = get_current_price()
-
-print()
-
-##################################################
-##################################################
-
-from sklearn.linear_model import LinearRegression
-
-def price_regression(close):
-    # Convert 'close' to a numpy array
-    close_data = np.array(close)
-
-    # Create timestamps based on the index (assuming each close price corresponds to a single time unit)
-    timestamps = np.arange(len(close_data))
-
-    # Fit a linear regression model
-    model = LinearRegression()
-    model.fit(timestamps.reshape(-1, 1), close_data)
-
-    # Predict future prices using the regression model
-    num_targets = 1
-    future_timestamps = np.arange(len(close_data), len(close_data) + num_targets)
-    future_prices = model.predict(future_timestamps.reshape(-1, 1))
-
-    return future_timestamps, future_prices
-
-##################################################
-##################################################
-
-def calculate_reversal_and_forecast(close):
-    # Initialize variables
-    current_reversal = None
-    next_reversal = None
-    last_reversal = None
-    forecast_dip = None
-    forecast_top = None
-    
-    # Calculate minimum and maximum values
-    min_value = np.min(close)
-    max_value = np.max(close)
-    
-    # Calculate forecast direction and price using FFT
-    fft = fftpack.rfft(close)
-    frequencies = fftpack.rfftfreq(len(close))
-    idx = np.argsort(np.abs(fft))[::-1][:10]
-    top_frequencies = frequencies[idx]
-    filtered_fft = np.zeros_like(fft)
-    filtered_fft[idx] = fft[idx]
-    filtered_signal = fftpack.irfft(filtered_fft)
-    
-    if len(close) > 1:
-        if filtered_signal[-1] > filtered_signal[-2]:
-            forecast_direction = "Up"
-            forecast_price_fft = filtered_signal[-1] + (filtered_signal[-1] - filtered_signal[-2]) * 0.5
-        else:
-            forecast_direction = "Down"
-            forecast_price_fft = filtered_signal[-1] - (filtered_signal[-2] - filtered_signal[-1]) * 0.5
-    else:
-        forecast_direction = "Neutral"
-        forecast_price_fft = close[-1]
-    
-    # Check the relationship between the last value and min/max
-    last_value = close[-1]
-    if min_value <= last_value <= max_value:
-        if last_value == min_value:
-            current_reversal = "DIP"
-            next_reversal = "TOP"
-        elif last_value == max_value:
-            current_reversal = "TOP"
-            next_reversal = "DIP"
-    else:
-        forecast_direction = "Up" if close[-1] > close[-2] else "Down"
-        forecast_price_fft = price_regression(close)
-    
-    # Initialize variables for last reversal and distance
-    distance = None
-    last_reversal = None
-    
-    # Calculate the distance between the last reversal and the last value
-    reversal_idx = None
-    for i in range(len(close) - 2, -1, -1):
-        if current_reversal == "DIP" and close[i] == min_value:
-            reversal_idx = i
-            break
-        elif current_reversal == "TOP" and close[i] == max_value:
-            reversal_idx = i
-            break
-    
-    if reversal_idx is not None:
-        distance = len(close) - 1 - reversal_idx
-        if current_reversal == "DIP":
-            last_reversal = "DIP"
-        elif current_reversal == "TOP":
-            last_reversal = "TOP"
-    
-    # Calculate forecast DIP and TOP
-    if last_reversal == "DIP":
-        forecast_dip = close[-1] - (distance * 0.1)
-        forecast_top = forecast_dip + (forecast_dip - close[-1]) * 2
-    elif last_reversal == "TOP":
-        forecast_top = close[-1] + (distance * 0.1)
-        forecast_dip = forecast_top - (close[-1] - forecast_top) * 2
-    
-    future_price_regression = price_regression(close)
-    
-    return current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression, last_reversal, forecast_dip, forecast_top
-
-
-
-# Call the calculate_reversal_and_forecast function with the example data
-(current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression, last_reversal, forecast_dip, forecast_top) = calculate_reversal_and_forecast(close)
-
-print()
-
-##################################################
-##################################################
-
-def calculate_elements():
-    # Define PHI constant with 15 decimals
-    PHI = 1.6180339887498948482045868343656381177
-    # Calculate the Brun constant from the phi ratio and sqrt(5)
-    brun_constant = math.sqrt(PHI * math.sqrt(5))
-    # Define PI constant with 15 decimals
-    PI = 3.1415926535897932384626433832795028842
-    # Define e constant with 15 decimals
-    e = 2.718281828459045235360287471352662498
-    # Calculate sacred frequency
-    sacred_freq = (432 * PHI ** 2) / 360
-    # Calculate Alpha and Omega ratios
-    alpha_ratio = PHI / PI
-    omega_ratio = PI / PHI
-    # Calculate Alpha and Omega spiral angle rates
-    alpha_spiral = (2 * math.pi * sacred_freq) / alpha_ratio
-    omega_spiral = (2 * math.pi * sacred_freq) / omega_ratio
-    # Calculate inverse powers of PHI and fractional reciprocals
-    inverse_phi = 1 / PHI
-    inverse_phi_squared = 1 / (PHI ** 2)
-    inverse_phi_cubed = 1 / (PHI ** 3)
-    reciprocal_phi = PHI ** -1
-    reciprocal_phi_squared = PHI ** -2
-    reciprocal_phi_cubed = PHI ** -3
-
-    # Calculate unit circle degrees for each quadrant, including dip reversal up and top reversal down cycles
-    unit_circle_degrees = {
-        1: {'angle': 135, 'polarity': ('-', '-'), 'cycle': 'dip_to_top'},  # Quadrant 1 (Dip to Top)
-        2: {'angle': 45, 'polarity': ('+', '+'), 'cycle': 'top_to_dip'},   # Quadrant 2 (Top to Dip)
-        3: {'angle': 315, 'polarity': ('+', '-'), 'cycle': 'dip_to_top'},  # Quadrant 3 (Dip to Top)
-        4: {'angle': 225, 'polarity': ('-', '+'), 'cycle': 'top_to_dip'},   # Quadrant 4 (Top to Dip)
-    }
-
-    # Calculate ratios up to 12 ratio degrees
-    ratios = [math.atan(math.radians(degrees)) for degrees in range(1, 13)]
-
-    # Calculate arctanh values
-    arctanh_values = {
-        0: 0,
-        1: float('inf'),
-        -1: float('-inf')
-    }
-
-    # Calculate imaginary number
-    imaginary_number = 1j
-
-    return PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed  
-
-print()
-
-
-def forecast_sma_targets(price):
-    (PHI, sacred_freq, unit_circle_degrees, ratios, arctanh_values, imaginary_number, brun_constant, PI, e, alpha_ratio, omega_ratio, inverse_phi, inverse_phi_squared, inverse_phi_cubed, reciprocal_phi, reciprocal_phi_squared, reciprocal_phi_cubed) = calculate_elements()
-
-    output_data = []
-    output_data.append(f"Given Close Price (Center of Unit Circle): {price}\n")
-    
-    for quadrant, _ in unit_circle_degrees.items():
-        # Calculate the forecast price using sacred_freq and square of 9 for the quadrant
-        target = price + (sacred_freq * math.pow(9, (quadrant * 0.25)))
-        
-        # Adjust the target price with a 45-degree angle (using trigonometry)
-        angle_adjustment = sacred_freq * math.cos(math.radians(45)) * (quadrant * 0.25)
-        target_45 = price + angle_adjustment
-
-        distance = ((target - price) / price) * 100
-
-        output_data.append(f"Quadrant: {quadrant}")
-        output_data.append(f"Forecasted Target_Quad_{quadrant}: Price - {target:.2f}, Distance Percentage - {distance:.2f}%")
-        output_data.append(f"Forecasted 45Degree_Target_Quad_{quadrant}: Price - {target_45:.2f}")
-        output_data.append("-" * 50)
-
-    return output_data
-
-results = forecast_sma_targets(price)
-
-# Print each output string separately
-for result in results:
-    print(result)
-
-print()
-
-##################################################
-##################################################
-
-def entry_long(symbol):
-    try:     
-        # Get balance and leverage     
-        account_balance = get_account_balance()   
-        trade_leverage = 20
-    
-        # Get symbol price    
-        symbol_price = client.futures_symbol_ticker(symbol=symbol)['price']
-        
-        # Get step size from exchange info
-        info = client.futures_exchange_info()
-        filters = [f for f in info['symbols'] if f['symbol'] == symbol][0]['filters']
-        step_size = [f['stepSize'] for f in filters if f['filterType']=='LOT_SIZE'][0]
+                if name == "5m":
+                    results["new_5m"] = result
+                elif name == "1m":
+                    results["new_1m"] = result
+                elif name == "price":
+                    results["price"] = result
+                elif name == "balance":
+                    results["balance"] = result
+                elif name == "position":
+                    results["position"] = result
                     
-        # Calculate max quantity based on balance, leverage, and price
-        max_qty = int(account_balance * trade_leverage / float(symbol_price) / float(step_size)) * float(step_size)  
-                    
-        # Create buy market order    
-        order = client.futures_create_order(
-            symbol=symbol,        
-            side='BUY',           
-            type='MARKET',         
-            quantity=max_qty)          
-                    
-        if 'orderId' in order:
-            return True
-          
-        else: 
-            print("Error creating long order.")  
-            return False
-            
-    except BinanceAPIException as e:
-        print(f"Error creating long order: {e}")
-        return False
-
-def entry_short(symbol):
-    try:     
-        # Get balance and leverage     
-        account_balance = get_account_balance()   
-        trade_leverage = 20
-    
-        # Get symbol price    
-        symbol_price = client.futures_symbol_ticker(symbol=symbol)['price']
+            except Exception as e:
+                results["times"][name] = -1
+                print(f"  [Concurrent] Task '{name}' failed: {e}")
         
-        # Get step size from exchange info
-        info = client.futures_exchange_info()
-        filters = [f for f in info['symbols'] if f['symbol'] == symbol][0]['filters']
-        step_size = [f['stepSize'] for f in filters if f['filterType']=='LOT_SIZE'][0]
-                    
-        # Calculate max quantity based on balance, leverage, and price
-        max_qty = int(account_balance * trade_leverage / float(symbol_price) / float(step_size)) * float(step_size)  
-                    
-        # Create sell market order    
-        order = client.futures_create_order(
-            symbol=symbol,        
-            side='SELL',           
-            type='MARKET',         
-            quantity=max_qty)          
-                    
-        if 'orderId' in order:
-            return True
-          
-        else: 
-            print("Error creating short order.")  
-            return False
-            
-    except BinanceAPIException as e:
-        print(f"Error creating short order: {e}")
-        return False
-
-def exit_trade():
-    try:
-        # Get account information including available margin
-        account_info = client.futures_account()
-
-        # Check if 'availableBalance' is present in the response
-        if 'availableBalance' in account_info:
-            available_margin = float(account_info['availableBalance'])
-
-            # Check available margin before proceeding
-            if available_margin < 0:
-                print("Insufficient available margin to exit trades.")
-                return
-
-            # Get all open positions
-            positions = client.futures_position_information()
-
-            # Loop through each position
-            for position in positions:
-                symbol = position['symbol']
-                position_amount = float(position['positionAmt'])
-
-                # Determine order side
-                if position_amount > 0:
-                    order_side = 'SELL'
-                elif position_amount < 0:
-                    order_side = 'BUY'
-                else:
-                    continue  # Skip positions with zero amount
-
-                # Place order to exit position      
-                order = client.futures_create_order(
-                    symbol=symbol,
-                    side=order_side,
-                    type='MARKET',
-                    quantity=abs(position_amount))
-
-                print(f"{order_side} order created to exit {abs(position_amount)} {symbol}.")
-
-            print("All positions exited!")
-        else:
-            print("Error: 'availableBalance' not found in account_info.")
-    except BinanceAPIException as e:
-        print(f"Error exiting trade: {e}")
-
-print()
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
-
-def calculate_normalized_distance(price, close):
-    min_price = np.min(close)
-    max_price = np.max(close)
+        results["parallel_total_ms"] = (time.perf_counter() - t0) * 1000
+        return results
     
-    distance_to_min = price - min_price
-    distance_to_max = max_price - price
+    def _full_refresh_buffer(self, buffer):
+        buffer.initialize(client)
+        return len(buffer)
     
-    normalized_distance_to_min = distance_to_min / (distance_to_min + distance_to_max) * 100
-    normalized_distance_to_max = distance_to_max / (distance_to_min + distance_to_max) * 100
-    
-    return normalized_distance_to_min, normalized_distance_to_max
+    def shutdown(self):
+        self.executor.shutdown(wait=False)
 
-def calculate_price_distance_and_wave(price, close):
-    normalized_distance_to_min, normalized_distance_to_max = calculate_normalized_distance(price, close)
-    
-    # Calculate HT_SINE using talib
-    ht_sine, _ = talib.HT_SINE(close) 
-    #ht_sine = -ht_sine
+# ═══════════════════════════════════════════════════════════════════════════════
+# TECHNICAL ANALYSIS
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    # Initialize market_mood
-    market_mood = None
-    
-    # Determine market mood based on HT_SINE crossings and closest reversal
-    closest_to_min = np.abs(close - np.min(close)).argmin()
-    closest_to_max = np.abs(close - np.max(close)).argmin()
-    
-    # Check if any of the elements in the close array up to the last value is the minimum or maximum
-    if np.any(close[:len(close)-1] == np.min(close[:len(close)-1])):
-        market_mood = "Uptrend"
-    elif np.any(close[:len(close)-1] == np.max(close[:len(close)-1])):
-        market_mood = "Downtrend"
-
-    result = {
-        "price": price,
-        "ht_sine_value": ht_sine[-1],
-        "normalized_distance_to_min": normalized_distance_to_min,
-        "normalized_distance_to_max": normalized_distance_to_max,
-        "min_price": np.min(close),
-        "max_price": np.max(close),
-        "market_mood": market_mood
-    }
-    
-    return result
-
-# Example close prices
-close_prices = np.array(close)  # Insert your actual close prices here
-
-result = calculate_price_distance_and_wave(price, close_prices)
-
-# Print the detailed information for the given price
-print(f"Price: {result['price']:.2f}")
-print(f"HT_SINE Value: {result['ht_sine_value']:.2f}")
-print(f"Normalized Distance to Min: {result['normalized_distance_to_min']:.2f}%")
-print(f"Normalized Distance to Max: {result['normalized_distance_to_max']:.2f}%")
-print(f"Min Price: {result['min_price']:.2f}")
-print(f"Max Price: {result['max_price']:.2f}")
-print(f"Market Mood: {result['market_mood']}")
-
-print()
-
-##################################################
-##################################################
-
-def calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold):
-    """
-    Determine market mood and forecast price movement based on sine wave reversals.
-    """
-    
-    # Create a sequence of close prices centered around the thresholds to compute the sine wave
-    sequence_min = np.linspace(min_threshold - 10, min_threshold + 10, 100)  # Adjust range and number as needed
-    sequence_max = np.linspace(max_threshold - 10, max_threshold + 10, 100)  # Adjust range and number as needed
-    
-    # Compute HT_SINE for both sequences
-    ht_sine_min, _ = talib.HT_SINE(sequence_min)
-    ht_sine_max, _ = talib.HT_SINE(sequence_max)
-
-    market_mood = None
-    forecast_price = None
-
-    # Check for uptrend based on the last reversal being the min_threshold
-    if ht_sine_min[-1] < ht_sine_min[-2] and closes[-1] > min_threshold:
-        market_mood = "Uptrend"
-        forecast_price = min_threshold + (ht_sine_min[-1] - np.min(ht_sine_min[-10:]))
-    
-    # Check for downtrend based on the last reversal being the max_threshold
-    elif ht_sine_max[-1] > ht_sine_max[-2] and closes[-1] < max_threshold:
-        market_mood = "Downtrend"
-        forecast_price = max_threshold - (np.max(ht_sine_max[-10:]) - ht_sine_max[-1])
-
-    return market_mood, forecast_price
-
-min_threshold, max_threshold, avg_mtf, momentum_signal, _ = calculate_thresholds(close, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-
-print("Momentum signal:", momentum_signal)
-print("Minimum threshold:", min_threshold)
-print("Maximum threshold:", max_threshold)
-print("Average MTF:", avg_mtf)
-
-market_mood, forecast_price = calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold)
-if market_mood:
-    print(f"Forecast price: {forecast_price}")
-
-closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - closes[-1]))
-if closest_threshold == min_threshold:
-    print("The last minimum value is closest to the current close.")
-elif closest_threshold == max_threshold:
-    print("The last maximum value is closest to the current close.")
-else:
-    print("No threshold value found.")
-
-print()
-
-##################################################
-##################################################
-
-# Calculate the 45-degree angle (simple linear regression)
-x = np.arange(len(close))
-slope, intercept = np.polyfit(x, close, 1)
-
-# Calculate the expected trend line value for the last close price
-expected_price = slope * len(close) + intercept
-
-# Display the expected price on the 45-degree angle trend
-print(f"Expected price on the 45-degree angle trend: {expected_price}")
-
-# Get the last close price from the list for forecasting
-last_close_price = price
-
-# Define a function to forecast based on the 45-degree angle
-def forecast_45_degree_angle(close_price, expected_price):
-    if close_price < expected_price:
-        return "Bullish Market Mood: Close below 45-degree angle moving towards it."
-    elif close_price > expected_price:
-        return "Bearish Market Mood: Close above 45-degree angle moving towards it."
-    else:
-        return "Neutral: Close at the 45-degree angle."
-
-# Generate forecast based on the 45-degree angle
-forecast_result = forecast_45_degree_angle(last_close_price, expected_price)
-
-# Display the forecast result
-print(forecast_result)
-
-print()
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-import talib  # Assuming you have the TA-Lib library installed and imported
-
-# Time Series Decomposition
-def decompose_time_series(close):
-    padding = len(close) - len(np.convolve(close, np.ones(10)/10, mode='valid'))
-    trend = np.convolve(close, np.ones(10)/10, mode='valid')
-    trend = np.pad(trend, (padding, 0), mode='constant', constant_values=(trend[0], trend[-1]))
-
-    seasonal = close - trend
-    residual = close - (trend + seasonal)
-    return trend, seasonal, residual
-
-# Fast Fourier Transform (FFT)
-def apply_fft(close):
-    fft_values = np.fft.fft(close)
-    frequencies = np.fft.fftfreq(len(fft_values))
-    dominant_idx = np.argmax(np.abs(fft_values[:25]))
-    dominant_frequency = frequencies[dominant_idx]
-    return dominant_frequency
-
-# Identify Reversals
-def identify_reversals(close):
-    trend, seasonal, residual = decompose_time_series(close)
-    trend_direction = "up" if trend[-1] < trend[-2] else "down"
-    dominant_frequency = apply_fft(close)
-    
-    if dominant_frequency < 0:
-        market_mood = "Negative"
-    else:
-        market_mood = "Positive"
-        
-    forecasted_price = 4264490  # Placeholder value
-    print(f"Forecasted Price: {forecasted_price // 100}.{forecasted_price % 100:02}")
-    
-    return forecasted_price
-
-# Toroidal Group Symmetry Analysis
-def toroidal_group_symmetry_analysis(close):
-    fft_values = np.fft.fft(close)
-    frequencies = np.fft.fftfreq(len(fft_values))
-
-    # Get the indices of the 25 dominant frequencies
-    dominant_indices = np.argsort(np.abs(fft_values))[-25:]
-
-    # Get the last 5 dominant frequencies
-    last_five_dominant_frequencies = frequencies[dominant_indices][-5:]
-
-    # Count how many of the last 5 dominant frequencies are negative or positive
-    negative_count = np.sum(last_five_dominant_frequencies < 0)
-    positive_count = np.sum(last_five_dominant_frequencies > 0)
-
-    if negative_count > positive_count:
-        trend_behavior = "up"
-    elif positive_count > negative_count:
-        trend_behavior = "down"
-    else:
-        trend_behavior = "neutral"
-
-    if abs(np.mean(last_five_dominant_frequencies)) < 0.5:
-        print("The sinewave stationary circuit is stable based on toroidal group symmetry.")
-    else:
-        print("The sinewave stationary circuit might be unstable based on toroidal group symmetry.")
-    
-    if trend_behavior == "up":
-        print("Designing a filter to pass only the fundamental frequency (based on toroidal group symmetry).")
-        print("Designing a circuit to generate square waves (based on toroidal group symmetry).")
-    elif trend_behavior == "down":
-        print("Designing a filter to block higher harmonics (based on toroidal group symmetry).")
-        print("Designing a circuit to generate sawtooth waves (based on toroidal group symmetry).")
-    else:
-        print("Neutral: No definitive trend behavior based on the last 5 dominant frequencies yet.")
-
-# Scale current close price to sine wave
-def scale_to_sine(timeframe):
-    close_prices = np.random.rand(1001)  # Replace with your actual close prices array
-    current_close = close_prices[-1]
-        
-    sine_wave, _ = talib.HT_SINE(close_prices)
-    sine_wave = np.nan_to_num(sine_wave)
-    sine_wave = -sine_wave
+def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
+    if len(close_prices_5m) < 32: return 50.0, 50.0
+    sine_wave, _ = talib.HT_SINE(close_prices_5m)
+    sine_wave = np.nan_to_num(-sine_wave)
+    sine_window = sine_wave[-ANALYSIS_WINDOW_5M:] if len(sine_wave) >= ANALYSIS_WINDOW_5M else sine_wave
+    cycle_min, cycle_max = sine_window[argmin_idx], sine_window[argmax_idx]
+    rng = cycle_max - cycle_min if cycle_max != cycle_min else 1e-9
     current_sine = sine_wave[-1]
-    sine_wave_min = np.min(sine_wave)
-    sine_wave_max = np.max(sine_wave)
+    dist_to_min = max(0, min(100, ((current_sine - cycle_min) / rng) * 100))
+    dist_to_max = max(0, min(100, ((cycle_max - current_sine) / rng) * 100))
+    return dist_to_min, dist_to_max
 
-    dist_min = ((current_sine - sine_wave_min) / (sine_wave_max - sine_wave_min)) * 100
-    dist_max = ((sine_wave_max - current_sine) / (sine_wave_max - sine_wave_min)) * 100
 
-    print(f"For {timeframe} timeframe:")
-    print(f"Distance to min: {dist_min:.2f}%")
-    print(f"Distance to max: {dist_max:.2f}%")
-    print(f"Current Sine value: {current_sine}\n")
+# ═══════════════════════════════════════════════════════════════════════════════
+# HARMONIC OSCILLATOR — BIDIRECTIONAL DUAL CIRCUIT (Condition 4)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# NOTE: base phase/cycle data now derives from the 5m timeframe (close_arr_5m /
+# candles_5m) instead of 1m — 1m HT_SINE was too noisy / whipped phase too fast.
+# Volume VROC nudge still reads 1m tick-level buy/sell dominance for fine nudging.
+#
+# Two independent oscillators run simultaneously, each STRICTLY divided into
+# 4 quadrants of exactly 25% of the 360° cycle each (90° per quadrant):
+#
+#  UP-CYCLE  (θ, driven by +sine):
+#    Q1u [0°–90°)   : Reversal-Dip     — EM exhaust LOW, dip confirmed → LONG entry
+#    Q2u [90°–180°) : Accumulation     — price rising off bottom        → LONG cont.
+#    Q3u [180°–270°): Pump / Mark-up   — ascending toward peak          → LONG cont.
+#    Q4u [270°–360°): Reversal-Top     — EM exhaust HIGH, top confirmed → cycle end
+#
+#  DOWN-CYCLE (φ, driven by –sine, i.e. inverted):
+#    Q4d [0°–90°)   : Reversal-Top     — EM exhaust HIGH, top confirmed → SHORT entry
+#    Q3d [90°–180°) : Distribution     — price falling off top          → SHORT cont.
+#    Q2d [180°–270°): Falling          — descending toward floor        → SHORT cont.
+#    Q1d [270°–360°): Reversal-Dip     — EM exhaust LOW, dip confirmed  → cycle end
+#
+#  Active circuit selection (ARGMIN/ARGMAX pole, on the 5m window):
+#    recent extreme = ARGMIN (low) → UP-CYCLE  active (price bouncing up)
+#    recent extreme = ARGMAX (high)→ DOWN-CYCLE active (price falling down)
+#
+#  STAGE-ORDER ENFORCEMENT (quadrature):
+#    Each call may only advance the active circuit's stage by ONE quadrant
+#    relative to the previous call (or hold the same stage) — never skip a
+#    stage (e.g. straight from Reversal-Dip to Pump). A raw phase reading
+#    that jumps ahead more than one quadrant is clamped to "previous + 1".
+#    A full circuit flip (handled separately by the ARGMIN/ARGMAX pole
+#    switch) resets the stage tracker for the new circuit to its raw reading.
+#
+#  Volume VROC nudges phase ±15° toward the active cycle's entry quadrant.
+#  Forecast projects θ or φ forward HARMONIC_FORECAST_BARS along the active sine.
+#  Output: strictly binary — LONG xor SHORT, never both, never neither.
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    return dist_min, dist_max  # Return these values
+HARMONIC_FORECAST_BARS = 8      # bars ahead for TP-direction forecast (5m bars)
+HARMONIC_VROC_PERIOD   = 10     # bars for Volume Rate-of-Change (1m tick bars)
 
-forecasted_price = identify_reversals(close)
-toroidal_group_symmetry_analysis(close)
+UP_QUAD_LABELS   = ["Q1u-REVERSAL-DIP", "Q2u-ACCUMULATION", "Q3u-PUMP", "Q4u-REVERSAL-TOP"]
+DOWN_QUAD_LABELS = ["Q4d-REVERSAL-TOP", "Q3d-DISTRIBUTION", "Q2d-FALLING", "Q1d-REVERSAL-DIP"]
 
-print()
+# Persistent stage tracker across calls — enforces sequential quadrant
+# progression (no skipping stages) within whichever circuit is active.
+_HO_STAGE_STATE = {"circuit": None, "stage_idx": 0}
 
-for timeframe in timeframes:
-    dist_min, dist_max = scale_to_sine(timeframe)
-    if dist_min < dist_max:
-        print(f"For {timeframe} timeframe: Up")
+
+def _sine_to_phase(sine_val, prev_sine_val):
+    """Map a sine value [-1,+1] + direction to a 0–360° phase angle."""
+    raw = float(np.degrees(np.arcsin(np.clip(sine_val, -1.0, 1.0))))
+    if sine_val >= prev_sine_val:
+        return raw + 90.0          # ascending half: 0° (bottom) … 180° (top)
     else:
-        print(f"For {timeframe} timeframe: Down")
+        return 270.0 - raw         # descending half: 180° (top) … 360° (bottom)
 
-    print()
 
-print()
-
-##################################################
-##################################################
-
-def calculate_value_area(close):
+def _enforce_sequential_stage(circuit_name, raw_stage_idx):
     """
-    Calculate the Value Area based on the lows and highs of the closing prices.
+    Quadrature guard: only allow the active circuit's stage index (0-3) to
+    hold or advance by exactly +1 (mod 4) per call relative to the last
+    confirmed stage. A circuit switch (UP<->DOWN) resets the tracker to the
+    raw reading immediately (new cycle, no continuity constraint).
+    Returns (confirmed_stage_idx, prev_stage_idx).
+    """
+    state = _HO_STAGE_STATE
+    prev_circuit = state["circuit"]
+    prev_stage   = state["stage_idx"]
 
-    Args:
-    - close (list): List of closing prices for a given trading session.
+    if prev_circuit != circuit_name:
+        # New circuit just became active -> accept raw reading, no clamp.
+        state["circuit"]   = circuit_name
+        state["stage_idx"] = raw_stage_idx
+        return raw_stage_idx, (prev_stage if prev_circuit is not None else raw_stage_idx)
+
+    # Same circuit: allow hold or +1 step only; clamp skips.
+    next_allowed = (prev_stage + 1) % 4
+    if raw_stage_idx == prev_stage or raw_stage_idx == next_allowed:
+        confirmed = raw_stage_idx
+    else:
+        confirmed = next_allowed   # force single sequential step forward
+
+    state["stage_idx"] = confirmed
+    return confirmed, prev_stage
+
+
+def compute_harmonic_oscillator(candles_5m, close_arr_5m, live_price,
+                                 argmin_idx_5m, argmax_idx_5m,
+                                 bars_ago_min, bars_ago_max,
+                                 bullish_perc, bearish_perc,
+                                 candles_1m=None):
+    """
+    Base data is the 5m timeframe (slower, far less noisy than 1m).
+    `candles_1m` (optional) is only used for the fine-grained volume VROC nudge.
 
     Returns:
-    - value_area_low (float): Lower boundary of the Value Area.
-    - value_area_high (float): Upper boundary of the Value Area.
+        ho_long          (bool)  : strictly binary
+        ho_short         (bool)  : strictly binary, always opposite of ho_long
+        theta_deg        (float) : active oscillator phase 0–360
+        forecast_price   (float) : projected price HARMONIC_FORECAST_BARS (5m) ahead
+        trend_str        (str)   : 'UP' or 'DOWN'
+        quad_label       (str)   : active quadrant label with cycle indicator
+        extra            (dict)  : quad_progress_pct, cycle_progress_pct,
+                                    last_quad_label, next_quad_label, cycle_period
     """
-    
-    # Calculate the Point of Control (POC) - the price with the highest trading volume.
-    poc = max(set(close), key=close.count)
-    
-    # Calculate the Value Area boundaries based on 70% of the total prices
-    threshold = 0.7 * len(close)
-    
-    # Count occurrences of each price
-    price_counts = {price: close.count(price) for price in set(close)}
-    
-    cumulative_count = 0
-    value_area_low = None
-    value_area_high = None
-    
-    # Calculate Value Area Low
-    for price, count in sorted(price_counts.items()):
-        cumulative_count += count
-        if cumulative_count >= threshold:
-            value_area_low = price
-            break
+    n = len(close_arr_5m)
+    if n < max(32, HARMONIC_VROC_PERIOD + 5):
+        return (True, False, 90.0, live_price, "UP", "UP:Q2u-ACCUMULATION",
+                {"quad_progress_pct": 0.0, "cycle_progress_pct": 25.0,
+                 "last_quad_label": "UP:Q1u-REVERSAL-DIP",
+                 "next_quad_label": "UP:Q3u-PUMP", "cycle_period": 20.0})
 
-    cumulative_count = 0  # Reset cumulative count for the upper boundary
-    
-    # Calculate Value Area High
-    for price, count in sorted(price_counts.items(), reverse=True):
-        cumulative_count += count
-        if cumulative_count >= threshold:
-            value_area_high = price
-            break
-    
-    return value_area_low, value_area_high
+    # ── 1. COMPUTE BASE SINE ARRAYS (5m) ─────────────────────────────────────
+    try:
+        sine_raw, _ = talib.HT_SINE(close_arr_5m)
+        up_sine   = np.nan_to_num(-sine_raw)   # +sine: bottom=–1, top=+1
+        down_sine = np.nan_to_num(sine_raw)    # –sine: top=–1,    bottom=+1
+    except Exception:
+        up_sine = down_sine = np.zeros(n)
 
-
-def analyze_market_profile(close):
-    """
-    Analyze the Market Profile to determine Value Area, Support, Resistance, Market Mood, and Forecast Price.
-
-    Args:
-    - close (list): List of closing prices for a given trading session.
-
-    Returns:
-    - value_area_low (float): Lower boundary of the Value Area.
-    - value_area_high (float): Upper boundary of the Value Area.
-    - support (float): Current support level.
-    - resistance (float): Current resistance level.
-    - market_mood (str): Market mood based on current price position relative to the Value Area.
-    - forecast_price (float): Forecasted price based on Value Area.
-    """
-    
-    # Calculate Value Area boundaries
-    value_area_low, value_area_high = calculate_value_area(close)
-    
-    # Calculate Support and Resistance levels
-    support = min(close)
-    resistance = max(close)
-    
-    # Determine Market Mood
-    current_price = close[-1]
-    if current_price > value_area_low:
-        market_mood = "Bearish"
-    elif current_price < value_area_high:
-        market_mood = "Bullish"
+    # ── 2. VOLUME VROC (fine nudge from 1m ticks if available, else neutral) ─
+    if candles_1m and len(candles_1m) >= HARMONIC_VROC_PERIOD + 1:
+        vols = np.array([c["volume"] for c in candles_1m[-HARMONIC_VROC_PERIOD-1:]], dtype=np.float64)
+        vroc = (float(vols[-1]) - float(vols[0])) / (float(vols[0]) + 1e-9)
     else:
-        market_mood = "Neutral"
-    
-    # Forecast Price based on Value Area
-    forecast_price = (value_area_high + value_area_low) / 2  # Midpoint of Value Area
-    
-    return value_area_low, value_area_high, support, resistance, market_mood, forecast_price
-
-
-val_low, val_high, sup, res, mood, forecast = analyze_market_profile(close)
-
-print(f"Value Area Low: {val_low}, Value Area High: {val_high}")
-print(f"Current Support: {sup}, Current Resistance: {res}")
-print(f"Market Mood: {mood}")
-print(f"Forecasted Price: {forecast}")
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-import numpy.fft as fft
-
-def preprocess_data(close):
-    # Simple preprocessing: normalize data by subtracting mean and dividing by standard deviation
-    return (close - np.mean(close)) / np.std(close)
-
-def apply_fourier_transform(close):
-    # Apply Fourier Transform
-    transformed_data = fft.fft(close)
-    
-    # Extract frequencies and magnitudes
-    frequencies = fft.fftfreq(len(close))
-    magnitudes = np.abs(transformed_data)  # Corrected the variable name here
-    
-    # Get dominant frequency (peak frequency)
-    dominant_frequency = frequencies[np.argmax(magnitudes)]
-    
-    return dominant_frequency
-
-def time_geometry_analysis(close):
-    # Identify peaks and troughs
-    peaks = np.where((close[1:-1] > close[:-2]) & (close[1:-1] > close[2:]))[0] + 1
-    troughs = np.where((close[1:-1] < close[:-2]) & (close[1:-1] < close[2:]))[0] + 1
-    
-    return peaks, troughs
-
-def calculate_metrics(dominant_frequency, peaks, troughs):
-    # Calculate energy based on dominant frequency
-    energy = np.abs(dominant_frequency)
-    
-    # Calculate momentum (simplified as the number of peaks and troughs)
-    momentum = len(peaks) + len(troughs)
-    
-    # Determine reversals: if the number of peaks is greater than troughs, it's bullish; otherwise, bearish
-    reversals_confirmations = "Bullish" if len(peaks) > len(troughs) else "Bearish"
-    
-    return energy, momentum, reversals_confirmations
-
-# Convert the list to a numpy array for processing
-close_prices = np.array(close)
-
-# Step 1: Preprocess Data
-processed_data = preprocess_data(close_prices)
-
-# Step 2: Apply Fourier Transform
-dominant_freq = apply_fourier_transform(processed_data)
-
-# Step 3: Time Geometry Analysis
-peaks, troughs = time_geometry_analysis(processed_data)
-
-# Step 4: Calculate Metrics
-energy, momentum, reversals_confirmations = calculate_metrics(dominant_freq, peaks, troughs)
-
-# Step 5: Make Predictions
-print(f"Dominant Frequency (Energy): {dominant_freq}")
-print(f"Total Momentum (Peaks + Troughs): {momentum}")
-print(f"Reversals Confirmation: {reversals_confirmations}")
-
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-import scipy.fftpack as fftpack
-
-def forecast_prices(close):
-    time = np.linspace(0, 1, len(close), endpoint=False)
-
-    fast_frequency = 10
-    medium_frequency = 5
-    slow_frequency = 2
-
-    fast_sinewave = np.sin(2 * np.pi * fast_frequency * time)
-    medium_sinewave = 0.5 * np.sin(2 * np.pi * medium_frequency * time)
-    slow_sinewave = 0.2 * np.sin(2 * np.pi * slow_frequency * time)
-
-    combined_sinewave = fast_sinewave + medium_sinewave + slow_sinewave
-
-    fft_output = fftpack.fft(combined_sinewave)
-
-    dominant_frequency_index = np.argmax(np.abs(fft_output))
-    fast_forecasted_frequency = dominant_frequency_index / time[-1]
-    medium_forecasted_frequency = dominant_frequency_index / time[-1] * 0.5
-    slow_forecasted_frequency = dominant_frequency_index / time[-1] * 0.2
-
-    next_minute = time[-1] + 1
-
-    fast_forecasted_sine = np.sin(2 * np.pi * fast_forecasted_frequency * next_minute)
-    medium_forecasted_sine = 0.5 * np.sin(2 * np.pi * medium_forecasted_frequency * next_minute)
-    slow_forecasted_sine = 0.2 * np.sin(2 * np.pi * slow_forecasted_frequency * next_minute)
-
-    # Convert sine forecasted values back to price values
-    price_min = min(close)
-    price_max = max(close)
-
-    fast_forecasted_price = price_min + 0.5 * (fast_forecasted_sine + 1) * (price_max - price_min)
-    medium_forecasted_price = price_min + 0.5 * (medium_forecasted_sine + 1) * (price_max - price_min)
-    slow_forecasted_price = price_min + 0.5 * (slow_forecasted_sine + 1) * (price_max - price_min)
-
-    return fast_forecasted_price, medium_forecasted_price, slow_forecasted_price
-
-# Forecast prices
-fast_price, medium_price, slow_price = forecast_prices(close)
-
-# Print forecasted prices
-print(f"Forecasted price (fast cycle): {fast_price:.2f}")
-print(f"Forecasted price (medium cycle): {medium_price:.2f}")
-print(f"Forecasted price (slow cycle): {slow_price:.2f}")
-
-print()
-
-##################################################
-##################################################
-
-def forecast_next_hour_price(close_prices):
-    """
-    Forecast the price for the next hour based on the given close prices using FFT.
-    
-    Parameters:
-    - close_prices (list): List of close prices for the timeframe.
-    
-    Returns:
-    - dominant_trend (str): Dominant trend identified (Upward/Downward).
-    - forecast_price (float): Forecasted price for the next hour.
-    """
-    
-    # Convert the list to a numpy array for FFT processing
-    close_array = np.array(close_prices)
-
-    # Compute FFT
-    fft_values = np.fft.fft(close_array)
-    freq = np.fft.fftfreq(len(close_array))
-
-    # Identify significant frequencies based on a threshold
-    threshold = 100
-    significant_freq_indices = np.where(np.abs(fft_values) > threshold)[0]
-
-    # Get the last three significant frequencies
-    last_three_significant_freqs = freq[significant_freq_indices][-3:]
-    last_three_amplitudes = np.abs(fft_values[significant_freq_indices][-3:])
-    last_three_phases = np.angle(fft_values[significant_freq_indices][-3:])
-
-    # Calculate the average between the most negative and most positive frequencies
-    most_negative_freq = last_three_significant_freqs[np.argmin(last_three_significant_freqs)]
-    most_positive_freq = last_three_significant_freqs[np.argmax(last_three_significant_freqs)]
-    average_freq = (most_negative_freq + most_positive_freq) / 2
-
-    # Determine the dominant trend
-    dominant_trend = "Up" if average_freq < 0 else "Down"
-
-    # Forecast for the next hour (assuming 60 minutes in an hour)
-    forecast_time = len(close_array) + 60  # Forecasting for the next hour
-
-    # Initialize forecast
-    forecast = 0
-
-    # Use sinusoidal model for forecasting with the average frequency
-    forecast += np.mean(last_three_amplitudes) * np.sin(2 * np.pi * average_freq * forecast_time + np.mean(last_three_phases))
-
-    # Calculate the forecasted price for the next hour
-    current_price = close_prices[-1]
-    forecast_price = current_price + forecast
-
-    return dominant_trend, forecast_price
-
-dominant_trend, forecasted_price = forecast_next_hour_price(close)
-
-print(f"Dominant Trend: {dominant_trend}")
-
-print()
-
-##################################################
-##################################################
-
-def impulse_momentum_overall_signal(closes):
-    overall_signal = None  # Can be 'BUY', 'SELL', or None
-    mean_price = sum(closes) / len(closes)
-
-    for i in range(1, len(closes)):
-        current_price = closes[i]
-        previous_price = closes[i - 1]
-
-        # Mean reversion strategy
-        if current_price > mean_price:
-            overall_signal = 'BUY'
-
-        elif current_price < mean_price:
-            overall_signal = 'SELL'
-
-        # Breakout trading strategy
-        if current_price > previous_price:
-            overall_signal = 'BUY'
-
-        elif current_price < previous_price:
-            overall_signal = 'SELL'
-
-        # Range trading strategy
-        range_threshold = 0.02 * mean_price  # 2% range around the mean
-        if current_price > mean_price + range_threshold:
-            overall_signal = 'SELL'
-        elif current_price < mean_price - range_threshold:
-            overall_signal = 'BUY'
-
-        # Volatility trading strategy
-        price_change_percentage = ((current_price - previous_price) / previous_price) * 100
-        volatility_threshold = 5  # 5% volatility threshold
-        if abs(price_change_percentage) > volatility_threshold:
-            if price_change_percentage > 0:
-                overall_signal = 'BUY'
-            else:
-                overall_signal = 'SELL'
-
-    return overall_signal
-
-# Example usage:
-closes = close
-
-signal = impulse_momentum_overall_signal(closes)
-print("Overall Signal:", signal)
-
-print()
-
-##################################################
-##################################################
-
-def adjust_stationary_object(min_threshold, max_threshold, reversal):
-    """
-    Adjust the stationary object based on the reversal.
-    
-    Parameters:
-        min_threshold (float): Current minimum threshold.
-        max_threshold (float): Current maximum threshold.
-        reversal (str): Reversal value ("peak" or "dip").
-    
-    Returns:
-        tuple: Adjusted thresholds (min_threshold, max_threshold).
-    """
-    # Convert reversal values to numerical values for comparison
-    if reversal == "peak":
-        reversal_value = max_threshold  # Assuming 'peak' corresponds to the current max_threshold
-    elif reversal == "dip":
-        reversal_value = min_threshold  # Assuming 'dip' corresponds to the current min_threshold
+        vroc = 0.0
+    energy_dir = 1.0 if bullish_perc > bearish_perc else -1.0
+    vol_nudge  = 15.0 * np.clip(abs(vroc), 0.0, 1.0)  # magnitude only; sign per cycle
+
+    # ── 3. CYCLE PERIOD (shared, 5m bars) ─────────────────────────────────────
+    try:
+        period_arr   = talib.HT_DCPERIOD(close_arr_5m)
+        valid_p      = period_arr[np.isfinite(period_arr)]
+        cycle_period = float(np.median(valid_p[-20:])) if len(valid_p) >= 5 else 20.0
+    except Exception:
+        cycle_period = 20.0
+    cycle_period = max(4.0, min(cycle_period, 200.0))
+
+    window_p  = close_arr_5m[-int(cycle_period):]
+    amplitude = (float(np.max(window_p)) - float(np.min(window_p))) / 2.0
+    midline   = float(np.mean(window_p))
+
+    # ── 4. UP-CYCLE OSCILLATOR (θ) ───────────────────────────────────────────
+    up_cur  = float(up_sine[-1])
+    up_prev = float(up_sine[-2]) if n >= 2 else up_cur
+    theta_sine = _sine_to_phase(up_cur, up_prev)
+    up_vol_shift = -vol_nudge * energy_dir   # negative = toward 0° (Q1u entry)
+    theta_deg = (theta_sine + up_vol_shift) % 360.0
+    theta_advance = (HARMONIC_FORECAST_BARS / cycle_period) * 360.0
+    theta_future  = (theta_deg + theta_advance) % 360.0
+    up_forecast   = midline + amplitude * np.sin(np.radians(theta_future - 90.0))
+
+    # ── 5. DOWN-CYCLE OSCILLATOR (φ) ─────────────────────────────────────────
+    dn_cur  = float(down_sine[-1])
+    dn_prev = float(down_sine[-2]) if n >= 2 else dn_cur
+    phi_sine = _sine_to_phase(dn_cur, dn_prev)
+    dn_vol_shift = vol_nudge * energy_dir    # positive sell energy → toward 0° (Q4d entry)
+    phi_deg = (phi_sine + dn_vol_shift) % 360.0
+    phi_advance  = (HARMONIC_FORECAST_BARS / cycle_period) * 360.0
+    phi_future   = (phi_deg + phi_advance) % 360.0
+    dn_forecast  = midline - amplitude * np.sin(np.radians(phi_future - 90.0))
+
+    # ── 6. ACTIVE CIRCUIT SELECTION (ARGMIN/ARGMAX pole, 5m window) ──────────
+    up_cycle_active = (bars_ago_min < bars_ago_max)   # True = up-cycle
+
+    if up_cycle_active:
+        circuit_name  = "UP"
+        active_phase  = theta_deg
+        raw_stage_idx = int(theta_deg // 90.0) % 4
+        labels        = UP_QUAD_LABELS
+        forecast_price = float(np.clip(up_forecast, live_price * 0.95, live_price * 1.05))
     else:
-        raise ValueError("Invalid reversal value")
+        circuit_name  = "DOWN"
+        active_phase  = phi_deg
+        raw_stage_idx = int(phi_deg // 90.0) % 4
+        labels        = DOWN_QUAD_LABELS
+        forecast_price = float(np.clip(dn_forecast, live_price * 0.95, live_price * 1.05))
 
-    if reversal_value > max_threshold:
-        max_threshold = reversal_value
-    elif reversal_value < min_threshold:
-        min_threshold = reversal_value
-    
-    # Adjust the current value to remain stationary between reversals
-    current_value = (min_threshold + max_threshold) / 2
-    return min_threshold, max_threshold
+    # ── 7. QUADRATURE STAGE GUARD — sequential progression only ─────────────
+    confirmed_idx, prev_idx = _enforce_sequential_stage(circuit_name, raw_stage_idx)
+    next_idx     = (confirmed_idx + 1) % 4
+    cur_label    = labels[confirmed_idx]
+    last_label   = labels[prev_idx]
+    next_label   = labels[next_idx]
+    tag          = "UP" if circuit_name == "UP" else "DN"
+    active_label = f"{tag}:{cur_label}"
+    last_full    = f"{tag}:{last_label}"
+    next_full    = f"{tag}:{next_label}"
 
-def detect_reversals(close):
-    """
-    Detect peaks and troughs in the close prices to identify reversals.
-    
-    Parameters:
-        close (list): List of close prices.
-    
-    Returns:
-        list: List of detected reversals (peaks and dips).
-    """
-    reversals = []
-    for i in range(1, len(close) - 1):
-        if close[i] > close[i - 1] and close[i] > close[i + 1]:
-            reversals.append("peak")  # Peak
-        elif close[i] < close[i - 1] and close[i] < close[i + 1]:
-            reversals.append("dip")  # Dip
-    return reversals
+    # Confirmed-quadrant phase boundaries (each EXACTLY 25% / 90° of cycle)
+    quad_lo = confirmed_idx * 90.0
+    quad_progress_pct  = float(np.clip(((active_phase - quad_lo) / 90.0) * 100.0, 0.0, 100.0))
+    cycle_progress_pct = float(np.clip((active_phase / 360.0) * 100.0, 0.0, 100.0))
 
-def analyze_market_mood(reversals):
-    """
-    Analyze the last reversal to determine the market mood.
-    
-    Parameters:
-        reversals (list): List of detected reversals (peaks and dips).
-    
-    Returns:
-        str: Overall market mood ("up", "down").
-    """
-    if reversals:
-        last_reversal = reversals[-1]
-        if last_reversal == "dip":
-            return "up"
-        elif last_reversal == "peak":
-            return "down"
-    # Default to up if no reversals detected (for demonstration purposes)
-    return "up"
-
-reversals = detect_reversals(close)
-
-for reversal in reversals:
-    min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, reversal)
-
-market_mood_type = analyze_market_mood(reversals)
-
-print(f"Market Mood: {market_mood_type}")
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-import scipy.fft as fft
-
-def fft_trading_signal(close):
-    """
-    Perform FFT on the close prices and check the last three most significant frequencies for trading signals.
-    
-    Parameters:
-    - close (list or numpy array): List or array of close prices.
-    
-    Returns:
-    - forecast_price (float): Forecasted price based on the FFT.
-    - market_mood (str): 'long', 'short', or 'neutral' based on the FFT signals.
-    """
-    
-    # Compute the FFT of the close prices
-    fft_values = fft.fft(close)
-    
-    # Compute the frequencies corresponding to FFT values
-    frequencies = fft.fftfreq(len(close))
-    
-    # Sort indices of FFT values based on magnitude (excluding the first value which is DC component)
-    sorted_indices = np.argsort(np.abs(fft_values[1:]))[::-1] + 1  # +1 because we excluded the DC component
-    
-    # Get the three most significant frequencies and their corresponding values
-    top_three_indices = sorted_indices[:3]
-    top_three_frequencies = frequencies[top_three_indices]
-    top_three_values = fft_values[top_three_indices]
-    
-    # Check if the last three most significant frequencies are negative for long signal
-    if np.any(top_three_values < 0):
-        market_mood = 'long'
-    # Check if the last three most significant frequencies are positive for short signal
-    elif np.any(top_three_values > 0):
-        market_mood = 'short'
+    # Direction from the CONFIRMED (stage-guarded) quadrant, not raw phase,
+    # so binary output always matches the displayed/enforced stage.
+    # NOTE — INVERTED ON PURPOSE: live observation showed the raw UP/DOWN
+    # circuit label moves opposite to actual price action (when this engine
+    # reads "UP" the market is actually falling, and vice versa). Labels,
+    # quadrant names, and stage tracking above are left untouched — only the
+    # final ho_long/ho_short/trend_str handed to the entry engine is flipped
+    # here so it correlates with real market direction.
+    if circuit_name == "UP":
+        if confirmed_idx < 3:          # Q1u/Q2u/Q3u
+            ho_long, ho_short, trend_str = False, True, "DOWN"
+        else:                          # Q4u: up-cycle exhausted -> top reversal
+            ho_long, ho_short, trend_str = True, False, "UP"
     else:
-        market_mood = 'neutral'
-    
-    # Forecast the next price based on the inverse FFT of the top three frequencies
-    forecast_fft = np.zeros_like(fft_values)
-    forecast_fft[top_three_indices] = top_three_values
-    
-    return market_mood
+        if confirmed_idx < 3:          # Q4d/Q3d/Q2d
+            ho_long, ho_short, trend_str = True, False, "UP"
+        else:                          # Q1d: down-cycle exhausted -> dip reversal
+            ho_long, ho_short, trend_str = False, True, "DOWN"
 
-
-market_mood = fft_trading_signal(close)
-
-print(f"Market Mood: {market_mood}")
-
-print()
-
-##################################################
-##################################################
-
-import numpy as np
-
-def calculate_frequencies(close):
-    # Calculate frequencies using a Fourier Transform (Replace with appropriate method)
-    frequencies = np.fft.fft(close)
-    return frequencies
-
-def check_cycle_trigger(last_three_frequencies):
-    # Check if the average of the last three frequencies indicates an up or down cycle
-    avg_frequency = np.mean(last_three_frequencies)
-    if avg_frequency > 0:
-        return "Down Cycle"
-    elif avg_frequency < 0:
-        return "Up Cycle"
-    else:
-        return "Neutral"
-
-def find_last_reversal(frequencies):
-    # Identify the last reversal based on the sign of the last frequency
-    if frequencies[-1] < 0:
-        return "DIP Reversal"
-    elif frequencies[-1] > 0:
-        return "TOP Reversal"
-    else:
-        return "No significant reversal detected"
-
-def identify_incoming_reversal(market_mood):
-    # Identify the incoming reversal based on the current market mood
-    if market_mood == "Down Cycle":
-        return "Dip"
-    elif market_mood == "Up Cycle":
-        return "Top"
-    else:
-        return "No significant reversal detected"
-
-def analyze_market_behavior(close):
-    # Calculate frequencies
-    frequencies = calculate_frequencies(close)
-    
-    # Get the last three dominant frequencies
-    last_three_frequencies = frequencies[-3:]
-    
-    # Check trigger mechanism
-    market_mood = check_cycle_trigger(last_three_frequencies)
-    
-    # Find the last reversal
-    last_reversal = find_last_reversal(frequencies)
-    
-    # Identify incoming reversal based on the current market mood
-    incoming_reversal = identify_incoming_reversal(market_mood)
-    
-    # Return the results as a dictionary
-    results = {
-        "Market Mood": market_mood,
-        "Last Reversal": last_reversal,
-        "Incoming Reversal": incoming_reversal
+    extra = {
+        "quad_progress_pct":  quad_progress_pct,
+        "cycle_progress_pct": cycle_progress_pct,
+        "last_quad_label":    last_full,
+        "next_quad_label":    next_full,
+        "cycle_period":       cycle_period,
     }
-    
-    return results
 
-# Analyze the market behavior based on the sample data
-analysis_results = analyze_market_behavior(close)
+    return ho_long, ho_short, active_phase, forecast_price, trend_str, active_label, extra
 
-# Print the results separately
-print("Market Mood:", analysis_results["Market Mood"])
-print("Incoming Reversal:", analysis_results["Incoming Reversal"])
-
-print()
-
-##################################################
-##################################################
-
-def forecast_price_and_mood(close):
+def calculate_momentum_cyclicity(close_arr, period=14, window=100):
     """
-    Forecast future price and infer market mood based on polynomial regression.
-    
-    Parameters:
-    - close (list): List of close prices in chronological order.
-    
-    Returns:
-    - forecasted_price (float): Predicted price for the next period.
-    - market_mood (str): Inferred market mood (e.g., 'Bullish' or 'Bearish').
+    Momentum condition based on MOM extrema recency, not sign.
+    Computes MOM series over `window` bars, finds the index of the
+    most negative value (argmin) and most positive value (argmax).
+    If argmin is more recent (closer to now) → momentum is LONG (cycle bottom).
+    If argmax is more recent                 → momentum is SHORT (cycle top).
+    Returns: (mom_last, bars_ago_min, bars_ago_max, is_long, is_short)
+    Never both-True, never both-False.
     """
-    
-    # Generate x values (indices of close prices)
-    x = np.arange(len(close))
-    
-    # Fit a 2nd degree polynomial (you can adjust the degree based on your requirement)
-    coeffs = np.polyfit(x, close, 2)
-    
-    # Create a polynomial function using the coefficients
-    poly_function = np.poly1d(coeffs)
-    
-    # Predict the next value (forecasted price)
-    forecasted_price = poly_function(len(close))
-    
-    # Infer market mood based on the coefficient of the x^2 term
-    a, _, _ = coeffs
-    if a < 0:
-        market_mood = 'Bullish'
+    needed = period + window + 1
+    if len(close_arr) < needed:
+        return np.nan, 0, 0, True, False   # fallback LONG
+
+    mom_full = talib.MOM(close_arr, timeperiod=period)
+    # take the last `window` valid MOM values
+    mom_window = mom_full[-window:]
+    mom_window = np.nan_to_num(mom_window, nan=0.0)
+
+    argmin_idx = int(np.argmin(mom_window))   # index of most negative (trough)
+    argmax_idx = int(np.argmax(mom_window))   # index of most positive (peak)
+
+    w = len(mom_window)
+    bars_ago_min = (w - 1) - argmin_idx   # 0 = current bar
+    bars_ago_max = (w - 1) - argmax_idx
+
+    mom_last = float(mom_full[-1]) if np.isfinite(mom_full[-1]) else 0.0
+
+    # strictly binary: most recent extreme determines direction
+    # argmin (most negative MOM) more recent → momentum trough just passed → LONG reversal incoming
+    # argmax (most positive MOM) more recent → momentum peak just passed   → SHORT reversal incoming
+    # tie-break: use sign of current MOM value
+    if bars_ago_min < bars_ago_max:
+        is_long, is_short = True, False   # trough more recent → troughed after → LONG
+    elif bars_ago_max < bars_ago_min:
+        is_long, is_short = False, True   # peak more recent → peaked after → SHORT
     else:
-        market_mood = 'Bearish'
+        # exact tie — fall back to inverse sign
+        is_long  = mom_last <= 0.0
+        is_short = not is_long
+
+    return mom_last, bars_ago_min, bars_ago_max, is_long, is_short
+
+def generate_ml_forecast(candles_1m):
+    """
+    Lightweight ML-style forecast using talib indicators + linear regression slope.
+    Uses only numpy and talib (no sklearn/pandas dependency).
+
+    Returns:
+        forecast_price (float): predicted price one step ahead
+        current_close  (float): last close used as baseline
+    """
+    if len(candles_1m) < ML_LOOKBACK:
+        return 0.0, 0.0
+
+    window = candles_1m[-ML_LOOKBACK:]
+    closes  = np.array([c["close"]  for c in window], dtype=np.float64)
+    highs   = np.array([c["high"]   for c in window], dtype=np.float64)
+    lows    = np.array([c["low"]    for c in window], dtype=np.float64)
+    volumes = np.array([c["volume"] for c in window], dtype=np.float64)
+
+    # Replace any NaN / zero with previous value
+    for arr in (closes, highs, lows, volumes):
+        for i in range(len(arr)):
+            if not np.isfinite(arr[i]) or arr[i] == 0:
+                arr[i] = arr[i-1] if i > 0 else arr[0]
+
+    current_close = float(closes[-1])
+
+    try:
+        # ── Feature 1: RSI momentum bias ─────────────────────────────────────
+        rsi = talib.RSI(closes, timeperiod=14)
+        rsi_last = float(rsi[-1]) if np.isfinite(rsi[-1]) else 50.0
+        rsi_bias = (rsi_last - 50.0) / 50.0           # −1..+1
+
+        # ── Feature 2: MACD histogram sign & magnitude ────────────────────────
+        macd, macd_sig, macd_hist = talib.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
+        hist_last = float(macd_hist[-1]) if np.isfinite(macd_hist[-1]) else 0.0
+        hist_norm = hist_last / (current_close + 1e-12)
+
+        # ── Feature 3: Bollinger Band position ───────────────────────────────
+        bb_up, bb_mid, bb_lo = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+        bb_range = float(bb_up[-1] - bb_lo[-1]) if np.isfinite(bb_up[-1]) and np.isfinite(bb_lo[-1]) else 1e-9
+        if bb_range < 1e-12:
+            bb_range = 1e-9
+        bb_pos = float((closes[-1] - bb_lo[-1]) / bb_range) if np.isfinite(bb_lo[-1]) else 0.5   # 0..1
+
+        # ── Feature 4: Short-term linear regression slope ────────────────────
+        n_lr = 20
+        lr_closes = closes[-n_lr:]
+        x = np.arange(n_lr, dtype=np.float64)
+        slope = float(np.polyfit(x, lr_closes, 1)[0])
+        slope_norm = slope / (current_close + 1e-12)   # normalised slope
+
+        # ── Feature 5: Volume-weighted price change ───────────────────────────
+        recent_ret = (closes[-1] - closes[-6]) / (closes[-6] + 1e-12)
+        vol_ratio = float(np.mean(volumes[-3:])) / (float(np.mean(volumes[-20:])) + 1e-12)
+        vol_weighted_ret = recent_ret * vol_ratio
+
+        # ── Combine features into a single directional score ─────────────────
+        # Weights chosen to reflect relative signal reliability
+        score = (
+            0.30 * rsi_bias
+          + 0.25 * np.sign(hist_norm) * min(abs(hist_norm) * 1e4, 1.0)
+          + 0.20 * (bb_pos - 0.5) * 2          # map 0..1 → −1..+1
+          + 0.15 * np.sign(slope_norm) * min(abs(slope_norm) * 1e3, 1.0)
+          + 0.10 * np.sign(vol_weighted_ret) * min(abs(vol_weighted_ret) * 10, 1.0)
+        )
+
+        # ── Translate score into a 1-bar ahead price forecast ─────────────────
+        # Max expected single-bar move ~ 0.3% at score magnitude of 1.0
+        MAX_MOVE_FRAC = 0.003
+        forecast_price = current_close * (1.0 + score * MAX_MOVE_FRAC)
+
+        return float(forecast_price), current_close
+
+    except Exception as e:
+        print(f"  [ML Forecast] Error: {e}")
+        return 0.0, current_close
+
+
+def compute_signals(buffer_5m, buffer_1m, live_price):
+    candles_5m = buffer_5m.get_candles()
+    candles_1m  = buffer_1m.get_candles()
+
+    closes_5m_raw = [c["close"] for c in candles_5m]
+    closes_1m_raw = [c["close"] for c in candles_1m]
+
+    if len(closes_5m_raw) < 50 or len(closes_1m_raw) < 50:
+        return None
+
+    close_arr_5m = np.array(closes_5m_raw, dtype=float)
+    close_arr_1m = np.array(closes_1m_raw, dtype=float)
+
+    # ── Shared pre-computation (needed by Harmonic block) ────────────────────
+    candles_1m_window = candles_1m[-500:]
+    last_500_1m       = close_arr_1m[-500:]
+    window_len_1m     = len(last_500_1m)
+    argmin_idx_1m     = int(np.argmin(last_500_1m))
+    argmax_idx_1m     = int(np.argmax(last_500_1m))
+    cycle_min_price   = float(last_500_1m[argmin_idx_1m])
+    cycle_max_price   = float(last_500_1m[argmax_idx_1m])
+    current_close_1m  = float(close_arr_1m[-1])
+    bars_ago_min      = (window_len_1m - 1) - argmin_idx_1m
+    bars_ago_max      = (window_len_1m - 1) - argmax_idx_1m
+    most_recent_extreme = "ARGMIN (LOW)" if bars_ago_min > bars_ago_max else (
+                          "ARGMAX (HIGH)" if bars_ago_max > bars_ago_min else "TIE")
+
+    try:
+        ts_min = datetime.datetime.fromtimestamp(candles_1m_window[argmin_idx_1m]["time"]).strftime("%H:%M:%S")
+        ts_max = datetime.datetime.fromtimestamp(candles_1m_window[argmax_idx_1m]["time"]).strftime("%H:%M:%S")
+    except Exception:
+        ts_min = ts_max = "N/A"
+
+    # ── 1. Momentum (1m) — MANDATORY ─────────────────────────────────────────
+    # Cyclicity: most recent MOM extrema determines direction.
+    # argmin (most negative MOM) more recent → dip/reversal → LONG
+    # argmax (most positive MOM) more recent → peak/reversal → SHORT
+    mom_1m, mom_bars_ago_min, mom_bars_ago_max, cond_mom_long, cond_mom_short =         calculate_momentum_cyclicity(close_arr_1m)
+    if np.isnan(mom_1m):
+        return None
+
+    # ── 2. 3m Midpoint Gate ───────────────────────────────────────────────────
+    # Re-derive from 5m candles (proxy: use last 3 candles of 1m as 3m substitute)
+    # Full 3m candle data not separately buffered — compute from 1m closes
+    last_3m_closes = closes_1m_raw[-180:] if len(closes_1m_raw) >= 180 else closes_1m_raw
+    mid_3m_min  = float(np.min(last_3m_closes))
+    mid_3m_max  = float(np.max(last_3m_closes))
+    mid_3m      = (mid_3m_min + mid_3m_max) / 2.0
+    cur_price   = live_price
+    cond_mid_long  = cur_price < mid_3m          # below midpoint → upside room
+    cond_mid_short = not cond_mid_long
+
+    # ── 3. 45° Angle (Gann) ───────────────────────────────────────────────────
+    # Keep exactly as original: expected price along 45° line from cycle low
+    # Reference point: cycle min price at bars_ago_min bars ago
+    # 1 bar of time = 1 unit of price movement scaled to range/window
+    price_range   = cycle_max_price - cycle_min_price
+    time_units    = float(window_len_1m)
+    slope_per_bar = price_range / time_units if time_units > 0 else 0.0
+    expected_45   = cycle_min_price + slope_per_bar * float(bars_ago_min)
+    # Above 45° line = bearish (price moved too fast), below = bullish
+    above_45      = (live_price > expected_45)
+    pct_vs_45     = ((live_price - expected_45) / (expected_45 + 1e-9)) * 100.0
+    cond_45_long  = not above_45
+    cond_45_short = above_45
+
+    # ── 4. Harmonic Oscillator (Sine + Cycle + Volume fused) — MANDATORY ──────
+    # Base phase/cycle data now comes from the 5m timeframe (much less noisy
+    # than 1m); 1m candles are still passed in for the fine volume-VROC nudge.
+    last_5m_window   = close_arr_5m[-ANALYSIS_WINDOW_5M:] if len(close_arr_5m) >= ANALYSIS_WINDOW_5M else close_arr_5m
+    window_len_5m    = len(last_5m_window)
+    argmin_idx_5m    = int(np.argmin(last_5m_window))
+    argmax_idx_5m    = int(np.argmax(last_5m_window))
+    bars_ago_min_5m  = (window_len_5m - 1) - argmin_idx_5m
+    bars_ago_max_5m  = (window_len_5m - 1) - argmax_idx_5m
+
+    bullish_perc, bearish_perc = get_buy_sell_volume_perc(candles_1m)
+    ho_long, ho_short, theta_deg, forecast_price, trend_str, quad_label, ho_extra = compute_harmonic_oscillator(
+        candles_5m, last_5m_window, live_price,
+        argmin_idx_5m, argmax_idx_5m,
+        bars_ago_min_5m, bars_ago_max_5m,
+        bullish_perc, bearish_perc,
+        candles_1m=candles_1m
+    )
+    cond_ho_long  = ho_long
+    cond_ho_short = ho_short
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ENTRY LOGIC:
+    #   MANDATORY: Mom (1) AND Harmonic (4) must agree on direction
+    #   FLEXIBLE:  Need all 4/4 total (strict — all must agree)
+    #              This is maximum-accuracy mode: every condition must be True
+    #   Result is strictly binary — is_long XOR is_short always
+    # ══════════════════════════════════════════════════════════════════════════
+    long_votes  = [cond_mom_long,  cond_mid_long,  cond_45_long,  cond_ho_long]
+    short_votes = [cond_mom_short, cond_mid_short, cond_45_short, cond_ho_short]
+
+    long_true_count  = sum(long_votes)
+    short_true_count = sum(short_votes)
+
+    # Mandatory: Mom + HO must both agree
+    mom_ho_agree_long  = cond_mom_long  and cond_ho_long
+    mom_ho_agree_short = cond_mom_short and cond_ho_short
+
+    # Signal requires mandatory pair + all 4 agree (highest accuracy gate)
+    is_long  = mom_ho_agree_long  and (long_true_count  == 4)
+    is_short = mom_ho_agree_short and (short_true_count == 4)
+
+    # Strict mutual exclusivity fallback (can't be both)
+    if is_long and is_short:
+        is_long, is_short = False, False
+
+    return {
+        "price":      live_price,
+        "is_long":    is_long,
+        "is_short":   is_short,
+        "cond_flags": {
+            "mom_long":  cond_mom_long,  "mom_short":  cond_mom_short,
+            "mid_long":  cond_mid_long,  "mid_short":  cond_mid_short,
+            "ang_long":  cond_45_long,   "ang_short":  cond_45_short,
+            "ho_long":   cond_ho_long,   "ho_short":   cond_ho_short,
+        },
+        "long_true_count":  long_true_count,
+        "short_true_count": short_true_count,
+        # Momentum
+        "mom_1m": mom_1m,
+        "mom_bars_ago_min": mom_bars_ago_min,
+        "mom_bars_ago_max": mom_bars_ago_max,
+        # 3m Midpoint
+        "mid_3m_min": mid_3m_min, "mid_3m_max": mid_3m_max, "mid_3m": mid_3m,
+        # 45° Angle
+        "expected_45": expected_45, "pct_vs_45": pct_vs_45, "above_45": above_45,
+        # Harmonic Oscillator outputs
+        "theta_deg":      theta_deg,
+        "forecast_price": forecast_price,
+        "trend_str":      trend_str,
+        "quad_label":     quad_label,
+        "quad_progress_pct":  ho_extra["quad_progress_pct"],
+        "cycle_progress_pct": ho_extra["cycle_progress_pct"],
+        "last_quad_label":    ho_extra["last_quad_label"],
+        "next_quad_label":    ho_extra["next_quad_label"],
+        "ho_cycle_period":    ho_extra["cycle_period"],
+        "bullish_perc":   bullish_perc,
+        "bearish_perc":   bearish_perc,
+        # Cycle data (kept for reference / journaling)
+        "argmin_idx_1m": argmin_idx_1m, "argmax_idx_1m": argmax_idx_1m,
+        "cycle_min_price": cycle_min_price, "cycle_max_price": cycle_max_price,
+        "current_close_1m": current_close_1m,
+        "bars_ago_min": bars_ago_min, "bars_ago_max": bars_ago_max,
+        "ts_min": ts_min, "ts_max": ts_max,
+        "most_recent_extreme": most_recent_extreme,
+        "window_len_1m": window_len_1m,
+    }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SL & TP CALCULATIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def calculate_sl_tp(entry_price, side):
+    tp_dist = entry_price * TP_PRICE_PCT
+    sl_dist = entry_price * SL_PRICE_PCT
+    if side == "long": sl_price, tp_price = entry_price - sl_dist, entry_price + tp_dist
+    else: sl_price, tp_price = entry_price + sl_dist, entry_price - tp_dist
+    print(f"  [Risk Calc] TP: {tp_price:.2f} ({TAKE_PROFIT_ROE}% ROE) | SL: {sl_price:.2f} ({STOP_LOSS_ROE}% ROE)")
+    return float(sl_price), float(tp_price)
+
+def check_sim_tp_sl(entry_price, current_price, side):
+    if side == "long": price_change_pct = ((current_price - entry_price) / entry_price) * 100
+    else: price_change_pct = ((entry_price - current_price) / entry_price) * 100
+    roe_pct = price_change_pct * LEVERAGE - RT_FEE_ROE_PCT
+    if roe_pct >= TAKE_PROFIT_ROE: return True, "TAKE PROFIT", roe_pct
+    elif roe_pct <= STOP_LOSS_ROE: return True, "STOP LOSS", roe_pct
+    return False, None, roe_pct
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STATE & JOURNALING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def save_trade_state(state):
+    try:
+        with open(TRADE_STATE_FILE, "w") as f: json.dump(state, f, indent=2)
+    except Exception as e: print(f"  [state] save error: {e}")
+
+def load_trade_state():
+    if not os.path.exists(TRADE_STATE_FILE): return None
+    try:
+        with open(TRADE_STATE_FILE, "r") as f: return json.load(f)
+    except Exception: return None
+
+def clear_trade_state():
+    try:
+        if os.path.exists(TRADE_STATE_FILE): os.remove(TRADE_STATE_FILE)
+    except Exception: pass
+
+def write_trade_to_journal(trade_result):
+    mode = trade_result.get("mode", "LIVE")
+    trade_type = trade_result.get("type", "N/A").upper()
+    entry_time = trade_result.get("entry_time", "N/A")
+    exit_time = trade_result.get("exit_time", "N/A")
+    duration = trade_result.get("duration", "N/A")
+    entry_price = trade_result.get("entry_price", 0)
+    exit_price = trade_result.get("exit_price", 0)
+    price_change_pct = trade_result.get("price_change_pct", 0)
+    gross_roe = trade_result.get("gross_roe", 0)
+    rt_fee_pct = trade_result.get("rt_fee_pct", 0)
+    net_roe = trade_result.get("roe", 0)
+    reason = trade_result.get("reason", "N/A")
+    strategy = trade_result.get("strategy", f"4/4 Cond (Mom+HO Mandatory, ALL must agree) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%")
     
-    return market_mood
+    separator = "=" * 60
+    line = (
+        f"{separator}\n"
+        f"MODE: {mode}\n"
+        f"TYPE: {trade_type}\n"
+        f"ENTRY TIME: {entry_time}\n"
+        f"EXIT TIME: {exit_time}\n"
+        f"DURATION: {duration}\n"
+        f"ENTRY PRICE: {entry_price:.2f}\n"
+        f"EXIT PRICE: {exit_price:.2f}\n"
+        f"PRICE CHANGE: {price_change_pct:+.4f}%\n"
+        f"GROSS ROE: {gross_roe:+.2f}%\n"
+        f"RT FEE DEDUCTED: {rt_fee_pct:.2f}%\n"
+        f"NET ROE: {net_roe:+.2f}%\n"
+        f"REASON: {reason}\n"
+        f"LEVERAGE: {LEVERAGE}x\n"
+        f"STRATEGY: {strategy}\n"
+        f"{separator}\n\n"
+    )
+    try:
+        with open(TRADES_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line)
+        print(f"  [journal] Trade written to {TRADES_LOG_FILE}")
+    except Exception as e:
+        print(f"  [journal] write error: {e}")
 
-market_mood = forecast_price_and_mood(close)
+# ═══════════════════════════════════════════════════════════════════════════════
+# ORDER EXECUTION
+# ═══════════════════════════════════════════════════════════════════════════════
 
-print(f"Market Mood: {market_mood}")
+def get_contract_size(symbol):
+    if not API_CONNECTED: return 0.001
+    try: return float(client.get(f"/api/v1/contracts/{symbol}")["data"]["multiplier"])
+    except Exception: return 0.001
 
-print()
+def execute_entry(symbol, side, balance, price):
+    try:
+        trade_balance = balance * TRADE_BALANCE_PCT   # use only 5% of available balance
+        contracts = max(1, int((trade_balance * LEVERAGE) / (price * get_contract_size(symbol))))
+        resp = client.place_order(symbol, side, contracts, LEVERAGE)
+        if resp.get("data", {}).get("orderId"):
+            print(f"  >>> {side.upper()} PLACED: {contracts} contracts @ ~{price:.2f}  (used {trade_balance:.2f} USDT / {TRADE_BALANCE_PCT*100:.0f}% of balance)")
+            return True
+        print(f"  [ORDER FAIL] {side.upper()} [{resp.get('code')}]: {resp.get('msg')}")
+        return False
+    except Exception as e:
+        print(f"  [ORDER ERROR] {side.upper()}: {e}")
+        return False
 
-##################################################
-##################################################
+# ═══════════════════════════════════════════════════════════════════════════════
+# DISPLAY HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
 
-print("Init main() loop: ")
+def format_duration(start_dt, end_dt):
+    total_sec = int((end_dt - start_dt).total_seconds())
+    h, rem = divmod(total_sec, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
-print()
+def print_conditions(sig):
+    f        = sig["cond_flags"]
+    fc       = sig["forecast_price"]
+    lp       = sig["price"]
+    fc_pct   = ((fc - lp) / lp * 100) if lp else 0.0
+    trend_arrow = "▲ UP" if sig["trend_str"] == "UP" else "▼ DOWN"
+    ql       = sig["quad_label"]          # e.g. "UP:Q2u-ACCUMULATION" or "DN:Q3d-DISTRIBUTION"
+    cycle_tag = ql.split(":")[0]          # "UP" or "DN"
+    quad_tag  = ql.split(":")[-1] if ":" in ql else ql
+    last_ql   = sig.get("last_quad_label", ql)
+    next_ql   = sig.get("next_quad_label", ql)
+    qpp       = sig.get("quad_progress_pct", 0.0)
+    cpp       = sig.get("cycle_progress_pct", 0.0)
 
-##################################################
-##################################################
+    print(f"  ┌─────────────────── DUAL-CIRCUIT HARMONIC STATE (5m) ────────────┐")
+    print(f"  │ Active: {cycle_tag}-CYCLE  {trend_arrow:<8}  Phase: {sig['theta_deg']:>6.1f}°            │")
+    print(f"  │ Last:    {last_ql:<28}                          │")
+    print(f"  │ Current: {quad_tag:<28} (each quad = 25% of cycle) │")
+    print(f"  │ Incoming:{next_ql:<28}                          │")
+    print(f"  │ Quad progress: {qpp:5.1f}%   Cycle progress: {cpp:5.1f}%               │")
+    print(f"  │ Forecast→{fc:.2f} ({fc_pct:+.3f}%)  CyclePeriod:{sig.get('ho_cycle_period',0):.1f}bars(5m){' '*10}│")
+    print(f"  │ Vol: Bull:{sig['bullish_perc']:.1f}% Bear:{sig['bearish_perc']:.1f}%{" "*36}│")
+    print(f"  └─────────────────────────────────────────────────────────────────┘")
+    mom_recent = "argmax(HIGH)" if sig["mom_bars_ago_max"] < sig["mom_bars_ago_min"] else "argmin(LOW)"
+    print(f"  1. Mom (1m):    {sig['mom_1m']:+.4f}  MinAgo:{sig['mom_bars_ago_min']}bars MaxAgo:{sig['mom_bars_ago_max']}bars Recent:{mom_recent}  L:{'✓' if f['mom_long'] else '✗'} S:{'✓' if f['mom_short'] else '✗'} [MANDATORY]")
+    print(f"  2. 3mMid:       Min:{sig['mid_3m_min']:.2f} Max:{sig['mid_3m_max']:.2f} Mid:{sig['mid_3m']:.2f} | Cur:{lp:.2f} ({'above' if lp>=sig['mid_3m'] else 'below'})  L:{'✓' if f['mid_long'] else '✗'} S:{'✓' if f['mid_short'] else '✗'}")
+    print(f"  3. 45°Angle:    Expected:{sig['expected_45']:.2f} | Cur:{lp:.2f} ({sig['pct_vs_45']:+.3f}%) {'▲Above' if sig['above_45'] else '▼Below'}  L:{'✓' if f['ang_long'] else '✗'} S:{'✓' if f['ang_short'] else '✗'}")
+    print(f"  4. Harmonic:    [{cycle_tag}:{quad_tag}] θ={sig['theta_deg']:.1f}° Trend:{sig['trend_str']} Fcst:{fc:.2f}  L:{'✓' if f['ho_long'] else '✗'} S:{'✓' if f['ho_short'] else '✗'} [MANDATORY]")
+    print(f"  ═══ LONG:{sig['long_true_count']}/4 SHORT:{sig['short_true_count']}/4 (Mom+HO Mandatory + ALL 4 Agree) -> LONG:{sig['is_long']} SHORT:{sig['is_short']}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN TRADING LOOP
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def main():
-    # Load credentials from file
-    with open("credentials.txt", "r") as f:
-        lines = f.readlines()
-        api_key = lines[0].strip()
-        api_secret = lines[1].strip()
+    print(f"\n{'='*60}")
+    print(f"HFT KuCoin Bot - 4/4 CONDITIONS (MOM+HARMONIC MANDATORY)")
+    print(f"{'='*60}")
+    print(f"Symbol:              {TRADE_SYMBOL}")
+    print(f"Leverage:            {LEVERAGE}x")
+    print(f"TP: {TAKE_PROFIT_ROE}% ROE | SL: {STOP_LOSS_ROE}% ROE")
+    print(f"Loop Sleep:          {LOOP_SLEEP}s")
+    print(f"Entry Logic:         Mom & HarmonicOscillator MANDATORY + All 4 Must Agree")
+    print(f"Position Sizing:     {TRADE_BALANCE_PCT*100:.0f}% of balance per trade")
+    print(f"API Connected:       {API_CONNECTED}")
+    print(f"Trades Log File:     {TRADES_LOG_FILE}")
+    print(f"{'='*60}\n")
 
-    # Instantiate Binance client
-    client = BinanceClient(api_key, api_secret)
+    buffer_5m = CandleBuffer(TRADE_SYMBOL, "5m", ANALYSIS_WINDOW_5M)
+    buffer_1m = CandleBuffer(TRADE_SYMBOL, "1m", ANALYSIS_WINDOW_1M)
+    
+    if API_CONNECTED:
+        print("  === INITIALIZING BUFFERS (one-time) ===\n")
+        t0 = time.perf_counter()
+        buffer_5m.initialize(client)
+        buffer_1m.initialize(client)
+        print(f"  Total init: {(time.perf_counter()-t0)*1000:.0f}ms\n")
+        
+        if not buffer_5m.is_ready() or not buffer_1m.is_ready():
+            print("  [ERROR] Buffer init failed. Exiting.")
+            return
+    
+    fetcher = ConcurrentDataFetcher(buffer_5m, buffer_1m, TRADE_SYMBOL, max_workers=5)
+    
+    saved_state = load_trade_state()
+    if saved_state:
+        print(f"  [recovery] State: {saved_state.get('mode')} {saved_state.get('side')} @ {saved_state.get('entry_price', 0):.2f}")
+    
+    loop_count = 0
+    last_timing_print = time.time()
+    last_buffer_log = 0
 
-    get_account_balance()
-
-    ##################################################
-    ##################################################
-
-    # Define timeframes
-    timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
-    TRADE_SYMBOL = "BTCUSDT"
-    symbol = TRADE_SYMBOL
-
-    trade_entry_pnl = 0
-    trade_exit_pnl = 0
-
-    current_pnl = 0.0
-
-    ##################################################
-    ##################################################
-
-    print()
-
-    ##################################################
-    ##################################################
+    print("  === STARTING MAIN LOOP ===\n")
 
     while True:
-
-        ##################################################
-        ##################################################
-        
-        # Get fresh closes for the current timeframe
-        closes = get_closes('1m')
-       
-        # Get close price as <class 'float'> type
-        close = get_close('1m')
-        
-        # Get fresh candles  
-        candles = get_candles(TRADE_SYMBOL, timeframes)
-                
-        # Update candle_map with fresh data
-        for candle in candles:
-            timeframe = candle["timeframe"]  
-            candle_map.setdefault(timeframe, []).append(candle)
-                
-        ##################################################
-        ##################################################
-
-        try:     
-            ##################################################
-            ##################################################
-
-            url = "https://fapi.binance.com/fapi/v1/ticker/price"
-
-            params = {
-                "symbol": "BTCUSDT" 
-                }
-
-            response = requests.get(url, params=params)
-            data = response.json()
-
-            price = data["price"]
-            #print(f"Current BTCUSDT price: {price}")
-
-            # Define the current time and close price
-            current_time = datetime.datetime.now()
-            current_close = price
-
-            #print("Current local Time is now at: ", current_time)
-            #print("Current close price is at : ", current_close)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Call function with minimum percentage of 2%, maximum percentage of 2%, and range distance of 5%
-            min_threshold, max_threshold, avg_mtf, momentum_signal, range_price = calculate_thresholds(closes, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-
-            print("Momentum sinewave signal:", momentum_signal)
-            print()
-
-            print("Minimum threshold:", min_threshold)
-            print("Maximum threshold:", max_threshold)
-            print("Average MTF:", avg_mtf)
-
-            # Determine which threshold is closest to the current close
-            closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - close[-1]))
-
-            if closest_threshold == min_threshold:
-                print("The last minimum value is closest to the current close.")
-            elif closest_threshold == max_threshold:
-                print("The last maximum value is closest to the current close.")
-            else:
-                print("No threshold value found.")
-
-            print()
-
-
-            ##################################################
-            ##################################################
-
-            # closes = get_closes("1m")     
-            n_components = 5
-
-            current_time, entry_price, stop_loss, fastest_target, fast_target1, fast_target2, fast_target3, fast_target4, target1, target2, target3, target4, target5, target6, target7, target8, target9, target10, filtered_signal, target_price, market_mood = get_target(closes, n_components, target_distance=56)
-
-            print("Current local Time is now at: ", current_time)
-            print("Market mood is: ", market_mood)
-            market_mood_fft = market_mood
- 
-            print()
-
-            print("Current close price is at : ", current_close)
-
-            print()
-
-            print("Fast target 1 is: ", fast_target4)
-            print("Fast target 2 is: ", fast_target3)
-            print("Fast target 3 is: ", fast_target2)
-            print("Fast target 4 is: ", fast_target1)
-
-            print()
-
-            print("Fastest target is: ", fastest_target)
-
-            print()
-
-            print("Target 1 is: ", target1)
-            print("Target 2 is: ", target2)
-            print("Target 3 is: ", target3)
-            print("Target 4 is: ", target4)
-            print("Target 5 is: ", target5)
-
-            # Get the current price
-            price = get_current_price()
-
-            print()
-
-            price = float(price)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Call the calculate_reversal_and_forecast function with the example data
-            (current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression, last_reversal, forecast_dip, forecast_top) = calculate_reversal_and_forecast(close)
-            print("Forecast Direction:", forecast_direction if forecast_direction is not None else "None")
-
-            # Handle NaN and None values for Forecast Price FFT
-            if forecast_price_fft is None or np.isnan(forecast_price_fft):
-                forecast_price_fft = close_np[-1]
-            print("Forecast Price FFT:", forecast_price_fft)
-
-            forecast_price_fft = float(forecast_price_fft)
-
-            # Handle NaN and None values for Future Price Regression
-            if future_price_regression is None or np.isnan(future_price_regression[1][0]):
-                future_price_regression = close_np[-1]
-            else:
-                future_price_regression = future_price_regression[1][0]
-            print("Future Price Regression:", future_price_regression)
-
-            future_price_regression = float(future_price_regression)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Example close prices
-            close_prices = np.array(close)  # Insert your actual close prices here
-
-            result = calculate_price_distance_and_wave(price, close_prices)  # Assuming 'price' is defined somewhere
-
-            # Unpack the result dictionary into individual variables
-            price_val = result['price']
-            ht_sine_value = result['ht_sine_value']
-            normalized_distance_to_min = result['normalized_distance_to_min']
-            normalized_distance_to_max = result['normalized_distance_to_max']
-            min_price_val = result['min_price']
-            max_price_val = result['max_price']
-            market_mood_val = result['market_mood']
-
-            # Print the detailed information for the given price using the individual variables
-            print(f"Price: {price_val:.2f}")
-            print(f"HT_SINE Value: {ht_sine_value:.2f}")
-            print(f"Normalized Distance to Min: {normalized_distance_to_min:.2f}%")
-            print(f"Normalized Distance to Max: {normalized_distance_to_max:.2f}%")
-            print(f"Min Price: {min_price_val:.2f}")
-            print(f"Max Price: {max_price_val:.2f}")
-            print(f"Market Mood: {market_mood_val}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            min_threshold, max_threshold, avg_mtf, momentum_signal, _ = calculate_thresholds(close, period=14, minimum_percentage=2, maximum_percentage=2, range_distance=0.05)
-
-            print("Momentum signal:", momentum_signal)
-            print("Minimum threshold:", min_threshold)
-            print("Maximum threshold:", max_threshold)
-            print("Average MTF:", avg_mtf)
-
-            market_mood, forecast_price = calculate_sine_wave_and_forecast(closes, min_threshold, max_threshold)
-            if market_mood:
-                print(f"Forecast price: {forecast_price}")
-
-            closest_threshold = min(min_threshold, max_threshold, key=lambda x: abs(x - closes[-1]))
-            if closest_threshold == min_threshold:
-                print("The last minimum value is closest to the current close.")
-            elif closest_threshold == max_threshold:
-                print("The last maximum value is closest to the current close.")
-            else:
-                print("No threshold value found.")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Calculate the 45-degree angle (simple linear regression)
-            x = np.arange(len(close))
-            slope, intercept = np.polyfit(x, close, 1)
-
-            # Calculate the expected trend line value for the last close price
-            expected_price = slope * len(close) + intercept
-
-            # Display the expected price on the 45-degree angle trend
-            print(f"Expected price on the 45-degree angle trend: {expected_price}")
-
-            # Get the last close price from the list for forecasting
-            last_close_price = price
-
-            # Generate forecast based on the 45-degree angle
-            forecast_result = forecast_45_degree_angle(last_close_price, expected_price)
-
-            # Display the forecast result
-            print(forecast_result)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            val_low, val_high, sup, res, mood, forecast = analyze_market_profile(close)
-
-            print(f"Value Area Low: {val_low}, Value Area High: {val_high}")
-            print(f"Current Support: {sup}, Current Resistance: {res}")
-            print(f"Market Mood: {mood}")
-            print(f"Forecasted Price: {forecast}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Initialize variables
-            trigger_long = False 
-            trigger_short = False
-
-            current_time = datetime.datetime.utcnow() + timedelta(hours=3)
-
-            print()
-
-            print("Last reversal keypoint was: ", closest_threshold)
+        try:
+            loop_start = time.perf_counter()
+            now = datetime.datetime.now()
+            now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+            loop_count += 1
+
+            do_full_refresh = buffer_5m.needs_full_refresh() or buffer_1m.needs_full_refresh()
+            data = fetcher.fetch_all_parallel(do_full_refresh=do_full_refresh)
             
-            print()
-
-            ##################################################
-            ##################################################
-
-            forecasted_price = identify_reversals(close)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Forecast prices
-            fast_price, medium_price, slow_price = forecast_prices(close)
-
-            # Print forecasted prices
-            print(f"Forecasted price (fast cycle): {fast_price:.2f}")
-            print(f"Forecasted price (medium cycle): {medium_price:.2f}")
-            print(f"Forecasted price (slow cycle): {slow_price:.2f}")
-
-            fast_price = float(fast_price)
-            medium_price = float(medium_price)
-            slow_price = float(slow_price)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            results = forecast_sma_targets(price)
-
-            # Print each output string separately
-            for result in results:
-                print(result)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            timeframes = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h',  '6h', '8h', '12h', '1d']
-
-            # Calculate momentum for each timeframe
-            momentum_values = {}
-            for timeframe in timeframes:
-                momentum = get_momentum(timeframe)
-                momentum_values[timeframe] = momentum
-                print(f"Momentum for {timeframe}: {momentum}")
-
-            # Convert momentum to a normalized scale and determine if it's positive or negative
-            normalized_momentum = {}
-            for timeframe, momentum in momentum_values.items():
-                normalized_value = (momentum + 100) / 2  # Normalize to a scale between 0 and 100
-                normalized_momentum[timeframe] = normalized_value
-                print(f"Normalized Momentum for {timeframe}: {normalized_value:.2f}%")
-
-            # Calculate dominant ratio
-            positive_count = sum(1 for value in normalized_momentum.values() if value > 50)
-            negative_count = len(normalized_momentum) - positive_count
-
-            print(f"Positive momentum timeframes: {positive_count}/{len(normalized_momentum)}")
-            print(f"Negative momentum timeframes: {negative_count}/{len(normalized_momentum)}")
-
-            if positive_count > negative_count:
-                print("Overall dominant momentum: Positive")
-            elif positive_count < negative_count:
-                print("Overall dominant momentum: Negative")
-            else:
-                print("Overall dominant momentum: Balanced")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            timeframe = '1m'
-            momentum = get_momentum(timeframe)
-            print("Momentum on 1min tf is at: ", momentum)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Example usage:
-            closes = close
-
-            signal = impulse_momentum_overall_signal(closes)
-            print("Overall Signal:", signal)
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            reversals = detect_reversals(close)
-
-            for reversal in reversals:
-                min_threshold, max_threshold = adjust_stationary_object(min_threshold, max_threshold, reversal)
-
-            market_mood_type = analyze_market_mood(reversals)
-
-            print(f"Market Mood: {market_mood_type}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            market_mood_fastfft = fft_trading_signal(close)
-
-            #print(f"Market Mood: {market_mood_fastfft}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            # Analyze the market behavior based on the sample data
-            analysis_results = analyze_market_behavior(close)
-
-            # Print the results separately
-            print("Market Mood:", analysis_results["Market Mood"])
-            print("Incoming Reversal:", analysis_results["Incoming Reversal"])
-
-            incoming_reversal = analysis_results["Incoming Reversal"]
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            market_mood_poly = forecast_price_and_mood(close)
-
-            print(f"Market Mood: {market_mood_poly}")
-
-            print()
-
-            ##################################################
-            ##################################################
-
-            take_profit = 10.00
-            stop_loss = -10.00
-
-            # Current timestamp in milliseconds
-            timestamp = int(time.time() * 1000)
-
-            # Concatenate the parameters and create the signature
-            params = f"symbol={TRADE_SYMBOL}&timestamp={timestamp}"
-            signature = hmac.new(api_secret.encode('utf-8'), params.encode('utf-8'), hashlib.sha256).hexdigest()
-
-            # Construct the complete URL
-            position_endpoint = f"https://fapi.binance.com/fapi/v2/positionRisk?{params}&signature={signature}"
-
-            response = requests.get(position_endpoint, headers={"X-MBX-APIKEY": api_key})
-    
-            if response.status_code == 200:
-
-                positions = response.json()
-                found_position = False
-
-                for position in positions:
-                    if position['symbol'] == TRADE_SYMBOL:
-                        found_position = True
-                        print("Position open:", position['positionAmt'])
-
-                        entry_price = float(position['entryPrice'])
-                        mark_price = float(position['markPrice'])
-                        position_amount = float(position['positionAmt'])
-                        leverage = float(position['leverage'])
-                        un_realized_profit = float(position['unRealizedProfit'])
-
-                        print("entry price at:", entry_price)
-                        print("mark price at:", mark_price)
-                        print("position_amount:", position_amount)
-                        print("Current PNL at:", un_realized_profit)
-
-                        direction = 1 if position_amount > 0 else -1
-                        unrealized_pnl = position_amount * direction * (mark_price - entry_price)
-                        imr = 1 / leverage
-                        entry_margin = position_amount * mark_price * imr
-
-                        if entry_margin != 0:
-                            roe_percentage = (unrealized_pnl / entry_margin) * 100
-                            print(f"ROE Percentage (ROE %) for {TRADE_SYMBOL}: {roe_percentage:.2f}%")
-                        else:
-                            print("Initial Margin is zero, no position is open yet")
-                        break
-        
-                    if not found_position:
-                        print("Position not open.")
-
-            else:
-                print("Failed to retrieve position information. Status code:", response.status_code)
-
-            print()
-
-            ##################################################
-            ##################################################
-            # Cycles trigger conditions and bot autotrde sl and tp trigger conditions
-            with open("signals.txt", "a") as f:
-                # Get data and calculate indicators here...
-                timestamp = current_time.strftime("%d %H %M %S")
-
-                if un_realized_profit == 0:  
-                    # Check if a position is not open
-                    print("Now not in a trade, seeking entry conditions")
-
-                    print()
-
-                    # Uptrend cycle trigger conditions 
-                    if normalized_distance_to_min < normalized_distance_to_max:
-                        print("LONG condition 1: normalized_distance_to_min < normalized_distance_to_max")                
-                        if closest_threshold == min_threshold and price < avg_mtf: 
-                            print("LONG condition 2: closest_threshold == min_threshold and price < avg_mtf")                                                   
-                            if closest_threshold < price:  
-                                print("LONG condition 3: closest_threshold < price")
-                                if market_mood_poly == "Bullish":
-                                    print("LONG condition 4: market_mood_poly == Bullish")  
-                                    if market_mood_fastfft == "long":
-                                        print("LONG condition 5: market_mood_fastfft == long")        
-                                        if price < fastest_target:
-                                            print("LONG condition 6: price < fastest_target") 
-                                            if forecast_direction == "Up":
-                                                print("LONG condition 7: forecast_direction == Up")                             
-                                                if future_price_regression > price:
-                                                    print("LONG condition 8: future_price_regression > price")
-                                                    if forecast_price_fft > price:
-                                                        print("LONG condition 9: forecast_price_fft > price")
-                                                        if price < expected_price:
-                                                            print("LONG condition 10: price < expected_price") 
-                                                            if market_mood_fft == "Bullish":
-                                                                print("LONG condition 11: market_mood_fft == Bullish")  
-                                                                if price < forecast:
-                                                                    print("LONG condition 12: price < forecast")
-                                                                    if incoming_reversal == "Top": 
-                                                                        print("LONG condition 13: incoming_reversal == Top") 
-                                                                        if market_mood_type == "up":
-                                                                            print("LONG condition 14: market_mood_type == up")   
-                                                                            if price < fast_price:   
-                                                                                print("LONG condition 15: price < fast_price")  
-                                                                                if positive_count > negative_count or positive_count == negative_count:
-                                                                                    if positive_count > negative_count:
-                                                                                        print("LONG condition 16: positive_count > negative_count")     
-                                                                                    elif positive_count == negative_count:
-                                                                                        print("LONG condition 16: positive_count = negative_count")
-                                                                                    if signal == "BUY":
-                                                                                        print("LONG condition 17: signal == BUY")                             
-                                                                                        if momentum > 0:
-                                                                                            print("LONG condition 18: momentum > 0")
-                                                                                            trigger_long = True
-
-                    # Downtrend cycle trigger conditions
-                    if normalized_distance_to_max < normalized_distance_to_min:
-                        print("SHORT condition 1: normalized_distance_to_max < normalized_distance_to_min") 
-                        if closest_threshold == max_threshold and price > avg_mtf:
-                            print("SHORT condition 2: closest_threshold == max_threshold and price > avg_mtf")  
-                            if closest_threshold > price:
-                                print("SHORT condition 3: closest_threshold > price")  
-                                if market_mood_poly == "Bearish":
-                                    print("SHORT condition 4: market_mood_poly == Bearish") 
-                                    if market_mood_fastfft == "long":
-                                        print("SHORT condition 5: market_mood_fastfft == short") 
-                                        if price > fastest_target:
-                                            print("SHORT condition 6: price > fastest_target") 
-                                            if forecast_direction == "Down":
-                                                print("SHORT condition 7: forecast_direction == Down") 
-                                                if future_price_regression < price:
-                                                    print("SHORT condition 8: future_price_regression < price")
-                                                    if forecast_price_fft < price:
-                                                        print("SHORT condition 9: forecast_price_fft < price")
-                                                        if price > expected_price:
-                                                            print("SHORT condition 10: price > expected_price") 
-                                                            if market_mood_fft == "Bearish":
-                                                                print("SHORT condition 11: market_mood_fft == Bearish")
-                                                                if price > forecast:
-                                                                    print("SHORT condition 12: price > forecast")
-                                                                    if incoming_reversal == "Dip": 
-                                                                        print("SHORT condition 13: incoming_reversal == Dip") 
-                                                                        if market_mood_type == "down":
-                                                                            print("SHORT condition 14: market_mood_type == down")   
-                                                                            if price > fast_price:   
-                                                                                print("SHORT condition 15: price > fast_price")
-                                                                                if positive_count < negative_count or positive_count == negative_count:
-                                                                                    if positive_count < negative_count:
-                                                                                        print("SHORT condition 16: positive_count < negative_count")     
-                                                                                    elif positive_count == negative_count:
-                                                                                        print("SHORT condition 16: positive_count = negative_count")   
-                                                                                    if signal == "SELL":
-                                                                                        print("SHORT condition 17: signal == SELL")                                          
-                                                                                        if momentum < 0:
-                                                                                            print("SHORT condition 18: momentum < 0")
-                                                                                            trigger_short = True
-                    print()  
-
-                    #message = f'Price: ${price}' 
-                    #webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1168841370149060658/QM5ldJk02abTfal__0UpzHXYZI79bS-j6W75e8CbCwc6ZADimkSTLQkXwYIUd2s9Hk2T', content=message)
-                    #response = webhook.execute()
-
-                    message_long = f'LONG signal! Price now at: {price}\n'
-                    message_short = f'SHORT signal! Price now at: {price}\n'
-
-                    if trigger_long:
-                        print("LONG signal!")
-                        f.write(f"{current_time} LONG {price}\n")
-
-                        webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1191539448782000189/Jvz-8g-pEa3FxWdnIL51Fi5XQJFZDmPrsOYaw8NOvp66S0BESptJ99sZAdtdQe4HGI0C', content=message_long)
-                        response = webhook.execute()
-
-                        entry_long(symbol)
-                        trigger_long = False
-
-                    if trigger_short:
-                        print("SHORT signal!")
-                        f.write(f"{current_time} SHORT {price}\n")
-
-                        webhook = DiscordWebhook(url='https://discord.com/api/webhooks/1191539448782000189/Jvz-8g-pEa3FxWdnIL51Fi5XQJFZDmPrsOYaw8NOvp66S0BESptJ99sZAdtdQe4HGI0C', content=message_short)
-                        response = webhook.execute()
-
-                        entry_short(symbol)
-                        trigger_short = False
-
-                    print()
-
-                # Check stop loss and take profit conditions
-                if un_realized_profit != 0:
-                    print("Now in a trade, seeking exit conditions")
-
-                    if roe_percentage >= take_profit or roe_percentage <= stop_loss:
-                        # Call exit_trade() function
-                        exit_trade() 
+            current_price = data["price"]
+            balance = data["balance"]
+            pos = data["position"]
+            has_sufficient_balance = balance >= MIN_BALANCE_USDT
+            
+            parallel_ms = data["parallel_total_ms"]
+            log_timing("parallel_total", parallel_ms)
+            for k, v in data["times"].items():
+                log_timing(f"task_{k}", v)
+            
+            if loop_count - last_buffer_log >= 100:
+                print(f"  [Buffers] 5m:{len(buffer_5m)} 1m:{len(buffer_1m)} | Parallel: {parallel_ms:.0f}ms | Tasks: {data['times']}")
+                last_buffer_log = loop_count
+            
+            t = time.perf_counter()
+            sig = compute_signals(buffer_5m, buffer_1m, current_price)
+            compute_ms = (time.perf_counter() - t) * 1000
+            log_timing("compute_signals", compute_ms)
+
+            # ══════════════════════════════════════════════════════════════════
+            # POSITION MANAGEMENT — LIVE POSITION EXISTS
+            # ══════════════════════════════════════════════════════════════════
+            if pos["is_open"]:
+                roe, side, entry_price, mark_price = pos["roe_pct"], pos["side"], pos["entry_price"], pos["mark_price"]
+                
+                if loop_count % 10 == 0:
+                    print(f"\n[{now_str}] === LIVE {side.upper()} | Entry:{entry_price:.2f} Mark:{mark_price:.2f} ROE:{roe:+.2f}% ===")
+                    if sig: print_conditions(sig)
+                
+                reason = None
+                if roe >= TAKE_PROFIT_ROE: reason = "TAKE PROFIT"
+                elif roe <= STOP_LOSS_ROE: reason = "STOP LOSS"
                     
-            ##################################################
-            ##################################################
+                if reason:
+                    print(f"  >>> [{reason}] {roe:+.2f}% ROE - Closing...")
+                    client.close_position(TRADE_SYMBOL)
+                    price_change_pct = ((mark_price - entry_price) / entry_price) * 100 if side == "long" else ((entry_price - mark_price) / entry_price) * 100
+                    start_dt = datetime.datetime.strptime(saved_state["entry_time"], "%Y-%m-%d %H:%M:%S")
+                    gross_roe = price_change_pct * LEVERAGE
+                    net_roe = gross_roe - RT_FEE_ROE_PCT
+                    trade_result = {
+                        "mode": "LIVE",
+                        "entry_time": saved_state["entry_time"],
+                        "exit_time": now_str,
+                        "type": side,
+                        "entry_price": entry_price,
+                        "exit_price": mark_price,
+                        "price_change_pct": price_change_pct,
+                        "gross_roe": gross_roe,
+                        "rt_fee_pct": RT_FEE_ROE_PCT,
+                        "roe": net_roe,
+                        "duration": format_duration(start_dt, datetime.datetime.now()),
+                        "reason": reason,
+                        "strategy": f"4/4 Cond (Mom+HO Mandatory, ALL must agree) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%"
+                    }
+                    write_trade_to_journal(trade_result)
+                    clear_trade_state()
+                    saved_state = None
+                
+                loop_ms = (time.perf_counter() - loop_start) * 1000
+                log_timing("total_loop", loop_ms)
+                time.sleep(LOOP_SLEEP)
+                continue
 
-            print()
+            # ══════════════════════════════════════════════════════════════════
+            # POSITION MANAGEMENT — SIMULATION POSITION EXISTS
+            # ══════════════════════════════════════════════════════════════════
+            if saved_state and saved_state.get("mode") == "SIMULATION":
+                sim_entry_price, sim_side, sim_entry_time = saved_state["entry_price"], saved_state["side"], saved_state["entry_time"]
+                hit, reason, sim_roe = check_sim_tp_sl(sim_entry_price, current_price, sim_side)
+                
+                if loop_count % 10 == 0:
+                    start_dt = datetime.datetime.strptime(sim_entry_time, "%Y-%m-%d %H:%M:%S")
+                    print(f"\n[{now_str}] === SIM {sim_side.upper()} | Entry:{sim_entry_price:.2f} Now:{current_price:.2f} ROE:{sim_roe:+.2f}% ===")
+                    if sig: print_conditions(sig)
+                
+                if hit and reason:
+                    print(f"  >>> [SIM {reason}] {sim_roe:+.2f}% ROE")
+                    price_change_pct = ((current_price - sim_entry_price) / sim_entry_price) * 100 if sim_side == "long" else ((sim_entry_price - current_price) / sim_entry_price) * 100
+                    start_dt = datetime.datetime.strptime(sim_entry_time, "%Y-%m-%d %H:%M:%S")
+                    gross_roe = price_change_pct * LEVERAGE
+                    net_roe = gross_roe - RT_FEE_ROE_PCT
+                    trade_result = {
+                        "mode": "SIMULATION",
+                        "entry_time": sim_entry_time,
+                        "exit_time": now_str,
+                        "type": sim_side,
+                        "entry_price": sim_entry_price,
+                        "exit_price": current_price,
+                        "price_change_pct": price_change_pct,
+                        "gross_roe": gross_roe,
+                        "rt_fee_pct": RT_FEE_ROE_PCT,
+                        "roe": net_roe,
+                        "duration": format_duration(start_dt, datetime.datetime.now()),
+                        "reason": reason,
+                        "strategy": f"4/4 Cond (Mom+HO Mandatory, ALL must agree) | SizeAlloc: {TRADE_BALANCE_PCT*100:.0f}%"
+                    }
+                    write_trade_to_journal(trade_result)
+                    clear_trade_state()
+                    saved_state = None
+                
+                loop_ms = (time.perf_counter() - loop_start) * 1000
+                log_timing("total_loop", loop_ms)
+                time.sleep(LOOP_SLEEP)
+                continue
 
-            ##################################################
-            ##################################################
+            # ══════════════════════════════════════════════════════════════════
+            # SIGNAL CHECKING & NEW TRADE ENTRY
+            # ══════════════════════════════════════════════════════════════════
+            if sig:
+                if loop_count % 20 == 0:
+                    print(f"\n[{now_str}] Price:{current_price:.2f} | Bal:{balance:.2f} USDT | No Position")
+                    print_conditions(sig)
 
+                if sig["is_long"] or sig["is_short"]:
+                    side = "buy" if sig["is_long"] else "sell"
+                    side_label = "long" if sig["is_long"] else "short"
+
+                    if API_CONNECTED and has_sufficient_balance:
+                        print(f"\n  >>> SIGNAL: {side_label.upper()} @ {current_price:.2f} — Executing LIVE order...")
+                        success = execute_entry(TRADE_SYMBOL, side, balance, current_price)
+                        if success:
+                            save_trade_state({
+                                "mode": "LIVE",
+                                "side": side_label,
+                                "entry_price": current_price,
+                                "entry_time": now_str
+                            })
+                            saved_state = {
+                                "mode": "LIVE",
+                                "side": side_label,
+                                "entry_price": current_price,
+                                "entry_time": now_str
+                            }
+                            sl_price, tp_price = calculate_sl_tp(current_price, side_label)
+                            print(f"  [LIVE ENTRY] {side_label.upper()} @ {current_price:.2f} | TP:{tp_price:.2f} SL:{sl_price:.2f}")
+                    else:
+                        if not API_CONNECTED:
+                            print(f"\n  >>> SIGNAL: {side_label.upper()} @ {current_price:.2f} — Opening SIMULATION position...")
+                        elif not has_sufficient_balance:
+                            print(f"\n  >>> SIGNAL: {side_label.upper()} @ {current_price:.2f} — Balance too low ({balance:.2f} < {MIN_BALANCE_USDT}), opening SIMULATION position...")
+                        
+                        save_trade_state({
+                            "mode": "SIMULATION",
+                            "side": side_label,
+                            "entry_price": current_price,
+                            "entry_time": now_str
+                        })
+                        saved_state = {
+                            "mode": "SIMULATION",
+                            "side": side_label,
+                            "entry_price": current_price,
+                            "entry_time": now_str
+                        }
+                        sl_price, tp_price = calculate_sl_tp(current_price, side_label)
+                        print(f"  [SIM ENTRY] {side_label.upper()} @ {current_price:.2f} | TP:{tp_price:.2f} SL:{sl_price:.2f}")
+
+            # ══════════════════════════════════════════════════════════════════
+            # TIMING & LOOP MAINTENANCE
+            # ══════════════════════════════════════════════════════════════════
+            loop_ms = (time.perf_counter() - loop_start) * 1000
+            log_timing("total_loop", loop_ms)
+            
+            if time.time() - last_timing_print >= 300:
+                print_timing_summary()
+                last_timing_print = time.time()
+            
+            time.sleep(LOOP_SLEEP)
+
+        except KeyboardInterrupt:
+            print("\n\n  [SHUTDOWN] Keyboard interrupt received.")
+            print_timing_summary()
+            fetcher.shutdown()
+            break
         except Exception as e:
-            print(f"An error occurred: {e}")
-            time.sleep(5)
+            print(f"  [LOOP ERROR] {e}")
+            time.sleep(2)
 
-        ##################################################
-        ##################################################
-
-        # Delete variables and elements to clean up for the next iteration
-        del response, data, price, current_time, current_close, momentum
-        del min_threshold, max_threshold, avg_mtf, momentum_signal, range_price
-        del current_reversal, next_reversal, forecast_direction, forecast_price_fft, future_price_regression
-        del x, slope, intercept, expected_price, last_close_price, forecast_result
-        del fast_price, medium_price, slow_price, forecasted_price, results
-        del momentum_values, normalized_momentum, positive_count, negative_count  
-        del closes, signal, close, candles, reversals, market_mood_type
-        del market_mood_fastfft, analysis_results
-
-        # Force garbage collection to free up memory
-        gc.collect()
-
-        ##################################################
-        ##################################################
-
-        ##################################################
-        ##################################################
-
-        time.sleep(5)
-        print()
-
-        ##################################################
-        ##################################################
-
-##################################################
-##################################################
-
-print()
-
-##################################################
-##################################################
-
-# Run the main function
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-##################################################
-##################################################
-
-
-print()
-##################################################
-##################################################
