@@ -496,6 +496,8 @@ def scale_to_sine(close_prices_5m, argmin_idx, argmax_idx):
 
 HARMONIC_FORECAST_BARS = 8      # bars ahead for TP-direction forecast (5m bars)
 HARMONIC_VROC_PERIOD   = 10     # bars for Volume Rate-of-Change (1m tick bars)
+HARMONIC_CYCLE_SECONDS = 3600.0 # full 6-stage ring = 1 hour total, wall-clock enforced
+HARMONIC_STAGE_SECONDS = HARMONIC_CYCLE_SECONDS / 6.0   # = 600s minimum hold per stage
 
 UP_QUAD_LABELS   = ["Q1u-REVERSAL-DIP", "Q2u-ACCUMULATION", "Q3u-PUMP", "Q4u-REVERSAL-TOP"]
 DOWN_QUAD_LABELS = ["Q4d-REVERSAL-TOP", "Q3d-DISTRIBUTION", "Q2d-FALLING", "Q1d-REVERSAL-DIP"]
@@ -529,7 +531,7 @@ _DOWN_LOCAL_TO_UNIFIED = {0: 3, 1: 4, 2: 5, 3: 0}
 # only ever holds or advances by exactly +1 (mod 6) per call. No more
 # per-circuit reset, so the boundary transition (Q4u -> Q3d, and Q2d -> Q1u)
 # is enforced correctly instead of jumping/wrapping incorrectly.
-_HO_STAGE_STATE = {"unified_idx": None}
+_HO_STAGE_STATE = {"unified_idx": None, "last_change_time": None}
 
 
 def _to_unified_idx(circuit_name, local_idx):
@@ -604,21 +606,41 @@ def _enforce_sequential_stage(circuit_name, raw_local_idx):
     call relative to the previous confirmed unified stage. This guarantees
     the true physical order Q1u->Q2u->Q3u->Q4u->Q3d->Q2d->Q1u(wrap) is
     always respected, with no skipped stages and no premature wrap.
+
+    WALL-CLOCK PACED: in addition to the order guard, each stage must hold
+    for at least HARMONIC_STAGE_SECONDS (= HARMONIC_CYCLE_SECONDS / 6,
+    i.e. 10 min so the full 6-stage ring = 1 hour total) of real elapsed
+    time before it is allowed to advance — no matter how often this is
+    called or how noisy the raw phase reading is. This is what fixes the
+    oscillator "moving too fast": stage advancement is now time-gated, not
+    purely call/event-gated.
+
     Returns (confirmed_unified_idx, prev_unified_idx).
     """
     state = _HO_STAGE_STATE
     raw_unified = _to_unified_idx(circuit_name, raw_local_idx)
     prev_unified = state["unified_idx"]
+    now = time.time()
 
     if prev_unified is None:
         state["unified_idx"] = raw_unified
+        state["last_change_time"] = now
         return raw_unified, raw_unified
 
     next_allowed = (prev_unified + 1) % N_UNIFIED_STAGES
-    if raw_unified == prev_unified or raw_unified == next_allowed:
+    elapsed = now - (state["last_change_time"] or now)
+
+    if elapsed < HARMONIC_STAGE_SECONDS:
+        # Still within this stage's minimum hold window — never advance,
+        # regardless of what the raw phase reading says.
+        confirmed = prev_unified
+    elif raw_unified == prev_unified or raw_unified == next_allowed:
         confirmed = raw_unified
     else:
         confirmed = next_allowed   # force single sequential step forward
+
+    if confirmed != prev_unified:
+        state["last_change_time"] = now
 
     state["unified_idx"] = confirmed
     return confirmed, prev_unified
@@ -720,13 +742,16 @@ def compute_harmonic_oscillator(candles_5m, close_arr_5m, live_price,
     confirmed_unified, prev_unified = _enforce_sequential_stage(circuit_name, raw_stage_idx)
     next_unified = (confirmed_unified + 1) % N_UNIFIED_STAGES
 
-    # Confirmed-quadrant phase boundaries (each EXACTLY 25% / 90° of its own
-    # circuit's cycle). raw_stage_idx is still the LOCAL (0-3) index used for
-    # the phase-percentage math below; the unified index above is only for
-    # display/sequencing across the UP<->DOWN boundary.
-    quad_lo = raw_stage_idx * 90.0
-    quad_progress_pct  = float(np.clip(((active_phase - quad_lo) / 90.0) * 100.0, 0.0, 100.0))
-    cycle_progress_pct = float(np.clip((active_phase / 360.0) * 100.0, 0.0, 100.0))
+    # Progress is now WALL-CLOCK based (ties to the 1h-total ring pacing in
+    # _enforce_sequential_stage) rather than raw-phase based — this is what
+    # the Q1u/Q4u 50% cycle-tag flip uses, so it must move at the same slow,
+    # steady real-time rate as stage advancement itself, not jump around
+    # with every noisy phase reading.
+    elapsed_in_stage  = time.time() - (_HO_STAGE_STATE["last_change_time"] or time.time())
+    quad_progress_pct  = float(np.clip((elapsed_in_stage / HARMONIC_STAGE_SECONDS) * 100.0, 0.0, 100.0))
+    cycle_progress_pct = float(np.clip(
+        ((confirmed_unified + elapsed_in_stage / HARMONIC_STAGE_SECONDS) / N_UNIFIED_STAGES) * 100.0,
+        0.0, 100.0))
 
     # Direction from the CONFIRMED unified stage, not raw phase, so binary
     # output always matches the displayed/enforced stage.
@@ -1383,34 +1408,4 @@ def main():
                             "entry_time": now_str
                         })
                         saved_state = {
-                            "mode": "SIMULATION",
-                            "side": side_label,
-                            "entry_price": current_price,
-                            "entry_time": now_str
-                        }
-                        sl_price, tp_price = calculate_sl_tp(current_price, side_label)
-                        print(f"  [SIM ENTRY] {side_label.upper()} @ {current_price:.2f} | TP:{tp_price:.2f} SL:{sl_price:.2f}")
-
-            # ══════════════════════════════════════════════════════════════════
-            # TIMING & LOOP MAINTENANCE
-            # ══════════════════════════════════════════════════════════════════
-            loop_ms = (time.perf_counter() - loop_start) * 1000
-            log_timing("total_loop", loop_ms)
-            
-            if time.time() - last_timing_print >= 300:
-                print_timing_summary()
-                last_timing_print = time.time()
-            
-            time.sleep(LOOP_SLEEP)
-
-        except KeyboardInterrupt:
-            print("\n\n  [SHUTDOWN] Keyboard interrupt received.")
-            print_timing_summary()
-            fetcher.shutdown()
-            break
-        except Exception as e:
-            print(f"  [LOOP ERROR] {e}")
-            time.sleep(2)
-
-if __name__ == "__main__":
-    main()
+                  
