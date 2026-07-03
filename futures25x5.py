@@ -36,7 +36,22 @@ POSITION SIZING:
   - Remaining 90% stays untouched.
 
 25x Leverage
-TP: +10% NET ROE (clean profit after round-trip fees) | SL: -10% ROE
+TP: +5.55% NET ROE (clean profit after round-trip fees)
+SL: DISABLED by default (USE_STOP_LOSS=False) — see CHANGELOG v7 below.
+
+  CHANGELOG v7 (risk model change):
+    * TP target lowered from 10% to 5.55% net ROE (faster, higher hit-rate
+      exits on the mean-reversion bounce).
+    * Stop loss disabled by default. Since each trade only ever commits
+      TRADE_BALANCE_PCT (10%) of total balance as margin, the worst-case loss
+      on any single trade is already capped at that 10% slice even without a
+      price-based SL - the other 90% of the account is never in the trade.
+      A hard-coded SL price on top of that account-level cap doesn't lower
+      total-balance risk further; it just risks getting whipsawed out on a
+      wick before the mean-reversion thesis plays out. The existing
+      "NEAR LIQUIDATION" safety close (roe <= -95%) still guards against an
+      actual liquidation event regardless of this setting. Set
+      USE_STOP_LOSS=True in the config section to restore price-based SL.
 
 MOMENTUM CONDITION:
   - Looks at last 200 momentum values
@@ -108,7 +123,7 @@ del _f
 gc.collect()
 clean_trades_file()
 
-print("HFT KuCoin Bot (25x / 10% net TP / 10% SL / ALL 8/8 CONDITIONS MUST AGREE) initialising...")
+print("HFT KuCoin Bot (25x / 5.55% net TP / SL DISABLED (position-sized risk cap) / ALL 8/8 CONDITIONS MUST AGREE) initialising...")
 if _cleaned:
     print(f"  [cleanup] Wiped: {', '.join(_cleaned)}")
 del _cleaned
@@ -213,12 +228,24 @@ ANALYSIS_WINDOW_3M = 400
 KUCOIN_TAKER_FEE = 0.0006
 RT_FEE_ROE_PCT = KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100  # round-trip fee cost in ROE% at this leverage
 
-# TP = +10% CLEAN/NET ROE (after round-trip fees are deducted) at 25x leverage.
-# SL = -10% ROE at 25x leverage.
-_TARGET_NET_ROE_PCT = 10.0
-_TARGET_SL_ROE_PCT  = 10.0
+# TP = net/clean ROE target (after round-trip fees are deducted) at 25x leverage.
+_TARGET_NET_ROE_PCT = 5.55
+_TARGET_SL_ROE_PCT  = 10.0   # only used if USE_STOP_LOSS is re-enabled below
 TP_PCT = (_TARGET_NET_ROE_PCT + KUCOIN_TAKER_FEE * 2 * LEVERAGE * 100) / (LEVERAGE * 100)
 SL_PCT = _TARGET_SL_ROE_PCT / (LEVERAGE * 100)
+
+# ── STOP LOSS: DISABLED by design ──
+# Each trade only commits TRADE_BALANCE_PCT (10%) of total balance as isolated
+# margin. Even in the absolute worst case - the position gets fully liquidated -
+# the loss is capped at that 10% margin slice; the other 90% of the account was
+# never in the trade and is never at risk. A price-based stop loss on top of
+# that account-level cap doesn't reduce total-balance risk any further, it just
+# whipsaws the bot out of positions on ordinary wicks before the mean-reversion
+# thesis (which is exactly what the 8/8 unanimous condition gate is built to
+# time) has a chance to play out. The "NEAR LIQUIDATION" safety close in the
+# main loop (roe <= -95%) remains active regardless, as a hard last-resort
+# backstop against an actual liquidation event.
+USE_STOP_LOSS = False
 
 ATR_PERIOD = 14
 FULL_REFRESH_INTERVAL = 3600
@@ -472,41 +499,56 @@ def calculate_atr(candles, period=14):
 
 def calculate_dynamic_sl_tp(entry_price, side, atr_value=0.0):
     """
-    FIX: previously accepted atr_value but never used it (fixed-percentage SL/TP
-    only). Now uses ATR when available: SL is placed at max(fixed %, ATR-based
-    distance) so stops aren't tighter than current volatility, and TP keeps the
-    same reward:risk ratio as the fee-aware fixed-percentage target.
-    """
-    sl_dist_fixed = entry_price * SL_PCT
-    tp_dist_fixed = entry_price * TP_PCT
+    TP: fixed net-ROE target (TP_PCT = 5.55% net after fees), independent of
+    SL/ATR - it's the profit level the mean-reversion bounce is expected to
+    reach, not a reward:risk multiple of a stop distance.
 
-    if atr_value and atr_value > 0:
-        atr_sl_dist = atr_value * 1.5  # don't place SL tighter than ~1.5x current volatility
-        sl_dist = max(sl_dist_fixed, atr_sl_dist)
-        # keep the same reward:risk ratio as the fee-aware fixed target
-        tp_dist = sl_dist * (tp_dist_fixed / sl_dist_fixed) if sl_dist_fixed > 0 else tp_dist_fixed
+    SL: DISABLED when USE_STOP_LOSS is False (the default - see config
+    section for rationale). sl_price is returned as 0.0 as a sentinel meaning
+    "no stop order" and check_dynamic_tp_sl() knows to skip the SL branch
+    entirely. If USE_STOP_LOSS is re-enabled, SL still uses
+    max(fixed %, 1.5x ATR) so stops aren't tighter than current volatility.
+    """
+    tp_dist = entry_price * TP_PCT
+
+    if USE_STOP_LOSS:
+        sl_dist_fixed = entry_price * SL_PCT
+        if atr_value and atr_value > 0:
+            sl_dist = max(sl_dist_fixed, atr_value * 1.5)
+        else:
+            sl_dist = sl_dist_fixed
     else:
-        sl_dist, tp_dist = sl_dist_fixed, tp_dist_fixed
+        sl_dist = 0.0
 
     if side == "long":
-        sl_price, tp_price = entry_price - sl_dist, entry_price + tp_dist
+        tp_price = entry_price + tp_dist
+        sl_price = (entry_price - sl_dist) if USE_STOP_LOSS else 0.0
     else:
-        sl_price, tp_price = entry_price + sl_dist, entry_price - tp_dist
+        tp_price = entry_price - tp_dist
+        sl_price = (entry_price + sl_dist) if USE_STOP_LOSS else 0.0
 
-    sl_roe = (sl_dist / entry_price) * 100 * LEVERAGE
     tp_roe = (tp_dist / entry_price) * 100 * LEVERAGE - RT_FEE_ROE_PCT
-    print(f"  [SL/TP] SL:-{(sl_dist/entry_price)*100:.3f}%={sl_dist:.2f} ({sl_roe:.1f}% ROE) | "
-          f"TP:+{(tp_dist/entry_price)*100:.3f}%={tp_dist:.2f} ({tp_roe:.1f}% net ROE) | ATR:{atr_value:.2f}")
+    sl_roe = (sl_dist / entry_price) * 100 * LEVERAGE if USE_STOP_LOSS else 0.0
+
+    if USE_STOP_LOSS:
+        print(f"  [SL/TP] SL:-{(sl_dist/entry_price)*100:.3f}%={sl_dist:.2f} ({sl_roe:.1f}% ROE) | "
+              f"TP:+{(tp_dist/entry_price)*100:.3f}%={tp_dist:.2f} ({tp_roe:.1f}% net ROE) | ATR:{atr_value:.2f}")
+    else:
+        print(f"  [SL/TP] SL: DISABLED (risk capped at {TRADE_BALANCE_PCT*100:.0f}% of balance via position "
+              f"sizing; liq-guard closes at -95% ROE) | TP:+{(tp_dist/entry_price)*100:.3f}%={tp_dist:.2f} "
+              f"({tp_roe:.1f}% net ROE) | ATR:{atr_value:.2f}")
+
     return float(sl_price), float(tp_price), sl_roe, tp_roe
 
 def check_dynamic_tp_sl(entry_price, current_price, side, sl_price, tp_price):
     hit, hit_type = False, None
+    sl_active = USE_STOP_LOSS and sl_price and sl_price > 0
     if side == "long":
         if current_price >= tp_price: hit, hit_type = True, "TP"
-        elif current_price <= sl_price: hit, hit_type = True, "SL"
+        elif sl_active and current_price <= sl_price: hit, hit_type = True, "SL"
     else:
         if current_price <= tp_price: hit, hit_type = True, "TP"
-        elif current_price >= sl_price: hit, hit_type = True, "SL"
+        elif sl_active and current_price >= sl_price: hit, hit_type = True, "SL"
     
     pcp = ((current_price - entry_price) / entry_price) * 100 if side == "long" else ((entry_price - current_price) / entry_price) * 100
     roe_pct = pcp * LEVERAGE - RT_FEE_ROE_PCT
@@ -961,7 +1003,8 @@ def main():
     print(f"HFT KuCoin Bot — ALL 8/8 CONDITIONS MUST AGREE TO TRIGGER")
     print(f"{'='*70}")
     print(f"Symbol: {TRADE_SYMBOL} | Leverage: {LEVERAGE}x | API: {API_CONNECTED}")
-    print(f"TP: +{TP_PCT*100:.3f}% price (~{_TARGET_NET_ROE_PCT:.0f}% net ROE, after fees) | SL: -{SL_PCT*100:.3f}% price (~{_TARGET_SL_ROE_PCT:.0f}% ROE)")
+    print(f"TP: +{TP_PCT*100:.3f}% price (~{_TARGET_NET_ROE_PCT:.2f}% net ROE, after fees) | "
+          f"SL: {'DISABLED - risk capped by ' + str(int(TRADE_BALANCE_PCT*100)) + '% position sizing; liq-guard @ -95% ROE' if not USE_STOP_LOSS else f'-{SL_PCT*100:.3f}% price (~{_TARGET_SL_ROE_PCT:.0f}% ROE)'}")
     print(f"Balance per trade: {TRADE_BALANCE_PCT*100:.0f}%")
     print(f"Conditions: Sine(1m) + Sine(5m) + Cycle(1m) + Mom(1m:{MOM_LOOKBACK}argmin/argmax) + "
           f"VolExh(1m:{VOLUME_LOOKBACK}) + 3mMid({MIDPOINT_LOOKBACK}) + RegrDev({ANGLE_LOOKBACK}) + ATR-Band({ATR_BAND_MULT}x)")
@@ -1017,12 +1060,12 @@ def main():
                 roe, side, ep, mp = pos["roe_pct"], pos["side"], pos["entry_price"], pos["mark_price"]
                 sl_p = saved_state.get("sl", 0.0) if saved_state else 0.0
                 tp_p = saved_state.get("tp", 0.0) if saved_state else 0.0
-                if sl_p <= 0 or tp_p <= 0:
+                if tp_p <= 0:
                     sl_p, tp_p, _, _ = calculate_dynamic_sl_tp(ep, side, sig["atr_value"] if sig else 0.0)
                 
                 if loop_count % 10 == 0:
                     print(f"\n[{now_str}] === LIVE {side.upper()} | Entry:{ep:.2f} Mark:{mp:.2f} ROE:{roe:+.2f}% ===")
-                    print(f"  SL:{sl_p:.2f} TP:{tp_p:.2f}")
+                    print(f"  SL:{'DISABLED (liq-guard @ -95% ROE)' if not USE_STOP_LOSS or sl_p <= 0 else f'{sl_p:.2f}'} TP:{tp_p:.2f}")
                     if sig: print_conditions(sig)
                 
                 hit, reason, _ = check_dynamic_tp_sl(ep, mp, side, sl_p, tp_p)
@@ -1057,7 +1100,7 @@ def main():
                 
                 if loop_count % 10 == 0:
                     print(f"\n[{now_str}] === SIM {s_side.upper()} | Entry:{s_ep:.2f} Now:{cur_p:.2f} ROE:{s_roe:+.2f}% ===")
-                    print(f"  SL:{s_sl:.2f} TP:{s_tp:.2f}")
+                    print(f"  SL:{'DISABLED (liq-guard @ -95% ROE)' if not USE_STOP_LOSS or s_sl <= 0 else f'{s_sl:.2f}'} TP:{s_tp:.2f}")
                     if sig: print_conditions(sig)
                 
                 if not hit and s_roe >= 100: hit, reason = True, "EXTREME PROFIT"
