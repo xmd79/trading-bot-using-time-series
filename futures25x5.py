@@ -647,10 +647,63 @@ def get_atr_band_reversal_condition(candles, current_price, atr_period=ATR_PERIO
 
     recent_candles = candles[-breach_lookback:] if breach_lookback > 0 else []
 
-    # stretched below band (live tick OR a recent candle's wick low) -> oversold -> LONG
-    c_atr_l = current_price < lower_band or any(c["low"] < lower_band for c in recent_candles)
-    # stretched above band (live tick OR a recent candle's wick high) -> overbought -> SHORT
-    c_atr_s = current_price > upper_band or any(c["high"] > upper_band for c in recent_candles)
+    # FIX (mutual exclusivity): previously c_atr_l and c_atr_s were each an
+    # independent `any()` over the lookback window, so a whipsaw inside that
+    # window (e.g. wicked below lower_band 3 candles ago, then above
+    # upper_band 1 candle ago) could set BOTH True at once — a binary-vote
+    # condition must never do that. Now we find the single MOST RECENT
+    # breach event (live tick counts as "now" and wins ties) and only that
+    # side is allowed to be True.
+
+    lower_breach_idx = None
+    for i in range(len(recent_candles) - 1, -1, -1):
+        if recent_candles[i]["low"] < lower_band:
+            lower_breach_idx = i
+            break
+
+    upper_breach_idx = None
+    for i in range(len(recent_candles) - 1, -1, -1):
+        if recent_candles[i]["high"] > upper_band:
+            upper_breach_idx = i
+            break
+
+    live_lower = current_price < lower_band
+    live_upper = current_price > upper_band
+
+    def _recency(live_flag, idx):
+        if live_flag:
+            return len(recent_candles)   # "now" = most recent possible
+        if idx is not None:
+            return idx
+        return -1                         # no breach at all
+
+    lower_recency = _recency(live_lower, lower_breach_idx)
+    upper_recency = _recency(live_upper, upper_breach_idx)
+
+    if lower_recency > upper_recency:
+        c_atr_l, c_atr_s = True, False
+    elif upper_recency > lower_recency:
+        c_atr_l, c_atr_s = False, True
+    else:
+        # NEITHER band breached (both recency == -1) — the previous version
+        # returned (False, False) here, which the user flagged as still not
+        # truly binary: they want EXACTLY one side True on every call, no
+        # both-False case either. So when there's no breach to arbitrate,
+        # fall back to which side of the band midpoint (`ma`) price is
+        # currently on. This makes the condition a strict XOR instead of a
+        # pure breach detector — it always casts a vote.
+        #
+        # NOTE: this changes what the condition means for the unanimous
+        # 8/8 vote. As a pure breach detector it silently abstained
+        # (False,False) most of the time, meaning it rarely blocked or
+        # rarely gated the vote by itself. Forced to always vote, it now
+        # ALWAYS agrees with "price below mid -> long lean, above mid ->
+        # short lean", which is a much weaker/noisier signal on quiet bars.
+        # If ties should instead not exist because live_lower/live_upper
+        # can't both be true (which is why the exact-tie branch above was
+        # removed) — the only remaining tie is genuinely "no breach", which
+        # is now the midpoint fallback below.
+        c_atr_l, c_atr_s = (current_price <= ma), (current_price > ma)
 
     return c_atr_l, c_atr_s, atr_value, ma, lower_band, upper_band
 
